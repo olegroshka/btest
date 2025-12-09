@@ -6,6 +6,7 @@ It assumes all DSL primitives and the run_backtest() function are implemented.
 """
 
 from dataclasses import asdict
+import os
 
 from quantdsl_backtest.dsl.strategy import Strategy
 from quantdsl_backtest.dsl.data_config import DataConfig
@@ -67,7 +68,7 @@ def build_strategy() -> Strategy:
     # 1. Data configuration
     # -----------------------
     data_cfg = DataConfig(
-        source="parquet://equities/sp500_daily",  # you’ll implement the adapter later
+        source="parquet://equities/sp500_daily",  # implement the adapter later
         calendar="XNYS",
         frequency="1d",
         start="2015-01-01",
@@ -331,13 +332,41 @@ def main():
     print(f"Max drawdown: {result.metrics['max_drawdown']:.2%}")
     print(f"Turnover (annualized): {result.metrics['turnover_annual']:.2f}")
 
-    # You might expose plotting helpers on result:
-    # result.plot_equity_curve()
-    # result.plot_exposures()
-    # result.plot_drawdowns()
+    # Outputs directory (used for both images and parquet exports)
+    out_dir = "outputs/mom_long_short_sp500/"
+    os.makedirs(out_dir, exist_ok=True)
 
-    # Or export detailed outputs:
-    # result.to_parquet("outputs/mom_long_short_sp500/")
+    # Generate plots and save them as PNG files in outputs
+    try:
+        import matplotlib.pyplot as plt
+
+        ax_eq = result.plot_equity_curve()
+        ax_exp = result.plot_exposures()
+        ax_dd = result.plot_drawdowns()
+
+        plot_files = [
+            ("equity_curve.png", ax_eq),
+            ("exposures.png", ax_exp),
+            ("drawdowns.png", ax_dd),
+        ]
+        for fname, ax in plot_files:
+            fpath = os.path.join(out_dir, fname)
+            ax.figure.savefig(fpath, dpi=150, bbox_inches="tight")
+            print(f"Saved plot: {fpath}")
+
+        # Optionally show plots if the environment variable is set
+        if str(os.environ.get("SHOW_PLOTS", "0")).lower() in ("1", "true", "yes"): 
+            plt.show()
+        else:
+            # Close figures when not showing to free resources
+            for _, ax in plot_files:
+                plt.close(ax.figure)
+    except RuntimeError as e:
+        # If matplotlib is not installed, continue without plotting
+        print(f"Plotting skipped: {e}")
+
+    # Export detailed tabular outputs
+    result.to_parquet(out_dir)
 
 
 if __name__ == "__main__":

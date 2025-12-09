@@ -205,6 +205,7 @@ class BacktestResult:
               metadata.parquet     (key/value as small table)
         """
         import os
+        import json
 
         os.makedirs(path, exist_ok=True)
 
@@ -215,13 +216,28 @@ class BacktestResult:
         if include_trades:
             self.trades.to_parquet(os.path.join(path, "trades.parquet"))
 
-        # Save metrics + metadata as a tiny table
+        # Save metrics + metadata as a tiny table.
+        # Ensure the 'value' column is STRING to avoid pyarrow mixed-type errors.
+        def _serialize_value(val) -> str:
+            try:
+                # Preserve timestamps nicely
+                if hasattr(val, "isoformat"):
+                    return val.isoformat()
+                # Basic scalars
+                if isinstance(val, (int, float, bool, str)) or val is None:
+                    return json.dumps(val)
+                # Try JSON for dict/list/np types
+                return json.dumps(val, default=str)
+            except Exception:
+                return str(val)
+
         meta_records = []
         for k, v in self.metrics.items():
-            meta_records.append({"key": f"metric:{k}", "value": v})
+            meta_records.append({"key": f"metric:{k}", "value": _serialize_value(v)})
         for k, v in self.metadata.items():
-            meta_records.append({"key": f"meta:{k}", "value": v})
-        meta_df = pd.DataFrame(meta_records)
+            meta_records.append({"key": f"meta:{k}", "value": _serialize_value(v)})
+
+        meta_df = pd.DataFrame(meta_records, columns=["key", "value"]).astype({"key": "string", "value": "string"})
         meta_df.to_parquet(os.path.join(path, "metadata.parquet"))
 
     # ----------------------------------------------------------------------
@@ -241,52 +257,187 @@ class BacktestResult:
 
     def plot_equity(self, ax=None) -> Any:
         """
-        Quick equity curve plot. We do a lazy import of matplotlib so this
-        method doesn't force matplotlib as a hard dependency for headless use.
+        Professional-looking equity curve plot.
+
+        - Lazy-imports matplotlib
+        - Applies a clean style and grid
+        - Uses concise date formatting
+        - Returns the provided/new axis without calling plt.show()
         """
         try:
             import matplotlib.pyplot as plt
+            import matplotlib.dates as mdates
         except ImportError as exc:
             raise RuntimeError(
                 "matplotlib is required for plot_equity(), "
                 "please install it (e.g. `pip install matplotlib`)."
             ) from exc
 
+        # Apply a modern style without requiring seaborn package
+        try:
+            plt.style.use("seaborn-v0_8-whitegrid")
+        except Exception:
+            # Fallback to basic style if not available in older matplotlib
+            plt.style.use("default")
+
+        created_fig = False
         if ax is None:
-            _, ax = plt.subplots()
+            _, ax = plt.subplots(figsize=(10, 5))
+            created_fig = True
 
-        self.equity.plot(ax=ax, label="Equity")
+        # Plot lines with consistent palette and thicker linewidths
+        ax.plot(self.equity.index, self.equity.astype(float).values,
+                label="Equity", color="#1f77b4", linewidth=2.0)
         if self.benchmark is not None:
-            self.benchmark.plot(ax=ax, label="Benchmark", linestyle="--")
+            try:
+                ax.plot(self.benchmark.index, self.benchmark.astype(float).values,
+                        label="Benchmark", color="#2ca02c", linestyle="--", linewidth=1.6)
+            except Exception:
+                # Be tolerant to odd benchmark types
+                self.benchmark.plot(ax=ax, label="Benchmark", linestyle="--", linewidth=1.6)
 
-        ax.set_title("Equity Curve")
+        # Formatting
+        locator = mdates.AutoDateLocator()
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+        ax.grid(True, linestyle="--", linewidth=0.6, alpha=0.6)
+        ax.margins(x=0)
+
+        # Labels and legend
+        ax.set_title("Equity Curve", fontsize=12, pad=10)
         ax.set_xlabel("Date")
         ax.set_ylabel("NAV")
-        ax.legend()
+        ax.legend(loc="best", frameon=False)
+
+        # Lighten spines for a cleaner look
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+
+        if created_fig:
+            plt.tight_layout()
         return ax
 
     def plot_exposure(self, ax=None) -> Any:
         """
-        Plot gross/net/long/short exposures over time.
+        Professional-looking plot of gross/net/long/short exposures over time.
         """
         try:
             import matplotlib.pyplot as plt
+            import matplotlib.dates as mdates
         except ImportError as exc:
             raise RuntimeError(
                 "matplotlib is required for plot_exposure(), "
                 "please install it (e.g. `pip install matplotlib`)."
             ) from exc
 
+        # Style
+        try:
+            plt.style.use("seaborn-v0_8-whitegrid")
+        except Exception:
+            plt.style.use("default")
+
+        created_fig = False
         if ax is None:
-            _, ax = plt.subplots()
+            _, ax = plt.subplots(figsize=(10, 5))
+            created_fig = True
 
-        self.long_exposure.plot(ax=ax, label="Long")
-        self.short_exposure.plot(ax=ax, label="Short")
-        self.net_exposure.plot(ax=ax, label="Net")
-        self.gross_exposure.plot(ax=ax, label="Gross")
+        # Consistent colors
+        ax.plot(self.long_exposure.index, self.long_exposure.astype(float).values,
+                label="Long", color="#2ca02c", linewidth=1.8)
+        ax.plot(self.short_exposure.index, self.short_exposure.astype(float).values,
+                label="Short", color="#d62728", linewidth=1.8)
+        ax.plot(self.net_exposure.index, self.net_exposure.astype(float).values,
+                label="Net", color="#9467bd", linewidth=1.8)
+        ax.plot(self.gross_exposure.index, self.gross_exposure.astype(float).values,
+                label="Gross", color="#7f7f7f", linewidth=1.6)
 
-        ax.set_title("Exposures")
+        locator = mdates.AutoDateLocator()
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+        ax.grid(True, linestyle="--", linewidth=0.6, alpha=0.6)
+        ax.margins(x=0)
+
+        ax.set_title("Exposures", fontsize=12, pad=10)
         ax.set_xlabel("Date")
         ax.set_ylabel("Exposure (notional)")
-        ax.legend()
+        ax.legend(loc="best", frameon=False, ncol=2)
+
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+
+        if created_fig:
+            plt.tight_layout()
+        return ax
+
+    # ------------------------------------------------------------------
+    # Friendly aliases requested by examples
+    # ------------------------------------------------------------------
+
+    def plot_equity_curve(self, ax=None) -> Any:
+        """Alias for plot_equity()."""
+        return self.plot_equity(ax=ax)
+
+    def plot_exposures(self, ax=None) -> Any:
+        """Alias for plot_exposure()."""
+        return self.plot_exposure(ax=ax)
+
+    def plot_drawdowns(self, ax=None) -> Any:
+        """
+        Professional drawdown plot derived from the equity curve.
+
+        Drawdown is computed as: equity / rolling_max(equity) - 1.
+        Plotted as a filled area below zero for clarity.
+        """
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib.dates as mdates
+        except ImportError as exc:
+            raise RuntimeError(
+                "matplotlib is required for plot_drawdowns(), "
+                "please install it (e.g. `pip install matplotlib`)."
+            ) from exc
+
+        try:
+            plt.style.use("seaborn-v0_8-whitegrid")
+        except Exception:
+            plt.style.use("default")
+
+        created_fig = False
+        if ax is None:
+            _, ax = plt.subplots(figsize=(10, 4.5))
+            created_fig = True
+
+        eq = self.equity.astype(float)
+        roll_max = eq.cummax()
+        dd = (eq / roll_max) - 1.0  # negative numbers
+        dd_pct = dd * 100.0
+
+        # Filled area under zero for visual impact
+        ax.fill_between(dd_pct.index, dd_pct.values, 0.0, color="crimson", alpha=0.30)
+        ax.plot(dd_pct.index, dd_pct.values, color="crimson", linewidth=1.2, label="Drawdown (%)")
+
+        locator = mdates.AutoDateLocator()
+        formatter = mdates.ConciseDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+        ax.axhline(0.0, color="black", linewidth=0.8)
+        ax.grid(True, linestyle="--", linewidth=0.6, alpha=0.6)
+        ax.margins(x=0)
+
+        # Y-limits slightly above zero to emphasize downside
+        ymin = float(min(-1.0, dd_pct.min() * 1.05))  # cap at -100% or slightly lower than min
+        ax.set_ylim(ymin, 2.0)
+
+        ax.set_title("Drawdowns", fontsize=12, pad=10)
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Drawdown (%)")
+        ax.legend(loc="best", frameon=False)
+
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+
+        if created_fig:
+            plt.tight_layout()
         return ax
