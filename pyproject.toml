@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantdsl-backtest"
+version = "0.1.0"
+description = "Experimental internal DSL for trading strategy backtesting."
+readme = "README.md"
+requires-python = "==3.11.*"
+
+# Core runtime dependencies
+dependencies = [
+  "pandas>=2.0",
+  "numpy>=1.23,<1.24",
+  "pandas-stubs==2.3.3.251201",
+  "vectorbt>=0.28",      # core backtesting & YFData
+  "yfinance>=0.2.40",    # Yahoo backend used by vectorbt.YFData
+  "plotly>=5.0",         # for plots from pf.plot(), etc.
+  "pyarrow",             # for efficient data storage
+  "lxml",                # for XML parsing
+]
+
+[project.optional-dependencies]
+dev = [
+  "ipykernel",
+  "pytest",
+  "pytest>=8.0",
+  "mypy>=1.10",
+  "black>=24.0",
+  "isort>=5.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/olegroshka/btest"
+Repository = "https://github.com/olegroshka/btest"

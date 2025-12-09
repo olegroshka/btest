@@ -1,0 +1,292 @@
+# src/quantdsl_backtest/engine/results.py
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, asdict
+from typing import Any, Dict, Optional, Sequence, Tuple
+
+import pandas as pd
+
+
+@dataclass(slots=True)
+class BacktestResult:
+    """
+    Comprehensive backtest result container.
+
+    This is designed to support:
+      - Equity curve / returns analysis
+      - Exposure & leverage analysis
+      - Position & trade-level analysis
+      - Easy export to DataFrames / Parquet
+      - Light plotting helpers for quick inspection
+
+    Conventions:
+      - All time series are indexed by a DatetimeIndex aligned on bar end.
+      - `positions` / `weights` are wide DataFrames (columns = instruments).
+      - `trades` is a long DataFrame with one row per execution.
+    """
+
+    # ---- Core P&L series ---------------------------------------------------
+    equity: pd.Series              # NAV over time
+    returns: pd.Series             # period returns, aligned with equity.index
+    cash: pd.Series                # cash balance
+
+    # ---- Exposure / leverage ----------------------------------------------
+    gross_exposure: pd.Series      # |long| + |short|
+    net_exposure: pd.Series        # long - short
+    long_exposure: pd.Series       # long-only exposure
+    short_exposure: pd.Series      # short-only (negative) exposure
+    leverage: pd.Series            # gross_exposure / equity
+
+    # ---- Positions & weights -----------------------------------------------
+    positions: pd.DataFrame        # units (shares / contracts) per instrument
+    weights: pd.DataFrame          # weights (exposure / equity) per instrument
+
+    # ---- Trades -----------------------------------------------------------
+    trades: pd.DataFrame
+    """
+    Expected columns (engine can add more):
+
+        datetime : Timestamp (index or column)
+        instrument : str
+        side : {"BUY", "SELL", "SHORT", "COVER"} or similar
+        quantity : float  (signed or absolute; your choice, but be consistent)
+        price : float
+        notional : float
+        slippage : float      (slippage cost for this trade, in PnL units)
+        commission : float
+        fees : float
+        realized_pnl : float  (if you track it trade-by-trade)
+        order_id : optional
+        trade_id : optional
+    """
+
+    # ---- Metrics & metadata -----------------------------------------------
+    metrics: Dict[str, float]      # summary metrics: sharpe, max_dd, etc.
+    start_date: pd.Timestamp
+    end_date: pd.Timestamp
+    benchmark: Optional[pd.Series] = None   # optional benchmark equity/returns
+
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    """
+    Free-form metadata, e.g.:
+        "strategy_name": str
+        "data_source": str
+        "parameters": dict
+        "run_id": str
+        etc.
+    """
+
+    # ----------------------------------------------------------------------
+    # Convenience properties
+    # ----------------------------------------------------------------------
+
+    @property
+    def index(self) -> pd.DatetimeIndex:
+        """The primary time index of the backtest (equity index)."""
+        return self.equity.index
+
+    @property
+    def total_return(self) -> float:
+        """Total return over the full period."""
+        if len(self.equity) < 2:
+            return 0.0
+        return float(self.equity.iloc[-1] / self.equity.iloc[0] - 1.0)
+
+    # ----------------------------------------------------------------------
+    # Slicing / subsetting
+    # ----------------------------------------------------------------------
+
+    def slice(self, start: Optional[str] = None, end: Optional[str] = None) -> "BacktestResult":
+        """
+        Return a new BacktestResult restricted to [start, end].
+
+        `start` and `end` can be anything pandas can parse as a Timestamp.
+        """
+        if start is not None:
+            start_ts = pd.to_datetime(start)
+        else:
+            start_ts = self.index[0]
+
+        if end is not None:
+            end_ts = pd.to_datetime(end)
+        else:
+            end_ts = self.index[-1]
+
+        mask = (self.index >= start_ts) & (self.index <= end_ts)
+
+        # Helper to slice Series/DataFrames that share the main index
+        def _slice_ts(obj):
+            return obj.loc[mask] if len(obj) > 0 else obj
+
+        # Slice trades separately by datetime column or index
+        trades = self.trades
+        if not trades.empty:
+            if "datetime" in trades.columns:
+                tmask = (trades["datetime"] >= start_ts) & (trades["datetime"] <= end_ts)
+                trades = trades.loc[tmask]
+            elif isinstance(trades.index, pd.DatetimeIndex):
+                trades = trades.loc[start_ts:end_ts]
+
+        return BacktestResult(
+            equity=_slice_ts(self.equity),
+            returns=_slice_ts(self.returns),
+            cash=_slice_ts(self.cash),
+            gross_exposure=_slice_ts(self.gross_exposure),
+            net_exposure=_slice_ts(self.net_exposure),
+            long_exposure=_slice_ts(self.long_exposure),
+            short_exposure=_slice_ts(self.short_exposure),
+            leverage=_slice_ts(self.leverage),
+            positions=_slice_ts(self.positions),
+            weights=_slice_ts(self.weights),
+            trades=trades,
+            metrics=dict(self.metrics),  # metrics are global; you can recompute if needed
+            start_date=start_ts,
+            end_date=end_ts,
+            benchmark=self.benchmark.loc[start_ts:end_ts] if self.benchmark is not None else None,
+            metadata=dict(self.metadata),
+        )
+
+    # ----------------------------------------------------------------------
+    # Export helpers
+    # ----------------------------------------------------------------------
+
+    def equity_frame(self) -> pd.DataFrame:
+        """Return a DataFrame with the core equity & exposure series."""
+        df = pd.DataFrame(
+            {
+                "equity": self.equity,
+                "returns": self.returns,
+                "cash": self.cash,
+                "gross_exposure": self.gross_exposure,
+                "net_exposure": self.net_exposure,
+                "long_exposure": self.long_exposure,
+                "short_exposure": self.short_exposure,
+                "leverage": self.leverage,
+            }
+        )
+        if self.benchmark is not None:
+            df["benchmark"] = self.benchmark
+        return df
+
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert result into a JSON-serializable dict skeleton.
+        (Note: large time-series will be converted via .to_dict())
+        """
+        return {
+            "equity": self.equity.to_dict(),
+            "returns": self.returns.to_dict(),
+            "cash": self.cash.to_dict(),
+            "gross_exposure": self.gross_exposure.to_dict(),
+            "net_exposure": self.net_exposure.to_dict(),
+            "long_exposure": self.long_exposure.to_dict(),
+            "short_exposure": self.short_exposure.to_dict(),
+            "leverage": self.leverage.to_dict(),
+            "positions": {c: self.positions[c].to_dict() for c in self.positions.columns},
+            "weights": {c: self.weights[c].to_dict() for c in self.weights.columns},
+            "trades": self.trades.to_dict(orient="records"),
+            "metrics": dict(self.metrics),
+            "start_date": self.start_date.isoformat(),
+            "end_date": self.end_date.isoformat(),
+            "benchmark": self.benchmark.to_dict() if self.benchmark is not None else None,
+            "metadata": self.metadata,
+        }
+
+    def to_parquet(self, path: str, include_trades: bool = True, include_positions: bool = True) -> None:
+        """
+        Save the result to a folder of Parquet files:
+
+            path/
+              equity.parquet
+              positions.parquet
+              weights.parquet
+              trades.parquet       (optional)
+              metadata.parquet     (key/value as small table)
+        """
+        import os
+
+        os.makedirs(path, exist_ok=True)
+
+        self.equity_frame().to_parquet(os.path.join(path, "equity.parquet"))
+        if include_positions:
+            self.positions.to_parquet(os.path.join(path, "positions.parquet"))
+            self.weights.to_parquet(os.path.join(path, "weights.parquet"))
+        if include_trades:
+            self.trades.to_parquet(os.path.join(path, "trades.parquet"))
+
+        # Save metrics + metadata as a tiny table
+        meta_records = []
+        for k, v in self.metrics.items():
+            meta_records.append({"key": f"metric:{k}", "value": v})
+        for k, v in self.metadata.items():
+            meta_records.append({"key": f"meta:{k}", "value": v})
+        meta_df = pd.DataFrame(meta_records)
+        meta_df.to_parquet(os.path.join(path, "metadata.parquet"))
+
+    # ----------------------------------------------------------------------
+    # Summary & plotting
+    # ----------------------------------------------------------------------
+
+    def summary(self) -> pd.Series:
+        """
+        Return a pandas Series with key summary metrics. This is handy
+        for printing/logging or quick inspection in a notebook.
+        """
+        s = pd.Series(self.metrics).copy()
+        s["start_date"] = self.start_date
+        s["end_date"] = self.end_date
+        s["total_return"] = self.total_return
+        return s
+
+    def plot_equity(self, ax=None) -> Any:
+        """
+        Quick equity curve plot. We do a lazy import of matplotlib so this
+        method doesn't force matplotlib as a hard dependency for headless use.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as exc:
+            raise RuntimeError(
+                "matplotlib is required for plot_equity(), "
+                "please install it (e.g. `pip install matplotlib`)."
+            ) from exc
+
+        if ax is None:
+            _, ax = plt.subplots()
+
+        self.equity.plot(ax=ax, label="Equity")
+        if self.benchmark is not None:
+            self.benchmark.plot(ax=ax, label="Benchmark", linestyle="--")
+
+        ax.set_title("Equity Curve")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("NAV")
+        ax.legend()
+        return ax
+
+    def plot_exposure(self, ax=None) -> Any:
+        """
+        Plot gross/net/long/short exposures over time.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError as exc:
+            raise RuntimeError(
+                "matplotlib is required for plot_exposure(), "
+                "please install it (e.g. `pip install matplotlib`)."
+            ) from exc
+
+        if ax is None:
+            _, ax = plt.subplots()
+
+        self.long_exposure.plot(ax=ax, label="Long")
+        self.short_exposure.plot(ax=ax, label="Short")
+        self.net_exposure.plot(ax=ax, label="Net")
+        self.gross_exposure.plot(ax=ax, label="Gross")
+
+        ax.set_title("Exposures")
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Exposure (notional)")
+        ax.legend()
+        return ax
