@@ -189,3 +189,53 @@ def test_powerlaw_slippage_exponent_and_k_affect_exec_price():
     # Cash equals -notional (no commission/fees)
     expected_cash = -expected_exec_price * qty
     assert np.isclose(cash_delta, expected_cash, rtol=1e-12, atol=1e-8)
+
+
+def test_per_share_commission_and_skip_invalid_instruments():
+    # Three instruments: one buy, one sell, one invalid (NaN price)
+    names = ["A", "B", "C"]
+    date = pd.Timestamp("2020-01-02")
+    equity = 1000.0
+    prices = pd.Series({"A": 100.0, "B": 100.0, "C": np.nan})
+    volumes = pd.Series({"A": 1_000_000.0, "B": 1_000_000.0, "C": 1_000_000.0})
+    prev_pos = pd.Series(0.0, index=names)
+    target_w = pd.Series({"A": 0.5, "B": -0.5, "C": 0.5})
+
+    execution = _exec(unlimited=True)
+    commission = Commission(type="per_share", amount=0.01)  # $0.01 per share
+    fees = StaticFees(nav_fee_annual=0.0, perf_fee_fraction=0.0)
+
+    new_pos, cash_delta, trades = rebalance_to_target_weights(
+        date,
+        execution,
+        commission,
+        fees,
+        equity,
+        prices,
+        volumes,
+        prev_pos,
+        target_w,
+    )
+
+    # A: +5 shares, B: -5 shares, C skipped due to NaN price
+    assert np.isclose(new_pos["A"], 5.0)
+    assert np.isclose(new_pos["B"], -5.0)
+    assert np.isclose(new_pos.get("C", 0.0), 0.0)
+
+    # Two trades only
+    assert len(trades) == 2
+    assert set(trades["instrument"]) == {"A", "B"}
+
+    # Cash delta includes per-share commissions: 0.01 * (|5| + |5|) = 0.10
+    slip_frac = execution.slippage.base_bps / 1e4
+    buy_exec = 100.0 * (1 + slip_frac)
+    sell_exec = 100.0 * (1 - slip_frac)
+    notional_buy = buy_exec * 5.0
+    notional_sell = sell_exec * -5.0
+    expected_comm = 0.01 * (abs(5.0) + abs(-5.0))
+    expected_cash = -(notional_buy + expected_comm) - (notional_sell + expected_comm - expected_comm)  # careful below
+    # Simpler: compute from trades table
+    calc_cash = 0.0
+    for _, tr in trades.iterrows():
+        calc_cash += -(tr["notional"]) - tr["commission"]
+    assert np.isclose(cash_delta, calc_cash, rtol=1e-12, atol=1e-10)

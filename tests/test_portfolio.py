@@ -95,3 +95,29 @@ def test_turnover_limit_scales_towards_target():
     # Turnover from zero = 0.5 * sum(|target|) = 0.5 * 2 = 1.0 -> scale = 0.2
     expected = unconstrained * 0.2
     pd.testing.assert_series_equal(tw, expected)
+
+
+def test_selection_fallback_fills_from_unmasked_pool_when_insufficient():
+    # Construct situation where long mask allows only 1 of top 2; should fill from unmasked pool
+    idx = pd.date_range("2020-01-01", periods=1, freq="D")
+    names = ["A", "B", "C", "D"]
+    # Rankings descending: A(0.9) > B(0.8) > C(0.7) > D(0.6)
+    ranks = [[0.9, 0.8, 0.7, 0.6]]
+    # Long mask: only B passes (exclude A)
+    long_mask_rows = [[False, True, False, False]]
+    # Short mask: only D passes (exclude C)
+    short_mask_rows = [[False, False, False, True]]
+    sigs = _make_signals(idx, names, ranks, long_mask_rows=long_mask_rows, short_mask_rows=short_mask_rows)
+
+    portfolio = _portfolio(n_long=2, n_short=2, gross=2.0, net=0.0, max_abs=1.0)
+    prev_w = pd.Series(0.0, index=names)
+
+    tw = compute_target_weights_for_date(idx[0], portfolio, sigs, prev_w)
+
+    # Longs: B (masked) plus next best from unmasked pool excluding B -> A
+    # Shorts: D (masked) plus next worst from unmasked pool excluding D -> C
+    expected = pd.Series(0.0, index=names, dtype=float)
+    expected[["B", "A"]] = 0.5
+    expected[["D", "C"]] = -0.5
+
+    pd.testing.assert_series_equal(tw, expected)
