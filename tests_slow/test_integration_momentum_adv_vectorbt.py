@@ -321,7 +321,6 @@ def test_momentum_ls_with_signal_delay_matches_vectorbt():
 
     equity_vbt = pf.value(group_by=True)
     returns_vbt = pf.returns(group_by=True)
-    weights_vbt = pf.asset_value().div(pf.value(), axis=0).fillna(0.0)
 
     equity_dsl = result.equity
     returns_dsl = result.returns
@@ -348,7 +347,8 @@ def test_momentum_ls_with_signal_delay_matches_vectorbt():
 
     # Log comparable metrics for both frameworks
     metrics_dsl = compute_basic_metrics(returns_dsl, equity_dsl, result.weights)
-    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights_vbt)
+    # Use the baseline target weights fed into vectorbt for correct turnover
+    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights)
     log.info("[Metrics] DSL (delay): %s", metrics_dsl)
     log.info("[Metrics] vectorbt (delay): %s", metrics_vbt)
 
@@ -372,7 +372,6 @@ def test_momentum_ls_with_commission_and_turnover_matches_vectorbt():
 
     equity_vbt = pf.value(group_by=True)
     returns_vbt = pf.returns(group_by=True)
-    weights_vbt = pf.asset_value().div(pf.value(), axis=0).fillna(0.0)
 
     equity_dsl = result.equity
     returns_dsl = result.returns
@@ -399,6 +398,7 @@ def test_momentum_ls_with_commission_and_turnover_matches_vectorbt():
 
     # Log comparable metrics for both frameworks
     metrics_dsl = compute_basic_metrics(returns_dsl, equity_dsl, result.weights)
-    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights_vbt)
+    # Use the baseline target weights fed into vectorbt for correct turnover
+    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights)
     log.info("[Metrics] DSL (fees+turnover): %s", metrics_dsl)
     log.info("[Metrics] vectorbt (fees+turnover): %s", metrics_vbt)

@@ -232,7 +232,7 @@ def build_simple_momentum_ls_strategy() -> Strategy:
     )
 
 
-def _build_vectorbt_baseline(prices: pd.DataFrame) -> vbt.Portfolio:
+def _build_vectorbt_baseline(prices: pd.DataFrame) -> tuple[vbt.Portfolio, pd.DataFrame]:
     """
     Build a vectorbt portfolio that implements the exact same
     simple momentum L/S strategy as build_simple_momentum_ls_strategy().
@@ -279,7 +279,7 @@ def _build_vectorbt_baseline(prices: pd.DataFrame) -> vbt.Portfolio:
         freq="1D",
     )
 
-    return pf
+    return pf, weights
 
 
 @pytest.mark.slow
@@ -305,13 +305,11 @@ def test_simple_momentum_long_short_matches_vectorbt():
     ).sort_index()
 
     # Run vectorbt baseline
-    pf = _build_vectorbt_baseline(prices)
+    pf, weights_baseline = _build_vectorbt_baseline(prices)
 
     # Aggregate baseline equity / returns to a single series
     equity_vbt = pf.value(group_by=True)
     returns_vbt = pf.returns(group_by=True)
-    # Per-instrument weights from realized asset values
-    weights_vbt = pf.asset_value().div(pf.value(group_by=True), axis=0).fillna(0.0)
 
     # Align indices
     equity_dsl = result.equity  # from our BacktestResult
@@ -326,7 +324,8 @@ def test_simple_momentum_long_short_matches_vectorbt():
 
     # Log comparable metrics for both frameworks for visual comparison in CI logs
     metrics_dsl = compute_basic_metrics(returns_dsl, equity_dsl, result.weights)
-    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights_vbt)
+    # Use the same baseline target weights we fed into vectorbt for correct turnover
+    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights_baseline)
     log.info("[Metrics] DSL: %s", metrics_dsl)
     log.info("[Metrics] vectorbt: %s", metrics_vbt)
 
