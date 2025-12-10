@@ -19,6 +19,7 @@ dependencies = [
   "plotly>=5.0",         # for plots from pf.plot(), etc.
   "pyarrow",             # for efficient data storage
   "lxml",                # for XML parsing
+  "polars>=1.4,<2.0",    # high-performance dataframe engine (optional path)
 ]
 
 [project.optional-dependencies]

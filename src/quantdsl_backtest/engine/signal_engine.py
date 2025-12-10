@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
+
+try:
+    import polars as pl  # type: ignore
+except Exception:  # pragma: no cover - optional dependency
+    pl = None  # lazy optional
 
 from ..dsl.signals import (
     SignalNode,
@@ -36,6 +41,7 @@ class SignalEngine:
         self,
         factors: Dict[str, pd.DataFrame],
         signal_nodes: Dict[str, SignalNode],
+        use_polars: Optional[bool] = None,
     ):
         self.factors = factors
         self.nodes = signal_nodes
@@ -46,6 +52,20 @@ class SignalEngine:
         any_factor = next(iter(factors.values()))
         self.index = any_factor.index
         self.columns = any_factor.columns
+
+        # Decide whether to use polars-backed path
+        if use_polars is None:
+            self._use_polars = pl is not None
+        else:
+            self._use_polars = bool(use_polars and (pl is not None))
+
+        if self._use_polars:
+            log.info("SignalEngine: using Polars-accelerated path where available")
+        else:
+            if use_polars:
+                log.warning(
+                    "SignalEngine: use_polars requested but polars not available; falling back to pandas"
+                )
 
     # ------------------------------------------------------------------ #
 
@@ -126,26 +146,75 @@ class SignalEngine:
         else:
             # Treat as signal name if not a factor
             factor = self._get_signal(node.factor_name)
-        mask = None
-        if node.within_mask is not None:
-            mask = self._get_signal(node.within_mask).astype(bool)
 
-        # For each date, compute quantile across columns
+        mask_df: Optional[pd.DataFrame] = None
+        if node.within_mask is not None:
+            mask_df = self._get_signal(node.within_mask).astype(bool)
+
+        # Fast path with Polars
+        if self._use_polars:
+            try:
+                # Prepare long tables: (date, symbol, value) and optional mask
+                vals = factor.copy()
+                vals.index.name = "date"
+                pl_df_vals = pl.from_pandas(vals.reset_index())
+                pl_vals = pl_df_vals.unpivot(
+                    index=["date"],
+                    on=[c for c in pl_df_vals.columns if c != "date"],
+                    variable_name="symbol",
+                    value_name="value",
+                )
+
+                if mask_df is not None:
+                    mdf = mask_df.copy()
+                    mdf.index.name = "date"
+                    pl_df_mask = pl.from_pandas(mdf.reset_index())
+                    pl_mask = pl_df_mask.unpivot(
+                        index=["date"],
+                        on=[c for c in pl_df_mask.columns if c != "date"],
+                        variable_name="symbol",
+                        value_name="mask",
+                    )
+                    pl_joined = pl_vals.join(pl_mask, on=["date", "symbol"], how="left")
+                    pl_filtered = pl_joined.filter(
+                        pl.col("mask").fill_null(False) & pl.col("value").is_not_null()
+                    )
+                else:
+                    pl_filtered = pl_vals.filter(pl.col("value").is_not_null())
+
+                # Compute per-date quantile using linear interpolation to match pandas
+                q = float(node.q)
+                per_date_q = (
+                    pl_filtered.group_by("date")
+                    .agg(pl.col("value").quantile(q, interpolation="linear").alias("q_val"))
+                    .sort("date")
+                )
+
+                # Expand to wide by broadcasting q_val to all symbols at each date
+                # Build pandas Series of q values indexed by date
+                q_pd = per_date_q.to_pandas().set_index("date")["q_val"]
+                out = pd.DataFrame(index=self.index, columns=self.columns, dtype="float64")
+                # Assign the scalar per row (will broadcast across columns)
+                for dt, val in q_pd.items():
+                    if dt in out.index:
+                        out.loc[dt] = float(val)
+                return out
+            except Exception as e:  # Fallback safety
+                log.warning(f"Polars path failed in Quantile; falling back to pandas: {e}")
+
+        # Pandas reference implementation
+        mask = mask_df
         q = node.q
         out = pd.DataFrame(index=self.index, columns=self.columns, dtype="float64")
-
         for ts in self.index:
             row = factor.loc[ts]
             if mask is not None:
                 row_mask = mask.loc[ts]
                 row = row[row_mask]
-
             if row.count() == 0:
                 continue
-
             val = float(row.quantile(q))
             out.loc[ts] = val
-
         return out
 
     def _eval_rank(self, node: CrossSectionRank) -> pd.DataFrame:
@@ -155,19 +224,79 @@ class SignalEngine:
         else:
             mask = pd.DataFrame(True, index=self.index, columns=self.columns)
 
-        out = pd.DataFrame(index=self.index, columns=self.columns, dtype="float64")
+        # Polars accelerated path
+        if self._use_polars:
+            try:
+                vals = factor.copy()
+                vals.index.name = "date"
+                pl_df_vals = pl.from_pandas(vals.reset_index())
+                pl_vals = pl_df_vals.unpivot(
+                    index=["date"],
+                    on=[c for c in pl_df_vals.columns if c != "date"],
+                    variable_name="symbol",
+                    value_name="value",
+                )
 
+                mdf = mask.copy()
+                mdf.index.name = "date"
+                pl_df_mask = pl.from_pandas(mdf.reset_index())
+                pl_mask = pl_df_mask.unpivot(
+                    index=["date"],
+                    on=[c for c in pl_df_mask.columns if c != "date"],
+                    variable_name="symbol",
+                    value_name="mask",
+                )
+
+                df = pl_vals.join(pl_mask, on=["date", "symbol"], how="left").filter(
+                    pl.col("mask").fill_null(False) & pl.col("value").is_not_null()
+                )
+
+                if node.method == "percentile":
+                    # Create denominator column correctly named as "denom"
+                    df = df.with_columns(
+                        (pl.len().over("date") - 1).alias("denom")
+                    ).with_columns(
+                        denom_safe=pl.when(pl.col("denom") <= 0)
+                        .then(1)
+                        .otherwise(pl.col("denom"))
+                    ).with_columns(
+                        r=(pl.col("value").rank(method="average").over("date") - 1)
+                        / pl.col("denom_safe")
+                    )
+                elif node.method == "zscore":
+                    df = df.with_columns(
+                        mu=pl.mean("value").over("date"),
+                        sigma=pl.std("value").over("date"),
+                    ).with_columns(
+                        r=pl.when((pl.col("sigma") == 0) | pl.col("sigma").is_nan())
+                        .then(0.0)
+                        .otherwise((pl.col("value") - pl.col("mu")) / pl.col("sigma"))
+                    )
+                else:
+                    raise ValueError(f"Unknown rank method: {node.method}")
+
+                # Keep only computed ranks and pivot to wide
+                long_out = df.select(["date", "symbol", pl.col("r").alias("rank")])
+                pl_wide = long_out.pivot(
+                    index="date", on="symbol", values="rank", aggregate_function=None
+                ).sort("date")
+                out = pl_wide.to_pandas()
+                out = out.set_index("date") if "date" in out.columns else out
+                # Ensure full shape and order
+                out = out.reindex(index=self.index, columns=self.columns)
+                return out
+            except Exception as e:  # Fallback safety
+                log.warning(f"Polars path failed in Rank; falling back to pandas: {e}")
+
+        # Pandas reference implementation
+        out = pd.DataFrame(index=self.index, columns=self.columns, dtype="float64")
         for ts in self.index:
             row = factor.loc[ts]
             m = mask.loc[ts]
-
-            # Consider only instruments passing mask & non-null
             valid = row[m].dropna()
             if valid.empty:
                 continue
-
             if node.method == "percentile":
-                # rank from 0..1
                 ranks = valid.rank(method="average", ascending=True) - 1
                 denom = max(len(valid) - 1, 1)
                 ranks = ranks / denom
@@ -180,9 +309,7 @@ class SignalEngine:
                     ranks = (valid - mu) / sigma
             else:
                 raise ValueError(f"Unknown rank method: {node.method}")
-
             out.loc[ts, ranks.index] = ranks
-
         return out
 
     def _eval_mask_from_boolean(self, node: MaskFromBoolean) -> pd.DataFrame:

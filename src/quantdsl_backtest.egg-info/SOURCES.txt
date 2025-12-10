@@ -40,10 +40,12 @@ src/quantdsl_backtest/utils/__init__.py
 src/quantdsl_backtest/utils/logging.py
 src/quantdsl_backtest/utils/time.py
 src/quantdsl_backtest/utils/types.py
+tests/test_accounting.py
+tests/test_backtest_runner_smoke.py
+tests/test_dsl_configs.py
+tests/test_dsl_costs_strategy.py
 tests/test_execution.py
 tests/test_factors.py
-tests/test_integration_momentum_adv_vectorbt.py
-tests/test_integration_simple_momentum_vectorbt.py
-tests/test_momentum_strategy_e2e.py
 tests/test_portfolio.py
+tests/test_signal_engine_expr.py
 tests/test_signals.py
