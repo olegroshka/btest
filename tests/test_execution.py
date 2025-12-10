@@ -102,3 +102,90 @@ def test_rebalance_capped_by_volume_participation():
     assert np.isclose(new_pos["A"], 100.0)
     assert len(trades) == 1
     assert trades.iloc[0]["quantity"] > 0
+
+
+def test_min_fill_notional_skips_tiny_trades():
+    # Single name, tiny target that falls below min_fill_notional should be skipped
+    names = ["A"]
+    date = pd.Timestamp("2020-01-02")
+    equity = 10_000.0
+    prices = pd.Series({"A": 100.0})
+    volumes = pd.Series({"A": 1_000_000.0})
+    prev_pos = pd.Series(0.0, index=names)
+
+    # Target notional change = 0.0005 * 10_000 = $5, below threshold 10
+    target_w = pd.Series({"A": 0.0005})
+
+    exec_cfg = _exec(unlimited=True)
+    exec_cfg.volume_limits.min_fill_notional = 10.0
+
+    commission = Commission(type="bps_notional", amount=0.0)
+    fees = StaticFees(nav_fee_annual=0.0, perf_fee_fraction=0.0)
+
+    new_pos, cash_delta, trades = rebalance_to_target_weights(
+        date,
+        exec_cfg,
+        commission,
+        fees,
+        equity,
+        prices,
+        volumes,
+        prev_pos,
+        target_w,
+    )
+
+    # No trade occurred
+    assert np.isclose(new_pos["A"], 0.0)
+    assert np.isclose(cash_delta, 0.0)
+    assert trades.empty
+
+
+def test_powerlaw_slippage_exponent_and_k_affect_exec_price():
+    # Verify slippage_bps = base + k * participation ** exponent
+    names = ["A"]
+    date = pd.Timestamp("2020-01-02")
+    equity = 100_000.0
+    price = 100.0
+    prices = pd.Series({"A": price})
+    volumes = pd.Series({"A": 50_000.0})  # high volume
+    prev_pos = pd.Series(0.0, index=names)
+    target_w = pd.Series({"A": 0.5})  # $50,000 notional -> qty 500
+
+    # participation = 500 / 50_000 = 0.01
+    base_bps = 2.0
+    k = 800.0
+    exponent = 1.0
+
+    vp = VolumeParticipation(max_participation=None, mode="proportional", min_fill_notional=0.0)
+    slip = PowerLawSlippageModel(base_bps=base_bps, k=k, exponent=exponent)
+    exec_cfg = Execution(order_policy=OrderPolicy(), latency=LatencyModel(), slippage=slip, volume_limits=vp)
+
+    commission = Commission(type="bps_notional", amount=0.0)
+    fees = StaticFees(nav_fee_annual=0.0, perf_fee_fraction=0.0)
+
+    new_pos, cash_delta, trades = rebalance_to_target_weights(
+        date,
+        exec_cfg,
+        commission,
+        fees,
+        equity,
+        prices,
+        volumes,
+        prev_pos,
+        target_w,
+    )
+
+    qty = 500.0
+    participation = qty / volumes["A"]
+    expected_slip_bps = base_bps + k * (participation ** exponent)
+    expected_exec_price = price * (1 + expected_slip_bps / 1e4)
+
+    # One BUY trade expected
+    assert len(trades) == 1
+    assert trades.iloc[0]["side"] == "BUY"
+    assert np.isclose(trades.iloc[0]["slippage_bps"], expected_slip_bps)
+    assert np.isclose(trades.iloc[0]["price"], expected_exec_price)
+
+    # Cash equals -notional (no commission/fees)
+    expected_cash = -expected_exec_price * qty
+    assert np.isclose(cash_delta, expected_cash, rtol=1e-12, atol=1e-8)
