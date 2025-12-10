@@ -41,10 +41,15 @@ from quantdsl_backtest.dsl.strategy import Strategy
 
 from quantdsl_backtest.data.adapters import load_market_data
 from quantdsl_backtest.engine.backtest_runner import run_backtest
+from quantdsl_backtest.engine.accounting import compute_basic_metrics
+from quantdsl_backtest.utils.logging import get_logger
 
 
 # Same data source as other integration test
 DATA_SOURCE = "parquet://equities/sp500_daily"
+
+
+log = get_logger(__name__)
 
 
 def _build_strategy(
@@ -316,6 +321,7 @@ def test_momentum_ls_with_signal_delay_matches_vectorbt():
 
     equity_vbt = pf.value(group_by=True)
     returns_vbt = pf.returns(group_by=True)
+    weights_vbt = pf.asset_value().div(pf.value(), axis=0).fillna(0.0)
 
     equity_dsl = result.equity
     returns_dsl = result.returns
@@ -340,6 +346,12 @@ def test_momentum_ls_with_signal_delay_matches_vectorbt():
         err_msg="Returns differ with signal delay",
     )
 
+    # Log comparable metrics for both frameworks
+    metrics_dsl = compute_basic_metrics(returns_dsl, equity_dsl, result.weights)
+    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights_vbt)
+    log.info("[Metrics] DSL (delay): %s", metrics_dsl)
+    log.info("[Metrics] vectorbt (delay): %s", metrics_vbt)
+
 
 @pytest.mark.slow
 def test_momentum_ls_with_commission_and_turnover_matches_vectorbt():
@@ -360,6 +372,7 @@ def test_momentum_ls_with_commission_and_turnover_matches_vectorbt():
 
     equity_vbt = pf.value(group_by=True)
     returns_vbt = pf.returns(group_by=True)
+    weights_vbt = pf.asset_value().div(pf.value(), axis=0).fillna(0.0)
 
     equity_dsl = result.equity
     returns_dsl = result.returns
@@ -383,3 +396,9 @@ def test_momentum_ls_with_commission_and_turnover_matches_vectorbt():
         atol=2e-5,
         err_msg="Returns differ with commission & turnover cap",
     )
+
+    # Log comparable metrics for both frameworks
+    metrics_dsl = compute_basic_metrics(returns_dsl, equity_dsl, result.weights)
+    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights_vbt)
+    log.info("[Metrics] DSL (fees+turnover): %s", metrics_dsl)
+    log.info("[Metrics] vectorbt (fees+turnover): %s", metrics_vbt)

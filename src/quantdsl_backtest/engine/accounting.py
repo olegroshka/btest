@@ -96,30 +96,48 @@ def compute_exposures(
 def compute_basic_metrics(
     returns: pd.Series,
     equity: pd.Series,
-    weights: pd.DataFrame,
+    weights: pd.DataFrame | None,
 ) -> Dict[str, float]:
     """
-    Compute basic performance metrics: Sharpe, Sortino, max drawdown, turnover.
+    Compute basic performance metrics using robust, comparable logic:
+      - total_return
+      - sharpe (annualized, 252 trading days)
+      - sortino (annualized)
+      - max_drawdown
+      - turnover_annual (if weights provided)
     """
     metrics: Dict[str, float] = {}
-    rets = returns.replace([np.inf, -np.inf], np.nan).dropna()
+
+    # Clean returns: replace infinities with NaN and treat NaNs as 0.0 (no move)
+    rets = returns.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
+    # Total return from equity if available
+    try:
+        if equity is not None and len(equity) >= 2:
+            total_ret = float(equity.iloc[-1] / equity.iloc[0] - 1.0)
+        else:
+            total_ret = 0.0
+    except Exception:
+        total_ret = 0.0
+
     if len(rets) == 0:
+        metrics["total_return"] = float(total_ret)
         metrics["sharpe"] = 0.0
         metrics["sortino"] = 0.0
         metrics["max_drawdown"] = 0.0
         metrics["turnover_annual"] = 0.0
         return metrics
 
-    mean_ret = rets.mean()
-    std_ret = rets.std()
+    mean_ret = float(rets.mean())
+    std_ret = float(rets.std())
     neg_ret = rets[rets < 0]
 
-    ann_factor = np.sqrt(252.0)
-    sharpe = mean_ret / std_ret * ann_factor if std_ret > 0 else 0.0
+    ann_factor = float(np.sqrt(252.0))
+    sharpe = (mean_ret / std_ret * ann_factor) if std_ret > 0 else 0.0
 
     if len(neg_ret) > 0:
-        downside_std = neg_ret.std()
-        sortino = mean_ret / downside_std * ann_factor if downside_std > 0 else 0.0
+        downside_std = float(neg_ret.std())
+        sortino = (mean_ret / downside_std * ann_factor) if downside_std > 0 else 0.0
     else:
         sortino = 0.0
 
@@ -127,15 +145,19 @@ def compute_basic_metrics(
     cum = (1.0 + rets).cumprod()
     peak = cum.cummax()
     dd = (cum / peak) - 1.0
-    max_dd = float(dd.min())
+    max_dd = float(dd.min()) if len(dd) > 0 else 0.0
 
     # Turnover: 0.5 * sum(|w_t - w_{t-1}|) per day, annualized
     turnover_daily = 0.0
-    if len(weights) > 1:
-        diff = weights.diff().abs().sum(axis=1) * 0.5
-        turnover_daily = float(diff.mean())
-    turnover_annual = turnover_daily * 252.0
+    try:
+        if weights is not None and len(weights) > 1:
+            diff = weights.diff().abs().sum(axis=1) * 0.5
+            turnover_daily = float(diff.mean())
+    except Exception:
+        turnover_daily = 0.0
+    turnover_annual = float(turnover_daily * 252.0)
 
+    metrics["total_return"] = float(total_ret)
     metrics["sharpe"] = float(sharpe)
     metrics["sortino"] = float(sortino)
     metrics["max_drawdown"] = float(max_dd)

@@ -40,10 +40,15 @@ from quantdsl_backtest.dsl.strategy import Strategy
 
 from quantdsl_backtest.data.adapters import load_market_data
 from quantdsl_backtest.engine.backtest_runner import run_backtest
+from quantdsl_backtest.engine.accounting import compute_basic_metrics
+from quantdsl_backtest.utils.logging import get_logger
 
 
 # Path to your S&P500 parquet (same as in momentum_long_short_sp500.py)
 DATA_SOURCE = "parquet://equities/sp500_daily"
+
+
+log = get_logger(__name__)
 
 
 def build_simple_momentum_ls_strategy() -> Strategy:
@@ -305,6 +310,8 @@ def test_simple_momentum_long_short_matches_vectorbt():
     # Aggregate baseline equity / returns to a single series
     equity_vbt = pf.value(group_by=True)
     returns_vbt = pf.returns(group_by=True)
+    # Per-instrument weights from realized asset values
+    weights_vbt = pf.asset_value().div(pf.value(group_by=True), axis=0).fillna(0.0)
 
     # Align indices
     equity_dsl = result.equity  # from our BacktestResult
@@ -316,6 +323,12 @@ def test_simple_momentum_long_short_matches_vectorbt():
     # Basic sanity
     assert len(equity_dsl) > 0
     assert len(returns_dsl) > 0
+
+    # Log comparable metrics for both frameworks for visual comparison in CI logs
+    metrics_dsl = compute_basic_metrics(returns_dsl, equity_dsl, result.weights)
+    metrics_vbt = compute_basic_metrics(returns_vbt, equity_vbt, weights_vbt)
+    log.info("[Metrics] DSL: %s", metrics_dsl)
+    log.info("[Metrics] vectorbt: %s", metrics_vbt)
 
     # Compare equity curves and cumulative returns
     # Use reasonably strict tolerances (they should be nearly identical)
