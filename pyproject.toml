@@ -40,3 +40,6 @@ Repository = "https://github.com/olegroshka/btest"
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
+testpaths = [
+  "tests",
+]

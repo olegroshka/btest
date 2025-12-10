@@ -1,4 +1,4 @@
-# tests/test_integration_simple_momentum_vectorbt.py
+# tests_slow/test_integration_simple_momentum_vectorbt.py
 
 import numpy as np
 import pandas as pd
@@ -292,7 +292,7 @@ def test_simple_momentum_long_short_matches_vectorbt():
 
     # Load same data (using the same adapter the engine uses)
     md = load_market_data(strategy.data, strategy.universe)
-
+    
     # Construct wide price panel for vectorbt baseline
     instruments = md.instruments
     prices = pd.DataFrame(
