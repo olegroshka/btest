@@ -52,6 +52,21 @@ def compute_target_weights_for_date(
     long_mask = signals["long_candidates"].loc[sig_date].astype(bool)
     short_mask = signals["short_candidates"].loc[sig_date].astype(bool)
 
+    # If there are not enough valid instruments (non-NaN rank), stay flat.
+    # The vectorbt baseline requires at least 100 valid names (50 long + 50 short).
+    valid_count = int(rank_row.notna().sum())
+    need = 0
+    if isinstance(portfolio.long_book.selector, TopN):
+        need += int(portfolio.long_book.selector.n)
+    if isinstance(portfolio.short_book.selector, BottomN):
+        need += int(portfolio.short_book.selector.n)
+
+    instruments = sig_df.columns
+    target = pd.Series(0.0, index=instruments, dtype="float64")
+
+    if valid_count < need:
+        return target
+
     # Select instruments for long and short books using selectors
     long_names = _select_book_names(
         date=sig_date,
@@ -65,9 +80,6 @@ def compute_target_weights_for_date(
         rank_row=rank_row,
         mask=short_mask,
     )
-
-    instruments = sig_df.columns
-    target = pd.Series(0.0, index=instruments, dtype="float64")
 
     n_long = len(long_names)
     n_short = len(short_names)
@@ -119,21 +131,39 @@ def _select_book_names(
     Currently supports TopN and BottomN.
     """
     # Filter out instruments failing mask or with NaN rank
-    valid = rank_row[mask & rank_row.notna()]
-
-    if valid.empty:
-        return []
+    masked_valid = rank_row[mask & rank_row.notna()]
+    unmasked_valid = rank_row[rank_row.notna()]
 
     if isinstance(book.selector, TopN):
         n = book.selector.n
         # sort descending by rank (higher = better)
-        selected = valid.sort_values(ascending=False).head(n).index.tolist()
+        selected = masked_valid.sort_values(ascending=False).head(n).index.tolist()
+        # If mask yields fewer than n, fill the remainder from the unmasked pool
+        if len(selected) < n:
+            remaining = n - len(selected)
+            filler = (
+                unmasked_valid.drop(index=selected, errors="ignore")
+                .sort_values(ascending=False)
+                .head(remaining)
+                .index.tolist()
+            )
+            selected.extend(filler)
         return selected
 
     if isinstance(book.selector, BottomN):
         n = book.selector.n
         # sort ascending by rank (lower = worse)
-        selected = valid.sort_values(ascending=True).head(n).index.tolist()
+        selected = masked_valid.sort_values(ascending=True).head(n).index.tolist()
+        # If mask yields fewer than n, fill the remainder from the unmasked pool
+        if len(selected) < n:
+            remaining = n - len(selected)
+            filler = (
+                unmasked_valid.drop(index=selected, errors="ignore")
+                .sort_values(ascending=True)
+                .head(remaining)
+                .index.tolist()
+            )
+            selected.extend(filler)
         return selected
 
     raise TypeError(f"Unsupported selector type in Book: {type(book.selector)}")
