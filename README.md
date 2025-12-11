@@ -120,6 +120,21 @@ pytest -q
 ```
 
 
+Run slow integration tests
+--------------------------
+The slower end-to-end/integration tests live under `tests_slow/`.
+
+- Run only the slow test suite:
+```
+uv run pytest tests_slow -q
+```
+
+- Run slow tests with live logging to the console (INFO level):
+```
+uv run pytest -q tests_slow -m slow -o log_cli=true --log-cli-level=INFO
+```
+
+
 Troubleshooting
 ---------------
 - Import errors: ensure the venv is active and you installed with `pip install -e .`.
