@@ -82,25 +82,94 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             prev_weights = target
 
     # ------------------------------------------------------------------ #
-    # 4. Build vectorbt portfolio
+    # 4. Build vectorbt portfolio (potentially two-pass for costs)
     # ------------------------------------------------------------------ #
-    fees = _commission_to_vbt_fees(strategy.costs.commission)
-    slippage = _slippage_to_vbt_frac(strategy.execution)
     init_cash = float(strategy.backtest.cash_initial)
     freq = strategy.data.frequency or "1D"
 
-    # vectorbt expects NaNs for "no order" rows; that's exactly what we built
-    pf = vbt.Portfolio.from_orders(
-        close=prices,
-        size=weights,
-        size_type="targetpercent",  # TargetPercent sizing (per asset) :contentReference[oaicite:2]{index=2}
-        init_cash=init_cash,
-        fees=fees,
-        slippage=slippage,
-        cash_sharing=True,
-        call_seq="auto",            # sell before buy within a bar
-        freq=freq,
+    # Decide whether we need a two-pass run to emulate per-share commission
+    # and power-law slippage using actual order sizes.
+    commission = strategy.costs.commission if strategy.costs is not None else None
+    exec_cfg = strategy.execution
+    sl_cfg = exec_cfg.slippage if exec_cfg is not None else None
+
+    need_per_share = bool(
+        commission is not None and getattr(commission, "type", None) == "per_share" and float(getattr(commission, "amount", 0.0)) != 0.0
     )
+    need_power_law = bool(
+        sl_cfg is not None and (
+            float(getattr(sl_cfg, "k", 0.0)) != 0.0 or float(getattr(sl_cfg, "base_bps", 0.0)) != 0.0
+        )
+    )
+
+    if need_per_share or need_power_law:
+        # Pass 1: build portfolio with zero costs to get actual order sizes
+        pf0 = vbt.Portfolio.from_orders(
+            close=prices,
+            size=weights,
+            size_type="targetpercent",
+            init_cash=init_cash,
+            fees=0.0,
+            slippage=0.0,
+            cash_sharing=True,
+            call_seq="auto",
+            freq=freq,
+        )
+
+        # Extract orders and build per-bar cost matrices
+        try:
+            orders_rec = pf0.orders.records_readable
+        except Exception as exc:
+            log.warning("Vectorized engine: unable to access orders for cost computation, falling back to constant costs: %s", exc)
+            fees = _commission_to_vbt_fees(commission)
+            slippage = _slippage_to_vbt_frac(exec_cfg)
+            pf = vbt.Portfolio.from_orders(
+                close=prices,
+                size=weights,
+                size_type="targetpercent",
+                init_cash=init_cash,
+                fees=fees,
+                slippage=slippage,
+                cash_sharing=True,
+                call_seq="auto",
+                freq=freq,
+            )
+        else:
+            # Build per-bar cost DataFrames aligned to prices index/columns
+            fees_df, slippage_df = _build_cost_matrices_from_orders(
+                prices=prices,
+                volumes=volumes,
+                orders_df=orders_rec,
+                commission=commission,
+                slippage_model=sl_cfg,
+            )
+
+            pf = vbt.Portfolio.from_orders(
+                close=prices,
+                size=weights,
+                size_type="targetpercent",
+                init_cash=init_cash,
+                fees=fees_df if fees_df is not None else 0.0,
+                slippage=slippage_df if slippage_df is not None else 0.0,
+                cash_sharing=True,
+                call_seq="auto",
+                freq=freq,
+            )
+    else:
+        # Simple single-pass: map constant fees/slippage
+        fees = _commission_to_vbt_fees(commission)
+        slippage = _slippage_to_vbt_frac(exec_cfg)
+        pf = vbt.Portfolio.from_orders(
+            close=prices,
+            size=weights,
+            size_type="targetpercent",  # TargetPercent sizing (per asset)
+            init_cash=init_cash,
+            fees=fees,
+            slippage=slippage,
+            cash_sharing=True,
+            call_seq="auto",            # sell before buy within a bar
+            freq=freq,
+        )
 
     # ------------------------------------------------------------------ #
     # 5. Extract time series & build BacktestResult
@@ -287,8 +356,8 @@ def _commission_to_vbt_fees(commission: Commission) -> float:
     (fraction of traded notional).
 
     Currently:
-      - 'bps_notional' -> amount / 1e4
-      - 'per_share'    -> not supported in vectorized mode (falls back to 0)
+      - 'bps_notional' -> amount / 1e4 (applied per order)
+      - 'per_share'    -> handled via two-pass order-based cost matrices elsewhere; returns 0 here
     """
     if commission is None:
         return 0.0
@@ -297,11 +366,7 @@ def _commission_to_vbt_fees(commission: Commission) -> float:
         return float(commission.amount) / 1e4
 
     if commission.type == "per_share":
-        log.warning(
-            "Vectorized engine: commission.type='per_share' not supported "
-            "by constant-fee model; treating as zero. "
-            "Use event_driven engine for exact per-share costs."
-        )
+        # Two-pass path will compute per-bar fees fraction; return 0 for single-pass
         return 0.0
 
     return 0.0
@@ -312,12 +377,157 @@ def _slippage_to_vbt_frac(execution: Execution) -> float:
     Map our (potentially non-linear) slippage model to vectorbt's
     constant `slippage` argument (fraction of price).
 
-    For now we only use the base_bps parameter and ignore k/exponent.
+    For simple single-pass path we only use the base_bps parameter and ignore k/exponent.
     """
     if execution is None or execution.slippage is None:
         return 0.0
     sl = execution.slippage
     return float(sl.base_bps) / 1e4
+
+
+def _build_cost_matrices_from_orders(
+    *,
+    prices: pd.DataFrame,
+    volumes: pd.DataFrame | None,
+    orders_df: pd.DataFrame,
+    commission: Commission | None,
+    slippage_model: Any | None,
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    """
+    Build per-bar, per-asset cost matrices to pass into vectorbt from
+    order records. Returns (fees_df, slippage_df) where values are
+    fractions of traded notional to apply on that bar for that asset.
+
+    - Per-share commission: fraction = commission_per_share / price for bars with orders
+    - Bps commission: handled by single-pass path; we keep None here
+    - Power-law slippage: slip_frac = (base_bps + k * (|shares|/volume)^exponent) / 1e4
+      on bars with orders; 0 otherwise.
+    """
+    dates = prices.index
+    cols = prices.columns
+
+    # Aggregate signed and absolute order sizes per bar/asset
+    df = orders_df.copy()
+    # Normalize column names
+    ts_col = "Timestamp" if "Timestamp" in df.columns else ("timestamp" if "timestamp" in df.columns else None)
+    size_col = "Size" if "Size" in df.columns else ("size" if "size" in df.columns else None)
+    col_col = "Column" if "Column" in df.columns else ("column" if "column" in df.columns else None)
+    if ts_col is None or size_col is None or col_col is None:
+        # Unable to parse; return None to fall back
+        return None, None
+
+    # Group by ts/column to get net signed size and absolute size within a bar
+    grp_signed = (
+        df.groupby([ts_col, col_col], as_index=False)[size_col]
+        .sum()
+    )
+    grp_abs = (
+        df.assign(_abs=np.abs(df[size_col]))
+        .groupby([ts_col, col_col], as_index=False)["_abs"]
+        .sum()
+    )
+    grp_buy = (
+        df[df[size_col] > 0]
+        .assign(_buy=lambda x: x[size_col])
+        .groupby([ts_col, col_col], as_index=False)["_buy"]
+        .sum()
+    )
+    grp_sell = (
+        df[df[size_col] < 0]
+        .assign(_sell=lambda x: -x[size_col])
+        .groupby([ts_col, col_col], as_index=False)["_sell"]
+        .sum()
+    )
+    # Pivot to DataFrames with index=dates, columns by instrument order
+    net_size_by_col = (
+        grp_signed.pivot(index=ts_col, columns=col_col, values=size_col).reindex(dates).fillna(0.0)
+    )
+    abs_size_by_col = (
+        grp_abs.pivot(index=ts_col, columns=col_col, values="_abs").reindex(dates).fillna(0.0)
+    )
+    buy_qty_by_col = (
+        grp_buy.pivot(index=ts_col, columns=col_col, values="_buy").reindex(dates).fillna(0.0)
+    )
+    sell_qty_by_col = (
+        grp_sell.pivot(index=ts_col, columns=col_col, values="_sell").reindex(dates).fillna(0.0)
+    )
+    # Map integer columns to instrument names order; if columns already labels 0..N-1
+    # we'll just align using positions below.
+    # Build a template DataFrame aligned to prices
+    abs_size = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+    net_size = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+    buy_qty = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+    sell_qty = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+    # If abs_size_by_col columns are numeric indices mapping to positions
+    try:
+        for j in abs_size_by_col.columns:
+            # j may be int column index
+            if isinstance(j, (int, np.integer)) and 0 <= int(j) < len(cols):
+                abs_size.iloc[:, int(j)] = abs_size_by_col[j].astype("float64").values
+                if j in net_size_by_col.columns:
+                    net_size.iloc[:, int(j)] = net_size_by_col[j].astype("float64").values
+                if j in buy_qty_by_col.columns:
+                    buy_qty.iloc[:, int(j)] = buy_qty_by_col[j].astype("float64").values
+                if j in sell_qty_by_col.columns:
+                    sell_qty.iloc[:, int(j)] = sell_qty_by_col[j].astype("float64").values
+            else:
+                # If it is already instrument name
+                if str(j) in cols:
+                    abs_size[str(j)] = abs_size_by_col[j].astype("float64")
+                    if j in net_size_by_col.columns:
+                        net_size[str(j)] = net_size_by_col[j].astype("float64")
+                    if j in buy_qty_by_col.columns:
+                        buy_qty[str(j)] = buy_qty_by_col[j].astype("float64")
+                    if j in sell_qty_by_col.columns:
+                        sell_qty[str(j)] = sell_qty_by_col[j].astype("float64")
+    except Exception:
+        # Best-effort alignment
+        pass
+
+    # Build FEES matrix
+    fees_df: pd.DataFrame | None = None
+    if commission is not None:
+        if getattr(commission, "type", None) == "per_share" and float(getattr(commission, "amount", 0.0)) != 0.0:
+            per_share = float(commission.amount)
+            # Vectorbt applies `fees` as a fraction of order value, which uses base price.
+            # Event-driven commission is per-share, independent of slippage.
+            # Thus, set per-bar fee fraction = per_share / price on bars with orders.
+            with np.errstate(divide="ignore", invalid="ignore"):
+                frac = per_share / prices.replace(0.0, np.nan)
+            frac = frac.replace([np.inf, -np.inf], np.nan).fillna(0.0).astype("float64")
+            fees_df = frac.where(abs_size > 0.0, 0.0)
+        elif getattr(commission, "type", None) == "bps_notional" and float(getattr(commission, "amount", 0.0)) != 0.0:
+            # Single-pass could handle this; but for consistency, only apply on order bars
+            frac = float(commission.amount) / 1e4
+            fees_df = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+            mask = abs_size > 0.0
+            fees_df[mask] = frac
+
+    # Build SLIPPAGE matrix
+    slippage_df: pd.DataFrame | None = None
+    if slippage_model is not None:
+        base_bps = float(getattr(slippage_model, "base_bps", 0.0) or 0.0)
+        k = float(getattr(slippage_model, "k", 0.0) or 0.0)
+        exponent = float(getattr(slippage_model, "exponent", 1.0) or 1.0)
+
+        if base_bps != 0.0 or k != 0.0:
+            if volumes is None:
+                part_net = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+            else:
+                vol = volumes.reindex(index=dates, columns=cols).astype("float64")
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    part_net = np.abs(net_size) / vol.replace(0.0, np.nan)
+                part_net = part_net.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+                part_net = part_net.clip(lower=0.0, upper=1.0)
+            slip_bps_ev = base_bps + k * np.power(part_net, exponent)
+            # Scale slippage by net/legs ratio so that total slippage dollars across legs
+            # approximates event-driven slippage on the net trade
+            with np.errstate(divide="ignore", invalid="ignore"):
+                scale = (np.abs(net_size)) / abs_size.replace(0.0, np.nan)
+            scale = scale.replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(lower=0.0, upper=1.0)
+            slippage_df = ((slip_bps_ev / 1e4) * scale).astype("float64").where(abs_size > 0.0, 0.0)
+
+    return fees_df, slippage_df
 
 
 def _orders_to_trades_df(pf: vbt.Portfolio, instruments) -> pd.DataFrame:
