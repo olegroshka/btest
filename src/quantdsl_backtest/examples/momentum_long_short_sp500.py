@@ -268,7 +268,7 @@ def build_strategy() -> Strategy:
     # 8. Backtest runtime config
     # -----------------------
     backtest_cfg = BacktestConfig(
-        engine="event_driven",           # or "vectorized" later
+        engine="vectorized", #"event_driven",           # or "vectorized"
         cash_initial=100_000_000.0,      # 100mm
         margin=MarginConfig(
             long_initial=0.5,

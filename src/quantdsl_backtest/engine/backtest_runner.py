@@ -22,13 +22,50 @@ from .accounting import (
     compute_basic_metrics,
 )
 
-
 log = get_logger(__name__)
+
+
+# --------------------------------------------------------------------------- #
+# Public entry point
+# --------------------------------------------------------------------------- #
 
 
 def run_backtest(strategy: Strategy) -> BacktestResult:
     """
+    Dispatch to the appropriate engine implementation based on
+    `strategy.backtest.engine`.
+
+    Supported values:
+      - "event_driven" : custom daily event loop (current implementation)
+      - "vectorized"   : vectorbt-backed engine in `vectorized_engine.py`
+    """
+    engine_name = getattr(strategy.backtest, "engine", "event_driven")
+
+    if engine_name == "event_driven":
+        return _run_backtest_event_driven(strategy)
+
+    if engine_name == "vectorized":
+        from .vectorized_engine import run_backtest_vectorized
+
+        log.info("Running strategy %s with vectorized engine", strategy.name)
+        return run_backtest_vectorized(strategy)
+
+    raise ValueError(f"Unknown backtest engine: {engine_name!r}")
+
+
+# --------------------------------------------------------------------------- #
+# Existing event-driven engine (unchanged logic)
+# --------------------------------------------------------------------------- #
+
+
+def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
+    """
     Run an event-driven daily backtest for the given Strategy.
+
+    This is the original implementation which we keep intact for:
+      - fine-grained execution control
+      - custom slippage / volume / latency models
+      - easier debugging
     """
 
     # ------------------------------------------------------------------ #
@@ -50,8 +87,6 @@ def run_backtest(strategy: Strategy) -> BacktestResult:
     # ------------------------------------------------------------------ #
     # 3. Initialize state containers
     # ------------------------------------------------------------------ #
-    n = len(dates)
-
     equity_series = pd.Series(index=dates, dtype="float64")
     return_series = pd.Series(index=dates, dtype="float64")
     cash_series = pd.Series(index=dates, dtype="float64")
@@ -178,19 +213,23 @@ def run_backtest(strategy: Strategy) -> BacktestResult:
         prev_positions = cur_positions
         prev_equity = equity
 
-    trades_df = pd.concat(all_trades, ignore_index=True) if all_trades else pd.DataFrame(
-        columns=[
-            "datetime",
-            "instrument",
-            "side",
-            "quantity",
-            "price",
-            "notional",
-            "slippage_bps",
-            "commission",
-            "fees",
-            "realized_pnl",
-        ]
+    trades_df = (
+        pd.concat(all_trades, ignore_index=True)
+        if all_trades
+        else pd.DataFrame(
+            columns=[
+                "datetime",
+                "instrument",
+                "side",
+                "quantity",
+                "price",
+                "notional",
+                "slippage_bps",
+                "commission",
+                "fees",
+                "realized_pnl",
+            ]
+        )
     )
 
     # ------------------------------------------------------------------ #
@@ -214,11 +253,15 @@ def run_backtest(strategy: Strategy) -> BacktestResult:
         start_date=dates[0],
         end_date=dates[-1],
         benchmark=None,
-        metadata={"strategy_name": strategy.name, "data_source": strategy.data.source},
+        metadata={
+            "strategy_name": strategy.name,
+            "data_source": strategy.data.source,
+            "engine": "event_driven",
+        },
     )
 
     log.info(
-        "Backtest complete: total return %.2f%%, Sharpe %.2f, max DD %.2f%%",
+        "Backtest complete (event_driven): total return %.2f%%, Sharpe %.2f, max DD %.2f%%",
         result.total_return * 100.0,
         metrics.get("sharpe", 0.0),
         metrics.get("max_drawdown", 0.0) * 100.0,
