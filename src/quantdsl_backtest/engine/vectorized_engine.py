@@ -417,72 +417,64 @@ def _build_cost_matrices_from_orders(
         return None, None
 
     # Group by ts/column to get net signed size and absolute size within a bar
-    grp_signed = (
-        df.groupby([ts_col, col_col], as_index=False)[size_col]
-        .sum()
-    )
-    grp_abs = (
-        df.assign(_abs=np.abs(df[size_col]))
-        .groupby([ts_col, col_col], as_index=False)["_abs"]
-        .sum()
-    )
+    grp_signed = df.groupby([ts_col, col_col], as_index=False)[size_col].sum()
+    grp_abs = df.assign(_abs=np.abs(df[size_col])).groupby([ts_col, col_col], as_index=False)["_abs"].sum()
     grp_buy = (
         df[df[size_col] > 0]
         .assign(_buy=lambda x: x[size_col])
-        .groupby([ts_col, col_col], as_index=False)["_buy"]
-        .sum()
+        .groupby([ts_col, col_col], as_index=False)["_buy"].sum()
     )
     grp_sell = (
         df[df[size_col] < 0]
         .assign(_sell=lambda x: -x[size_col])
-        .groupby([ts_col, col_col], as_index=False)["_sell"]
-        .sum()
+        .groupby([ts_col, col_col], as_index=False)["_sell"].sum()
     )
-    # Pivot to DataFrames with index=dates, columns by instrument order
-    net_size_by_col = (
-        grp_signed.pivot(index=ts_col, columns=col_col, values=size_col).reindex(dates).fillna(0.0)
-    )
-    abs_size_by_col = (
-        grp_abs.pivot(index=ts_col, columns=col_col, values="_abs").reindex(dates).fillna(0.0)
-    )
-    buy_qty_by_col = (
-        grp_buy.pivot(index=ts_col, columns=col_col, values="_buy").reindex(dates).fillna(0.0)
-    )
-    sell_qty_by_col = (
-        grp_sell.pivot(index=ts_col, columns=col_col, values="_sell").reindex(dates).fillna(0.0)
-    )
-    # Map integer columns to instrument names order; if columns already labels 0..N-1
-    # we'll just align using positions below.
-    # Build a template DataFrame aligned to prices
-    abs_size = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
-    net_size = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
-    buy_qty = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
-    sell_qty = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
-    # If abs_size_by_col columns are numeric indices mapping to positions
-    try:
-        for j in abs_size_by_col.columns:
-            # j may be int column index
-            if isinstance(j, (int, np.integer)) and 0 <= int(j) < len(cols):
-                abs_size.iloc[:, int(j)] = abs_size_by_col[j].astype("float64").values
-                if j in net_size_by_col.columns:
-                    net_size.iloc[:, int(j)] = net_size_by_col[j].astype("float64").values
-                if j in buy_qty_by_col.columns:
-                    buy_qty.iloc[:, int(j)] = buy_qty_by_col[j].astype("float64").values
-                if j in sell_qty_by_col.columns:
-                    sell_qty.iloc[:, int(j)] = sell_qty_by_col[j].astype("float64").values
-            else:
-                # If it is already instrument name
-                if str(j) in cols:
-                    abs_size[str(j)] = abs_size_by_col[j].astype("float64")
-                    if j in net_size_by_col.columns:
-                        net_size[str(j)] = net_size_by_col[j].astype("float64")
-                    if j in buy_qty_by_col.columns:
-                        buy_qty[str(j)] = buy_qty_by_col[j].astype("float64")
-                    if j in sell_qty_by_col.columns:
-                        sell_qty[str(j)] = sell_qty_by_col[j].astype("float64")
-    except Exception:
-        # Best-effort alignment
-        pass
+
+    # Pivot only on active timestamps; align to full dates later (sparse-aware)
+    net_size_by_col = grp_signed.pivot(index=ts_col, columns=col_col, values=size_col)
+    abs_size_by_col = grp_abs.pivot(index=ts_col, columns=col_col, values="_abs")
+    buy_qty_by_col = grp_buy.pivot(index=ts_col, columns=col_col, values="_buy")
+    sell_qty_by_col = grp_sell.pivot(index=ts_col, columns=col_col, values="_sell")
+
+    # Map integer column indices directly to instrument labels where applicable
+    def _map_col(c):
+        try:
+            if isinstance(c, (int, np.integer)):
+                j = int(c)
+                if 0 <= j < len(cols):
+                    return cols[j]
+            # Already a label; ensure string match if present
+            s = str(c)
+            return s if s in cols else c
+        except Exception:
+            return c
+
+    for _df in (net_size_by_col, abs_size_by_col, buy_qty_by_col, sell_qty_by_col):
+        if _df is not None:
+            _df.columns = _df.columns.map(_map_col)
+
+    # Now align each to prices index/columns, filling missing with 0.0
+    def _align(df_like: pd.DataFrame | None) -> pd.DataFrame:
+        if df_like is None or df_like.empty:
+            return pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+        # Ensure datetime index comparable to prices' index
+        try:
+            idx = pd.to_datetime(df_like.index)
+        except Exception:
+            idx = df_like.index
+        df_like = df_like.copy()
+        df_like.index = idx
+        return (
+            df_like.reindex(index=dates)
+            .reindex(columns=cols)
+            .fillna(0.0)
+            .astype("float64")
+        )
+
+    net_size = _align(net_size_by_col)
+    abs_size = _align(abs_size_by_col)
+    buy_qty = _align(buy_qty_by_col)
+    sell_qty = _align(sell_qty_by_col)
 
     # Build FEES matrix
     fees_df: pd.DataFrame | None = None
@@ -519,6 +511,7 @@ def _build_cost_matrices_from_orders(
                     part_net = np.abs(net_size) / vol.replace(0.0, np.nan)
                 part_net = part_net.replace([np.inf, -np.inf], np.nan).fillna(0.0)
                 part_net = part_net.clip(lower=0.0, upper=1.0)
+            # Compute slippage in bps and convert to fraction
             slip_bps_ev = base_bps + k * np.power(part_net, exponent)
             # Scale slippage by net/legs ratio so that total slippage dollars across legs
             # approximates event-driven slippage on the net trade
