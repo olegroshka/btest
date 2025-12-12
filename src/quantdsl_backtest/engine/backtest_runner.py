@@ -233,7 +233,7 @@ def _is_rebalance_date(
     portfolio,
 ) -> bool:
     """
-    Simple daily rebalance logic for now. You can extend to weekly/monthly.
+    Simple daily rebalance logic for now. Need to extend to weekly/monthly.
     """
     freq = portfolio.rebalance_frequency
     if freq == "1d":

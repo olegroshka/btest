@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from typing import Dict
 
 from .data_config import DataConfig
+from .signals import SignalNode
 from .universe import Universe
 from .factors import FactorNode
-# signals module not implemented yet in this step, so we treat signals as `object`
 from .portfolio import LongShortPortfolio
 from .execution import Execution
 from .costs import Costs
@@ -29,7 +29,7 @@ class Strategy:
 
     # Named factor and signal definitions.
     factors: Dict[str, FactorNode]
-    signals: Dict[str, object]          # you’ll replace `object` with a proper base class later
+    signals: Dict[str, SignalNode]          # you’ll replace `object` with a proper base class later
 
     portfolio: LongShortPortfolio
     execution: Execution
