@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from typing import Any, Dict
+import os
+import time
 
 import numpy as np
 import pandas as pd
@@ -87,6 +89,10 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
     init_cash = float(strategy.backtest.cash_initial)
     freq = strategy.data.frequency or "1D"
 
+    # Engine options (flags) with sane defaults. Can be overridden via
+    # BacktestConfig.extra["vectorized_engine"] or environment variables.
+    eng_opts = _resolve_engine_options(getattr(strategy.backtest, "extra", {}))
+
     # Decide whether we need a two-pass run to emulate per-share commission
     # and power-law slippage using actual order sizes.
     commission = strategy.costs.commission if strategy.costs is not None else None
@@ -102,7 +108,31 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
         )
     )
 
-    if need_per_share or need_power_law:
+    if (need_per_share or need_power_law) and eng_opts["approx_single_pass"]:
+        # Optional approximate single-pass path: estimate quantities from weights and
+        # constant equity approximation (init_cash). This is faster but less exact.
+        log.info("Vectorized engine: using approximate single-pass friction model")
+        fees_df, slippage_df = _approximate_cost_matrices(
+            prices=prices,
+            volumes=volumes,
+            weights=weights,
+            init_cash=init_cash,
+            commission=commission,
+            slippage_model=sl_cfg,
+        )
+        pf = vbt.Portfolio.from_orders(
+            close=prices,
+            size=weights,
+            size_type="targetpercent",
+            init_cash=init_cash,
+            fees=fees_df if fees_df is not None else 0.0,
+            slippage=slippage_df if slippage_df is not None else 0.0,
+            cash_sharing=True,
+            call_seq="auto",
+            freq=freq,
+        )
+    elif need_per_share or need_power_law:
+        t0 = time.perf_counter() if eng_opts["timing"] else None
         # Pass 1: build portfolio with zero costs to get actual order sizes
         pf0 = vbt.Portfolio.from_orders(
             close=prices,
@@ -115,10 +145,22 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             call_seq="auto",
             freq=freq,
         )
+        t1 = time.perf_counter() if eng_opts["timing"] else None
 
         # Extract orders and build per-bar cost matrices
         try:
-            orders_rec = pf0.orders.records_readable
+            # Optional cache for pass-1 orders
+            orders_rec = None
+            if eng_opts["enable_caching"]:
+                key = _make_orders_cache_key(weights, prices, init_cash)
+                cached = _pass1_orders_cache.get(key)
+                if cached is not None:
+                    orders_rec = cached
+                    log.info("Vectorized engine: Pass-1 orders cache hit")
+            if orders_rec is None:
+                orders_rec = pf0.orders.records_readable
+                if eng_opts["enable_caching"]:
+                    _pass1_orders_cache[key] = orders_rec
         except Exception as exc:
             log.warning("Vectorized engine: unable to access orders for cost computation, falling back to constant costs: %s", exc)
             fees = _commission_to_vbt_fees(commission)
@@ -142,7 +184,10 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
                 orders_df=orders_rec,
                 commission=commission,
                 slippage_model=sl_cfg,
+                sparse=eng_opts["sparse_cost_mats"],
+                numpy_fast=eng_opts["numpy_fast_path"],
             )
+            t2 = time.perf_counter() if eng_opts["timing"] else None
 
             pf = vbt.Portfolio.from_orders(
                 close=prices,
@@ -155,6 +200,14 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
                 call_seq="auto",
                 freq=freq,
             )
+            if eng_opts["timing"]:
+                t3 = time.perf_counter()
+                log.info(
+                    "Vectorized engine timing: pass1=%.3fs cost_build=%.3fs pass2=%.3fs",
+                    (t1 - t0) if (t0 is not None and t1 is not None) else float('nan'),
+                    (t2 - t1) if (t1 is not None and t2 is not None) else float('nan'),
+                    (t3 - t2) if (t2 is not None) else float('nan'),
+                )
     else:
         # Simple single-pass: map constant fees/slippage
         fees = _commission_to_vbt_fees(commission)
@@ -392,6 +445,8 @@ def _build_cost_matrices_from_orders(
     orders_df: pd.DataFrame,
     commission: Commission | None,
     slippage_model: Any | None,
+    sparse: bool = True,
+    numpy_fast: bool = True,
 ) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
     """
     Build per-bar, per-asset cost matrices to pass into vectorbt from
@@ -431,6 +486,7 @@ def _build_cost_matrices_from_orders(
     )
 
     # Pivot only on active timestamps; align to full dates later (sparse-aware)
+    # If sparse=False, expand immediately to full index to keep identical behavior.
     net_size_by_col = grp_signed.pivot(index=ts_col, columns=col_col, values=size_col)
     abs_size_by_col = grp_abs.pivot(index=ts_col, columns=col_col, values="_abs")
     buy_qty_by_col = grp_buy.pivot(index=ts_col, columns=col_col, values="_buy")
@@ -464,12 +520,18 @@ def _build_cost_matrices_from_orders(
             idx = df_like.index
         df_like = df_like.copy()
         df_like.index = idx
-        return (
-            df_like.reindex(index=dates)
-            .reindex(columns=cols)
-            .fillna(0.0)
-            .astype("float64")
-        )
+        if sparse:
+            out = (
+                df_like.reindex(index=dates)
+                .reindex(columns=cols)
+                .fillna(0.0)
+                .astype("float64")
+            )
+        else:
+            # Expand to full shape even if there are many zeros
+            out = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+            out.loc[df_like.index, df_like.columns] = df_like.astype("float64").values
+        return out
 
     net_size = _align(net_size_by_col)
     abs_size = _align(abs_size_by_col)
@@ -484,10 +546,20 @@ def _build_cost_matrices_from_orders(
             # Vectorbt applies `fees` as a fraction of order value, which uses base price.
             # Event-driven commission is per-share, independent of slippage.
             # Thus, set per-bar fee fraction = per_share / price on bars with orders.
-            with np.errstate(divide="ignore", invalid="ignore"):
-                frac = per_share / prices.replace(0.0, np.nan)
-            frac = frac.replace([np.inf, -np.inf], np.nan).fillna(0.0).astype("float64")
-            fees_df = frac.where(abs_size > 0.0, 0.0)
+            if numpy_fast:
+                p = prices.to_numpy(dtype=float, copy=False)
+                abs_a = abs_size.to_numpy(dtype=float, copy=False)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    frac_arr = per_share / p
+                frac_arr[~np.isfinite(frac_arr)] = 0.0
+                mask = abs_a > 0.0
+                fees_arr = np.where(mask, frac_arr, 0.0)
+                fees_df = pd.DataFrame(fees_arr, index=dates, columns=cols, dtype="float64")
+            else:
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    frac = per_share / prices.replace(0.0, np.nan)
+                frac = frac.replace([np.inf, -np.inf], np.nan).fillna(0.0).astype("float64")
+                fees_df = frac.where(abs_size > 0.0, 0.0)
         elif getattr(commission, "type", None) == "bps_notional" and float(getattr(commission, "amount", 0.0)) != 0.0:
             # Single-pass could handle this; but for consistency, only apply on order bars
             frac = float(commission.amount) / 1e4
@@ -503,24 +575,156 @@ def _build_cost_matrices_from_orders(
         exponent = float(getattr(slippage_model, "exponent", 1.0) or 1.0)
 
         if base_bps != 0.0 or k != 0.0:
+            if numpy_fast:
+                abs_net_a = np.abs(net_size.to_numpy(dtype=float, copy=False))
+                abs_a = abs_size.to_numpy(dtype=float, copy=False)
+                if volumes is None:
+                    part_net_a = np.zeros_like(abs_net_a)
+                else:
+                    vol_a = volumes.reindex(index=dates, columns=cols).to_numpy(dtype=float, copy=False)
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        part_net_a = abs_net_a / vol_a
+                    part_net_a[~np.isfinite(part_net_a)] = 0.0
+                    np.clip(part_net_a, 0.0, 1.0, out=part_net_a)
+                slip_bps_a = base_bps + k * np.power(part_net_a, exponent)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    scale_a = np.divide(abs_net_a, abs_a)
+                scale_a[~np.isfinite(scale_a)] = 0.0
+                np.clip(scale_a, 0.0, 1.0, out=scale_a)
+                slip_frac_a = (slip_bps_a / 1e4) * scale_a
+                mask = abs_a > 0.0
+                slip_frac_a = np.where(mask, slip_frac_a, 0.0)
+                slippage_df = pd.DataFrame(slip_frac_a, index=dates, columns=cols, dtype="float64")
+            else:
+                if volumes is None:
+                    part_net = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+                else:
+                    vol = volumes.reindex(index=dates, columns=cols).astype("float64")
+                    with np.errstate(divide="ignore", invalid="ignore"):
+                        part_net = np.abs(net_size) / vol.replace(0.0, np.nan)
+                    part_net = part_net.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+                    part_net = part_net.clip(lower=0.0, upper=1.0)
+                # Compute slippage in bps and convert to fraction
+                slip_bps_ev = base_bps + k * np.power(part_net, exponent)
+                # Scale slippage by net/legs ratio so that total slippage dollars across legs
+                # approximates event-driven slippage on the net trade
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    scale = (np.abs(net_size)) / abs_size.replace(0.0, np.nan)
+                scale = scale.replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(lower=0.0, upper=1.0)
+                slippage_df = ((slip_bps_ev / 1e4) * scale).astype("float64").where(abs_size > 0.0, 0.0)
+
+    return fees_df, slippage_df
+
+
+def _approximate_cost_matrices(
+    *,
+    prices: pd.DataFrame,
+    volumes: pd.DataFrame | None,
+    weights: pd.DataFrame,
+    init_cash: float,
+    commission: Commission | None,
+    slippage_model: Any | None,
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    """
+    Build approximate per-bar cost matrices without running a first vectorbt pass.
+    Assumptions:
+      - Equity used for target shares is approximated as constant `init_cash`.
+      - Positions follow target weights instantly at each rebalance.
+    This is purely optional for speed and will not perfectly match event-driven results.
+    """
+    dates = prices.index
+    cols = prices.columns
+
+    # Approximate target shares per bar
+    # Use forward-filled weights to mimic vectorbt's hold behavior between rebalances
+    weights_ffill = weights.ffill().fillna(0.0)
+    eq = float(init_cash)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        target_shares = (weights_ffill * eq) / prices.replace(0.0, np.nan)
+    target_shares = target_shares.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    prev_shares = target_shares.shift(1).fillna(0.0)
+    net_shares = (target_shares - prev_shares).astype("float64")
+    abs_shares = np.abs(net_shares)
+
+    # Fees (per-share commission) -> per-bar fraction of traded notional
+    fees_df: pd.DataFrame | None = None
+    if commission is not None and getattr(commission, "type", None) == "per_share" and float(getattr(commission, "amount", 0.0)) != 0.0:
+        per_share = float(commission.amount)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            frac = per_share / prices.replace(0.0, np.nan)
+        frac = frac.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        fees_df = frac.where(abs_shares > 0.0, 0.0).astype("float64")
+
+    # Slippage (power-law)
+    slippage_df: pd.DataFrame | None = None
+    if slippage_model is not None:
+        base_bps = float(getattr(slippage_model, "base_bps", 0.0) or 0.0)
+        k = float(getattr(slippage_model, "k", 0.0) or 0.0)
+        exponent = float(getattr(slippage_model, "exponent", 1.0) or 1.0)
+        if base_bps != 0.0 or k != 0.0:
             if volumes is None:
-                part_net = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
+                part = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
             else:
                 vol = volumes.reindex(index=dates, columns=cols).astype("float64")
                 with np.errstate(divide="ignore", invalid="ignore"):
-                    part_net = np.abs(net_size) / vol.replace(0.0, np.nan)
-                part_net = part_net.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-                part_net = part_net.clip(lower=0.0, upper=1.0)
-            # Compute slippage in bps and convert to fraction
-            slip_bps_ev = base_bps + k * np.power(part_net, exponent)
-            # Scale slippage by net/legs ratio so that total slippage dollars across legs
-            # approximates event-driven slippage on the net trade
-            with np.errstate(divide="ignore", invalid="ignore"):
-                scale = (np.abs(net_size)) / abs_size.replace(0.0, np.nan)
-            scale = scale.replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(lower=0.0, upper=1.0)
-            slippage_df = ((slip_bps_ev / 1e4) * scale).astype("float64").where(abs_size > 0.0, 0.0)
+                    part = abs_shares / vol.replace(0.0, np.nan)
+                part = part.replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(lower=0.0, upper=1.0)
+            slip_bps = base_bps + k * np.power(part, exponent)
+            slippage_df = (slip_bps / 1e4).astype("float64").where(abs_shares > 0.0, 0.0)
 
     return fees_df, slippage_df
+
+
+# -----------------------------
+# Options & caching helpers
+# -----------------------------
+
+def _resolve_engine_options(extra: Dict[str, object]) -> Dict[str, bool]:
+    # Defaults
+    opts = {
+        "sparse_cost_mats": True,
+        "numpy_fast_path": True,
+        "approx_single_pass": False,
+        "enable_caching": False,
+        "timing": bool(int(os.environ.get("QUANTDSL_VEC_TIMING", "0") or 0)),
+    }
+    # From BacktestConfig.extra
+    sub = {}
+    if isinstance(extra, dict):
+        sub = extra.get("vectorized_engine") if isinstance(extra.get("vectorized_engine"), dict) else {}
+    if sub:
+        for k in ("sparse_cost_mats", "numpy_fast_path", "approx_single_pass", "enable_caching", "timing"):
+            if k in sub:
+                opts[k] = bool(sub[k])
+    # Env overrides
+    def _env_bool(name: str, default: bool) -> bool:
+        v = os.environ.get(name)
+        if v is None:
+            return default
+        try:
+            return bool(int(v))
+        except Exception:
+            return default
+    opts["sparse_cost_mats"] = _env_bool("QUANTDSL_VEC_SPARSE", opts["sparse_cost_mats"])
+    opts["numpy_fast_path"] = _env_bool("QUANTDSL_VEC_NUMPY", opts["numpy_fast_path"])
+    opts["approx_single_pass"] = _env_bool("QUANTDSL_VEC_APPROX", opts["approx_single_pass"])
+    opts["enable_caching"] = _env_bool("QUANTDSL_VEC_CACHE", opts["enable_caching"])
+    return opts
+
+
+def _make_orders_cache_key(weights: pd.DataFrame, prices: pd.DataFrame, init_cash: float) -> tuple:
+    try:
+        # Lightweight, collision-resistant key
+        w_hash = pd.util.hash_pandas_object(weights.fillna(0.0), index=True).values.sum()
+        idx_sig = (len(prices.index), prices.index[0], prices.index[-1])
+        col_sig = (len(prices.columns), prices.columns[0], prices.columns[-1])
+        return ("v1", int(w_hash), idx_sig, col_sig, float(init_cash))
+    except Exception:
+        return ("v1_fallback", weights.shape, prices.shape, float(init_cash))
+
+
+# Simple in-memory cache (module-level). Not persisted across runs.
+_pass1_orders_cache: Dict[tuple, pd.DataFrame] = {}
 
 
 def _orders_to_trades_df(pf: vbt.Portfolio, instruments) -> pd.DataFrame:
