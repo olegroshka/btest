@@ -32,8 +32,12 @@ src/quantdsl_backtest/engine/results.py
 src/quantdsl_backtest/engine/signal_engine.py
 src/quantdsl_backtest/engine/vectorized_engine.py
 src/quantdsl_backtest/examples/__init__.py
+src/quantdsl_backtest/examples/lagging_indecies.py
 src/quantdsl_backtest/examples/momentum_long_short_sp500.py
+src/quantdsl_backtest/examples/tiny_momentum_ls.py
 src/quantdsl_backtest/models/__init__.py
+src/quantdsl_backtest/models/costs.py
+src/quantdsl_backtest/models/latency.py
 src/quantdsl_backtest/models/metrics.py
 src/quantdsl_backtest/models/risk.py
 src/quantdsl_backtest/models/slippage.py
@@ -49,6 +53,11 @@ tests/test_dsl_configs.py
 tests/test_dsl_costs_strategy.py
 tests/test_execution.py
 tests/test_factors.py
+tests/test_metrics_quantstats.py
+tests/test_models_costs.py
+tests/test_models_latency.py
+tests/test_models_slippage.py
+tests/test_models_volume_limits.py
 tests/test_portfolio.py
 tests/test_signal_engine_expr.py
 tests/test_signals.py

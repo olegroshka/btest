@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .transforms import DataTransform
 
 
 PriceAdjustment = Literal["none", "split_only", "split_dividend"]
@@ -30,3 +33,6 @@ class DataConfig:
 
     # Optional: additional metadata
     tz: Optional[str] = None             # e.g. "America/New_York"
+
+    # Optional: data transforms to apply after loading
+    transforms: Optional[List["DataTransform"]] = None

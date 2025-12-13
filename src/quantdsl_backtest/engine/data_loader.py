@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Tuple, Iterable
 
 import pandas as pd
 
 from ..dsl.strategy import Strategy
+from ..dsl.transforms import DataTransform
 from ..data.adapters import load_market_data
 from ..data.schema import MarketData
 from ..utils.logging import get_logger
@@ -46,6 +47,34 @@ def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame
     # Ensure time is sorted and volumes align to prices' index
     prices = prices.sort_index()
     volumes = volumes.sort_index().reindex(prices.index)
+
+    # Apply any configured data transforms declared in the DSL. This replaces
+    # previous source-specific cleaning logic with a generic, composable pipeline.
+    transforms: Iterable[DataTransform] = getattr(strategy.data, "transforms", []) or []
+    for t in transforms:
+        try:
+            # Allow users to pass either a transform instance or the class itself.
+            # If a class is provided, instantiate with defaults.
+            obj = t  # type: ignore[assignment]
+            if isinstance(t, type):  # a class, not an instance
+                obj = t()  # type: ignore[call-arg]
+
+            prices, volumes = obj.apply(prices, volumes)  # type: ignore[attr-defined]
+        except Exception as e:
+            name = None
+            try:
+                name = getattr(t, "name", None)
+            except Exception:
+                name = None
+            if not isinstance(name, str) or not name:
+                # Fall back to readable type/instance name
+                name = getattr(getattr(t, "__class__", type(t)), "__name__", str(t))
+            log.error("Data transform %s failed: %s", name, e)
+            raise
+
+    if transforms:
+        log.info("Applied %d data transform(s); resulting shape: prices=%s, volumes=%s",
+                 len(list(transforms)), prices.shape, volumes.shape)
 
     # Enforce float64 dtype for numerical stability
     prices = prices.astype("float64")

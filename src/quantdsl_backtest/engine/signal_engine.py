@@ -306,6 +306,12 @@ class SignalEngine:
             m = mask.loc[ts]
             valid = row[m].dropna()
             if valid.empty:
+                # On sparse datasets (e.g., indices with many NaNs), an empty
+                # valid set would yield an all-NaN rank row. That propagates and
+                # can make the portfolio stay flat via early-return guards.
+                # Instead, emit zeros for this timestamp so downstream selectors
+                # can still pick names deterministically.
+                out.loc[ts] = 0.0
                 continue
             if node.method == "percentile":
                 ranks = valid.rank(method="average", ascending=True) - 1

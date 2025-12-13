@@ -61,9 +61,10 @@ def apply_carry_costs(
     borrow_rate = borrow.default_annual_rate
     borrow_cost = short_notional * borrow_rate * dt_years
 
-    # Simple financing on cash (use spread_bps as full rate for now)
-    fin_rate = financing.spread_bps / 1e4
-    financing_pnl = cash * fin_rate * dt_years  # positive if earning interest
+    # Financing on cash: project baseline tests expect spread applied on cash
+    # balance (positive earns, negative pays).
+    fin_rate = float(financing.spread_bps) / 1e4
+    financing_pnl = cash * fin_rate * dt_years
 
     new_cash = cash - borrow_cost + financing_pnl
     return new_cash, borrow_cost, financing_pnl
