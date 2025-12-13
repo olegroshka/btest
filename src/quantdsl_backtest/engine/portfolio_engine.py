@@ -31,12 +31,52 @@ def compute_target_weights_for_date(
 
     Returns: Series of target weights indexed by instrument.
     """
-    # Use delayed signals
+    # Use delayed signals. Make this generic by resolving factor/mask names
+    # from the portfolio books rather than hardcoding specific keys.
     delay = portfolio.signal_delay_bars
-    sig_df = signals["rank"]  # we know sample strategy uses this
-    all_dates = sig_df.index
-    date_pos = all_dates.get_loc(date)
 
+    long_sel = portfolio.long_book.selector
+    short_sel = portfolio.short_book.selector
+
+    def _get_df_opt(name: Optional[str]) -> Optional[pd.DataFrame]:
+        if name is None:
+            return None
+        return signals.get(name)
+
+    # Resolve rank/score DataFrames per book
+    _long_rank_try = _get_df_opt(getattr(long_sel, "factor_name", None))
+    long_rank_df = _long_rank_try if _long_rank_try is not None else signals.get("rank")
+
+    _short_rank_try = _get_df_opt(getattr(short_sel, "factor_name", None))
+    short_rank_df = _short_rank_try if _short_rank_try is not None else signals.get("rank")
+
+    # Resolve masks per book (default to all True over the rank_df shape)
+    _long_mask_try = _get_df_opt(getattr(long_sel, "mask_name", None))
+    long_mask_df = _long_mask_try if _long_mask_try is not None else signals.get("long_candidates")
+
+    _short_mask_try = _get_df_opt(getattr(short_sel, "mask_name", None))
+    short_mask_df = _short_mask_try if _short_mask_try is not None else signals.get("short_candidates")
+
+    # Choose a reference index that contains the requested date
+    ref_df: Optional[pd.DataFrame] = None
+    for df in (long_rank_df, short_rank_df):
+        if df is not None and date in df.index:
+            ref_df = df
+            break
+    if ref_df is None:
+        # Fallback: try any signal frame containing the date
+        for df in signals.values():
+            if isinstance(df, pd.DataFrame) and date in df.index:
+                ref_df = df
+                break
+
+    if ref_df is None:
+        # No signal aligned to this date; keep previous weights
+        log.debug("No signals available for %s; keeping previous weights.", date)
+        return prev_weights.copy()
+
+    all_dates = ref_df.index
+    date_pos = all_dates.get_loc(date)
     if isinstance(date_pos, slice):
         date_pos = date_pos.start  # should not happen for unique index
 
@@ -47,37 +87,83 @@ def compute_target_weights_for_date(
 
     sig_date = all_dates[sig_pos]
 
-    rank_row = sig_df.loc[sig_date]
+    # Pull rows for the signal date, with graceful fallbacks
+    def _safe_row(df_opt: Optional[pd.DataFrame], like: Optional[pd.DataFrame]) -> pd.Series:
+        if df_opt is None:
+            # Create an all-NaN row matching the 'like' columns if available
+            cols = like.columns if like is not None else (prev_weights.index if prev_weights is not None else [])
+            return pd.Series(index=cols, dtype="float64")
+        # If date missing in df, return NaNs over its columns
+        if sig_date not in df_opt.index:
+            return pd.Series(index=df_opt.columns, dtype="float64")
+        row = df_opt.loc[sig_date]
+        # Ensure Series
+        if isinstance(row, pd.DataFrame):
+            # Unexpected multi-index/slice; take first row
+            row = row.iloc[0]
+        return row
 
-    long_mask = signals["long_candidates"].loc[sig_date].astype(bool)
-    short_mask = signals["short_candidates"].loc[sig_date].astype(bool)
+    long_rank_row = _safe_row(long_rank_df, short_rank_df)
+    short_rank_row = _safe_row(short_rank_df, long_rank_df)
 
-    # If there are not enough valid instruments (non-NaN rank), stay flat.
-    # The vectorbt baseline requires at least 100 valid names (50 long + 50 short).
-    valid_count = int(rank_row.notna().sum())
-    need = 0
-    if isinstance(portfolio.long_book.selector, TopN):
-        need += int(portfolio.long_book.selector.n)
-    if isinstance(portfolio.short_book.selector, BottomN):
-        need += int(portfolio.short_book.selector.n)
+    def _safe_mask_row(mask_df_opt: Optional[pd.DataFrame], idx_like: pd.Index) -> pd.Series:
+        if mask_df_opt is None:
+            return pd.Series(True, index=idx_like, dtype="bool")
+        if sig_date not in mask_df_opt.index:
+            return pd.Series(True, index=idx_like, dtype="bool")
+        m = mask_df_opt.loc[sig_date].astype(bool)
+        # Align to idx_like; any missing defaults to False (conservative)
+        return m.reindex(idx_like).fillna(False).astype(bool)
 
-    instruments = sig_df.columns
+    long_mask = _safe_mask_row(long_mask_df, long_rank_row.index)
+    short_mask = _safe_mask_row(short_mask_df, short_rank_row.index)
+
+    # Instruments universe comes from any available rank df; fallback to prev_weights index
+    instruments: pd.Index
+    if long_rank_df is not None:
+        instruments = long_rank_df.columns
+    elif short_rank_df is not None:
+        instruments = short_rank_df.columns
+    else:
+        instruments = prev_weights.index
+
     target = pd.Series(0.0, index=instruments, dtype="float64")
 
-    if valid_count < need:
-        return target
+    # Optional gating: if there aren't enough valid ranks to populate both books,
+    # keep target at zeros (baseline reference behavior in integration tests).
+    try:
+        long_n_req = getattr(portfolio.long_book.selector, "n", 0)
+        short_n_req = getattr(portfolio.short_book.selector, "n", 0)
+        n_required = int(long_n_req) + int(short_n_req)
+    except Exception:
+        n_required = 0
+
+    if n_required > 0:
+        valid_long = long_rank_row[long_rank_row.notna()].index if long_rank_row is not None else pd.Index([])
+        valid_short = short_rank_row[short_rank_row.notna()].index if short_rank_row is not None else pd.Index([])
+        # union of symbols with a valid rank in either book
+        valid_union = valid_long.union(valid_short)
+        if int(valid_union.size) < n_required:
+            # Not enough valid names to form both books: return zeros after turnover cap
+            if portfolio.turnover_limit is not None:
+                target = _apply_turnover_limit(
+                    prev_weights=prev_weights,
+                    target_weights=target,
+                    max_fraction=portfolio.turnover_limit.max_fraction,
+                )
+            return target
 
     # Select instruments for long and short books using selectors
     long_names = _select_book_names(
         date=sig_date,
         book=portfolio.long_book,
-        rank_row=rank_row,
+        rank_row=long_rank_row,
         mask=long_mask,
     )
     short_names = _select_book_names(
         date=sig_date,
         book=portfolio.short_book,
-        rank_row=rank_row,
+        rank_row=short_rank_row,
         mask=short_mask,
     )
 

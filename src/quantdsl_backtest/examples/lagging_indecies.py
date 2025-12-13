@@ -57,35 +57,40 @@ from quantdsl_backtest.engine.data_loader import load_data_for_strategy
 
 
 def build_strategy() -> Strategy:
-    # 1) Data config: use indices parquet created earlier
+    # 1) Data config: indices parquet
     data = DataConfig(
         source="parquet://equities/indicies.parquet",
-        calendar="XNYS",  # single calendar; timezone effects approximated via returns
+        calendar="XNYS",  # single calendar; temporal effects via returns
         frequency="1d",
         start="2015-01-01",
         end="2025-12-31",
         price_adjustment="split_dividend",
         fields=["open", "high", "low", "close", "volume"],
-        transforms=[CleaningTransform]
     )
 
-    # 2) Universe: require some history and loose price floor
+    # 2) Universe: minimal sanity filters
     universe = Universe(
         name="Indices",
         id_field="ticker",
         filters=[
             HasHistory(min_days=252),
-            MinPrice(min_price=1.0),
+            MinPrice(min_price=5.0),
         ],
     )
 
-    # 3) Factors
-    # Short / medium horizon momentum
-    mom_1 = ReturnFactor(name="mom_1", field="close", lookback=1, method="log")
-    mom_5 = ReturnFactor(name="mom_5", field="close", lookback=5, method="log")
-    mom_20 = ReturnFactor(name="mom_20", field="close", lookback=20, method="log")
-
-    # Realized volatility as simple risk proxy
+    # 3) Factors: multi-horizon momentum + vol
+    mom_20 = ReturnFactor(
+        name="mom_20",
+        field="close",
+        lookback=20,
+        method="log",
+    )
+    mom_60 = ReturnFactor(
+        name="mom_60",
+        field="close",
+        lookback=60,
+        method="log",
+    )
     vol_20 = VolatilityFactor(
         name="vol_20",
         field="close",
@@ -95,130 +100,123 @@ def build_strategy() -> Strategy:
     )
 
     factors = {
-        "mom_1": mom_1,
-        "mom_5": mom_5,
         "mom_20": mom_20,
+        "mom_60": mom_60,
         "vol_20": vol_20,
     }
 
     # 4) Signals
     #
-    # Core ranking signal: cross-sectional rank of 5-day momentum.
-    # This is what the portfolio uses to pick top/bottom names.
-    rank = CrossSectionRank(
-        factor_name="mom_5",
+    # Rank 20d and 60d momentum cross-sectionally.
+    rank_20 = CrossSectionRank(
+        factor_name="mom_20",
         mask_name=None,
         method="percentile",
-        name="rank",
+        name="rank_20",
+    )
+    rank_60 = CrossSectionRank(
+        factor_name="mom_60",
+        mask_name=None,
+        method="percentile",
+        name="rank_60",
     )
 
-    # Quantile thresholds for "strong" / "weak" on each horizon.
-    # We keep them moderately tight so we almost always have candidates
-    # even with a small universe of ~7 indices.
-    mom5_high = Quantile(factor_name="mom_5", q=0.65)  # strong short-term trend
-    mom5_low = Quantile(factor_name="mom_5", q=0.35)   # weak short-term trend
-
-    mom1_high = Quantile(factor_name="mom_1", q=0.65)  # strong recent move
-    mom1_low = Quantile(factor_name="mom_1", q=0.35)   # weak / negative recent move
-
-    # "Strong trend" / "weak trend" masks based on mom_5:
-    strong_trend = MaskFromBoolean(
-        name="strong_trend",
-        expr=GreaterEqual(left="mom_5", right=mom5_high),
+    # We'll approximate "combined score" as the average of the two ranks
+    # inside the signal engine by composing boolean masks on each:
+    combined_strong = MaskFromBoolean(
+        name="combined_strong",
+        expr=And(
+            left=GreaterEqual(left="rank_20", right=0.5),
+            right=GreaterEqual(left="rank_60", right=0.5),
+        ),
     )
-    weak_trend = MaskFromBoolean(
-        name="weak_trend",
-        expr=LessEqual(left="mom_5", right=mom5_low),
+    combined_weak = MaskFromBoolean(
+        name="combined_weak",
+        expr=And(
+            left=LessEqual(left="rank_20", right=0.5),
+            right=LessEqual(left="rank_60", right=0.5),
+        ),
     )
 
-    # "Strong recent move" / "weak recent move" based on mom_1:
-    strong_recent = MaskFromBoolean(
-        name="strong_recent",
-        expr=GreaterEqual(left="mom_1", right=mom1_high),
-    )
-    weak_recent = MaskFromBoolean(
-        name="weak_recent",
-        expr=LessEqual(left="mom_1", right=mom1_low),
-    )
-
-    # Basic "valid data" mask: non-null momentum and volatility.
+    # Valid data mask: non-null mom and reasonable volatility
     valid = MaskFromBoolean(
         name="valid",
         expr=And(
-            left=NotNull(factor_name="mom_5"),
-            right=NotNull(factor_name="vol_20"),
+            left=NotNull(factor_name="mom_20"),
+            right=NotNull(factor_name="mom_60"),
         ),
     )
 
     # LONG CANDIDATES:
-    # - strong short-term trend (mom_5 high)
-    # - but weak/negative very recent move (mom_1 low)
-    # Interpreted as "trend that just lagged or pulled back": potential catch-up.
+    # indices with above-median 20d AND 60d momentum.
     long_candidates = MaskFromBoolean(
         name="long_candidates",
         expr=And(
-            left=And(left="strong_trend", right="weak_recent"),
+            left="combined_strong",
             right="valid",
         ),
     )
 
     # SHORT CANDIDATES:
-    # - weak short-term trend (mom_5 low)
-    # - but strong positive very recent move (mom_1 high)
-    # Interpreted as "overreaction against a weak trend": potential give-back.
+    # indices with below-median 20d AND 60d momentum.
     short_candidates = MaskFromBoolean(
         name="short_candidates",
         expr=And(
-            left=And(left="weak_trend", right="strong_recent"),
+            left="combined_weak",
             right="valid",
         ),
     )
 
     signals = {
-        "rank": rank,
-        "strong_trend": strong_trend,
-        "weak_trend": weak_trend,
-        "strong_recent": strong_recent,
-        "weak_recent": weak_recent,
+        "rank_20": rank_20,
+        "rank_60": rank_60,
+        "combined_strong": combined_strong,
+        "combined_weak": combined_weak,
         "valid": valid,
         "long_candidates": long_candidates,
         "short_candidates": short_candidates,
     }
 
-    # 5) Portfolio: small L/S, daily rebalance, no signal delay
+    # 5) Portfolio: small long/short, trend following
     #
-    # The Book selectors use 'rank' (mom_5 percentile) to pick names
-    # *within* the long/short candidate masks defined above.
+    # Books use rank_60 as selector key (slower horizon), but are masked
+    # by 'long_candidates' / 'short_candidates' that also require 20d trend.
+    long_book = Book(
+        name="long_book",
+        selector=TopN(
+            factor_name="rank_60",
+            n=2,
+            mask_name="long_candidates",
+        ),
+        weighting=EqualWeight(),
+    )
+    short_book = Book(
+        name="short_book",
+        selector=BottomN(
+            factor_name="rank_60",
+            n=2,
+            mask_name="short_candidates",
+        ),
+        weighting=EqualWeight(),
+    )
+
     portfolio = LongShortPortfolio(
-        long_book=Book(
-            name="long",
-            selector=TopN(
-                factor_name="rank",   # name of the signal we rank on
-                n=2,
-                mask_name="long_candidates",
-            ),
-            weighting=EqualWeight(),
-        ),
-        short_book=Book(
-            name="short",
-            selector=BottomN(
-                factor_name="rank",
-                n=2,
-                mask_name="short_candidates",
-            ),
-            weighting=EqualWeight(),
-        ),
+        long_book=long_book,
+        short_book=short_book,
         rebalance_frequency="1d",
         rebalance_at="market_close",
-        signal_delay_bars=0,         # use today’s signals for today’s close
-        target_gross_leverage=1.5,   # a bit more active than 1.0
+        signal_delay_bars=0,
+        target_gross_leverage=1.2,   # a bit conservative vs 1.5–2.0
         target_net_exposure=0.0,
         max_abs_weight_per_name=0.75,
         sector_neutral=None,
-        turnover_limit=TurnoverLimit(window_bars=1, max_fraction=1.0),
+        turnover_limit=TurnoverLimit(
+            window_bars=5,
+            max_fraction=2.0,  # allow moderate churning but not crazy
+        ),
     )
 
-    # 6) Execution & costs — keep roughly as you had, but keep frictions modest
+    # 6) Execution & costs (leave modest but not crazy)
     execution = Execution(
         order_policy=OrderPolicy(),
         latency=LatencyModel(
@@ -226,7 +224,7 @@ def build_strategy() -> Strategy:
             market_latency_ms=0,
         ),
         slippage=PowerLawSlippageModel(
-            base_bps=1.0,   # modest slippage on indices
+            base_bps=0.5,  # tighter on highly liquid indices
             k=0.0,
             exponent=1.0,
             use_intraday_vol=False,
@@ -239,13 +237,24 @@ def build_strategy() -> Strategy:
     )
 
     costs = Costs(
-        commission=Commission(type="bps_notional", amount=0.5),
-        borrow=BorrowCost(default_annual_rate=0.01),
-        financing=FinancingCost(base_rate_curve="SOFR", spread_bps=0.0),
-        fees=StaticFees(nav_fee_annual=0.0, perf_fee_fraction=0.0),
+        commission=Commission(
+            type="bps_notional",
+            amount=0.2,   # keep frictions modest to avoid domination in example
+        ),
+        borrow=BorrowCost(
+            default_annual_rate=0.01,
+        ),
+        financing=FinancingCost(
+            base_rate_curve="SOFR",
+            spread_bps=0.0,
+        ),
+        fees=StaticFees(
+            nav_fee_annual=0.0,
+            perf_fee_fraction=0.0,
+        ),
     )
 
-    # 7) Backtest runtime and reporting
+    # 7) Backtest config & reporting
     bt = BacktestConfig(
         engine="event_driven",
         cash_initial=1_000_000,
@@ -253,18 +262,18 @@ def build_strategy() -> Strategy:
             store_trades=True,
             store_positions=True,
             metrics=[
-                "daily_returns",
                 "sharpe",
                 "sortino",
                 "max_drawdown",
                 "turnover",
+                "daily_returns",
             ],
         ),
     )
 
     # 8) Compose strategy
     strategy = Strategy(
-        name="lagging_indecies_v2",
+        name="lagging_indecies_trend_cs",
         data=data,
         universe=universe,
         factors=factors,
@@ -275,6 +284,7 @@ def build_strategy() -> Strategy:
         backtest=bt,
     )
     return strategy
+
 
 
 def main() -> None:
