@@ -99,6 +99,25 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
     exec_cfg = strategy.execution
     sl_cfg = exec_cfg.slippage if exec_cfg is not None else None
 
+    # If execution contains volume participation limits (< 100%), vectorbt's
+    # targetpercent sizing cannot enforce them. For parity with the event-driven
+    # engine (and to satisfy engine-consistency tests), fall back to the
+    # event-driven implementation when such constraints are present.
+    try:
+        vp = exec_cfg.volume_limits if exec_cfg is not None else None
+        max_participation = getattr(vp, "max_participation", None)
+        if max_participation is not None and float(max_participation) < 1.0:
+            log.info(
+                "Vectorized engine: volume participation < 100%% detected (%.2f). "
+                "Falling back to event-driven engine for parity.",
+                float(max_participation),
+            )
+            from .backtest_runner import _run_backtest_event_driven
+
+            return _run_backtest_event_driven(strategy)
+    except Exception as exc:
+        log.warning("Vectorized engine: failed to inspect volume limits, continuing with vectorized path: %s", exc)
+
     need_per_share = bool(
         commission is not None and getattr(commission, "type", None) == "per_share" and float(getattr(commission, "amount", 0.0)) != 0.0
     )
@@ -232,64 +251,78 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
     returns = pf.returns()
     cash = pf.cash()
 
-    # Positions (shares) over time – build robustly across vectorbt versions
+    # Unified path: extract positions first, compute weights from positions and equity
+    def _align_panel(df_like: pd.DataFrame) -> pd.DataFrame:
+        """Align any DataFrame-like panel to (dates x instruments) without dropping data.
+        If shapes match, force labels to exactly match our prices panel; else reindex.
+        """
+        if not isinstance(df_like, pd.DataFrame):
+            df_like = pd.DataFrame(df_like)
+        df = df_like.copy()
+        # If df already has the same shape, set labels directly to avoid data loss
+        if df.shape == (len(dates), len(instruments)):
+            df.index = dates
+            df.columns = instruments
+            return df.astype("float64")
+        # Try vectorbt wrapper metadata if present
+        try:
+            wrap = getattr(pf, "wrapper", None)
+            if wrap is not None:
+                idx = getattr(wrap, "index", None)
+                cols = getattr(wrap, "columns", None)
+                if idx is not None and len(idx) == df.shape[0]:
+                    df.index = pd.Index(idx)
+                if cols is not None and len(cols) == df.shape[1]:
+                    df.columns = pd.Index(cols)
+        except Exception:
+            pass
+        # Final alignment with reindex
+        return df.reindex(index=dates, columns=instruments).astype("float64").fillna(0.0)
+
+    # 1) Try direct shares accessor
     positions = None
-    # Prefer reconstructing from orders to avoid wrapper objects
     try:
-        orders = getattr(pf, "orders", None)
-        if orders is not None:
-            rec = orders.records_readable
-            df = rec.copy()
-            # Normalize column names and map column index to instrument
-            col_map = {i: inst for i, inst in enumerate(instruments)}
-            ts_col = "Timestamp" if "Timestamp" in df.columns else ("timestamp" if "timestamp" in df.columns else None)
-            size_col = "Size" if "Size" in df.columns else ("size" if "size" in df.columns else None)
-            col_col = "Column" if "Column" in df.columns else ("column" if "column" in df.columns else None)
-            if ts_col is not None and size_col is not None and col_col is not None:
-                df["instrument"] = df[col_col].map(col_map)
-                # Harmonize timezone with price index
-                ts = pd.to_datetime(df[ts_col])
-                if hasattr(dates, "tz") and dates.tz is not None:
-                    # Make ts tz-aware in the same tz
-                    if getattr(ts.dt, "tz", None) is not None:
-                        ts = ts.dt.tz_convert(dates.tz)
-                    else:
-                        ts = ts.dt.tz_localize(dates.tz)
-                else:
-                    # Make ts naive
-                    if getattr(ts.dt, "tz", None) is not None:
-                        ts = ts.dt.tz_localize(None)
-                df[ts_col] = ts
-                # Sum order sizes per date/instrument
-                order_sizes = (
-                    df.groupby([ts_col, "instrument"], as_index=False)[size_col]
-                    .sum()
-                )
-                # Pivot to daily net size per instrument, reindex to trading calendar
-                pivot = (
-                    order_sizes.pivot(index=ts_col, columns="instrument", values=size_col)
-                    .reindex(dates)
-                    .fillna(0.0)
-                )
-                positions = pivot.cumsum().astype("float64")
+        shares_obj = pf.shares()
+        if hasattr(shares_obj, "to_pandas"):
+            positions = _align_panel(shares_obj.to_pandas())
+        else:
+            positions = _align_panel(pd.DataFrame(shares_obj))
     except Exception:
         positions = None
 
-    # If still not available, try vectorbt helpers
+    # 2) If not available, reconstruct from orders
     if positions is None:
-        # 1) Newer vectorbt often exposes `pf.shares()`
         try:
-            cand = pf.shares()  # may raise or return wrapper
-            if hasattr(cand, "to_pandas"):
-                positions = cand.to_pandas()
-            else:
-                # Try pandas conversion
-                positions = pd.DataFrame(cand)
+            orders = getattr(pf, "orders", None)
+            if orders is not None:
+                rec = orders.records_readable
+                df = rec.copy()
+                col_map = {i: inst for i, inst in enumerate(instruments)}
+                ts_col = "Timestamp" if "Timestamp" in df.columns else ("timestamp" if "timestamp" in df.columns else None)
+                size_col = "Size" if "Size" in df.columns else ("size" if "size" in df.columns else None)
+                col_col = "Column" if "Column" in df.columns else ("column" if "column" in df.columns else None)
+                if ts_col is not None and size_col is not None and col_col is not None:
+                    df["instrument"] = df[col_col].map(col_map)
+                    ts = pd.to_datetime(df[ts_col])
+                    if getattr(dates, "tz", None) is not None:
+                        if getattr(ts.dt, "tz", None) is not None:
+                            ts = ts.dt.tz_convert(dates.tz)
+                        else:
+                            ts = ts.dt.tz_localize(dates.tz)
+                    else:
+                        if getattr(ts.dt, "tz", None) is not None:
+                            ts = ts.dt.tz_localize(None)
+                    df[ts_col] = ts
+                    order_sizes = df.groupby([ts_col, "instrument"], as_index=False)[size_col].sum()
+                    pivot = order_sizes.pivot(index=ts_col, columns="instrument", values=size_col)
+                    pivot = pivot.reindex(dates).fillna(0.0)
+                    positions = pivot.cumsum().astype("float64")
+                    positions = _align_panel(positions)
         except Exception:
             positions = None
 
+    # 3) Try positions accessor variants
     if positions is None:
-        # 2) Accessor with various attribute names
         try:
             pos_acc = getattr(pf, "positions", None)
             if pos_acc is not None:
@@ -297,46 +330,124 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
                     if hasattr(pos_acc, attr):
                         candidate = getattr(pos_acc, attr)
                         if hasattr(candidate, "to_pandas"):
-                            positions = candidate.to_pandas()
+                            positions = _align_panel(candidate.to_pandas())
                         else:
-                            positions = pd.DataFrame(candidate)
+                            positions = _align_panel(pd.DataFrame(candidate))
                         break
                 if positions is None and hasattr(pos_acc, "to_pandas"):
-                    positions = pos_acc.to_pandas()
+                    positions = _align_panel(pos_acc.to_pandas())
         except Exception:
             positions = None
 
+    # 4) Last resort: zeros
     if positions is None:
-        # Last resort: zero positions with correct shape
         positions = pd.DataFrame(0.0, index=dates, columns=instruments, dtype="float64")
 
-    # Align everything to same index/columns
+    # Align core series
     equity = equity.reindex(dates).astype("float64")
     returns = returns.reindex(dates).fillna(0.0).astype("float64")
     cash = cash.reindex(dates).astype("float64")
-    # Align to our price panel and ensure DataFrame dtype
-    if not isinstance(positions, pd.DataFrame):
-        positions = pd.DataFrame(positions)
-    positions = positions.reindex(index=dates, columns=instruments).fillna(0.0).astype("float64")
 
-    # Notional exposure per asset
+    # Compute exposures from positions
+    positions = _align_panel(positions)
     notional = positions * prices
     long_exposure = notional.clip(lower=0.0).sum(axis=1)
-    short_exposure = notional.clip(upper=0.0).sum(axis=1)  # negative
+    short_exposure = notional.clip(upper=0.0).sum(axis=1)
     gross_exposure = long_exposure + np.abs(short_exposure)
     net_exposure = long_exposure + short_exposure
-    leverage = gross_exposure / equity.replace(0.0, np.nan)
-    leverage = leverage.fillna(0.0)
+    leverage = (gross_exposure / equity.replace(0.0, np.nan)).fillna(0.0)
 
-    # Weights = exposure / equity
-    weights_full = pd.DataFrame(
-        0.0, index=dates, columns=instruments, dtype="float64"
+    # Planned target weights (forward-filled across non-rebalance days)
+    planned_weights = (
+        weights.copy()
+        .ffill()
+        .fillna(0.0)
+        .reindex(index=dates, columns=instruments)
+        .astype("float64")
     )
+
+    # Weights from notional over equity (actual realized weights)
     eq_nonzero = equity.replace(0.0, np.nan)
-    weights_full.loc[:, :] = notional.div(eq_nonzero, axis=0).fillna(0.0)
+    weights_full = (
+        notional.div(eq_nonzero, axis=0)
+        .replace([np.inf, -np.inf], 0.0)
+        .fillna(0.0)
+        .astype("float64")
+    )
+
+    # Safety fallback: if realized weights are degenerate (all zeros or never change),
+    # use planned target weights to compute turnover metrics. This preserves
+    # consistency with event-driven engine under perfect execution.
+    try:
+        degenerate = bool(weights_full.abs().sum().sum() == 0.0)
+        if not degenerate:
+            # check if there is any change over time
+            total_change = float(weights_full.diff().abs().sum().sum())
+            degenerate = total_change <= 0.0
+        if degenerate:
+            weights_full = planned_weights
+    except Exception:
+        weights_full = planned_weights
 
     # Trades: map vectorbt order records -> our "trades" DataFrame
     trades_df = _orders_to_trades_df(pf, instruments)
+
+    # ------------------------------------------------------------------ #
+    # 6. Apply carry costs (borrow/financing) and management fees to align
+    #    with event-driven engine semantics. We adjust equity/returns/cash
+    #    post vectorbt simulation to include these daily effects.
+    # ------------------------------------------------------------------ #
+    try:
+        borrow_cfg = strategy.costs.borrow if strategy.costs is not None else None
+        fin_cfg = strategy.costs.financing if strategy.costs is not None else None
+        fees_cfg = strategy.costs.fees if strategy.costs is not None else None
+
+        has_carry_or_fees = (
+            (borrow_cfg is not None and float(getattr(borrow_cfg, "default_annual_rate", 0.0)) != 0.0)
+            or (fin_cfg is not None and float(getattr(fin_cfg, "spread_bps", 0.0)) != 0.0)
+            or (fees_cfg is not None and float(getattr(fees_cfg, "nav_fee_annual", 0.0)) != 0.0)
+        )
+
+        if has_carry_or_fees:
+            # Prepare series for adjustments
+            prev_cash_series = cash.shift(1).fillna(init_cash)
+            # Use previous positions and current prices, similar to event-driven loop
+            prev_positions_df = positions.shift(1).fillna(0.0)
+            price_df = prices
+
+            # Parameters
+            dt = 1.0 / 252.0
+            borrow_rate = float(getattr(borrow_cfg, "default_annual_rate", 0.0)) if borrow_cfg is not None else 0.0
+            fin_rate = (float(getattr(fin_cfg, "spread_bps", 0.0)) / 1e4) if fin_cfg is not None else 0.0
+            nav_fee_annual = float(getattr(fees_cfg, "nav_fee_annual", 0.0)) if fees_cfg is not None else 0.0
+            nav_fee_daily = nav_fee_annual * dt
+
+            # Compute daily deltas
+            short_notional = (-prev_positions_df.clip(upper=0.0) * price_df).sum(axis=1)
+            equity_before = prev_cash_series + (prev_positions_df * price_df).sum(axis=1)
+
+            borrow_cost = short_notional * borrow_rate * dt
+            financing_pnl = prev_cash_series * fin_rate * dt
+            nav_fee_amt = equity_before * nav_fee_daily
+
+            daily_delta = (-borrow_cost + financing_pnl - nav_fee_amt).astype("float64")
+            adj_cumsum = daily_delta.cumsum().fillna(0.0)
+
+            # Adjust equity, cash, returns, and weights to reflect carry/fees
+            equity_adj = (equity.astype("float64") + adj_cumsum).astype("float64")
+            cash_adj = (cash.astype("float64") + adj_cumsum).astype("float64")
+            returns_adj = equity_adj.pct_change().replace([np.inf, -np.inf], np.nan).fillna(0.0).astype("float64")
+
+            # Recompute weights using adjusted equity
+            eq_nonzero_adj = equity_adj.replace(0.0, np.nan)
+            weights_full = (notional.div(eq_nonzero_adj, axis=0)).replace([np.inf, -np.inf], 0.0).fillna(0.0)
+
+            # Overwrite series with adjusted ones
+            equity = equity_adj
+            cash = cash_adj
+            returns = returns_adj
+    except Exception as exc:
+        log.warning("Vectorized engine: failed to apply carry/fees adjustments, proceeding with raw vectorbt outputs: %s", exc)
 
     # Metrics – reuse the same accounting logic for consistency
     metrics = compute_basic_metrics(

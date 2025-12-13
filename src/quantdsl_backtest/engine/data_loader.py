@@ -24,26 +24,36 @@ def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame
         volumes: DataFrame [datetime x instrument] (volume)
 
     Assumes that 'close' and 'volume' are present in DataConfig.fields.
+
+    Important: Preserve the original timestamp index from the data adapter
+    to maintain exact alignment with vectorbt baselines used in tests.
     """
     log.info("Loading market data from %s", strategy.data.source)
     md = load_market_data(strategy.data, strategy.universe)
 
-    # Build wide panels for 'close' and 'volume'
     instruments = md.instruments
-    # Construct index as union of all bar indices
-    all_indices = sorted({ts for df in md.bars.values() for ts in df.index})
-    idx = pd.DatetimeIndex(all_indices, name="datetime")
 
-    prices = pd.DataFrame(index=idx, columns=instruments, dtype="float64")
-    volumes = pd.DataFrame(index=idx, columns=instruments, dtype="float64")
+    # Build wide DataFrames directly from adapter output without altering timestamps
+    prices = pd.DataFrame({
+        instr: md.bars[instr].get("close", pd.Series(dtype="float64"))
+        for instr in instruments
+    })
+    volumes = pd.DataFrame({
+        instr: md.bars[instr].get("volume", pd.Series(dtype="float64"))
+        for instr in instruments
+    })
 
-    for instr, df in md.bars.items():
-        prices[instr] = df.get("close", pd.Series(index=df.index, dtype="float64")).reindex(idx)
-        volumes[instr] = df.get("volume", pd.Series(index=df.index, dtype="float64")).reindex(idx)
+    # Ensure time is sorted and volumes align to prices' index
+    prices = prices.sort_index()
+    volumes = volumes.sort_index().reindex(prices.index)
+
+    # Enforce float64 dtype for numerical stability
+    prices = prices.astype("float64")
+    volumes = volumes.astype("float64")
 
     log.info(
         "Loaded data: %d instruments, %d bars",
         len(instruments),
-        len(idx),
+        len(prices.index),
     )
     return md, prices, volumes

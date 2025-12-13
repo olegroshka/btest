@@ -284,7 +284,18 @@ class SignalEngine:
                 out = out.set_index("date") if "date" in out.columns else out
                 # Ensure full shape and order
                 out = out.reindex(index=self.index, columns=self.columns)
-                return out
+                # Validate: if Polars path produced suspiciously sparse output, fallback to pandas
+                try:
+                    total_cells = float(len(self.index) * len(self.columns))
+                    valid_cells = float(out.notna().sum().sum())
+                    if total_cells > 0 and valid_cells / total_cells < 0.2:
+                        raise RuntimeError(
+                            f"Polars rank produced sparse output ({valid_cells/total_cells:.3%} valid); falling back to pandas"
+                        )
+                except Exception as _fallback_trigger:
+                    log.warning(f"Polars path produced sparse rank; falling back to pandas: {_fallback_trigger}")
+                else:
+                    return out
             except Exception as e:  # Fallback safety
                 log.warning(f"Polars path failed in Rank; falling back to pandas: {e}")
 
