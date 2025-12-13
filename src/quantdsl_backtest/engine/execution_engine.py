@@ -10,6 +10,8 @@ import pandas as pd
 from ..dsl.execution import Execution
 from ..models.slippage import build_slippage_model
 from ..dsl.costs import Commission, StaticFees
+from ..models.costs import build_cost_model
+from ..models.volume_limits import build_volume_limit_model
 from ..utils.logging import get_logger
 
 
@@ -51,10 +53,8 @@ def rebalance_to_target_weights(
 
     delta_notional = target_notional - current_notional
 
-    # Volume limits
-    vp = execution.volume_limits
-    max_participation = getattr(vp, "max_participation", None)
-    min_notional = getattr(vp, "min_fill_notional", 0.0)
+    # Volume limits model
+    vl_model = build_volume_limit_model(getattr(execution, "volume_limits", None))
 
     trades = []
     cash_delta = 0.0
@@ -71,22 +71,9 @@ def rebalance_to_target_weights(
         if abs(dn) < 1e-8:
             continue
 
-        # Apply volume participation limit -> cap notional change.
-        # For this integration test we want unlimited fills like vectorbt's
-        # targetpercent sizing. Treat max_participation >= 1.0 (or None) as unlimited.
-        if (
-            vol > 0
-            and max_participation is not None
-            and 0.0 < max_participation < 1.0
-        ):
-            max_notional = max_participation * vol * price
-            if max_notional <= 0:
-                continue
-            if abs(dn) > max_notional:
-                # Both proportional and clip behave the same here: cap to limit
-                dn = np.sign(dn) * max_notional
-
-        if abs(dn) < min_notional:
+        # Apply volume participation limit using model
+        dn = vl_model.cap_notional_change(dn=dn, price=price, volume=vol)
+        if not vl_model.passes_min_fill(abs(dn)):
             continue
 
         # Determine side and quantity
@@ -104,13 +91,9 @@ def rebalance_to_target_weights(
             exec_price = price * (1.0 - slippage_frac)
 
         notional_exec = exec_price * qty  # signed
-        # Commission
-        if commission.type == "per_share":
-            comm = commission.amount * abs(qty)
-        elif commission.type == "bps_notional":
-            comm = (commission.amount / 1e4) * abs(notional_exec)
-        else:
-            comm = 0.0
+        # Commission via model
+        cost_model = build_cost_model(commission)
+        comm = cost_model.commission_from_trade(qty=qty, exec_price=exec_price)
 
         trade_cash = -notional_exec - comm  # cash decreases on buy (qty>0)
         cash_delta += trade_cash

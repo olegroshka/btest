@@ -14,6 +14,8 @@ from ..dsl.strategy import Strategy
 from ..dsl.costs import Commission
 from ..dsl.execution import Execution
 from ..models.slippage import build_slippage_model
+from ..models.costs import build_cost_model
+from ..models.latency import build_latency_model, apply_latency_to_weights
 from .data_loader import load_data_for_strategy
 from .factor_engine import FactorEngine
 from .signal_engine import SignalEngine
@@ -83,6 +85,16 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             target = target.reindex(instruments).fillna(0.0)
             weights.loc[dt] = target
             prev_weights = target
+
+    # ------------------------------------------------------------------ #
+    # 3.5 Apply latency model (weights shift)
+    # ------------------------------------------------------------------ #
+    try:
+        latency_cfg = getattr(strategy.execution, "latency", None)
+        latency = build_latency_model(latency_cfg)
+        weights = apply_latency_to_weights(weights, latency)
+    except Exception as exc:
+        log.warning("Vectorized engine: failed to apply latency model: %s", exc)
 
     # ------------------------------------------------------------------ #
     # 4. Build vectorbt portfolio (potentially two-pass for costs)
@@ -524,17 +536,12 @@ def _commission_to_vbt_fees(commission: Commission) -> float:
       - 'bps_notional' -> amount / 1e4 (applied per order)
       - 'per_share'    -> handled via two-pass order-based cost matrices elsewhere; returns 0 here
     """
+    from ..models.costs import build_cost_model
+
     if commission is None:
         return 0.0
-
-    if commission.type == "bps_notional":
-        return float(commission.amount) / 1e4
-
-    if commission.type == "per_share":
-        # Two-pass path will compute per-bar fees fraction; return 0 for single-pass
-        return 0.0
-
-    return 0.0
+    cm = build_cost_model(commission)
+    return float(cm.vbt_single_pass_fees_frac())
 
 
 def _slippage_to_vbt_frac(execution: Execution) -> float:
@@ -651,34 +658,17 @@ def _build_cost_matrices_from_orders(
     buy_qty = _align(buy_qty_by_col)
     sell_qty = _align(sell_qty_by_col)
 
-    # Build FEES matrix
+    # Build FEES matrix via cost model
     fees_df: pd.DataFrame | None = None
     if commission is not None:
-        if getattr(commission, "type", None) == "per_share" and float(getattr(commission, "amount", 0.0)) != 0.0:
-            per_share = float(commission.amount)
-            # Vectorbt applies `fees` as a fraction of order value, which uses base price.
-            # Event-driven commission is per-share, independent of slippage.
-            # Thus, set per-bar fee fraction = per_share / price on bars with orders.
-            if numpy_fast:
-                p = prices.to_numpy(dtype=float, copy=False)
-                abs_a = abs_size.to_numpy(dtype=float, copy=False)
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    frac_arr = per_share / p
-                frac_arr[~np.isfinite(frac_arr)] = 0.0
-                mask = abs_a > 0.0
-                fees_arr = np.where(mask, frac_arr, 0.0)
-                fees_df = pd.DataFrame(fees_arr, index=dates, columns=cols, dtype="float64")
-            else:
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    frac = per_share / prices.replace(0.0, np.nan)
-                frac = frac.replace([np.inf, -np.inf], np.nan).fillna(0.0).astype("float64")
-                fees_df = frac.where(abs_size > 0.0, 0.0)
-        elif getattr(commission, "type", None) == "bps_notional" and float(getattr(commission, "amount", 0.0)) != 0.0:
-            # Single-pass could handle this; but for consistency, only apply on order bars
-            frac = float(commission.amount) / 1e4
-            fees_df = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
-            mask = abs_size > 0.0
-            fees_df[mask] = frac
+        cm = build_cost_model(commission)
+        if numpy_fast:
+            p = prices.to_numpy(dtype=float, copy=False)
+            abs_a = abs_size.to_numpy(dtype=float, copy=False)
+            fees_arr = cm.build_fees_fraction_matrix_from_orders_numpy(prices_arr=p, abs_size_arr=abs_a)
+            fees_df = pd.DataFrame(fees_arr, index=dates, columns=cols, dtype="float64")
+        else:
+            fees_df = cm.build_fees_fraction_matrix_from_orders_pandas(prices=prices, abs_size=abs_size)
 
     # Build SLIPPAGE matrix
     slippage_df: pd.DataFrame | None = None
@@ -735,14 +725,11 @@ def _approximate_cost_matrices(
     net_shares = (target_shares - prev_shares).astype("float64")
     abs_shares = np.abs(net_shares)
 
-    # Fees (per-share commission) -> per-bar fraction of traded notional
+    # Fees via cost model -> per-bar fraction of traded notional
     fees_df: pd.DataFrame | None = None
-    if commission is not None and getattr(commission, "type", None) == "per_share" and float(getattr(commission, "amount", 0.0)) != 0.0:
-        per_share = float(commission.amount)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            frac = per_share / prices.replace(0.0, np.nan)
-        frac = frac.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-        fees_df = frac.where(abs_shares > 0.0, 0.0).astype("float64")
+    if commission is not None:
+        cm = build_cost_model(commission)
+        fees_df = cm.build_fees_fraction_matrix_from_orders_pandas(prices=prices, abs_size=abs_shares)
 
     # Slippage (power-law)
     slippage_df: pd.DataFrame | None = None

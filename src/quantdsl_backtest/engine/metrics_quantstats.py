@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Dict, Iterable, Optional
 
 import pandas as pd
-import warnings  # NEW: for warning suppression
+import warnings
 
 def compute_quantstats_metrics(
     returns: pd.Series,
