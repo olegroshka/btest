@@ -15,6 +15,7 @@ dependencies = [
   # NumPy 1.24+ provides official Python 3.11 wheels; avoid pinning below 1.24
   "numpy>=1.24,<3.0",
   "vectorbt>=0.28",      # core backtesting & YFData
+  "quantstats>=0.0.62",
   "yfinance>=0.2.40",    # Yahoo backend used by vectorbt.YFData
   "plotly>=5.0",         # for plots from pf.plot(), etc.
   "pyarrow",             # for efficient data storage

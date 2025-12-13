@@ -26,9 +26,11 @@ src/quantdsl_backtest/engine/backtest_runner.py
 src/quantdsl_backtest/engine/data_loader.py
 src/quantdsl_backtest/engine/execution_engine.py
 src/quantdsl_backtest/engine/factor_engine.py
+src/quantdsl_backtest/engine/metrics_quantstats.py
 src/quantdsl_backtest/engine/portfolio_engine.py
 src/quantdsl_backtest/engine/results.py
 src/quantdsl_backtest/engine/signal_engine.py
+src/quantdsl_backtest/engine/vectorized_engine.py
 src/quantdsl_backtest/examples/__init__.py
 src/quantdsl_backtest/examples/momentum_long_short_sp500.py
 src/quantdsl_backtest/models/__init__.py
@@ -42,6 +44,7 @@ src/quantdsl_backtest/utils/time.py
 src/quantdsl_backtest/utils/types.py
 tests/test_accounting.py
 tests/test_backtest_runner_smoke.py
+tests/test_cost_matrix_equivalence.py
 tests/test_dsl_configs.py
 tests/test_dsl_costs_strategy.py
 tests/test_execution.py

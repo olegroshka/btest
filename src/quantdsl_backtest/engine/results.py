@@ -441,3 +441,78 @@ class BacktestResult:
         if created_fig:
             plt.tight_layout()
         return ax
+
+    # ------------------------------------------------------------------
+    # QuantStats integration
+    # ------------------------------------------------------------------
+
+    def quantstats_metrics(
+        self,
+        metric_names: Sequence[str],
+        benchmark: Optional[pd.Series] = None,
+        risk_free: float = 0.0,
+        prefix: str = "qs_",
+    ) -> pd.Series:
+        """Compute a configurable set of QuantStats metrics.
+
+        Examples
+        --------
+        >>> result.quantstats_metrics(
+        ...     ["cagr", "sharpe", "sortino", "max_drawdown"]
+        ... )
+        qs_cagr           0.145
+        qs_sharpe         1.45
+        qs_sortino        2.10
+        qs_max_drawdown  -0.23
+        Name: quantstats, dtype: float64
+        """
+        from .metrics_quantstats import compute_quantstats_metrics
+
+        bench = benchmark if benchmark is not None else self.benchmark
+        metrics = compute_quantstats_metrics(
+            returns=self.returns,
+            metric_names=metric_names,
+            benchmark=bench,
+            risk_free=risk_free,
+        )
+        # Optionally prefix keys so they don't collide with core metrics
+        keyed = {f"{prefix}{k}" if prefix else k: v for k, v in metrics.items()}
+        return pd.Series(keyed, name="quantstats")
+
+    def quantstats_tearsheet(
+        self,
+        output: Optional[str] = None,
+        title: Optional[str] = None,
+        benchmark: Optional[pd.Series] = None,
+        **kwargs,
+    ) -> None:
+        """Generate a QuantStats HTML tearsheet for this backtest.
+
+        Parameters
+        ----------
+        output:
+            Path to the HTML output file.
+        title:
+            Optional report title; defaults to strategy name (if present).
+        benchmark:
+            Optional benchmark returns Series. Falls back to self.benchmark
+            if provided there.
+        **kwargs:
+            Passed through to quantstats.reports.html, e.g.
+            compounded=True, periods=252, etc.
+        """
+        from .metrics_quantstats import generate_quantstats_tearsheet
+
+        bench = benchmark if benchmark is not None else self.benchmark
+        if title is None:
+            title = self.metadata.get("strategy_name", "Strategy")
+
+        generate_quantstats_tearsheet(
+            returns=self.returns,
+            benchmark=bench,
+            output=output,
+            title=title,
+            **kwargs,
+        )
+
+

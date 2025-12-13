@@ -312,19 +312,21 @@ def build_strategy() -> Strategy:
     return strategy
 
 
-def main():
+def main() -> None:
+    from quantdsl_backtest.engine.backtest_runner import run_backtest
+
     strategy = build_strategy()
 
-    # For debugging you can inspect the DSL tree as plain dict
     print("Strategy spec (truncated):")
-    # Beware: asdict() will explode on large trees; this is just conceptual
     print(asdict(strategy)["name"], "configured")
 
     # Run the backtest
     result = run_backtest(strategy)
 
-    # The BacktestResult object is up to you; here’s a likely interface:
-    print("\nBacktest summary:")
+    # ------------------------------------------------------------------
+    # Core summary using BacktestResult
+    # ------------------------------------------------------------------
+    print("\n=== Core summary ===")
     print(f"Start date:  {result.start_date}")
     print(f"End date:    {result.end_date}")
     print(f"Total return: {result.total_return:.2%}")
@@ -332,40 +334,75 @@ def main():
     print(f"Max drawdown: {result.metrics['max_drawdown']:.2%}")
     print(f"Turnover (annualized): {result.metrics['turnover_annual']:.2f}")
 
-    # Outputs directory (used for both images and parquet exports)
+    # ------------------------------------------------------------------
+    # QuantStats metrics
+    # ------------------------------------------------------------------
+    try:
+        qs_metric_names = [
+            "cagr",
+            "volatility",
+            "sharpe",
+            "sortino",
+            "max_drawdown",
+            "skew",
+            "kurtosis",
+            "var",
+            "cvar",
+        ]
+        qs_metrics = result.quantstats_metrics(qs_metric_names, risk_free=0.0)
+        print("\n=== QuantStats metrics ===")
+        # Nice aligned printing
+        print(qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
+    except RuntimeError as e:
+        # quantstats not installed
+        print(f"\nQuantStats metrics skipped: {e}")
+
+    # Outputs directory (used for plots, parquet, and HTML report)
     out_dir = "outputs/mom_long_short_sp500/"
     os.makedirs(out_dir, exist_ok=True)
 
-    # Generate plots and save them as PNG files in outputs
+    # ------------------------------------------------------------------
+    # QuantStats HTML tear sheet
+    # ------------------------------------------------------------------
+    try:
+        html_path = os.path.join(out_dir, "tearsheet.html")
+        result.quantstats_tearsheet(
+            output=html_path,
+            title="S&P 500 Long/Short Momentum (QuantDSL)",
+            # you can pass extra kwargs here, e.g. compounded=True, periods=252
+        )
+        print(f"QuantStats HTML report written to: {html_path}")
+    except RuntimeError as e:
+        print(f"QuantStats HTML report skipped: {e}")
+
+    # ------------------------------------------------------------------
+    # Existing plots (equity / exposures / drawdowns)
+    # ------------------------------------------------------------------
     try:
         import matplotlib.pyplot as plt
 
-        ax_eq = result.plot_equity_curve()
+        ax_eq = result.plot_equity()
         ax_exp = result.plot_exposures()
         ax_dd = result.plot_drawdowns()
 
         plot_files = [
-            ("equity_curve.png", ax_eq),
+            ("equity.png", ax_eq),
             ("exposures.png", ax_exp),
             ("drawdowns.png", ax_dd),
         ]
-        for fname, ax in plot_files:
-            fpath = os.path.join(out_dir, fname)
-            ax.figure.savefig(fpath, dpi=150, bbox_inches="tight")
-            print(f"Saved plot: {fpath}")
 
-        # Optionally show plots if the environment variable is set
-        if str(os.environ.get("SHOW_PLOTS", "0")).lower() in ("1", "true", "yes"): 
-            plt.show()
-        else:
-            # Close figures when not showing to free resources
-            for _, ax in plot_files:
-                plt.close(ax.figure)
+        for fname, ax in plot_files:
+            fig = ax.figure
+            fig.savefig(os.path.join(out_dir, fname), dpi=150)
+            plt.close(fig)
+
+        print(f"Plots saved under {out_dir}")
     except RuntimeError as e:
-        # If matplotlib is not installed, continue without plotting
         print(f"Plotting skipped: {e}")
 
+    # ------------------------------------------------------------------
     # Export detailed tabular outputs
+    # ------------------------------------------------------------------
     result.to_parquet(out_dir)
 
 
