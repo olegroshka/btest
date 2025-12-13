@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from ..dsl.execution import Execution
+from ..models.slippage import build_slippage_model
 from ..dsl.costs import Commission, StaticFees
 from ..utils.logging import get_logger
 
@@ -92,12 +93,9 @@ def rebalance_to_target_weights(
         side = "BUY" if dn > 0 else "SELL"
         qty = dn / price  # signed quantity
 
-        # Slippage model: power-law in participation
-        sl_model = execution.slippage
-        participation = 0.0
-        if vol > 0:
-            participation = min(1.0, abs(qty) / vol)
-        slippage_bps = sl_model.base_bps + sl_model.k * (participation ** sl_model.exponent)
+        # Slippage model (delegated to models.slippage)
+        sl_model = build_slippage_model(execution.slippage)
+        slippage_bps = sl_model.slippage_bps_from_order(qty=qty, volume=vol)
         slippage_frac = slippage_bps / 1e4
 
         if side == "BUY":

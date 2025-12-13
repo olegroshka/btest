@@ -13,6 +13,7 @@ import vectorbt as vbt
 from ..dsl.strategy import Strategy
 from ..dsl.costs import Commission
 from ..dsl.execution import Execution
+from ..models.slippage import build_slippage_model
 from .data_loader import load_data_for_strategy
 from .factor_engine import FactorEngine
 from .signal_engine import SignalEngine
@@ -545,8 +546,9 @@ def _slippage_to_vbt_frac(execution: Execution) -> float:
     """
     if execution is None or execution.slippage is None:
         return 0.0
-    sl = execution.slippage
-    return float(sl.base_bps) / 1e4
+    # Use the model but evaluate at zero participation for constant frac
+    sl_model = build_slippage_model(execution.slippage)
+    return float(sl_model.slippage_bps_from_participation(0.0)) / 1e4
 
 
 def _build_cost_matrices_from_orders(
@@ -681,48 +683,24 @@ def _build_cost_matrices_from_orders(
     # Build SLIPPAGE matrix
     slippage_df: pd.DataFrame | None = None
     if slippage_model is not None:
-        base_bps = float(getattr(slippage_model, "base_bps", 0.0) or 0.0)
-        k = float(getattr(slippage_model, "k", 0.0) or 0.0)
-        exponent = float(getattr(slippage_model, "exponent", 1.0) or 1.0)
-
-        if base_bps != 0.0 or k != 0.0:
-            if numpy_fast:
-                abs_net_a = np.abs(net_size.to_numpy(dtype=float, copy=False))
-                abs_a = abs_size.to_numpy(dtype=float, copy=False)
-                if volumes is None:
-                    part_net_a = np.zeros_like(abs_net_a)
-                else:
-                    vol_a = volumes.reindex(index=dates, columns=cols).to_numpy(dtype=float, copy=False)
-                    with np.errstate(divide="ignore", invalid="ignore"):
-                        part_net_a = abs_net_a / vol_a
-                    part_net_a[~np.isfinite(part_net_a)] = 0.0
-                    np.clip(part_net_a, 0.0, 1.0, out=part_net_a)
-                slip_bps_a = base_bps + k * np.power(part_net_a, exponent)
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    scale_a = np.divide(abs_net_a, abs_a)
-                scale_a[~np.isfinite(scale_a)] = 0.0
-                np.clip(scale_a, 0.0, 1.0, out=scale_a)
-                slip_frac_a = (slip_bps_a / 1e4) * scale_a
-                mask = abs_a > 0.0
-                slip_frac_a = np.where(mask, slip_frac_a, 0.0)
-                slippage_df = pd.DataFrame(slip_frac_a, index=dates, columns=cols, dtype="float64")
-            else:
-                if volumes is None:
-                    part_net = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
-                else:
-                    vol = volumes.reindex(index=dates, columns=cols).astype("float64")
-                    with np.errstate(divide="ignore", invalid="ignore"):
-                        part_net = np.abs(net_size) / vol.replace(0.0, np.nan)
-                    part_net = part_net.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-                    part_net = part_net.clip(lower=0.0, upper=1.0)
-                # Compute slippage in bps and convert to fraction
-                slip_bps_ev = base_bps + k * np.power(part_net, exponent)
-                # Scale slippage by net/legs ratio so that total slippage dollars across legs
-                # approximates event-driven slippage on the net trade
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    scale = (np.abs(net_size)) / abs_size.replace(0.0, np.nan)
-                scale = scale.replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(lower=0.0, upper=1.0)
-                slippage_df = ((slip_bps_ev / 1e4) * scale).astype("float64").where(abs_size > 0.0, 0.0)
+        sl_model = build_slippage_model(slippage_model)
+        if numpy_fast:
+            net_a = net_size.to_numpy(dtype=float, copy=False)
+            abs_a = abs_size.to_numpy(dtype=float, copy=False)
+            vol_a = None
+            if volumes is not None:
+                vol_a = volumes.reindex(index=dates, columns=cols).to_numpy(dtype=float, copy=False)
+            slip_frac_a = sl_model.build_slippage_fraction_matrix_from_orders_numpy(
+                net_size_arr=net_a, abs_size_arr=abs_a, volumes_arr=vol_a
+            )
+            slippage_df = pd.DataFrame(slip_frac_a, index=dates, columns=cols, dtype="float64")
+        else:
+            vol_df = None
+            if volumes is not None:
+                vol_df = volumes.reindex(index=dates, columns=cols).astype("float64")
+            slippage_df = sl_model.build_slippage_fraction_matrix_from_orders_pandas(
+                net_size=net_size, abs_size=abs_size, volumes=vol_df
+            )
 
     return fees_df, slippage_df
 
@@ -769,19 +747,14 @@ def _approximate_cost_matrices(
     # Slippage (power-law)
     slippage_df: pd.DataFrame | None = None
     if slippage_model is not None:
-        base_bps = float(getattr(slippage_model, "base_bps", 0.0) or 0.0)
-        k = float(getattr(slippage_model, "k", 0.0) or 0.0)
-        exponent = float(getattr(slippage_model, "exponent", 1.0) or 1.0)
-        if base_bps != 0.0 or k != 0.0:
-            if volumes is None:
-                part = pd.DataFrame(0.0, index=dates, columns=cols, dtype="float64")
-            else:
-                vol = volumes.reindex(index=dates, columns=cols).astype("float64")
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    part = abs_shares / vol.replace(0.0, np.nan)
-                part = part.replace([np.inf, -np.inf], np.nan).fillna(0.0).clip(lower=0.0, upper=1.0)
-            slip_bps = base_bps + k * np.power(part, exponent)
-            slippage_df = (slip_bps / 1e4).astype("float64").where(abs_shares > 0.0, 0.0)
+        sl_model = build_slippage_model(slippage_model)
+        vol_df = None
+        if volumes is not None:
+            vol_df = volumes.reindex(index=dates, columns=cols).astype("float64")
+        # In the approximate path, abs_shares is |net_shares|, so scale becomes 1.0
+        slippage_df = sl_model.build_slippage_fraction_matrix_from_orders_pandas(
+            net_size=net_shares, abs_size=abs_shares, volumes=vol_df
+        )
 
     return fees_df, slippage_df
 
