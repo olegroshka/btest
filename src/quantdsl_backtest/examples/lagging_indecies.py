@@ -39,6 +39,7 @@ from quantdsl_backtest.dsl.signals import (
     MaskFromBoolean,
     And,
     NotNull,
+    CrossSectionAggregate,
 )
 from quantdsl_backtest.dsl.portfolio import (
     LongShortPortfolio,
@@ -147,14 +148,16 @@ def build_strategy() -> Strategy:
     )
 
     # Universe-level regime: "is the average 6m momentum across all indices > 0?"
-    # We approximate this via a signal:
-    #   - avg_mom_126 = mean across instruments of mom_126
-    #   - risk_on_global = avg_mom_126 > 0
-    #
-    # Current DSL you don't yet have an explicit "cross-sectional aggregate"
-    # node, so for now we will *only* use the per-name regime and leave the
-    # global regime idea as a possible future extension.
-    #
+    avg_mom_126 = CrossSectionAggregate(
+        source="mom_126",
+        op="mean",
+        name="avg_mom_126",
+    )
+    risk_on_global = MaskFromBoolean(
+        name="risk_on_global",
+        expr=GreaterEqual(left="avg_mom_126", right=0.0),
+    )
+
     # Ranks for timezone components
     rank_on = CrossSectionRank(
         factor_name="on_20",
@@ -178,12 +181,15 @@ def build_strategy() -> Strategy:
         ),
     )
 
-    # Require both trend and timezone tilt for long candidates
+    # Require validity, per-name regime, global regime, and timezone tilt for long candidates
     long_candidates = MaskFromBoolean(
         name="long_candidates",
         expr=And(
             left="valid",
-            right=And(left="risk_on_name", right="tz_long_candidates"),
+            right=And(
+                left="risk_on_name",
+                right=And(left="risk_on_global", right="tz_long_candidates"),
+            ),
         ),
     )
 
@@ -191,6 +197,8 @@ def build_strategy() -> Strategy:
         "rank_126": rank_126,
         "valid": valid,
         "risk_on_name": risk_on_name,
+        "avg_mom_126": avg_mom_126,
+        "risk_on_global": risk_on_global,
         "rank_on_20": rank_on,
         "rank_day_20": rank_day,
         "tz_long_candidates": tz_long_candidates,
@@ -198,7 +206,6 @@ def build_strategy() -> Strategy:
     }
 
     # 5) Portfolio: long-only, top-3 by 6m momentum, weekly rebalance
-
     long_book = Book(
         name="long_book",
         selector=TopN(

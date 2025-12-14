@@ -21,6 +21,7 @@ from ..dsl.signals import (
     LessEqual,
     GreaterEqual,
     Quantile,
+    CrossSectionAggregate,
     CrossSectionRank,
     MaskFromBoolean,
 )
@@ -105,6 +106,8 @@ class SignalEngine:
             return self._eval_greater_equal(node)
         if isinstance(node, Quantile):
             return self._eval_quantile(node)
+        if isinstance(node, CrossSectionAggregate):
+            return self._eval_cross_section_aggregate(node)
         if isinstance(node, CrossSectionRank):
             return self._eval_rank(node)
         if isinstance(node, MaskFromBoolean):
@@ -336,6 +339,44 @@ class SignalEngine:
     def _eval_mask_from_boolean(self, node: MaskFromBoolean) -> pd.DataFrame:
         expr = self._resolve_expr(node.expr)
         return expr.astype(bool)
+
+    def _eval_cross_section_aggregate(self, node: CrossSectionAggregate) -> pd.DataFrame:
+        # Source can be a factor or a previously computed signal
+        src_df = self._get_factor(node.source) if node.source in self.factors else self._get_signal(node.source)
+
+        if node.mask_name is not None:
+            mask_df = self._get_signal(node.mask_name).astype(bool)
+        else:
+            # default mask: valid where source is non-null
+            mask_df = ~src_df.isna()
+
+        out = pd.DataFrame(index=self.index, columns=self.columns, dtype="float64")
+
+        if node.op == "mean":
+            reducer = pd.Series.mean
+        elif node.op == "median":
+            reducer = pd.Series.median
+        elif node.op == "sum":
+            reducer = pd.Series.sum
+        elif node.op == "min":
+            reducer = pd.Series.min
+        elif node.op == "max":
+            reducer = pd.Series.max
+        else:
+            raise ValueError(f"Unknown cross-sectional aggregate op: {node.op}")
+
+        for ts in self.index:
+            row = src_df.loc[ts]
+            m = mask_df.loc[ts]
+            valid = row[m].dropna()
+            if valid.empty:
+                # emit NaN; downstream comparisons will be False
+                out.loc[ts] = np.nan
+                continue
+            val = reducer(valid)
+            out.loc[ts] = float(val)
+
+        return out
 
     # ------------------------------------------------------------------ #
     # Helpers: resolve expressions

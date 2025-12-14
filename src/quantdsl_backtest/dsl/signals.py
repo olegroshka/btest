@@ -162,6 +162,31 @@ class GreaterEqual(SignalNode):
 
 
 @dataclass(slots=True)
+class CrossSectionAggregate(SignalNode):
+    """
+    Cross-sectional aggregate over instruments at each timestamp.
+
+    Example:
+        CrossSectionAggregate(source="mom_126", op="mean", name="avg_mom_126")
+
+    Semantics:
+      for each date t:
+        value(t) = agg(op, source(t, universe) where mask is True and not NaN)
+
+    The engine will broadcast the scalar time series across columns so that
+    it can be used in comparisons and boolean masks consistently.
+    """
+
+    source: str                      # factor or signal name to aggregate
+    op: Literal["mean", "median", "sum", "min", "max"] = "mean"
+    mask_name: Optional[str] = None  # optional mask to restrict universe
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_cross_section_aggregate(self)
+
+
+@dataclass(slots=True)
 class Quantile(SignalNode):
     """
     Cross-sectional quantile of a factor at each time point.
