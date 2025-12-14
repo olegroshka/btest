@@ -25,6 +25,7 @@ class RiskChecks:
 
     max_drawdown: Optional[float] = None       # e.g. 0.25 = 25% DD
     max_gross_leverage: Optional[float] = None # e.g. <= 3x gross
+    max_daily_loss: Optional[float] = None     # e.g. 0.05 = -5% daily loss triggers cooldown
 
 
 @dataclass(slots=True)

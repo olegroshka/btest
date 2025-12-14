@@ -107,6 +107,11 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     prev_prices = prices.iloc[0].ffill()
     prev_equity = cash
 
+    # --- Risk checks context ---
+    risk = strategy.backtest.risk_checks
+    peak_equity = float(strategy.backtest.cash_initial)
+    cooldown_days = 0  # simple "no-risk" cooldown counter
+
     # ------------------------------------------------------------------ #
     # 4. Main daily loop
     # ------------------------------------------------------------------ #
@@ -114,22 +119,27 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         price_t = prices.loc[dt]
         volume_t = volumes.loc[dt]
 
+        # Use effective prices for valuation/P&L: if current price is missing (holiday),
+        # carry forward the previous price to avoid artificial PnL spikes.
+        price_t_eff = price_t.reindex(prev_positions.index)
+        price_t_eff = price_t_eff.where(~price_t_eff.isna(), prev_prices)
+
         if i == 0:
             # Day 0: no prior PnL, just initialize equity
-            equity_before = cash + (prev_positions * price_t).sum()
+            equity_before = cash + (prev_positions * price_t_eff).sum()
             price_pnl = 0.0
         else:
             equity_before, price_pnl = mark_to_market(
                 prev_positions=prev_positions,
                 prev_prices=prev_prices,
-                curr_prices=price_t,
+                curr_prices=price_t_eff,
                 prev_cash=cash,
             )
 
         # Apply carry costs (borrow + financing)
         cash, borrow_cost, fin_pnl = apply_carry_costs(
             positions=prev_positions,
-            prices=price_t,
+            prices=price_t_eff,
             cash=cash,
             borrow=strategy.costs.borrow,
             financing=strategy.costs.financing,
@@ -143,7 +153,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             cash -= fee_amt
 
         # Equity before trades at today's prices
-        equity_before = cash + (prev_positions * price_t).sum()
+        equity_before = cash + (prev_positions * price_t_eff).sum()
 
         # Decide if we rebalance today
         do_rebalance = _is_rebalance_date(i, dates, strategy.portfolio)
@@ -163,7 +173,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 commission=strategy.costs.commission,
                 fees=strategy.costs.fees,
                 equity=equity_before,
-                prices=price_t,
+                prices=price_t_eff,
                 volumes=volume_t,
                 prev_positions=prev_positions,
                 target_weights=target_weights,
@@ -175,15 +185,41 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             cur_positions = prev_positions
 
         # Final equity at end of day t
-        equity = cash + (cur_positions * price_t).sum()
+        equity = cash + (cur_positions * price_t_eff).sum()
 
         if i == 0:
             ret = 0.0
         else:
             ret = (equity / prev_equity) - 1.0 if prev_equity != 0 else 0.0
 
+        # --- Update peak equity & drawdown (before exposures/storage) ---
+        if equity > peak_equity:
+            peak_equity = equity
+        drawdown = 0.0 if peak_equity == 0 else (equity / peak_equity - 1.0)
+
+        # --- Risk checks: max_drawdown stop ---
+        if getattr(risk, "max_drawdown", None) is not None and drawdown <= -risk.max_drawdown:
+            # Simple policy: go to cash and stop trading further (buy & hold cash)
+            cur_positions = pd.Series(0.0, index=instruments)
+            cash = equity  # liquidate to cash
+            print(
+                f"[RISK] Max drawdown {drawdown: .2%} exceeded threshold "
+                f"{risk.max_drawdown: .2%} on {dt.date()}, de-risking to cash."
+            )
+
+        # --- Risk checks: max_daily_loss + cooldown ---
+        if getattr(risk, "max_daily_loss", None) is not None:
+            if ret <= -risk.max_daily_loss:
+                cooldown_days = max(cooldown_days, 5)  # stay flat for 5 days
+
+        if cooldown_days > 0:
+            cooldown_days -= 1
+            # Override: ensure we end the day flat & no new positions next loop
+            cur_positions = pd.Series(0.0, index=instruments)
+            cash = equity
+
         # Exposures
-        exps = compute_exposures(cur_positions, price_t)
+        exps = compute_exposures(cur_positions, price_t_eff)
         gross = exps["gross_exposure"]
         net = exps["net_exposure"]
         long_exp = exps["long_exposure"]
@@ -202,14 +238,14 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
 
         positions_df.iloc[i] = cur_positions
         if equity != 0:
-            weights_df.iloc[i] = (cur_positions * price_t) / equity
+            weights_df.iloc[i] = (cur_positions * price_t_eff) / equity
         else:
             weights_df.iloc[i] = 0.0
 
         if not trades_today.empty:
             all_trades.append(trades_today)
 
-        prev_prices = price_t
+        prev_prices = price_t_eff
         prev_positions = cur_positions
         prev_equity = equity
 

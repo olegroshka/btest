@@ -51,7 +51,7 @@ from quantdsl_backtest.dsl.execution import (
     VolumeParticipation,
 )
 from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees
-from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting
+from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting, RiskChecks
 from quantdsl_backtest.engine.backtest_runner import run_backtest
 from quantdsl_backtest.engine.data_loader import load_data_for_strategy
 
@@ -269,6 +269,11 @@ def build_strategy() -> Strategy:
     bt = BacktestConfig(
         engine="event_driven",
         cash_initial=1_000_000,
+        # risk_checks=RiskChecks(
+        #     max_drawdown=0.30,   # stop trading if DD hits -30%
+        #     max_gross_leverage=2.0,
+        #     max_daily_loss=0.05, # cooldown if we lose >5% in a day
+        # ),
         reporting=Reporting(
             store_trades=True,
             store_positions=True,
