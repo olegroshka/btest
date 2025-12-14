@@ -60,15 +60,16 @@ def build_strategy() -> Strategy:
     # 1) Data config: indices parquet
     data = DataConfig(
         source="parquet://equities/indicies.parquet",
-        calendar="XNYS",  # single calendar; temporal effects via returns
+        calendar="XNYS",
         frequency="1d",
         start="2015-01-01",
         end="2025-12-31",
         price_adjustment="split_dividend",
         fields=["open", "high", "low", "close", "volume"],
+        #transforms=[CleaningTransform]
     )
 
-    # 2) Universe: minimal sanity filters
+    # 2) Universe: simple but reasonable filters
     universe = Universe(
         name="Indices",
         id_field="ticker",
@@ -78,7 +79,7 @@ def build_strategy() -> Strategy:
         ],
     )
 
-    # 3) Factors: multi-horizon momentum + vol
+    # 3) Factors: multi-horizon momentum + long-term regime + vol
     mom_20 = ReturnFactor(
         name="mom_20",
         field="close",
@@ -89,6 +90,12 @@ def build_strategy() -> Strategy:
         name="mom_60",
         field="close",
         lookback=60,
+        method="log",
+    )
+    mom_200 = ReturnFactor(
+        name="mom_200",
+        field="close",
+        lookback=200,
         method="log",
     )
     vol_20 = VolatilityFactor(
@@ -102,12 +109,13 @@ def build_strategy() -> Strategy:
     factors = {
         "mom_20": mom_20,
         "mom_60": mom_60,
+        "mom_200": mom_200,
         "vol_20": vol_20,
     }
 
     # 4) Signals
-    #
-    # Rank 20d and 60d momentum cross-sectionally.
+
+    # Cross-sectional ranks of 20d and 60d momentum
     rank_20 = CrossSectionRank(
         factor_name="mom_20",
         mask_name=None,
@@ -121,8 +129,7 @@ def build_strategy() -> Strategy:
         name="rank_60",
     )
 
-    # We'll approximate "combined score" as the average of the two ranks
-    # inside the signal engine by composing boolean masks on each:
+    # "Strong" when both horizons are above median, "weak" when both below
     combined_strong = MaskFromBoolean(
         name="combined_strong",
         expr=And(
@@ -138,7 +145,7 @@ def build_strategy() -> Strategy:
         ),
     )
 
-    # Valid data mask: non-null mom and reasonable volatility
+    # Basic data sanity
     valid = MaskFromBoolean(
         name="valid",
         expr=And(
@@ -147,23 +154,29 @@ def build_strategy() -> Strategy:
         ),
     )
 
-    # LONG CANDIDATES:
-    # indices with above-median 20d AND 60d momentum.
+    # Regime filter: only trade indices whose own 200d momentum is non-negative
+    risk_on = MaskFromBoolean(
+        name="risk_on",
+        expr=GreaterEqual(left="mom_200", right=0.0),
+    )
+
+    # Long candidates: strong trend, valid, and in "risk_on" regime
     long_candidates = MaskFromBoolean(
         name="long_candidates",
         expr=And(
-            left="combined_strong",
-            right="valid",
+            left=And(left="combined_strong", right="valid"),
+            right="risk_on",
         ),
     )
 
-    # SHORT CANDIDATES:
-    # indices with below-median 20d AND 60d momentum.
+    # Short candidates: weak trend, valid, and also only when risk_on
+    # (you could relax this and allow shorts in down regimes, but we keep it
+    # simple and avoid heavy shorting in prolonged bear phases.)
     short_candidates = MaskFromBoolean(
         name="short_candidates",
         expr=And(
-            left="combined_weak",
-            right="valid",
+            left=And(left="combined_weak", right="valid"),
+            right="risk_on",
         ),
     )
 
@@ -173,18 +186,16 @@ def build_strategy() -> Strategy:
         "combined_strong": combined_strong,
         "combined_weak": combined_weak,
         "valid": valid,
+        "risk_on": risk_on,
         "long_candidates": long_candidates,
         "short_candidates": short_candidates,
     }
 
-    # 5) Portfolio: small long/short, trend following
-    #
-    # Books use rank_60 as selector key (slower horizon), but are masked
-    # by 'long_candidates' / 'short_candidates' that also require 20d trend.
+    # 5) Portfolio: net-long, trend-following cross-section
     long_book = Book(
         name="long_book",
         selector=TopN(
-            factor_name="rank_60",
+            factor_name="rank_60",   # slower horizon for selector
             n=2,
             mask_name="long_candidates",
         ),
@@ -206,17 +217,17 @@ def build_strategy() -> Strategy:
         rebalance_frequency="1d",
         rebalance_at="market_close",
         signal_delay_bars=0,
-        target_gross_leverage=1.2,   # a bit conservative vs 1.5–2.0
-        target_net_exposure=0.0,
+        target_gross_leverage=1.2,   # ~0.9 long / 0.3 short
+        target_net_exposure=0.6,     # net long bias
         max_abs_weight_per_name=0.75,
         sector_neutral=None,
         turnover_limit=TurnoverLimit(
             window_bars=5,
-            max_fraction=2.0,  # allow moderate churning but not crazy
+            max_fraction=1.0,  # smoother than daily full-flip
         ),
     )
 
-    # 6) Execution & costs (leave modest but not crazy)
+    # 6) Execution & costs (modest, so signal can show through)
     execution = Execution(
         order_policy=OrderPolicy(),
         latency=LatencyModel(
@@ -224,7 +235,7 @@ def build_strategy() -> Strategy:
             market_latency_ms=0,
         ),
         slippage=PowerLawSlippageModel(
-            base_bps=0.5,  # tighter on highly liquid indices
+            base_bps=0.25,  # small but non-zero
             k=0.0,
             exponent=1.0,
             use_intraday_vol=False,
@@ -239,7 +250,7 @@ def build_strategy() -> Strategy:
     costs = Costs(
         commission=Commission(
             type="bps_notional",
-            amount=0.2,   # keep frictions modest to avoid domination in example
+            amount=0.1,  # 0.1 bps per trade
         ),
         borrow=BorrowCost(
             default_annual_rate=0.01,
@@ -273,7 +284,7 @@ def build_strategy() -> Strategy:
 
     # 8) Compose strategy
     strategy = Strategy(
-        name="lagging_indecies_trend_cs",
+        name="lagging_indecies_trend_regime_netlong",
         data=data,
         universe=universe,
         factors=factors,
@@ -284,7 +295,6 @@ def build_strategy() -> Strategy:
         backtest=bt,
     )
     return strategy
-
 
 
 def main() -> None:
@@ -324,34 +334,47 @@ def main() -> None:
         print(f"QuantStats outputs skipped: {e}")
 
     # ------------------------------------------------------------------
-    # Existing plots (equity / exposures / drawdowns)
-    # ------------------------------------------------------------------
-    try:
-        import matplotlib.pyplot as plt
-
-        ax_eq = result.plot_equity()
-        ax_exp = result.plot_exposures()
-        ax_dd = result.plot_drawdowns()
-
-        plot_files = [
-            ("equity.png", ax_eq),
-            ("exposures.png", ax_exp),
-            ("drawdowns.png", ax_dd),
-        ]
-
-        for fname, ax in plot_files:
-            fig = ax.figure
-            fig.savefig(os.path.join(out_dir, fname), dpi=150)
-            plt.close(fig)
-
-        print(f"Plots saved under {out_dir}")
-    except RuntimeError as e:
-        print(f"Plotting skipped: {e}")
-
-    # ------------------------------------------------------------------
     # Export detailed tabular outputs
     # ------------------------------------------------------------------
     result.to_parquet(out_dir)
+
+    invested_days = (result.weights.abs().sum(axis=1) > 1e-6).sum()
+    print("Invested days:", invested_days, "out of", len(result.returns))
+
+    import numpy as np
+
+    w = result.weights
+
+    print("Max abs weight in sample:", np.nanmax(np.abs(w.values)))
+    print("95th percentile of abs weights:", np.nanpercentile(np.abs(w.values), 95))
+    print("Number of weights > 10:", (np.abs(w.values) > 10).sum())
+    print("Number of weights > 100:", (np.abs(w.values) > 100).sum())
+    print("Any NaN rows:", w.isna().all(axis=1).sum())
+
+    debug_worst_days(result)
+    print("Invested days:", (result.weights.abs().sum(axis=1) > 1e-6).sum(),
+          "out of", len(result.returns))
+
+
+def debug_worst_days(result, n=10):
+    """Print the worst and best daily returns with dates and equity levels."""
+    rets = result.returns
+    eq = result.equity
+
+    worst = rets.nsmallest(n)
+    best = rets.nlargest(n)
+
+    print("\n=== Worst daily returns ===")
+    for dt, r in worst.items():
+        print(
+            f"{dt.date()}  ret={r: .3%}  equity={eq.loc[dt]:,.2f}"
+        )
+
+    print("\n=== Best daily returns ===")
+    for dt, r in best.items():
+        print(
+            f"{dt.date()}  ret={r: .3%}  equity={eq.loc[dt]:,.2f}"
+        )
 
 
 if __name__ == "__main__":
