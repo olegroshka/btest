@@ -59,3 +59,27 @@ class FiboRetraceFactor(FactorNode):
     level: float = 0.618  # e.g. 61.8%
     # Optionally allow custom output name separate from `name`
     output_name: Optional[str] = None
+
+
+@dataclass(slots=True)
+class OvernightReturnFactor(FactorNode):
+    """
+    Rolling average of overnight returns: log(open_t / close_{t-1}).
+    """
+
+    field_open: str = "open"
+    field_close: str = "close"
+    lookback: int = 20
+    method: ReturnMethod = "log"
+
+
+@dataclass(slots=True)
+class IntradayReturnFactor(FactorNode):
+    """
+    Rolling average of intraday returns: log(close_t / open_t).
+    """
+
+    field_open: str = "open"
+    field_close: str = "close"
+    lookback: int = 20
+    method: ReturnMethod = "log"

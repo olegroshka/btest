@@ -20,6 +20,10 @@ class TopN(Selector):
     factor_name: str
     n: int
     mask_name: Optional[str] = None
+    # If True (default), when the mask yields fewer than n names,
+    # fill the remainder from the unmasked ranked universe (current default behavior).
+    # If False, return only the masked selection (may be < n), making masks bite harder.
+    fill_from_unmasked: bool = True
 
 
 @dataclass(slots=True)
@@ -27,6 +31,8 @@ class BottomN(Selector):
     factor_name: str
     n: int
     mask_name: Optional[str] = None
+    # See TopN.fill_from_unmasked
+    fill_from_unmasked: bool = True
 
 
 @dataclass(slots=True)

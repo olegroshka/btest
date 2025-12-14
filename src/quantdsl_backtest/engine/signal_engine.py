@@ -87,6 +87,10 @@ class SignalEngine:
         return df
 
     def _evaluate(self, node: SignalNode) -> pd.DataFrame:
+        # Prefer dynamic dispatch via the Signal interface if available
+        evaluate = getattr(node, "evaluate", None)
+        if callable(evaluate):
+            return evaluate(self)
         if isinstance(node, NotNull):
             return self._eval_notnull(node)
         if isinstance(node, And):
@@ -116,18 +120,18 @@ class SignalEngine:
         return factor.notna()
 
     def _eval_and(self, node: And) -> pd.DataFrame:
-        left = self._resolve_expr(node.left)
-        right = self._resolve_expr(node.right)
-        return (left.astype(bool)) & (right.astype(bool))
+        left = self._resolve_expr(node.left).astype(bool)
+        right = self._resolve_expr(node.right).astype(bool)
+        return left & right
 
     def _eval_or(self, node: Or) -> pd.DataFrame:
-        left = self._resolve_expr(node.left)
-        right = self._resolve_expr(node.right)
-        return (left.astype(bool)) | (right.astype(bool))
+        left = self._resolve_expr(node.left).astype(bool)
+        right = self._resolve_expr(node.right).astype(bool)
+        return left | right
 
     def _eval_not(self, node: Not) -> pd.DataFrame:
-        expr = self._resolve_expr(node.expr)
-        return ~expr.astype(bool)
+        expr = self._resolve_expr(node.expr).astype(bool)
+        return ~expr
 
     def _eval_less_equal(self, node: LessEqual) -> pd.DataFrame:
         left = self._resolve_expr(node.left)
@@ -194,10 +198,11 @@ class SignalEngine:
                 # Build pandas Series of q values indexed by date
                 q_pd = per_date_q.to_pandas().set_index("date")["q_val"]
                 out = pd.DataFrame(index=self.index, columns=self.columns, dtype="float64")
-                # Assign the scalar per row (will broadcast across columns)
-                for dt, val in q_pd.items():
-                    if dt in out.index:
-                        out.loc[dt] = float(val)
+                # Vectorized broadcast across columns for matching dates
+                idx = q_pd.index.intersection(out.index)
+                if len(idx) > 0:
+                    vals = q_pd.loc[idx].to_numpy().reshape(-1, 1)
+                    out.loc[idx, :] = np.repeat(vals, len(self.columns), axis=1)
                 return out
             except Exception as e:  # Fallback safety
                 log.warning(f"Polars path failed in Quantile; falling back to pandas: {e}")

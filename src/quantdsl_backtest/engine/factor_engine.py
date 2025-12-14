@@ -7,7 +7,14 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 
-from ..dsl.factors import FactorNode, ReturnFactor, VolatilityFactor, FiboRetraceFactor
+from ..dsl.factors import (
+    FactorNode,
+    ReturnFactor,
+    VolatilityFactor,
+    FiboRetraceFactor,
+    OvernightReturnFactor,
+    IntradayReturnFactor,
+)
 from ..data.schema import MarketData
 from ..utils.logging import get_logger
 
@@ -43,6 +50,10 @@ class FactorEngine:
             df = self._compute_volatility(node)
         elif isinstance(node, FiboRetraceFactor):
             df = self._compute_fibo(node)
+        elif isinstance(node, OvernightReturnFactor):
+            df = self._compute_overnight(node)
+        elif isinstance(node, IntradayReturnFactor):
+            df = self._compute_intraday(node)
         else:
             raise TypeError(f"Unsupported factor node type: {type(node)}")
 
@@ -107,6 +118,40 @@ class FactorEngine:
         lo = low_panel.rolling(node.lookback, min_periods=node.lookback).min()
         fibo = lo + (hi - lo) * node.level
         return fibo
+
+    def _compute_overnight(self, node: OvernightReturnFactor) -> pd.DataFrame:
+        """
+        Rolling average of overnight returns: log(open_t / close_{t-1}) or simple equivalent.
+        """
+        open_px = self._field_panel(node.field_open)
+        close_px = self._field_panel(node.field_close)
+
+        if node.method == "log":
+            with np.errstate(divide="ignore", invalid="ignore"):
+                rets = np.log(open_px / close_px.shift(1))
+        elif node.method == "simple":
+            rets = open_px / close_px.shift(1) - 1.0
+        else:
+            raise ValueError(f"Unknown return method: {node.method}")
+
+        return rets.rolling(node.lookback, min_periods=node.lookback).mean()
+
+    def _compute_intraday(self, node: IntradayReturnFactor) -> pd.DataFrame:
+        """
+        Rolling average of intraday returns: log(close_t / open_t) or simple equivalent.
+        """
+        open_px = self._field_panel(node.field_open)
+        close_px = self._field_panel(node.field_close)
+
+        if node.method == "log":
+            with np.errstate(divide="ignore", invalid="ignore"):
+                rets = np.log(close_px / open_px)
+        elif node.method == "simple":
+            rets = close_px / open_px - 1.0
+        else:
+            raise ValueError(f"Unknown return method: {node.method}")
+
+        return rets.rolling(node.lookback, min_periods=node.lookback).mean()
 
     def _field_panel(self, field: str) -> pd.DataFrame:
         """

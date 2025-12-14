@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Union, Any
+from typing import Literal, Optional, Any, Protocol, runtime_checkable
 
 
 # For now, we keep the expression types loose (Any / object) so the engine
@@ -16,6 +16,20 @@ from typing import Literal, Optional, Union, Any
 
 
 Expr = Any  # placeholder alias for clarity
+
+
+@runtime_checkable
+class Signal(Protocol):
+    """
+    Lightweight interface for all DSL signal nodes.
+
+    Engines can call `evaluate(engine)` for dynamic dispatch without
+    long isinstance chains. Implementations are free to delegate back
+    to the engine to keep business logic centralized (double-dispatch).
+    """
+
+    def evaluate(self, engine: Any) -> Any:  # return is a pandas.DataFrame
+        ...
 
 
 @dataclass(slots=True)
@@ -48,6 +62,10 @@ class NotNull(SignalNode):
     factor_name: str
     name: Optional[str] = None
 
+    # Double-dispatch entry
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_notnull(self)
+
 
 # ---------------------------------------------------------------------------
 # Logical composition
@@ -69,6 +87,9 @@ class And(SignalNode):
     right: Expr
     name: Optional[str] = None
 
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_and(self)
+
 
 @dataclass(slots=True)
 class Or(SignalNode):
@@ -80,6 +101,9 @@ class Or(SignalNode):
     right: Expr
     name: Optional[str] = None
 
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_or(self)
+
 
 @dataclass(slots=True)
 class Not(SignalNode):
@@ -89,6 +113,9 @@ class Not(SignalNode):
 
     expr: Expr
     name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_not(self)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +138,9 @@ class LessEqual(SignalNode):
     right: Expr
     name: Optional[str] = None
 
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_less_equal(self)
+
 
 @dataclass(slots=True)
 class GreaterEqual(SignalNode):
@@ -121,6 +151,9 @@ class GreaterEqual(SignalNode):
     left: Expr
     right: Expr
     name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_greater_equal(self)
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +179,9 @@ class Quantile(SignalNode):
     within_mask: Optional[str] = None  # restrict to subset, by mask name
     name: Optional[str] = None
 
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_quantile(self)
+
 
 @dataclass(slots=True)
 class CrossSectionRank(SignalNode):
@@ -161,6 +197,9 @@ class CrossSectionRank(SignalNode):
     mask_name: Optional[str] = None
     method: Literal["percentile", "zscore"] = "percentile"
     name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_rank(self)
 
 
 @dataclass(slots=True)
@@ -178,3 +217,6 @@ class MaskFromBoolean(SignalNode):
 
     expr: Expr
     name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_mask_from_boolean(self)

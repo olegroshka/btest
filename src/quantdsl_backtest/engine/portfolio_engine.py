@@ -222,10 +222,11 @@ def _select_book_names(
 
     if isinstance(book.selector, TopN):
         n = book.selector.n
+        do_fill = getattr(book.selector, "fill_from_unmasked", True)
         # sort descending by rank (higher = better)
         selected = masked_valid.sort_values(ascending=False).head(n).index.tolist()
-        # If mask yields fewer than n, fill the remainder from the unmasked pool
-        if len(selected) < n:
+        # If mask yields fewer than n, optionally fill the remainder from the unmasked pool
+        if do_fill and len(selected) < n:
             remaining = n - len(selected)
             filler = (
                 unmasked_valid.drop(index=selected, errors="ignore")
@@ -233,15 +234,21 @@ def _select_book_names(
                 .head(remaining)
                 .index.tolist()
             )
+            if len(filler) > 0:
+                log.debug(
+                    "[%s][%s] TopN filled %d/%d from unmasked pool",
+                    date, book.name, len(filler), n,
+                )
             selected.extend(filler)
         return selected
 
     if isinstance(book.selector, BottomN):
         n = book.selector.n
+        do_fill = getattr(book.selector, "fill_from_unmasked", True)
         # sort ascending by rank (lower = worse)
         selected = masked_valid.sort_values(ascending=True).head(n).index.tolist()
-        # If mask yields fewer than n, fill the remainder from the unmasked pool
-        if len(selected) < n:
+        # If mask yields fewer than n, optionally fill the remainder from the unmasked pool
+        if do_fill and len(selected) < n:
             remaining = n - len(selected)
             filler = (
                 unmasked_valid.drop(index=selected, errors="ignore")
@@ -249,6 +256,11 @@ def _select_book_names(
                 .head(remaining)
                 .index.tolist()
             )
+            if len(filler) > 0:
+                log.debug(
+                    "[%s][%s] BottomN filled %d/%d from unmasked pool",
+                    date, book.name, len(filler), n,
+                )
             selected.extend(filler)
         return selected
 

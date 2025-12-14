@@ -25,7 +25,12 @@ from quantdsl_backtest.dsl.strategy import Strategy
 from quantdsl_backtest.dsl.data_config import DataConfig
 from quantdsl_backtest.dsl.transforms import CleaningTransform
 from quantdsl_backtest.dsl.universe import Universe, HasHistory, MinPrice
-from quantdsl_backtest.dsl.factors import ReturnFactor, VolatilityFactor
+from quantdsl_backtest.dsl.factors import (
+    ReturnFactor,
+    VolatilityFactor,
+    OvernightReturnFactor,
+    IntradayReturnFactor,
+)
 from quantdsl_backtest.dsl.signals import (
     CrossSectionRank,
     Quantile,
@@ -65,7 +70,7 @@ def build_strategy() -> Strategy:
         start="2015-01-01",
         end="2025-12-12",
         price_adjustment="split_dividend",
-        fields=["close", "volume"],
+        fields=["open", "close", "volume"],
     )
 
     # 2) Universe: basic sanity
@@ -78,7 +83,7 @@ def build_strategy() -> Strategy:
         ],
     )
 
-    # 3) Factors: medium-term momentum (6m) + slower (12m) for regime + vol
+    # 3) Factors: medium-term momentum (6m) + slower (12m) for regime + vol + timezone tilt (ON/DAY)
     mom_126 = ReturnFactor(
         name="mom_126",    # ~6 months (252 trading days / 2)
         field="close",
@@ -99,10 +104,24 @@ def build_strategy() -> Strategy:
         annualize=True,
     )
 
+    # Timezone-flavoured factors
+    on_20 = OvernightReturnFactor(
+        name="on_20",
+        lookback=20,
+        method="log",
+    )
+    day_20 = IntradayReturnFactor(
+        name="day_20",
+        lookback=20,
+        method="log",
+    )
+
     factors = {
         "mom_126": mom_126,
         "mom_252": mom_252,
         "vol_20": vol_20,
+        "on_20": on_20,
+        "day_20": day_20,
     }
 
     # 4) Signals
@@ -132,16 +151,39 @@ def build_strategy() -> Strategy:
     #   - avg_mom_126 = mean across instruments of mom_126
     #   - risk_on_global = avg_mom_126 > 0
     #
-    # In your current DSL you don't yet have an explicit "cross-sectional aggregate"
+    # Current DSL you don't yet have an explicit "cross-sectional aggregate"
     # node, so for now we will *only* use the per-name regime and leave the
     # global regime idea as a possible future extension.
     #
-    # Long candidates: valid and risk_on_name
+    # Ranks for timezone components
+    rank_on = CrossSectionRank(
+        factor_name="on_20",
+        mask_name=None,
+        method="percentile",
+        name="rank_on_20",
+    )
+    rank_day = CrossSectionRank(
+        factor_name="day_20",
+        mask_name=None,
+        method="percentile",
+        name="rank_day_20",
+    )
+
+    # "Timezone leaders": high overnight, low intraday
+    tz_long_candidates = MaskFromBoolean(
+        name="tz_long_candidates",
+        expr=And(
+            left=GreaterEqual(left="rank_on_20", right=0.8),
+            right=LessEqual(left="rank_day_20", right=0.2),
+        ),
+    )
+
+    # Require both trend and timezone tilt for long candidates
     long_candidates = MaskFromBoolean(
         name="long_candidates",
         expr=And(
             left="valid",
-            right="risk_on_name",
+            right=And(left="risk_on_name", right="tz_long_candidates"),
         ),
     )
 
@@ -149,6 +191,9 @@ def build_strategy() -> Strategy:
         "rank_126": rank_126,
         "valid": valid,
         "risk_on_name": risk_on_name,
+        "rank_on_20": rank_on,
+        "rank_day_20": rank_day,
+        "tz_long_candidates": tz_long_candidates,
         "long_candidates": long_candidates,
     }
 
@@ -159,7 +204,8 @@ def build_strategy() -> Strategy:
         selector=TopN(
             factor_name="rank_126",
             n=3,                      # long strongest half of the basket
-            mask_name="long_candidates",
+            mask_name="tz_long_candidates",
+            fill_from_unmasked=False,
         ),
         weighting=EqualWeight(),
     )
