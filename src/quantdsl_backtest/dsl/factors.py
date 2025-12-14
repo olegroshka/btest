@@ -43,6 +43,9 @@ class VolatilityFactor(FactorNode):
     method: VolMethod = "realized"
     # Optional: you might later add annualization, etc.
     annualize: bool = True
+    # Allow loosening of rolling window requirement in sparse calendars.
+    # If None, defaults to `lookback`.
+    min_periods: int | None = None
 
 
 @dataclass(slots=True)
@@ -83,3 +86,33 @@ class IntradayReturnFactor(FactorNode):
     field_close: str = "close"
     lookback: int = 20
     method: ReturnMethod = "log"
+
+
+@dataclass(slots=True)
+class WinsorizedFactor(FactorNode):
+    """
+    Wraps another factor node and applies cross-sectional per-date symmetric
+    winsorization to its output before downstream usage (e.g., ranking).
+
+    Parameters
+    - base: FactorNode to evaluate first
+    - z: float, symmetric clipping threshold (mean ± z * std) per date
+    """
+
+    base: FactorNode
+    z: float = 3.0
+
+
+@dataclass(slots=True)
+class RatioFactor(FactorNode):
+    """
+    Element-wise ratio of two factor nodes: numerator / denominator.
+    Both inputs are evaluated first and aligned on [datetime x instrument].
+
+    Notes:
+    - No implicit epsilon/floor is applied; NaNs and infs propagate naturally.
+      Upstream/downstream winsorization or masking should be used if desired.
+    """
+
+    numerator: FactorNode
+    denominator: FactorNode

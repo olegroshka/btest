@@ -30,6 +30,8 @@ from quantdsl_backtest.dsl.factors import (
     VolatilityFactor,
     OvernightReturnFactor,
     IntradayReturnFactor,
+    WinsorizedFactor,
+    RatioFactor,
 )
 from quantdsl_backtest.dsl.signals import (
     CrossSectionRank,
@@ -85,11 +87,16 @@ def build_strategy() -> Strategy:
     )
 
     # 3) Factors: medium-term momentum (6m) + slower (12m) for regime + vol + timezone tilt (ON/DAY)
-    mom_126 = ReturnFactor(
-        name="mom_126",    # ~6 months (252 trading days / 2)
+    mom_126_raw = ReturnFactor(
+        name="mom_126_raw",    # ~6 months (252 trading days / 2)
         field="close",
         lookback=126,
         method="log",
+    )
+    mom_126 = WinsorizedFactor(
+        name="mom_126",
+        base=mom_126_raw,
+        z=3.0,
     )
     mom_252 = ReturnFactor(
         name="mom_252",    # ~12 months
@@ -103,36 +110,70 @@ def build_strategy() -> Strategy:
         lookback=20,
         method="realized",
         annualize=True,
+        min_periods=5,
+    )
+    # Smoother denominator for risk-adjusted momentum
+    vol_63 = VolatilityFactor(
+        name="vol_63",
+        field="close",
+        lookback=63,
+        method="realized",
+        annualize=True,
+        min_periods=10,
     )
 
     # Timezone-flavoured factors
-    on_20 = OvernightReturnFactor(
-        name="on_20",
+    on_20_raw = OvernightReturnFactor(
+        name="on_20_raw",
         lookback=20,
         method="log",
     )
-    day_20 = IntradayReturnFactor(
-        name="day_20",
+    on_20 = WinsorizedFactor(
+        name="on_20",
+        base=on_20_raw,
+        z=3.0,
+    )
+    day_20_raw = IntradayReturnFactor(
+        name="day_20_raw",
         lookback=20,
         method="log",
+    )
+    day_20 = WinsorizedFactor(
+        name="day_20",
+        base=day_20_raw,
+        z=3.0,
+    )
+
+    # Risk-adjusted momentum: winsorized 6m momentum divided by 63d vol (smoother)
+    mom_risk_adj_raw = RatioFactor(
+        name="mom_risk_adj_raw",
+        numerator=mom_126,
+        denominator=vol_63,
+    )
+    mom_risk_adj = WinsorizedFactor(
+        name="mom_risk_adj",
+        base=mom_risk_adj_raw,
+        z=3.0,
     )
 
     factors = {
         "mom_126": mom_126,
         "mom_252": mom_252,
         "vol_20": vol_20,
+        "vol_63": vol_63,
         "on_20": on_20,
         "day_20": day_20,
+        "mom_risk_adj": mom_risk_adj,
     }
 
     # 4) Signals
 
-    # Cross-sectional percentile rank of 6m momentum
-    rank_126 = CrossSectionRank(
-        factor_name="mom_126",
+    # Cross-sectional percentile rank of risk-adjusted 6m momentum
+    rank_mom = CrossSectionRank(
+        factor_name="mom_risk_adj",
         mask_name=None,
         method="percentile",
-        name="rank_126",
+        name="rank_mom",
     )
 
     # Per-name validity
@@ -194,7 +235,7 @@ def build_strategy() -> Strategy:
     )
 
     signals = {
-        "rank_126": rank_126,
+        "rank_mom": rank_mom,
         "valid": valid,
         "risk_on_name": risk_on_name,
         "avg_mom_126": avg_mom_126,
@@ -209,7 +250,7 @@ def build_strategy() -> Strategy:
     long_book = Book(
         name="long_book",
         selector=TopN(
-            factor_name="rank_126",
+            factor_name="rank_mom",
             n=3,                      # long strongest half of the basket
             mask_name="tz_long_candidates",
             fill_from_unmasked=True,
@@ -221,7 +262,7 @@ def build_strategy() -> Strategy:
     short_book = Book(
         name="short_book",
         selector=BottomN(
-            factor_name="rank_126",
+            factor_name="rank_mom",
             n=0,
             mask_name=None,
         ),

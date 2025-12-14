@@ -14,6 +14,8 @@ from ..dsl.factors import (
     FiboRetraceFactor,
     OvernightReturnFactor,
     IntradayReturnFactor,
+    WinsorizedFactor,
+    RatioFactor,
 )
 from ..data.schema import MarketData
 from ..utils.logging import get_logger
@@ -54,6 +56,14 @@ class FactorEngine:
             df = self._compute_overnight(node)
         elif isinstance(node, IntradayReturnFactor):
             df = self._compute_intraday(node)
+        elif isinstance(node, WinsorizedFactor):
+            base_df = self._dispatch_compute_node(node.base)
+            df = self._winsorize_cross_section(base_df, z=node.z)
+        elif isinstance(node, RatioFactor):
+            num = self._dispatch_compute_node(node.numerator)
+            den = self._dispatch_compute_node(node.denominator)
+            with np.errstate(divide="ignore", invalid="ignore"):
+                df = num / den
         else:
             raise TypeError(f"Unsupported factor node type: {type(node)}")
 
@@ -92,6 +102,7 @@ class FactorEngine:
         lookback = node.lookback
         method = node.method
         annualize = node.annualize
+        min_periods = node.min_periods if getattr(node, 'min_periods', None) is not None else lookback
 
         prices = self._field_panel(field)
         # 1-period log returns
@@ -99,7 +110,7 @@ class FactorEngine:
             r = np.log(prices / prices.shift(1))
 
         if method in ("realized", "stdev"):
-            vol = r.rolling(lookback, min_periods=lookback).std()
+            vol = r.rolling(lookback, min_periods=min_periods).std()
         else:
             raise ValueError(f"Unknown volatility method: {method}")
 
@@ -166,3 +177,39 @@ class FactorEngine:
             if field in bars.columns:
                 df[instr] = bars[field].reindex(self.index)
         return df
+
+    # ------------------------------------------------------------------ #
+    # Internals
+    def _dispatch_compute_node(self, node: FactorNode) -> pd.DataFrame:
+        """Compute a node without using the external name cache.
+        This allows nested nodes (e.g., WinsorizedFactor(base=...))."""
+        if isinstance(node, ReturnFactor):
+            return self._compute_return(node)
+        if isinstance(node, VolatilityFactor):
+            return self._compute_volatility(node)
+        if isinstance(node, FiboRetraceFactor):
+            return self._compute_fibo(node)
+        if isinstance(node, OvernightReturnFactor):
+            return self._compute_overnight(node)
+        if isinstance(node, IntradayReturnFactor):
+            return self._compute_intraday(node)
+        if isinstance(node, WinsorizedFactor):
+            base_df = self._dispatch_compute_node(node.base)
+            return self._winsorize_cross_section(base_df, z=node.z)
+        if isinstance(node, RatioFactor):
+            with np.errstate(divide="ignore", invalid="ignore"):
+                return self._dispatch_compute_node(node.numerator) / self._dispatch_compute_node(node.denominator)
+        raise TypeError(f"Unsupported factor node type: {type(node)}")
+
+    def _winsorize_cross_section(self, df: pd.DataFrame, z: float) -> pd.DataFrame:
+        """Clip values per date across instruments to mean±z*std (symmetric).
+        Preserves index/columns/NaNs."""
+        if df.empty:
+            return df
+        # Compute row-wise mean and std
+        mean = df.mean(axis=1, skipna=True)
+        std = df.std(axis=1, skipna=True)
+        lower = mean - z * std
+        upper = mean + z * std
+        # Use axis=0 to align Series to rows
+        return df.clip(lower=lower, upper=upper, axis=0)
