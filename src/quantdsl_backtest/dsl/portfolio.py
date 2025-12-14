@@ -99,3 +99,4 @@ class LongShortPortfolio:
     # Optional constraints
     sector_neutral: Optional[SectorNeutral] = None
     turnover_limit: Optional[TurnoverLimit] = None
+    debugging: bool = False

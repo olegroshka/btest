@@ -173,8 +173,8 @@ def build_strategy() -> Strategy:
     tz_long_candidates = MaskFromBoolean(
         name="tz_long_candidates",
         expr=And(
-            left=GreaterEqual(left="rank_on_20", right=0.8),
-            right=LessEqual(left="rank_day_20", right=0.2),
+            left=GreaterEqual(left="rank_on_20", right=0.4),
+            right=LessEqual(left="rank_day_20", right=0.6),
         ),
     )
 
@@ -205,7 +205,7 @@ def build_strategy() -> Strategy:
             factor_name="rank_126",
             n=3,                      # long strongest half of the basket
             mask_name="tz_long_candidates",
-            fill_from_unmasked=False,
+            fill_from_unmasked=True,
         ),
         weighting=EqualWeight(),
     )
@@ -318,6 +318,15 @@ def build_strategy() -> Strategy:
 
 
 def main() -> None:
+    # Enable verbose diagnostics for selection/mask behavior during this run
+    try:
+        import logging as _logging
+        # Set root to INFO to avoid excessive noise, but enable our engine module to DEBUG
+        _logging.basicConfig(level=_logging.INFO)
+        _logging.getLogger("quantdsl_backtest.engine.portfolio_engine").setLevel(_logging.DEBUG)
+    except Exception:
+        pass
+
     strategy = build_strategy()
     # Run with the selected engine (vectorized by default for this example)
     result = run_backtest(strategy)

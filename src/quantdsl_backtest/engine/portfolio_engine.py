@@ -159,13 +159,32 @@ def compute_target_weights_for_date(
         book=portfolio.long_book,
         rank_row=long_rank_row,
         mask=long_mask,
+        debugging=portfolio.debugging
     )
     short_names = _select_book_names(
         date=sig_date,
         book=portfolio.short_book,
         rank_row=short_rank_row,
         mask=short_mask,
+        debugging=portfolio.debugging
     )
+
+    # Diagnostics: mask sparsity and selection sizes (debug level)
+    try:
+        if portfolio.debugging:
+            long_mask_true = int(long_mask.sum()) if isinstance(long_mask, pd.Series) else 0
+            short_mask_true = int(short_mask.sum()) if isinstance(short_mask, pd.Series) else 0
+            log.debug(
+                "[%s] masks: long_true=%d short_true=%d | selected: long=%d short=%d",
+                sig_date,
+                long_mask_true,
+                short_mask_true,
+                len(long_names),
+                len(short_names),
+            )
+    except Exception:
+        # Best-effort diagnostics; never fail targeting because of logging
+        pass
 
     n_long = len(long_names)
     n_short = len(short_names)
@@ -211,6 +230,7 @@ def _select_book_names(
     book: Book,
     rank_row: pd.Series,
     mask: pd.Series,
+    debugging: bool = False,
 ) -> list[str]:
     """
     Based on the Book.selector type, choose instrument names at a given date.
@@ -234,7 +254,7 @@ def _select_book_names(
                 .head(remaining)
                 .index.tolist()
             )
-            if len(filler) > 0:
+            if debugging and len(filler) > 0:
                 log.debug(
                     "[%s][%s] TopN filled %d/%d from unmasked pool",
                     date, book.name, len(filler), n,
@@ -256,7 +276,7 @@ def _select_book_names(
                 .head(remaining)
                 .index.tolist()
             )
-            if len(filler) > 0:
+            if debugging and len(filler) > 0:
                 log.debug(
                     "[%s][%s] BottomN filled %d/%d from unmasked pool",
                     date, book.name, len(filler), n,
