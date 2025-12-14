@@ -111,6 +111,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     risk = strategy.backtest.risk_checks
     peak_equity = float(strategy.backtest.cash_initial)
     cooldown_days = 0  # simple "no-risk" cooldown counter
+    trading_halted = False  # terminal kill-switch state
 
     # ------------------------------------------------------------------ #
     # 4. Main daily loop
@@ -159,6 +160,50 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         do_rebalance = _is_rebalance_date(i, dates, strategy.portfolio)
 
         trades_today = pd.DataFrame()
+        # --- Pre-trade drawdown vs running peak (use equity_before) ---
+        dd_pretrade = 0.0 if peak_equity == 0 else (equity_before / peak_equity - 1.0)
+        dd_mag = -dd_pretrade if dd_pretrade < 0 else 0.0
+
+        # Determine drawdown policy (backward-compatible):
+        # If new policy present, use it; else, if max_drawdown set, treat as hard_kill threshold.
+        policy = getattr(risk, "drawdown", None)
+        policy_mode = getattr(policy, "mode", None) if policy is not None else None
+        # Back-compat mapping
+        if policy is None and getattr(risk, "max_drawdown", None) is not None:
+            policy_mode = "hard_kill"
+            policy_threshold = float(getattr(risk, "max_drawdown"))
+        else:
+            policy_threshold = float(getattr(policy, "threshold", 0.0) or 0.0)
+
+        # Compute scaling according to policy
+        scale = 1.0
+        if policy_mode == "hard_kill":
+            if dd_mag >= (policy_threshold or 0.0):
+                trading_halted = True
+                scale = 0.0
+        elif policy_mode == "soft_scale":
+            start = float(getattr(policy, "start", 0.1) or 0.1)
+            full = float(getattr(policy, "full", 0.35) or 0.35)
+            curve = getattr(policy, "curve", "linear") or "linear"
+            if full <= start:
+                # guard: if misconfigured, treat as immediate flat beyond start
+                full = start
+            if dd_mag <= start:
+                scale = 1.0
+            elif dd_mag >= full:
+                scale = 0.0
+            else:
+                x = (dd_mag - start) / (full - start)  # in (0,1)
+                if curve == "quadratic":
+                    scale = 1.0 - x * x
+                elif curve == "sqrt":
+                    scale = 1.0 - np.sqrt(x)
+                else:  # linear
+                    scale = 1.0 - x
+        else:
+            # "none" or not set: keep scale 1.0
+            pass
+
         if do_rebalance:
             target_weights = compute_target_weights_for_date(
                 date=dt,
@@ -167,17 +212,23 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 prev_weights=weights_df.iloc[i - 1] if i > 0 else pd.Series(0.0, index=instruments),
             )
 
+            # Apply drawdown policy scaling / halting
+            if trading_halted:
+                target_weights = pd.Series(0.0, index=target_weights.index)
+            elif scale < 1.0:
+                target_weights = target_weights * scale
+
             new_positions, cash_delta, trades_today = rebalance_to_target_weights(
-                date=dt,
-                execution=strategy.execution,
-                commission=strategy.costs.commission,
-                fees=strategy.costs.fees,
-                equity=equity_before,
-                prices=price_t_eff,
-                volumes=volume_t,
-                prev_positions=prev_positions,
-                target_weights=target_weights,
-            )
+                    date=dt,
+                    execution=strategy.execution,
+                    commission=strategy.costs.commission,
+                    fees=strategy.costs.fees,
+                    equity=equity_before,
+                    prices=price_t_eff,
+                    volumes=volume_t,
+                    prev_positions=prev_positions,
+                    target_weights=target_weights,
+                )
 
             cash += cash_delta
             cur_positions = new_positions
@@ -197,14 +248,10 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             peak_equity = equity
         drawdown = 0.0 if peak_equity == 0 else (equity / peak_equity - 1.0)
 
-        # --- Risk checks: max_drawdown stop ---
-        if getattr(risk, "max_drawdown", None) is not None and drawdown <= -risk.max_drawdown:
-            # Simple policy: go to cash and stop trading further (buy & hold cash)
-            cur_positions = pd.Series(0.0, index=instruments)
-            cash = equity  # liquidate to cash
+        # --- Risk checks: drawdown policy informational logging ---
+        if policy_mode == "hard_kill" and trading_halted:
             print(
-                f"[RISK] Max drawdown {drawdown: .2%} exceeded threshold "
-                f"{risk.max_drawdown: .2%} on {dt.date()}, de-risking to cash."
+                f"[RISK] Kill-switch: DD {dd_mag: .2%} >= {policy_threshold: .2%} on {dt.date()}, halting trading and staying in cash."
             )
 
         # --- Risk checks: max_daily_loss + cooldown ---

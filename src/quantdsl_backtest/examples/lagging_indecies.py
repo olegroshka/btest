@@ -51,25 +51,24 @@ from quantdsl_backtest.dsl.execution import (
     VolumeParticipation,
 )
 from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees
-from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting, RiskChecks
+from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting, RiskChecks, DrawdownPolicy
 from quantdsl_backtest.engine.backtest_runner import run_backtest
 from quantdsl_backtest.engine.data_loader import load_data_for_strategy
 
 
 def build_strategy() -> Strategy:
-    # 1) Data config: indices parquet
+    # 1) Data config: same indices parquet
     data = DataConfig(
         source="parquet://equities/indicies.parquet",
         calendar="XNYS",
         frequency="1d",
         start="2015-01-01",
-        end="2025-12-31",
+        end="2025-12-12",
         price_adjustment="split_dividend",
-        fields=["open", "high", "low", "close", "volume"],
-        #transforms=[CleaningTransform]
+        fields=["close", "volume"],
     )
 
-    # 2) Universe: simple but reasonable filters
+    # 2) Universe: basic sanity
     universe = Universe(
         name="Indices",
         id_field="ticker",
@@ -79,23 +78,17 @@ def build_strategy() -> Strategy:
         ],
     )
 
-    # 3) Factors: multi-horizon momentum + long-term regime + vol
-    mom_20 = ReturnFactor(
-        name="mom_20",
+    # 3) Factors: medium-term momentum (6m) + slower (12m) for regime + vol
+    mom_126 = ReturnFactor(
+        name="mom_126",    # ~6 months (252 trading days / 2)
         field="close",
-        lookback=20,
+        lookback=126,
         method="log",
     )
-    mom_60 = ReturnFactor(
-        name="mom_60",
+    mom_252 = ReturnFactor(
+        name="mom_252",    # ~12 months
         field="close",
-        lookback=60,
-        method="log",
-    )
-    mom_200 = ReturnFactor(
-        name="mom_200",
-        field="close",
-        lookback=200,
+        lookback=252,
         method="log",
     )
     vol_20 = VolatilityFactor(
@@ -107,106 +100,77 @@ def build_strategy() -> Strategy:
     )
 
     factors = {
-        "mom_20": mom_20,
-        "mom_60": mom_60,
-        "mom_200": mom_200,
+        "mom_126": mom_126,
+        "mom_252": mom_252,
         "vol_20": vol_20,
     }
 
     # 4) Signals
 
-    # Cross-sectional ranks of 20d and 60d momentum
-    rank_20 = CrossSectionRank(
-        factor_name="mom_20",
+    # Cross-sectional percentile rank of 6m momentum
+    rank_126 = CrossSectionRank(
+        factor_name="mom_126",
         mask_name=None,
         method="percentile",
-        name="rank_20",
-    )
-    rank_60 = CrossSectionRank(
-        factor_name="mom_60",
-        mask_name=None,
-        method="percentile",
-        name="rank_60",
+        name="rank_126",
     )
 
-    # "Strong" when both horizons are above median, "weak" when both below
-    combined_strong = MaskFromBoolean(
-        name="combined_strong",
-        expr=And(
-            left=GreaterEqual(left="rank_20", right=0.5),
-            right=GreaterEqual(left="rank_60", right=0.5),
-        ),
-    )
-    combined_weak = MaskFromBoolean(
-        name="combined_weak",
-        expr=And(
-            left=LessEqual(left="rank_20", right=0.5),
-            right=LessEqual(left="rank_60", right=0.5),
-        ),
-    )
-
-    # Basic data sanity
+    # Per-name validity
     valid = MaskFromBoolean(
         name="valid",
-        expr=And(
-            left=NotNull(factor_name="mom_20"),
-            right=NotNull(factor_name="mom_60"),
-        ),
+        expr=NotNull(factor_name="mom_126"),
     )
 
-    # Regime filter: only trade indices whose own 200d momentum is non-negative
-    risk_on = MaskFromBoolean(
-        name="risk_on",
-        expr=GreaterEqual(left="mom_200", right=0.0),
+    # Simple per-name regime filter: only trade indices whose own 12m mom >= 0
+    risk_on_name = MaskFromBoolean(
+        name="risk_on_name",
+        expr=GreaterEqual(left="mom_252", right=0.0),
     )
 
-    # Long candidates: strong trend, valid, and in "risk_on" regime
+    # Universe-level regime: "is the average 6m momentum across all indices > 0?"
+    # We approximate this via a signal:
+    #   - avg_mom_126 = mean across instruments of mom_126
+    #   - risk_on_global = avg_mom_126 > 0
+    #
+    # In your current DSL you don't yet have an explicit "cross-sectional aggregate"
+    # node, so for now we will *only* use the per-name regime and leave the
+    # global regime idea as a possible future extension.
+    #
+    # Long candidates: valid and risk_on_name
     long_candidates = MaskFromBoolean(
         name="long_candidates",
         expr=And(
-            left=And(left="combined_strong", right="valid"),
-            right="risk_on",
-        ),
-    )
-
-    # Short candidates: weak trend, valid, and also only when risk_on
-    # (you could relax this and allow shorts in down regimes, but we keep it
-    # simple and avoid heavy shorting in prolonged bear phases.)
-    short_candidates = MaskFromBoolean(
-        name="short_candidates",
-        expr=And(
-            left=And(left="combined_weak", right="valid"),
-            right="risk_on",
+            left="valid",
+            right="risk_on_name",
         ),
     )
 
     signals = {
-        "rank_20": rank_20,
-        "rank_60": rank_60,
-        "combined_strong": combined_strong,
-        "combined_weak": combined_weak,
+        "rank_126": rank_126,
         "valid": valid,
-        "risk_on": risk_on,
+        "risk_on_name": risk_on_name,
         "long_candidates": long_candidates,
-        "short_candidates": short_candidates,
     }
 
-    # 5) Portfolio: net-long, trend-following cross-section
+    # 5) Portfolio: long-only, top-3 by 6m momentum, weekly rebalance
+
     long_book = Book(
         name="long_book",
         selector=TopN(
-            factor_name="rank_60",   # slower horizon for selector
-            n=2,
+            factor_name="rank_126",
+            n=3,                      # long strongest half of the basket
             mask_name="long_candidates",
         ),
         weighting=EqualWeight(),
     )
+
+    # Dummy short book (no shorts)
     short_book = Book(
         name="short_book",
         selector=BottomN(
-            factor_name="rank_60",
-            n=2,
-            mask_name="short_candidates",
+            factor_name="rank_126",
+            n=0,
+            mask_name=None,
         ),
         weighting=EqualWeight(),
     )
@@ -214,20 +178,20 @@ def build_strategy() -> Strategy:
     portfolio = LongShortPortfolio(
         long_book=long_book,
         short_book=short_book,
-        rebalance_frequency="1d",
+        rebalance_frequency="5d",      # rebalance roughly weekly
         rebalance_at="market_close",
         signal_delay_bars=0,
-        target_gross_leverage=1.2,   # ~0.9 long / 0.3 short
-        target_net_exposure=0.6,     # net long bias
-        max_abs_weight_per_name=0.75,
+        target_gross_leverage=1.0,     # fully invested when risk-on
+        target_net_exposure=1.0,       # long-only
+        max_abs_weight_per_name=0.6,
         sector_neutral=None,
         turnover_limit=TurnoverLimit(
             window_bars=5,
-            max_fraction=1.0,  # smoother than daily full-flip
+            max_fraction=1.0,          # allow a full rotation over a week
         ),
     )
 
-    # 6) Execution & costs (modest, so signal can show through)
+    # 6) Execution & costs: keep small but non-zero
     execution = Execution(
         order_policy=OrderPolicy(),
         latency=LatencyModel(
@@ -235,7 +199,7 @@ def build_strategy() -> Strategy:
             market_latency_ms=0,
         ),
         slippage=PowerLawSlippageModel(
-            base_bps=0.25,  # small but non-zero
+            base_bps=0.25,     # 0.25 bps per side
             k=0.0,
             exponent=1.0,
             use_intraday_vol=False,
@@ -250,10 +214,10 @@ def build_strategy() -> Strategy:
     costs = Costs(
         commission=Commission(
             type="bps_notional",
-            amount=0.1,  # 0.1 bps per trade
+            amount=0.1,        # 0.1 bps per trade
         ),
         borrow=BorrowCost(
-            default_annual_rate=0.01,
+            default_annual_rate=0.0,   # long-only indices: no borrow
         ),
         financing=FinancingCost(
             base_rate_curve="SOFR",
@@ -269,11 +233,6 @@ def build_strategy() -> Strategy:
     bt = BacktestConfig(
         engine="event_driven",
         cash_initial=1_000_000,
-        # risk_checks=RiskChecks(
-        #     max_drawdown=0.30,   # stop trading if DD hits -30%
-        #     max_gross_leverage=2.0,
-        #     max_daily_loss=0.05, # cooldown if we lose >5% in a day
-        # ),
         reporting=Reporting(
             store_trades=True,
             store_positions=True,
@@ -285,11 +244,21 @@ def build_strategy() -> Strategy:
                 "daily_returns",
             ],
         ),
+        risk_checks=RiskChecks(
+            # Prefer soft scale down de-risking for this toy index trend strategy
+            drawdown= DrawdownPolicy(
+                mode="soft_scale",
+                start=0.10,
+                full=1.0,
+                curve="linear",
+            ),
+            max_gross_leverage=2.0,
+            max_daily_loss=0.10,
+        ),
     )
 
-    # 8) Compose strategy
     strategy = Strategy(
-        name="lagging_indecies_trend_regime_netlong",
+        name="indices_mom_6m_long_only_weekly",
         data=data,
         universe=universe,
         factors=factors,
