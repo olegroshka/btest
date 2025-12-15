@@ -153,7 +153,7 @@ def build_strategy() -> Strategy:
     mom_risk_adj = WinsorizedFactor(
         name="mom_risk_adj",
         base=mom_risk_adj_raw,
-        z=3.0,
+        z=2.0,
     )
 
     factors = {
