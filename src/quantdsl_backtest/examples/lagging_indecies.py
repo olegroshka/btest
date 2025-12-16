@@ -263,7 +263,7 @@ def build_strategy() -> Strategy:
         name="short_book",
         selector=BottomN(
             factor_name="rank_mom",
-            n=0,
+            n=3,
             mask_name=None,
         ),
         weighting=EqualWeight(),
