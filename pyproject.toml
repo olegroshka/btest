@@ -21,12 +21,15 @@ dependencies = [
   "pyarrow",             # for efficient data storage
   "lxml",                # for XML parsing
   "polars>=1.4,<2.0",    # high-performance dataframe engine (optional path)
+  "arcticdb>=3.0.0",     # local/remote versioned cache
+  "fredapi>=0.5.2",      # FRED API client
 ]
 
 [project.optional-dependencies]
 dev = [
   "ipykernel",
   "pytest>=8.0",
+  "pytest-mock>=3.12",
   "mypy>=1.10",
   "black>=24.0",
   "isort>=5.13",

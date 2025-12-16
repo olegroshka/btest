@@ -20,10 +20,20 @@ from ..dsl.signals import (
     Not,
     LessEqual,
     GreaterEqual,
+    Less,
+    Greater,
     Quantile,
     CrossSectionAggregate,
     CrossSectionRank,
     MaskFromBoolean,
+    TimeSeries,
+    EWMMean,
+    RollingMean,
+    RollingStd,
+    Diff,
+    PctChange,
+    ZScoreRolling,
+    RiskMultiplierFromZ,
 )
 from ..utils.logging import get_logger
 
@@ -104,6 +114,10 @@ class SignalEngine:
             return self._eval_less_equal(node)
         if isinstance(node, GreaterEqual):
             return self._eval_greater_equal(node)
+        if isinstance(node, Less):
+            return self._eval_less(node)
+        if isinstance(node, Greater):
+            return self._eval_greater(node)
         if isinstance(node, Quantile):
             return self._eval_quantile(node)
         if isinstance(node, CrossSectionAggregate):
@@ -112,6 +126,22 @@ class SignalEngine:
             return self._eval_rank(node)
         if isinstance(node, MaskFromBoolean):
             return self._eval_mask_from_boolean(node)
+        if isinstance(node, TimeSeries):
+            return self._eval_time_series(node)
+        if isinstance(node, EWMMean):
+            return self._eval_ewm_mean(node)
+        if isinstance(node, RollingMean):
+            return self._eval_rolling_mean(node)
+        if isinstance(node, RollingStd):
+            return self._eval_rolling_std(node)
+        if isinstance(node, Diff):
+            return self._eval_diff(node)
+        if isinstance(node, PctChange):
+            return self._eval_pct_change(node)
+        if isinstance(node, ZScoreRolling):
+            return self._eval_zscore_rolling(node)
+        if isinstance(node, RiskMultiplierFromZ):
+            return self._eval_risk_multiplier_from_z(node)
         raise TypeError(f"Unsupported SignalNode type: {type(node)}")
 
     # ------------------------------------------------------------------ #
@@ -145,6 +175,16 @@ class SignalEngine:
         left = self._resolve_expr(node.left)
         right = self._resolve_expr(node.right)
         return left >= right
+
+    def _eval_less(self, node: Less) -> pd.DataFrame:
+        left = self._resolve_expr(node.left)
+        right = self._resolve_expr(node.right)
+        return left < right
+
+    def _eval_greater(self, node: Greater) -> pd.DataFrame:
+        left = self._resolve_expr(node.left)
+        right = self._resolve_expr(node.right)
+        return left > right
 
     def _eval_quantile(self, node: Quantile) -> pd.DataFrame:
         # Support quantile over either a factor or another signal
@@ -339,6 +379,86 @@ class SignalEngine:
     def _eval_mask_from_boolean(self, node: MaskFromBoolean) -> pd.DataFrame:
         expr = self._resolve_expr(node.expr)
         return expr.astype(bool)
+
+    # ---- Time-series primitives ---------------------------------------- #
+    def _eval_time_series(self, node: TimeSeries) -> pd.DataFrame:
+        # Lazy import to avoid cycles
+        try:
+            from ..dsl.data_config import DataConfig  # type: ignore
+            from ..data.adapters import load_market_data as _load_md  # type: ignore
+        except Exception:
+            DataConfig = None  # type: ignore
+            _load_md = None  # type: ignore
+
+        # Prepare an empty frame in case of failure
+        out = pd.DataFrame(index=self.index, columns=self.columns, dtype="float64")
+        try:
+            if _load_md is None:
+                return out
+            source = node.source
+            if DataConfig is not None and isinstance(source, DataConfig):
+                cfg = source
+            elif isinstance(source, str):
+                # Minimal DataConfig: infer calendar/frequency from factor panel
+                from ..dsl.data_config import DataConfig as DC  # type: ignore
+                cfg = DC(
+                    source=source,
+                    calendar="XNYS",
+                    frequency="1d",
+                    start=str(self.index.min().date()),
+                    end=str(self.index.max().date()),
+                    price_adjustment="none",
+                    fields=[node.field],
+                )
+            else:
+                return out
+
+            md = _load_md(cfg)
+            sym = md.instruments[0]
+            series = md.bars[sym][node.field].astype("float64").ffill()
+            # Align to engine index and broadcast across columns
+            s = series.reindex(self.index)
+            for c in self.columns:
+                out[c] = s
+            return out
+        except Exception:
+            # On any failure, return NaNs; downstream logic should handle gracefully
+            return out
+
+    def _eval_ewm_mean(self, node: EWMMean) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.ewm(span=node.span, min_periods=node.min_periods, adjust=node.adjust).mean()
+
+    def _eval_rolling_mean(self, node: RollingMean) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.rolling(window=node.window, min_periods=node.min_periods).mean()
+
+    def _eval_rolling_std(self, node: RollingStd) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.rolling(window=node.window, min_periods=node.min_periods).std()
+
+    def _eval_diff(self, node: Diff) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.diff(node.periods)
+
+    def _eval_pct_change(self, node: PctChange) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.pct_change(node.periods)
+
+    def _eval_zscore_rolling(self, node: ZScoreRolling) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        mu = base.rolling(window=node.window, min_periods=node.min_periods).mean()
+        sd = base.rolling(window=node.window, min_periods=node.min_periods).std()
+        # Avoid division by zero
+        out = (base - mu) / sd
+        out = out.replace([np.inf, -np.inf], np.nan)
+        return out
+
+    def _eval_risk_multiplier_from_z(self, node: RiskMultiplierFromZ) -> pd.DataFrame:
+        z = self._resolve_expr(node.z)
+        clipped = z.clip(lower=0.0, upper=float(node.max_z)) / float(node.max_z)
+        mult = 1.0 - clipped
+        return mult.clip(lower=0.0, upper=1.0)
 
     def _eval_cross_section_aggregate(self, node: CrossSectionAggregate) -> pd.DataFrame:
         # Source can be a factor or a previously computed signal

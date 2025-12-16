@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 
 import pandas as pd
 import vectorbt as vbt  # NEW: for Yahoo / YFData support
@@ -11,9 +11,17 @@ import vectorbt as vbt  # NEW: for Yahoo / YFData support
 from ..dsl.data_config import DataConfig
 from ..dsl.universe import Universe, HasHistory, MinPrice, MinDollarADV, UniverseFilter
 from .schema import MarketData, InstrumentId
+from .market import fetch_fred_series  # FRED helper (uses fredapi)
+from .cache_arctic import (
+    get_cache_lib,
+    cache_has_symbol,
+    cache_read_symbol,
+    cache_write_symbol,
+)
 
 
 YF_PREFIX = "yf://"
+FRED_PREFIX = "fred://"
 
 
 # ---------------------------------------------------------------------------
@@ -58,9 +66,36 @@ def load_market_data(
             universe=universe,
         )
 
+    # FRED provider (single series time series)
+    if src.lower().startswith(FRED_PREFIX):
+        return _load_fred_series(
+            data_cfg=data_cfg,
+            universe=universe,
+        )
+
+    # FINRA convenience mapping for common series routed via FRED IDs
+    if src.upper().startswith("FINRA:"):
+        mapped = _map_finra_to_fred(src)
+        if mapped is None:
+            raise ValueError(
+                f"Unknown FINRA source {src!r}. Supported examples: 'FINRA:HY_OAS', 'FINRA:IG_OAS'."
+            )
+        cfg2 = DataConfig(
+            source=mapped,
+            calendar=data_cfg.calendar,
+            frequency=data_cfg.frequency,
+            start=data_cfg.start,
+            end=data_cfg.end,
+            price_adjustment=data_cfg.price_adjustment,
+            fields=data_cfg.fields,
+            tz=data_cfg.tz,
+            transforms=getattr(data_cfg, "transforms", None),
+        )
+        return _load_fred_series(cfg2, universe)
+
     raise ValueError(
         f"Unsupported data source scheme in {src!r}. "
-        "Currently supported: 'parquet://...' and 'yf://...'."
+        "Currently supported: 'parquet://...', 'yf://...', 'fred://SERIES_ID', 'FINRA:ALIAS'."
     )
 
 
@@ -259,6 +294,125 @@ def _load_yahoo_vbt(
         bars=bars_by_instr,
         instruments=instruments,
         fields=data_cfg.fields,
+        frequency=data_cfg.frequency,
+        calendar=data_cfg.calendar,
+        tz=data_cfg.tz,
+    )
+
+    return market_data
+
+
+# ---------------------------------------------------------------------------
+# FRED adapter with ArcticDB caching
+# ---------------------------------------------------------------------------
+
+
+def _parse_fred_source(source: str) -> str:
+    # Accept only form like "fred://CPIAUCSL"
+    if not source.lower().startswith(FRED_PREFIX):
+        raise ValueError(
+            f"FRED source must use 'fred://<SERIES_ID>' scheme, got {source!r}"
+        )
+    series_id = source[len(FRED_PREFIX):]
+    return series_id.strip()
+
+
+def _map_finra_to_fred(source: str) -> Optional[str]:
+    """Map a FINRA alias to an underlying FRED series ID."""
+    alias = source.split(":", 1)[1].strip().upper()
+    mapping = {
+        # High Yield OAS
+        "HY_OAS": f"{FRED_PREFIX}BAMLH0A0HYM2",
+        # Investment Grade OAS
+        "IG_OAS": f"{FRED_PREFIX}BAMLC0A0CM",
+    }
+    fred = mapping.get(alias)
+    return fred
+
+
+def _load_fred_series(
+    data_cfg: DataConfig,
+    universe: Optional[Universe],
+) -> MarketData:
+    """
+    Load a single FRED series and present it as one instrument with 'close' field.
+    Uses ArcticDB local cache for persistence.
+    """
+    series_id = _parse_fred_source(data_cfg.source)
+
+    # We treat each FRED series as a single instrument
+    instrument = series_id
+
+    # ArcticDB cache library per provider/frequency
+    lib = get_cache_lib(provider="FRED", frequency=data_cfg.frequency)
+    key = instrument  # key per instrument
+
+    start_ts = pd.to_datetime(data_cfg.start)
+    end_ts = pd.to_datetime(data_cfg.end)
+
+    df: pd.DataFrame
+    if cache_has_symbol(lib, key):
+        cached = cache_read_symbol(lib, key)
+        # Expect columns: ['value'] and index datetime or a 'date' column
+        if "date" in cached.columns:
+            cached = cached.copy()
+            cached["date"] = pd.to_datetime(cached["date"]).dt.tz_localize(None)
+            cached = cached.set_index("date").sort_index()
+        else:
+            if not isinstance(cached.index, pd.DatetimeIndex):
+                # try to coerce
+                cached = cached.copy()
+                cached.index = pd.to_datetime(cached.index)
+            cached = cached.sort_index()
+
+        last_dt = cached.index.max() if not cached.empty else None
+        # If cache covers the end date, use slice directly
+        if last_dt is not None and last_dt >= end_ts:
+            df_full = cached
+        else:
+            # Fetch missing tail from last_dt + 1 day (if any)
+            fetch_start = start_ts
+            if last_dt is not None:
+                fetch_start = (last_dt + pd.Timedelta(days=1)).normalize()
+            fetched = fetch_fred_series(series_id, fetch_start, end_ts)
+            fetched = fetched.rename(columns={"value": "close"})
+            fetched["date"] = pd.to_datetime(fetched["date"]).dt.tz_localize(None)
+            fetched = fetched.set_index("date").sort_index()
+            # Normalize cached columns to 'close' if needed
+            if "value" in cached.columns and "close" not in cached.columns:
+                cached = cached.rename(columns={"value": "close"})
+            df_full = pd.concat([cached, fetched], axis=0)
+            df_full = df_full[~df_full.index.duplicated(keep="last")].sort_index()
+            # Persist merged
+            cache_write_symbol(lib, key, df_full)
+        df = df_full
+    else:
+        fetched = fetch_fred_series(series_id, start_ts, end_ts)
+        fetched = fetched.rename(columns={"value": "close"})
+        fetched["date"] = pd.to_datetime(fetched["date"]).dt.tz_localize(None)
+        df = fetched.set_index("date").sort_index()
+        cache_write_symbol(lib, key, df)
+
+    # Map to bars dict with requested fields
+    # FRED has only a single value; map to 'close'. Volume not available.
+    cols: Dict[str, pd.Series] = {}
+    if "close" in data_cfg.fields:
+        cols["close"] = df["close"].astype("float64")
+    if "open" in data_cfg.fields:
+        cols["open"] = df["close"].astype("float64")
+    if "high" in data_cfg.fields:
+        cols["high"] = df["close"].astype("float64")
+    if "low" in data_cfg.fields:
+        cols["low"] = df["close"].astype("float64")
+    if "volume" in data_cfg.fields:
+        cols["volume"] = pd.Series(index=df.index, data=float("nan"))
+
+    df_bars = pd.DataFrame(cols).loc[data_cfg.start : data_cfg.end]
+
+    market_data = MarketData(
+        bars={instrument: df_bars},
+        instruments=[instrument],
+        fields=list(df_bars.columns),
         frequency=data_cfg.frequency,
         calendar=data_cfg.calendar,
         tz=data_cfg.tz,

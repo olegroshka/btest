@@ -156,6 +156,37 @@ class GreaterEqual(SignalNode):
         return engine._eval_greater_equal(self)
 
 
+# Additional strict comparisons
+
+
+@dataclass(slots=True)
+class Less(SignalNode):
+    """
+    Comparison: left < right.
+    """
+
+    left: Expr
+    right: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_less(self)
+
+
+@dataclass(slots=True)
+class Greater(SignalNode):
+    """
+    Comparison: left > right.
+    """
+
+    left: Expr
+    right: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_greater(self)
+
+
 # ---------------------------------------------------------------------------
 # Cross-sectional operations
 # ---------------------------------------------------------------------------
@@ -245,3 +276,105 @@ class MaskFromBoolean(SignalNode):
 
     def evaluate(self, engine: Any) -> Any:
         return engine._eval_mask_from_boolean(self)
+
+
+# ---------------------------------------------------------------------------
+# Time-series primitives (for macro series and transforms)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class TimeSeries(SignalNode):
+    """
+    Load a single time series (e.g., FRED) and broadcast across instruments.
+
+    `source` can be:
+      - a DataConfig-like dict or object understood by the data loader
+      - a string URI such as "fred://BAMLH0A0HYM2"
+    """
+
+    source: Any
+    field: str = "close"
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_time_series(self)
+
+
+@dataclass(slots=True)
+class EWMMean(SignalNode):
+    base: Expr
+    span: int
+    min_periods: int = 1
+    adjust: bool = False
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_ewm_mean(self)
+
+
+@dataclass(slots=True)
+class RollingMean(SignalNode):
+    base: Expr
+    window: int
+    min_periods: int = 1
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_rolling_mean(self)
+
+
+@dataclass(slots=True)
+class RollingStd(SignalNode):
+    base: Expr
+    window: int
+    min_periods: int = 1
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_rolling_std(self)
+
+
+@dataclass(slots=True)
+class Diff(SignalNode):
+    base: Expr
+    periods: int = 1
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_diff(self)
+
+
+@dataclass(slots=True)
+class PctChange(SignalNode):
+    base: Expr
+    periods: int = 1
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_pct_change(self)
+
+
+@dataclass(slots=True)
+class ZScoreRolling(SignalNode):
+    base: Expr
+    window: int
+    min_periods: int = 1
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_zscore_rolling(self)
+
+
+@dataclass(slots=True)
+class RiskMultiplierFromZ(SignalNode):
+    """
+    Map a z-score to [0,1] as: 1 - clip(z, 0, max_z)/max_z, then clip to [0,1].
+    """
+
+    z: Expr
+    max_z: float = 2.5
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_risk_multiplier_from_z(self)
