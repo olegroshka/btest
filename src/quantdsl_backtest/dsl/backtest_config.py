@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, TYPE_CHECKING
+
+# Avoid runtime dependency on engine.analytics in the DSL package.
+# Use TYPE_CHECKING to only import for typing purposes.
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from ..engine.analytics.types import SignalAnalyticsConfig  # noqa: F401
 
 
 @dataclass(slots=True)
@@ -64,6 +69,9 @@ class Reporting:
     store_trades: bool = True
     store_positions: bool = True
     metrics: List[str] = field(default_factory=list)
+    # Preferred location for configuring signal analytics / attribution.
+    # Annotated as string to avoid runtime import dependency on engine.analytics.
+    signal_analytics: Optional["SignalAnalyticsConfig"] = None
 
 
 @dataclass(slots=True)
@@ -80,3 +88,7 @@ class BacktestConfig:
 
     # Optional metadata / knobs
     extra: Dict[str, object] = field(default_factory=dict)
+
+    # DEPRECATED: prefer Reporting.signal_analytics. Kept for backward compatibility.
+    # Defined in engine.analytics.types.SignalAnalyticsConfig; annotated as string to avoid import cycle.
+    signal_analytics: Optional["SignalAnalyticsConfig"] = None

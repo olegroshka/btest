@@ -61,6 +61,7 @@ from quantdsl_backtest.dsl.execution import (
 from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees
 from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting, RiskChecks, DrawdownPolicy
 from quantdsl_backtest.engine.backtest_runner import run_backtest
+from quantdsl_backtest.engine.analytics.types import SignalAnalyticsConfig
 from quantdsl_backtest.engine.data_loader import load_data_for_strategy
 
 
@@ -337,6 +338,23 @@ def build_strategy() -> Strategy:
                 "turnover",
                 "daily_returns",
             ],
+            # Configure signal analytics (Alphalens-style) for named signals.
+            # Use the same delay as the portfolio to align ex-ante evaluation with execution.
+            signal_analytics=SignalAnalyticsConfig(
+                signals=[
+                    "rank_mom",
+                    "rank_on_20",
+                    "rank_day_20",
+                ],
+                horizons=[1, 5, 20],
+                quantiles=5,
+                within_mask="long_candidates",
+                signal_delay_bars=portfolio.signal_delay_bars,
+                # Storage tiering defaults (quantiles only; values/ranks off by default)
+                store_values=False,
+                store_rank=False,
+                store_quantile=True,
+            ),
         ),
         risk_checks=RiskChecks(
             # Prefer soft scale down de-risking for this toy index trend strategy
@@ -352,7 +370,7 @@ def build_strategy() -> Strategy:
     )
 
     strategy = Strategy(
-        name="indices_mom_6m_long_only_weekly",
+        name="lagging_indecies",
         data=data,
         universe=universe,
         factors=factors,

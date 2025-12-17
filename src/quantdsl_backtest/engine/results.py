@@ -7,6 +7,23 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 
 import pandas as pd
 
+try:  # Optional imports to avoid hard dependency when not used
+    from .analytics.types import (
+        SignalTearsheetData,
+        PortfolioSignalAttribution,
+        SelectionTrace,
+    )
+    from .analytics.render_tearsheets import (
+        render_signal_tearsheet_html,
+        render_portfolio_signal_tearsheet_html,
+    )
+except Exception:  # pragma: no cover - optional feature path
+    SignalTearsheetData = object  # type: ignore
+    PortfolioSignalAttribution = object  # type: ignore
+    SelectionTrace = object  # type: ignore
+    render_signal_tearsheet_html = None  # type: ignore
+    render_portfolio_signal_tearsheet_html = None  # type: ignore
+
 
 @dataclass(slots=True)
 class BacktestResult:
@@ -77,6 +94,11 @@ class BacktestResult:
         etc.
     """
 
+    # ---- Optional analytics (signal QC & attribution) ---------------------
+    signal_reports: Dict[str, "SignalTearsheetData"] = field(default_factory=dict)
+    selection_trace: Optional["SelectionTrace"] = None
+    signal_attribution: Dict[str, "PortfolioSignalAttribution"] = field(default_factory=dict)
+
     # ----------------------------------------------------------------------
     # Convenience properties
     # ----------------------------------------------------------------------
@@ -145,6 +167,9 @@ class BacktestResult:
             end_date=end_ts,
             benchmark=self.benchmark.loc[start_ts:end_ts] if self.benchmark is not None else None,
             metadata=dict(self.metadata),
+            signal_reports=dict(self.signal_reports),
+            selection_trace=self.selection_trace,
+            signal_attribution=dict(self.signal_attribution),
         )
 
     # ----------------------------------------------------------------------
@@ -513,6 +538,49 @@ class BacktestResult:
             output=output,
             title=title,
             **kwargs,
+        )
+
+    # ------------------------------------------------------------------
+    # Convenience renderers for analytics
+    # ------------------------------------------------------------------
+
+    def signal_tearsheet(
+        self,
+        signal_name: str,
+        *,
+        output_path: str,
+        strategy_name: Optional[str] = None,
+    ) -> None:
+        if render_signal_tearsheet_html is None:
+            raise RuntimeError("Analytics rendering not available: missing renderer imports")
+        report = self.signal_reports.get(signal_name)
+        if report is None:
+            raise KeyError(f"No signal report named '{signal_name}' attached to BacktestResult")
+        render_signal_tearsheet_html(
+            report,
+            output_path=output_path,
+            strategy_name=strategy_name or self.metadata.get("strategy_name"),
+            run_meta=self.metadata,
+        )
+
+    def portfolio_signal_tearsheet(
+        self,
+        signal_name: str,
+        *,
+        output_path: str,
+        strategy_name: Optional[str] = None,
+    ) -> None:
+        if render_portfolio_signal_tearsheet_html is None:
+            raise RuntimeError("Analytics rendering not available: missing renderer imports")
+        attrib = self.signal_attribution.get(signal_name)
+        if attrib is None:
+            raise KeyError(f"No portfolio attribution for signal '{signal_name}' attached to BacktestResult")
+        render_portfolio_signal_tearsheet_html(
+            signal_name=signal_name,
+            attribution=attrib,
+            output_path=output_path,
+            strategy_name=strategy_name or self.metadata.get("strategy_name"),
+            run_meta=self.metadata,
         )
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -21,6 +21,25 @@ from .accounting import (
     compute_exposures,
     compute_basic_metrics,
 )
+from .analytics.selection_trace import SelectionTraceCollector
+from .analytics.types import SignalAnalyticsConfig, SignalTearsheetData, PortfolioSignalAttribution, SelectionTrace
+from .analytics.signal_analytics import (
+    compute_forward_returns,
+    assign_quantiles,
+    compute_rank_ic,
+    mean_forward_return_by_quantile,
+    quantile_turnover,
+)
+from .analytics.attribution import (
+    contrib_return_panel,
+    contrib_by_quantile,
+    costs_by_instrument_day,
+)
+from .analytics.render_tearsheets import (
+    render_signal_tearsheet_html,
+    render_portfolio_signal_tearsheet_html,
+)
+from pathlib import Path
 
 log = get_logger(__name__)
 
@@ -100,6 +119,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     weights_df = pd.DataFrame(index=dates, columns=instruments, dtype="float64").fillna(0.0)
 
     all_trades = []
+    sel_collector = SelectionTraceCollector()
 
     init_cash = strategy.backtest.cash_initial
     cash = float(init_cash)
@@ -210,6 +230,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 portfolio=strategy.portfolio,
                 signals=signal_panels,
                 prev_weights=weights_df.iloc[i - 1] if i > 0 else pd.Series(0.0, index=instruments),
+                collector=sel_collector,
             )
 
             # Apply drawdown policy scaling / halting
@@ -342,6 +363,145 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             "engine": "event_driven",
         },
     )
+
+    # ------------------------------------------------------------------ #
+    # 6. Optional: Signal analytics & attribution (Alphalens-style)
+    # ------------------------------------------------------------------ #
+    try:
+        # Prefer configuration under Reporting; then deprecated BacktestConfig field; then legacy extra dict
+        cfg_raw = None
+        try:
+            rep = getattr(strategy.backtest, "reporting", None)
+            if rep is not None:
+                cfg_raw = getattr(rep, "signal_analytics", None)
+        except Exception:
+            cfg_raw = None
+        if cfg_raw is None:
+            cfg_raw = getattr(strategy.backtest, "signal_analytics", None)
+        if cfg_raw is None:
+            extra = getattr(strategy.backtest, "extra", {}) or {}
+            cfg_raw = extra.get("signal_analytics")
+        if cfg_raw is not None:
+            # Build config
+            if isinstance(cfg_raw, SignalAnalyticsConfig):
+                cfg = cfg_raw
+            elif isinstance(cfg_raw, dict):
+                cfg = SignalAnalyticsConfig(**cfg_raw)
+            else:
+                raise TypeError("signal_analytics must be dict or SignalAnalyticsConfig")
+
+            # Enforce engine’s actual delay
+            try:
+                cfg.signal_delay_bars = int(strategy.portfolio.signal_delay_bars)
+            except Exception:
+                pass
+
+            # Reference mask (optional)
+            mask_df: Optional[pd.DataFrame] = None
+            if cfg.within_mask is not None and cfg.within_mask in signal_panels:
+                try:
+                    mask_df = signal_panels[cfg.within_mask].astype(bool)
+                except Exception:
+                    mask_df = signal_panels[cfg.within_mask].notna()
+
+            # Forward returns from prices
+            fwd = compute_forward_returns(prices, cfg.horizons)
+
+            reports: Dict[str, SignalTearsheetData] = {}
+            attribs: Dict[str, PortfolioSignalAttribution] = {}
+
+            # Contributions (return-space) based on realized weights and asset returns
+            contrib_panel = contrib_return_panel(weights_df, prices)
+
+            for sname in cfg.signals:
+                if sname not in signal_panels:
+                    continue
+                panel = signal_panels[sname]
+                used_panel = panel.shift(cfg.signal_delay_bars)
+
+                # Optionally cap universe size (Tiering)
+                if cfg.max_instruments is not None and used_panel.shape[1] > cfg.max_instruments:
+                    used_panel = used_panel.iloc[:, : cfg.max_instruments]
+                    if mask_df is not None:
+                        mask_df = mask_df.reindex(columns=used_panel.columns)
+
+                # Assign quantiles for QC & attribution
+                qdf = assign_quantiles(used_panel, cfg.quantiles, mask=mask_df).astype("float32")
+
+                # Build report
+                rep = SignalTearsheetData(name=sname, config=cfg)
+                if cfg.store_values:
+                    rep.value = used_panel.astype("float32")
+                if cfg.store_rank:
+                    try:
+                        rep.rank = used_panel.rank(axis=1, method="average").astype("float32")
+                    except Exception:
+                        pass
+                if cfg.store_quantile:
+                    rep.quantile = qdf
+
+                rep.coverage = used_panel.notna().mean(axis=1)
+                rep.xsec_mean = used_panel.mean(axis=1, skipna=True)
+                rep.xsec_std = used_panel.std(axis=1, skipna=True)
+
+                # IC & quantile returns per horizon
+                for h in cfg.horizons:
+                    ic = compute_rank_ic(used_panel, fwd[h], mask=mask_df)
+                    rep.rank_ic[h] = ic
+                    qret, ls = mean_forward_return_by_quantile(qdf, fwd[h], cfg.quantiles)
+                    rep.mean_fwd_ret_by_q[h] = qret
+                    rep.ls_fwd_ret[h] = ls
+
+                rep.quantile_turnover = quantile_turnover(qdf, cfg.quantiles)
+                reports[sname] = rep
+
+                # Attribution by quantile (return-space)
+                contrib_by_q, ls_contrib = contrib_by_quantile(contrib_panel, qdf, cfg.quantiles)
+
+                # Costs by quantile (optional)
+                cost_panel = costs_by_instrument_day(trades_df)
+                cost_by_q = None
+                if cost_panel is not None and not cost_panel.empty:
+                    # Convert cost pnl to return space approx by dividing equity
+                    eq = result.equity.replace(0.0, np.nan)
+                    # align index to contrib dates
+                    cost_panel = cost_panel.reindex(contrib_by_q.index).fillna(0.0)
+                    cost_ret_panel = cost_panel.div(eq, axis=0).replace([np.inf, -np.inf], 0.0).fillna(0.0)
+                    cost_by_q, _ = contrib_by_quantile(cost_ret_panel, qdf, cfg.quantiles)
+
+                attribs[sname] = PortfolioSignalAttribution(
+                    contrib_ret_by_q=contrib_by_q,
+                    contrib_ret_ls=ls_contrib,
+                    cost_pnl_by_q=cost_by_q,
+                )
+
+            # Attach to result
+            result.signal_reports = reports
+            result.signal_attribution = attribs
+            result.selection_trace = SelectionTrace(sel_collector.finalize()) if len(sel_collector.rows) > 0 else None
+
+            # Render HTML outputs
+            out_dir = Path("outputs") / (strategy.name or "run")
+            (out_dir / "signals").mkdir(parents=True, exist_ok=True)
+            (out_dir / "attribution").mkdir(parents=True, exist_ok=True)
+
+            for sname, rep in reports.items():
+                render_signal_tearsheet_html(
+                    rep,
+                    output_path=out_dir / "signals" / sname / "signal_tearsheet.html",
+                    strategy_name=strategy.name,
+                    run_meta=result.metadata,
+                )
+            for sname, attr in attribs.items():
+                render_portfolio_signal_tearsheet_html(
+                    signal_name=sname,
+                    attribution=attr,
+                    output_path=out_dir / "attribution" / sname / "portfolio_signal_tearsheet.html",
+                    strategy_name=strategy.name,
+                    run_meta=result.metadata,
+                )
+    except Exception as exc:
+        log.warning("Signal analytics generation failed: %s", exc)
 
     log.info(
         "Backtest complete (event_driven): total return %.2f%%, Sharpe %.2f, max DD %.2f%%",

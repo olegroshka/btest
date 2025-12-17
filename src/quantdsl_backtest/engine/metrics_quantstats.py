@@ -108,6 +108,16 @@ def generate_quantstats_tearsheet(
     **kwargs:
         Passed through to :func:`quantstats.reports.html`.
     """
+    # Ensure a non-interactive matplotlib backend for headless/test environments
+    try:
+        import matplotlib
+        try:
+            matplotlib.use("Agg")  # safe in headless CI; no-op if already set
+        except Exception:
+            pass
+    except Exception:
+        pass
+
     try:
         import quantstats as qs  # type: ignore
     except ImportError as exc:  # pragma: no cover

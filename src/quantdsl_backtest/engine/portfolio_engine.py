@@ -19,6 +19,7 @@ def compute_target_weights_for_date(
     portfolio: LongShortPortfolio,
     signals: Dict[str, pd.DataFrame],
     prev_weights: pd.Series,
+    collector: Optional[object] = None,
 ) -> pd.Series:
     """
     Compute target weights on a rebalance date, based on the DSL portfolio spec.
@@ -221,6 +222,23 @@ def compute_target_weights_for_date(
             target_weights=target,
             max_fraction=portfolio.turnover_limit.max_fraction,
         )
+
+    # Record selection trace (opt-in)
+    try:
+        if collector is not None and hasattr(collector, "record_selection"):
+            collector.record_selection(
+                dt=date,
+                sig_date=sig_date,
+                long_names=long_names,
+                short_names=short_names,
+                long_rank_row=long_rank_row,
+                short_rank_row=short_rank_row,
+                long_mask=long_mask,
+                short_mask=short_mask,
+            )
+    except Exception:
+        # Never fail targeting due to diagnostics
+        pass
 
     return target
 
