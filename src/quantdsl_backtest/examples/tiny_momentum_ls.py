@@ -35,7 +35,8 @@ from quantdsl_backtest.dsl.execution import (
     VolumeParticipation,
 )
 from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees
-from quantdsl_backtest.dsl.backtest_config import BacktestConfig
+from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting
+from quantdsl_backtest.engine.analytics.types import StrategyAnalyticsConfig
 from quantdsl_backtest.engine.backtest_runner import run_backtest
 
 
@@ -92,8 +93,14 @@ def build_strategy() -> Strategy:
         fees=StaticFees(),
     )
 
-    # 6) Backtest runtime
-    bt = BacktestConfig(engine="event_driven", cash_initial=1_000_000)
+    # 6) Backtest runtime (rely on defaults wherever possible)
+    bt = BacktestConfig(
+        reporting=Reporting(
+            strategyAnalytics=StrategyAnalyticsConfig(
+                title="Tiny Momentum L/S (QuantDSL)",
+            ),
+        ),
+    )
 
     # 7) Compose
     strategy = Strategy(
@@ -121,38 +128,7 @@ def main() -> None:
     out_dir = os.path.join("outputs", "tiny_momentum_ls")
     os.makedirs(out_dir, exist_ok=True)
 
-    # Optional: QuantStats metrics and HTML tear sheet
-    try:
-        # metrics
-        qs_metric_names = [
-            "cagr",
-            "volatility",
-            "sharpe",
-            "sortino",
-            "max_drawdown",
-            "skew",
-            "kurtosis",
-            "var",
-            "cvar",
-        ]
-        print("\n=== QuantStats metrics (subset) ===")
-        print(
-            result.quantstats_metrics(qs_metric_names).to_string(
-                float_format=lambda x: f"{x:0.4f}"
-            )
-        )
-
-        # Full HTML report
-        html_path = os.path.join(out_dir, "tearsheet.html")
-        # If BacktestResult already has a benchmark configured, it will be used by default.
-        result.quantstats_tearsheet(
-            output=html_path,
-            title="Tiny Momentum L/S (QuantDSL)",
-        )
-        print(f"QuantStats HTML report written to: {html_path}")
-    except RuntimeError as e:
-        # quantstats is optional
-        print(f"QuantStats outputs skipped: {e}")
+    # QuantStats analytics now driven by Reporting.strategyAnalytics; no manual calls here
 
 if __name__ == "__main__":
     main()

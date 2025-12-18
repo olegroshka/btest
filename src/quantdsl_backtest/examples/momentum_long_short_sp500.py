@@ -54,6 +54,7 @@ from quantdsl_backtest.dsl.backtest_config import (
     RiskChecks,
     Reporting,
 )
+from quantdsl_backtest.engine.analytics.types import StrategyAnalyticsConfig
 
 from quantdsl_backtest.engine.backtest_runner import run_backtest
 
@@ -268,7 +269,7 @@ def build_strategy() -> Strategy:
     # 8. Backtest runtime config
     # -----------------------
     backtest_cfg = BacktestConfig(
-        engine="vectorized", #"event_driven",           # or "vectorized"
+        engine="vectorized",  # non-default engine retained
         cash_initial=100_000_000.0,      # 100mm
         margin=MarginConfig(
             long_initial=0.5,
@@ -280,8 +281,7 @@ def build_strategy() -> Strategy:
             max_gross_leverage=3.0,
         ),
         reporting=Reporting(
-            store_trades=True,
-            store_positions=True,
+            # override default metrics to include exposures
             metrics=[
                 "daily_returns",
                 "sharpe",
@@ -291,6 +291,10 @@ def build_strategy() -> Strategy:
                 "gross_exposure",
                 "net_exposure",
             ],
+            strategyAnalytics=StrategyAnalyticsConfig(
+                output_dir=f"outputs/{'mom_long_short_sp500'}",
+                title="S&P 500 Long/Short Momentum (QuantDSL)",
+            ),
         ),
     )
 
@@ -334,46 +338,10 @@ def main() -> None:
     print(f"Max drawdown: {result.metrics['max_drawdown']:.2%}")
     print(f"Turnover (annualized): {result.metrics['turnover_annual']:.2f}")
 
-    # ------------------------------------------------------------------
-    # QuantStats metrics
-    # ------------------------------------------------------------------
-    try:
-        qs_metric_names = [
-            "cagr",
-            "volatility",
-            "sharpe",
-            "sortino",
-            "max_drawdown",
-            "skew",
-            "kurtosis",
-            "var",
-            "cvar",
-        ]
-        qs_metrics = result.quantstats_metrics(qs_metric_names, risk_free=0.0)
-        print("\n=== QuantStats metrics ===")
-        # Nice aligned printing
-        print(qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
-    except RuntimeError as e:
-        # quantstats not installed
-        print(f"\nQuantStats metrics skipped: {e}")
-
     # Outputs directory (used for plots, parquet, and HTML report)
     out_dir = "outputs/mom_long_short_sp500/"
     os.makedirs(out_dir, exist_ok=True)
-
-    # ------------------------------------------------------------------
-    # QuantStats HTML tear sheet
-    # ------------------------------------------------------------------
-    try:
-        html_path = os.path.join(out_dir, "tearsheet.html")
-        result.quantstats_tearsheet(
-            output=html_path,
-            title="S&P 500 Long/Short Momentum (QuantDSL)",
-            # you can pass extra kwargs here, e.g. compounded=True, periods=252
-        )
-        print(f"QuantStats HTML report written to: {html_path}")
-    except RuntimeError as e:
-        print(f"QuantStats HTML report skipped: {e}")
+    # QuantStats analytics now driven by Reporting.strategyAnalytics; no manual calls here
 
     # ------------------------------------------------------------------
     # Existing plots (equity / exposures / drawdowns)

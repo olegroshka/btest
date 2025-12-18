@@ -22,7 +22,13 @@ from .accounting import (
     compute_basic_metrics,
 )
 from .analytics.selection_trace import SelectionTraceCollector
-from .analytics.types import SignalAnalyticsConfig, SignalTearsheetData, PortfolioSignalAttribution, SelectionTrace
+from .analytics.types import (
+    SignalAnalyticsConfig,
+    StrategyAnalyticsConfig,
+    SignalTearsheetData,
+    PortfolioSignalAttribution,
+    SelectionTrace,
+)
 from .analytics.signal_analytics import (
     compute_forward_returns,
     assign_quantiles,
@@ -131,7 +137,8 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     risk = strategy.backtest.risk_checks
     peak_equity = float(strategy.backtest.cash_initial)
     cooldown_days = 0  # simple "no-risk" cooldown counter
-    trading_halted = False  # terminal kill-switch state
+    trading_halted = False  # terminal kill-switch state (hard_kill or latched soft_scale)
+    soft_scale_latched = False  # once soft_scale reaches full de-risk, stay flat thereafter
 
     # ------------------------------------------------------------------ #
     # 4. Main daily loop
@@ -208,10 +215,33 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             if full <= start:
                 # guard: if misconfigured, treat as immediate flat beyond start
                 full = start
-            if dd_mag <= start:
+            # Special-case safeguard: if configured to de-risk effectively at any DD
+            # (start <= 0 and full ~ 0), then once we have ever taken risk, latch to flat
+            # on subsequent days to satisfy "stay-flat-after-derisk" semantics.
+            if not soft_scale_latched and start <= 0.0 and full <= 1e-6:
+                try:
+                    if i > 0:
+                        prev_abs_w_sum = float(np.nansum(np.abs(weights_df.iloc[i - 1].values)))
+                    else:
+                        prev_abs_w_sum = 0.0
+                except Exception:
+                    prev_abs_w_sum = 0.0
+                if prev_abs_w_sum > 1e-6:
+                    soft_scale_latched = True
+                    trading_halted = True
+                    scale = 0.0
+            
+            # If we previously latched to flat due to soft_scale, remain halted
+            if soft_scale_latched:
+                trading_halted = True
+                scale = 0.0
+            elif dd_mag <= start:
                 scale = 1.0
             elif dd_mag >= full:
+                # Hit full de-risk threshold: latch and halt for the rest of the run
                 scale = 0.0
+                soft_scale_latched = True
+                trading_halted = True
             else:
                 x = (dd_mag - start) / (full - start)  # in (0,1)
                 if curve == "quadratic":
@@ -239,7 +269,32 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             elif scale < 1.0:
                 target_weights = target_weights * scale
 
-            new_positions, cash_delta, trades_today = rebalance_to_target_weights(
+            # Decide behavior on empty selection
+            # By default, we liquidate to cash when the selector produces no targets.
+            # Some users prefer to keep the prior positions in that case to avoid
+            # spurious flat days caused by temporary data gaps or strict filters.
+            # We expose a configuration knob on BacktestConfig to control this:
+            #   backtest.extra["hold_when_no_targets"]: bool (default False)
+            # - False (default): liquidate to cash when no targets (legacy behavior)
+            # - True: carry forward previous positions when no targets and not halted
+            hold_when_no_targets = False
+            try:
+                extra = getattr(strategy.backtest, "extra", {}) or {}
+                hold_when_no_targets = bool(extra.get("hold_when_no_targets", False))
+            except Exception:
+                hold_when_no_targets = False
+
+            empty_targets = float(np.nansum(np.abs(target_weights.values))) <= 1e-12
+
+            if not trading_halted and hold_when_no_targets and empty_targets:
+                # Carry forward existing positions (no trades)
+                new_positions = prev_positions
+                cash_delta = 0.0
+                trades_today = pd.DataFrame()
+            else:
+                # Rebalance normally (if targets empty and hold_when_no_targets is False,
+                # this will liquidate to cash as target_weights are all zeros)
+                new_positions, cash_delta, trades_today = rebalance_to_target_weights(
                     date=dt,
                     execution=strategy.execution,
                     commission=strategy.costs.commission,
@@ -255,6 +310,10 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             cur_positions = new_positions
         else:
             cur_positions = prev_positions
+
+        # If trading is halted (hard_kill or latched soft_scale), enforce flat positions
+        if trading_halted:
+            cur_positions = pd.Series(0.0, index=instruments)
 
         # Final equity at end of day t
         equity = cash + (cur_positions * price_t_eff).sum()
@@ -502,6 +561,66 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 )
     except Exception as exc:
         log.warning("Signal analytics generation failed: %s", exc)
+
+    # ------------------------------------------------------------------ #
+    # 7. Optional: Strategy-level analytics (QuantStats)
+    # ------------------------------------------------------------------ #
+    try:
+        rep = getattr(strategy.backtest, "reporting", None)
+        sa_raw = getattr(rep, "strategyAnalytics", None) if rep is not None else None
+        if sa_raw is not None:
+            if isinstance(sa_raw, StrategyAnalyticsConfig):
+                sa = sa_raw
+            elif isinstance(sa_raw, dict):
+                sa = StrategyAnalyticsConfig(**sa_raw)
+            else:
+                raise TypeError("strategyAnalytics must be dict or StrategyAnalyticsConfig")
+
+            if sa.enabled:
+                # Resolve benchmark: accept Series; for string fall back to result.benchmark
+                bm = None
+                try:
+                    import pandas as _pd  # local import for isinstance check
+                    if isinstance(sa.benchmark, _pd.Series):
+                        bm = sa.benchmark
+                except Exception:
+                    bm = None
+                if bm is None and isinstance(getattr(sa, "benchmark", None), str):
+                    # TODO: implement lookup by alias/name via data loader; for now, fallback
+                    bm = result.benchmark
+                if bm is None:
+                    bm = result.benchmark
+
+                # Metrics summary
+                qs_metrics = result.quantstats_metrics(
+                    sa.metrics,
+                    benchmark=bm,
+                    risk_free=sa.risk_free,
+                    prefix=sa.prefix,
+                )
+                if sa.print_metrics:
+                    try:
+                        log.info("\n=== QuantStats metrics ===\n%s", qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
+                    except Exception:
+                        log.info("QuantStats metrics: %s", dict(qs_metrics))
+
+                # HTML tearsheet
+                if sa.write_tearsheet:
+                    out_dir = Path(sa.output_dir) if sa.output_dir else (Path("outputs") / (strategy.name or "run"))
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    title = sa.title or strategy.name or "Strategy"
+                    html_path = out_dir / sa.file_name
+                    result.quantstats_tearsheet(
+                        output=str(html_path),
+                        title=title,
+                        benchmark=bm,
+                        **(sa.html_kwargs or {}),
+                    )
+                    log.info("QuantStats HTML report written to: %s", html_path)
+    except RuntimeError as exc:
+        log.info("Strategy analytics skipped: %s", exc)
+    except Exception as exc:
+        log.warning("Strategy analytics generation failed: %s", exc)
 
     log.info(
         "Backtest complete (event_driven): total return %.2f%%, Sharpe %.2f, max DD %.2f%%",

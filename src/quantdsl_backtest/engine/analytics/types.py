@@ -1,7 +1,7 @@
 # src/quantdsl_backtest/engine/analytics/types.py
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 import pandas as pd
 
 @dataclass(slots=True)
@@ -29,6 +29,46 @@ class SignalAnalyticsConfig:
     # limit storage
     max_instruments: Optional[int] = None   # e.g. 2000
     store_only_traded_names: bool = False   # if you have selection trace
+
+
+@dataclass(slots=True)
+class StrategyAnalyticsConfig:
+    """
+    Configuration for strategy-level analytics (QuantStats integration).
+
+    Controls printing/logging of a metrics summary and generation of an HTML
+    tearsheet using QuantStats, driven by the DSL `Reporting.strategyAnalytics`.
+    """
+
+    enabled: bool = True
+
+    # Metrics summary
+    metrics: List[str] = field(
+        default_factory=lambda: [
+            "cagr",
+            "volatility",
+            "sharpe",
+            "sortino",
+            "max_drawdown",
+            "skew",
+            "kurtosis",
+            "var",
+            "cvar",
+        ]
+    )
+    risk_free: float = 0.0
+    prefix: str = "qs_"
+    print_metrics: bool = True
+
+    # Tearsheets / files
+    write_tearsheet: bool = True
+    output_dir: Optional[str] = None  # default: outputs/<strategy>
+    file_name: str = "tearsheet.html"
+    title: Optional[str] = None
+    html_kwargs: Dict[str, object] = field(default_factory=lambda: {"compounded": True, "periods": 252})
+
+    # Benchmark may be provided directly as a returns series, or as a string key/alias
+    benchmark: Optional[Union[pd.Series, str]] = None
 
 
 @dataclass(slots=True)

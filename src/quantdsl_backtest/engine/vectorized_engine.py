@@ -24,7 +24,13 @@ from .results import BacktestResult
 from .accounting import compute_basic_metrics
 from ..utils.logging import get_logger
 from .analytics.selection_trace import SelectionTraceCollector
-from .analytics.types import SignalAnalyticsConfig, SignalTearsheetData, PortfolioSignalAttribution, SelectionTrace
+from .analytics.types import (
+    SignalAnalyticsConfig,
+    StrategyAnalyticsConfig,
+    SignalTearsheetData,
+    PortfolioSignalAttribution,
+    SelectionTrace,
+)
 from .analytics.signal_analytics import (
     compute_forward_returns,
     assign_quantiles,
@@ -637,6 +643,60 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
                 )
     except Exception as exc:
         log.warning("Vectorized engine: signal analytics generation failed: %s", exc)
+
+    # Strategy-level analytics (QuantStats)
+    try:
+        rep = getattr(strategy.backtest, "reporting", None)
+        sa_raw = getattr(rep, "strategyAnalytics", None) if rep is not None else None
+        if sa_raw is not None:
+            if isinstance(sa_raw, StrategyAnalyticsConfig):
+                sa = sa_raw
+            elif isinstance(sa_raw, dict):
+                sa = StrategyAnalyticsConfig(**sa_raw)
+            else:
+                raise TypeError("strategyAnalytics must be dict or StrategyAnalyticsConfig")
+
+            if sa.enabled:
+                bm = None
+                try:
+                    import pandas as _pd
+                    if isinstance(sa.benchmark, _pd.Series):
+                        bm = sa.benchmark
+                except Exception:
+                    bm = None
+                if bm is None and isinstance(getattr(sa, "benchmark", None), str):
+                    bm = result.benchmark
+                if bm is None:
+                    bm = result.benchmark
+
+                qs_metrics = result.quantstats_metrics(
+                    sa.metrics,
+                    benchmark=bm,
+                    risk_free=sa.risk_free,
+                    prefix=sa.prefix,
+                )
+                if sa.print_metrics:
+                    try:
+                        log.info("\n=== QuantStats metrics ===\n%s", qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
+                    except Exception:
+                        log.info("QuantStats metrics: %s", dict(qs_metrics))
+
+                if sa.write_tearsheet:
+                    out_dir = Path(sa.output_dir) if sa.output_dir else (Path("outputs") / (strategy.name or "run"))
+                    out_dir.mkdir(parents=True, exist_ok=True)
+                    title = sa.title or strategy.name or "Strategy"
+                    html_path = out_dir / sa.file_name
+                    result.quantstats_tearsheet(
+                        output=str(html_path),
+                        title=title,
+                        benchmark=bm,
+                        **(sa.html_kwargs or {}),
+                    )
+                    log.info("QuantStats HTML report written to: %s", html_path)
+    except RuntimeError as exc:
+        log.info("Strategy analytics skipped: %s", exc)
+    except Exception as exc:
+        log.warning("Vectorized engine: strategy analytics generation failed: %s", exc)
 
     log.info(
         "Vectorized backtest complete: total return %.2f%%, Sharpe %.2f, max DD %.2f%%",

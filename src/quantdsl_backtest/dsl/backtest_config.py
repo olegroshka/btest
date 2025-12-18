@@ -9,6 +9,7 @@ from typing import Dict, List, Literal, Optional, TYPE_CHECKING
 # Use TYPE_CHECKING to only import for typing purposes.
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from ..engine.analytics.types import SignalAnalyticsConfig  # noqa: F401
+    from ..engine.analytics.types import StrategyAnalyticsConfig  # noqa: F401
 
 
 @dataclass(slots=True)
@@ -73,6 +74,10 @@ class Reporting:
     # Annotated as string to avoid runtime import dependency on engine.analytics.
     signal_analytics: Optional["SignalAnalyticsConfig"] = None
 
+    # Strategy-level analytics (QuantStats): metrics summary + HTML tearsheet
+    # Optional and only evaluated if present and enabled.
+    strategyAnalytics: Optional["StrategyAnalyticsConfig"] = None
+
 
 @dataclass(slots=True)
 class BacktestConfig:
@@ -87,6 +92,29 @@ class BacktestConfig:
     reporting: Reporting = field(default_factory=Reporting)
 
     # Optional metadata / knobs
+    #
+    # Use this dictionary for advanced/experimental switches that affect engine behavior
+    # but are not yet promoted to first‑class fields. Known keys:
+    #
+    #   - "hold_when_no_targets": bool (default False)
+    #       Controls how the event‑driven engine behaves on a rebalance date
+    #       when the selector produces an empty set of targets (i.e., desired
+    #       target weights are all zeros) and trading is not halted by risk policy.
+    #
+    #       False (default, legacy behavior):
+    #           Liquidate to cash on that day (engine rebalances into zero weights).
+    #           This can reduce exposure on sporadic empty‑selection days but may
+    #           introduce “spurious” flat days if emptiness is caused by data gaps
+    #           or overly strict filters.
+    #
+    #       True:
+    #           Carry forward the previous positions instead of liquidating when the
+    #           selection is empty. This avoids unexpected flat days due to temporary
+    #           selection emptiness, but increases the number of invested days and can
+    #           change returns/Sharpe if those additional days are adverse.
+    #
+    #       Note: Currently applied by the event‑driven engine; the vectorized engine
+    #       may not honor this flag yet.
     extra: Dict[str, object] = field(default_factory=dict)
 
     # DEPRECATED: prefer Reporting.signal_analytics. Kept for backward compatibility.

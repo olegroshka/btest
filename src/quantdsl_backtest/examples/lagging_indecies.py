@@ -61,7 +61,7 @@ from quantdsl_backtest.dsl.execution import (
 from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees
 from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting, RiskChecks, DrawdownPolicy
 from quantdsl_backtest.engine.backtest_runner import run_backtest
-from quantdsl_backtest.engine.analytics.types import SignalAnalyticsConfig
+from quantdsl_backtest.engine.analytics.types import SignalAnalyticsConfig, StrategyAnalyticsConfig
 from quantdsl_backtest.engine.data_loader import load_data_for_strategy
 
 
@@ -326,18 +326,7 @@ def build_strategy() -> Strategy:
 
     # 7) Backtest config & reporting
     bt = BacktestConfig(
-        engine="event_driven",
-        cash_initial=1_000_000,
         reporting=Reporting(
-            store_trades=True,
-            store_positions=True,
-            metrics=[
-                "sharpe",
-                "sortino",
-                "max_drawdown",
-                "turnover",
-                "daily_returns",
-            ],
             # Configure signal analytics (Alphalens-style) for named signals.
             # Use the same delay as the portfolio to align ex-ante evaluation with execution.
             signal_analytics=SignalAnalyticsConfig(
@@ -346,14 +335,12 @@ def build_strategy() -> Strategy:
                     "rank_on_20",
                     "rank_day_20",
                 ],
-                horizons=[1, 5, 20],
-                quantiles=5,
                 within_mask="long_candidates",
                 signal_delay_bars=portfolio.signal_delay_bars,
-                # Storage tiering defaults (quantiles only; values/ranks off by default)
-                store_values=False,
-                store_rank=False,
-                store_quantile=True,
+            ),
+            # Strategy-level analytics (QuantStats)
+            strategyAnalytics=StrategyAnalyticsConfig(
+                title="Lagging Indecies L/S (QuantDSL)",
             ),
         ),
         risk_checks=RiskChecks(
@@ -398,39 +385,11 @@ def main() -> None:
     result = run_backtest(strategy)
     print(result.summary())
 
-    try:
-        qs_metric_names = [
-            "cagr",
-            "volatility",
-            "sharpe",
-            "sortino",
-            "max_drawdown",
-            "skew",
-            "kurtosis",
-            "var",
-            "cvar",
-        ]
-        qs_metrics = result.quantstats_metrics(qs_metric_names, risk_free=0.0)
-        print("\n=== QuantStats metrics ===")
-        # Nice aligned printing
-        print(qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
-    except RuntimeError as e:
-        # quantstats not installed
-        print(f"\nQuantStats metrics skipped: {e}")
-
-    # Write QuantStats outputs if configured in BacktestConfig.Reporting
-    out_dir = os.path.join("outputs", "lagging_indecies")
-    os.makedirs(out_dir, exist_ok=True)
-    try:
-        html_path = os.path.join(out_dir, "tearsheet.html")
-        result.quantstats_tearsheet(output=html_path, title="Lagging Indecies L/S (QuantDSL)")
-        print(f"QuantStats HTML report written to: {html_path}")
-    except RuntimeError as e:
-        print(f"QuantStats outputs skipped: {e}")
-
     # ------------------------------------------------------------------
     # Export detailed tabular outputs
     # ------------------------------------------------------------------
+    out_dir = os.path.join("outputs", "lagging_indecies")
+    os.makedirs(out_dir, exist_ok=True)
     result.to_parquet(out_dir)
 
     invested_days = (result.weights.abs().sum(axis=1) > 1e-6).sum()
