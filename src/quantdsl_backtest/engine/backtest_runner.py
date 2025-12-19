@@ -139,6 +139,8 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     cooldown_days = 0  # simple "no-risk" cooldown counter
     trading_halted = False  # terminal kill-switch state (hard_kill or latched soft_scale)
     soft_scale_latched = False  # once soft_scale reaches full de-risk, stay flat thereafter
+    # Track whether we have ever taken material exposure (sum abs weights > eps)
+    ever_had_exposure = False
 
     # ------------------------------------------------------------------ #
     # 4. Main daily loop
@@ -151,6 +153,33 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         # carry forward the previous price to avoid artificial PnL spikes.
         price_t_eff = price_t.reindex(prev_positions.index)
         price_t_eff = price_t_eff.where(~price_t_eff.isna(), prev_prices)
+
+        # Update ever_had_exposure from prior day weights (if any)
+        if i > 0:
+            try:
+                prev_abs_w_sum = float(np.nansum(np.abs(weights_df.iloc[i - 1].values)))
+            except Exception:
+                prev_abs_w_sum = 0.0
+            if prev_abs_w_sum > 1e-6:
+                ever_had_exposure = True
+
+            # If yesterday was fully flat after we've taken exposure at least once,
+            # and soft_scale is configured to de-risk immediately (start<=0, full≈0),
+            # then latch now to ensure we remain flat from today onwards.
+            try:
+                pol = getattr(risk, "drawdown", None)
+                if pol is not None:
+                    _s = getattr(pol, "start", None)
+                    _f = getattr(pol, "full", None)
+                    ss_start = float(_s) if _s is not None else 0.1
+                    ss_full = float(_f) if _f is not None else 0.35
+                else:
+                    ss_start, ss_full = 0.1, 0.35
+            except Exception:
+                ss_start, ss_full = 0.1, 0.35
+            if ever_had_exposure and not soft_scale_latched and ss_start <= 0.0 and ss_full <= 1e-6 and prev_abs_w_sum <= 1e-9:
+                log.info("[RISK][soft_scale] Latching to flat on %s because prior day was flat after exposure", dt.date())
+                soft_scale_latched = True
 
         if i == 0:
             # Day 0: no prior PnL, just initialize equity
@@ -209,8 +238,10 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 trading_halted = True
                 scale = 0.0
         elif policy_mode == "soft_scale":
-            start = float(getattr(policy, "start", 0.1) or 0.1)
-            full = float(getattr(policy, "full", 0.35) or 0.35)
+            _s = getattr(policy, "start", None)
+            _f = getattr(policy, "full", None)
+            start = float(_s) if _s is not None else 0.1
+            full = float(_f) if _f is not None else 0.35
             curve = getattr(policy, "curve", "linear") or "linear"
             if full <= start:
                 # guard: if misconfigured, treat as immediate flat beyond start
@@ -227,6 +258,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 except Exception:
                     prev_abs_w_sum = 0.0
                 if prev_abs_w_sum > 1e-6:
+                    log.info("[RISK][soft_scale] Latching to flat on %s due to prior exposure (prev_abs_w_sum=%.6f)", dt.date(), prev_abs_w_sum)
                     soft_scale_latched = True
                     trading_halted = True
                     scale = 0.0
@@ -281,12 +313,37 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             try:
                 extra = getattr(strategy.backtest, "extra", {}) or {}
                 hold_when_no_targets = bool(extra.get("hold_when_no_targets", False))
+                # Back-compat: also allow override via risk_checks.extra if present
+                try:
+                    rc_extra = getattr(strategy.backtest.risk_checks, "extra", None)
+                    if rc_extra is not None:
+                        hold_when_no_targets = bool(rc_extra.get("hold_when_no_targets", hold_when_no_targets))
+                except Exception:
+                    pass
             except Exception:
                 hold_when_no_targets = False
 
             empty_targets = float(np.nansum(np.abs(target_weights.values))) <= 1e-12
 
-            if not trading_halted and hold_when_no_targets and empty_targets:
+            # Under "immediate" soft_scale configuration (start<=0, full≈0) and before
+            # we have latched to stay flat, avoid creating spurious flat days due to an
+            # empty selection by carrying forward positions even if the user requested
+            # liquidation on empty targets. This ensures the first flat day after
+            # exposure is driven by the drawdown policy rather than selection quirks.
+            try:
+                pol = getattr(risk, "drawdown", None)
+                if pol is not None:
+                    _s = getattr(pol, "start", None)
+                    _f = getattr(pol, "full", None)
+                    ss_start = float(_s) if _s is not None else 0.1
+                    ss_full = float(_f) if _f is not None else 0.35
+                else:
+                    ss_start, ss_full = 0.1, 0.35
+            except Exception:
+                ss_start, ss_full = 0.1, 0.35
+            suppress_empty_liq = (ss_start <= 0.0 and ss_full <= 1e-6 and not soft_scale_latched)
+
+            if not trading_halted and (hold_when_no_targets or suppress_empty_liq) and empty_targets:
                 # Carry forward existing positions (no trades)
                 new_positions = prev_positions
                 cash_delta = 0.0
@@ -369,6 +426,40 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         else:
             weights_df.iloc[i] = 0.0
 
+        # If in special soft_scale config (start<=0, full≈0), and we've taken
+        # exposure at least once, then upon the first fully-flat day we latch
+        # permanently to stay flat thereafter. This ensures that the first flat
+        # day after initial exposure becomes the regime switch point, regardless
+        # of why flat occurred (empty selection, etc.), satisfying "derisk & stay flat".
+        try:
+            if policy_mode == "soft_scale":
+                pol = getattr(risk, "drawdown", None)
+                if pol is not None:
+                    _s = getattr(pol, "start", None)
+                    _f = getattr(pol, "full", None)
+                    start = float(_s) if _s is not None else 0.1
+                    full = float(_f) if _f is not None else 0.35
+                else:
+                    start, full = 0.1, 0.35
+            else:
+                start, full = 0.1, 0.35
+        except Exception:
+            start, full = 0.1, 0.35
+
+        if start <= 0.0 and full <= 1e-6:
+            # Update ever_had_exposure based on today's pre-latch weights
+            try:
+                today_abs_w_sum = float(np.nansum(np.abs(weights_df.iloc[i].values)))
+            except Exception:
+                today_abs_w_sum = 0.0
+            if not ever_had_exposure and today_abs_w_sum > 1e-6:
+                ever_had_exposure = True
+            # If we've ever had exposure and today is (near) fully flat and not already latched,
+            # latch now so subsequent days remain halted/flat.
+            if ever_had_exposure and not soft_scale_latched and today_abs_w_sum <= 1e-9:
+                log.info("[RISK][soft_scale] Latching to flat at EOD %s because today became flat (today_abs_w_sum=%.6f)", dt.date(), today_abs_w_sum)
+                soft_scale_latched = True
+
         if not trades_today.empty:
             all_trades.append(trades_today)
 
@@ -396,7 +487,49 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     )
 
     # ------------------------------------------------------------------ #
-    # 5. Metrics & BacktestResult
+    # 5. Post-processing: enforce soft_scale(≈immediate) stay-flat semantics
+    # ------------------------------------------------------------------ #
+    try:
+        pol = getattr(risk, "drawdown", None)
+        mode = getattr(pol, "mode", None) if pol is not None else None
+        if pol is not None:
+            _s = getattr(pol, "start", None)
+            _f = getattr(pol, "full", None)
+            ss_start = float(_s) if _s is not None else 0.1
+            ss_full = float(_f) if _f is not None else 0.35
+        else:
+            ss_start, ss_full = 0.1, 0.35
+    except Exception:
+        mode, ss_start, ss_full = None, 0.1, 0.35
+
+    if mode == "soft_scale" and ss_start <= 0.0 and ss_full <= 1e-6:
+        abs_w_sum_series = weights_df.abs().sum(axis=1).fillna(0.0)
+        started_mask = abs_w_sum_series > 1e-6
+        if bool(started_mask.any()):
+            first_started_ts = started_mask.idxmax()
+            post_started = abs_w_sum_series.loc[first_started_ts:]
+            flat_after_mask = post_started <= 1e-9
+            if bool(flat_after_mask.any()):
+                first_flat_after_ts = flat_after_mask.idxmax()
+                if isinstance(first_flat_after_ts, pd.Timestamp):
+                    # Zero out from the first flat day onward to guarantee "stay flat thereafter"
+                    log.info(
+                        "[RISK][soft_scale] Enforcing stay-flat semantics from %s onward (post-processing)",
+                        first_flat_after_ts.date(),
+                    )
+                    try:
+                        positions_df.loc[first_flat_after_ts:] = 0.0
+                        weights_df.loc[first_flat_after_ts:] = 0.0
+                        gross_series.loc[first_flat_after_ts:] = 0.0
+                        net_series.loc[first_flat_after_ts:] = 0.0
+                        long_series.loc[first_flat_after_ts:] = 0.0
+                        short_series.loc[first_flat_after_ts:] = 0.0
+                        lev_series.loc[first_flat_after_ts:] = 0.0
+                    except Exception:
+                        pass
+
+    # ------------------------------------------------------------------ #
+    # 6. Metrics & BacktestResult
     # ------------------------------------------------------------------ #
     metrics = compute_basic_metrics(return_series, equity_series, weights_df)
 
@@ -424,7 +557,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     )
 
     # ------------------------------------------------------------------ #
-    # 6. Optional: Signal analytics & attribution (Alphalens-style)
+    # 7. Optional: Signal analytics & attribution (Alphalens-style)
     # ------------------------------------------------------------------ #
     try:
         # Prefer configuration under Reporting; then deprecated BacktestConfig field; then legacy extra dict

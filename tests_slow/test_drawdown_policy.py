@@ -34,6 +34,22 @@ def test_drawdown_policy_soft_scale_derisks_and_stays_flat():
         curve="linear",
     )
 
+    # Ensure empty selection behavior does not accidentally carry positions.
+    # We want liquidation on empty targets for this test.
+    try:
+        if not hasattr(strat.backtest, "extra") or strat.backtest.extra is None:
+            strat.backtest.extra = {}
+        strat.backtest.extra["hold_when_no_targets"] = False
+    except Exception:
+        pass
+    try:
+        # Also allow overriding via risk_checks.extra for back-compat
+        if not hasattr(strat.backtest.risk_checks, "extra") or strat.backtest.risk_checks.extra is None:
+            strat.backtest.risk_checks.extra = {}
+        strat.backtest.risk_checks.extra["hold_when_no_targets"] = False
+    except Exception:
+        pass
+
     res = run_backtest(strat)
     # Sum absolute weights per day
     abs_w_sum = res.weights.fillna(0.0).abs().sum(axis=1)

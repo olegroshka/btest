@@ -69,7 +69,38 @@ def compute_quantstats_metrics(
         if "rf" in sig.parameters:
             kwargs["rf"] = risk_free
 
-        value = fn(returns, **kwargs)
+        # Many quantstats stats emit RuntimeWarnings (divide by zero, empty slices)
+        # on degenerate inputs (e.g., all‑zero returns). Suppress those from
+        # third‑party libs to keep our test suite noise‑free while preserving
+        # the numeric output semantics used by quantstats.
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                category=RuntimeWarning,
+                module=r"numpy\._core\._methods",
+            )
+            warnings.filterwarnings(
+                "ignore",
+                category=RuntimeWarning,
+                module=r"numpy\.lib\._function_base_impl",
+            )
+            warnings.filterwarnings(
+                "ignore",
+                category=RuntimeWarning,
+                module=r"scipy\.stats\._distn_infrastructure",
+            )
+            warnings.filterwarnings(
+                "ignore",
+                category=RuntimeWarning,
+                module=r"quantstats\.stats",
+            )
+            warnings.filterwarnings(
+                "ignore",
+                category=UserWarning,
+                module=r"quantstats\.stats",
+                message=r"No non-zero returns found.*",
+            )
+            value = fn(returns, **kwargs)
         try:
             out[name] = float(value)
         except Exception:
@@ -129,15 +160,50 @@ def generate_quantstats_tearsheet(
     rets = returns.astype("float64")
     bench = benchmark.astype("float64") if isinstance(benchmark, pd.Series) else benchmark
 
-    # Suppress seaborn's PendingDeprecationWarning about 'vert' -> 'orientation'
-    # which is triggered inside quantstats when it calls seaborn's old plotting API.
+    # Suppress noisy warnings from seaborn/numpy/scipy/quantstats that can occur
+    # for degenerate inputs (e.g., constant/zero-variance returns) when rendering
+    # plots inside the HTML report.
+    # Additionally, forward a flag to quantstats to disable 0-variance density warnings.
+    kwargs.setdefault("warn_singular", False)
+
     with warnings.catch_warnings():
+        # seaborn API deprecation used by quantstats' internal plotting
         warnings.filterwarnings(
             "ignore",
             category=PendingDeprecationWarning,
             module=r"seaborn\.categorical",
             message=r".*vert: bool will be deprecated.*",
         )
+        # numerical runtime warnings from downstream libs during plotting/stats
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            module=r"numpy\..*",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            module=r"scipy\..*",
+        )
+        # stats warnings emitted within quantstats itself on degenerate inputs
+        warnings.filterwarnings(
+            "ignore",
+            category=RuntimeWarning,
+            module=r"quantstats\.stats",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            module=r"quantstats\.stats",
+            message=r"No non-zero returns found.*",
+        )
+        warnings.filterwarnings(
+            "ignore",
+            category=UserWarning,
+            module=r"quantstats\._plotting\.core",
+            message=r"Dataset has 0 variance; skipping density estimate.*",
+        )
+
         qs.reports.html(
             rets,
             benchmark=bench,
