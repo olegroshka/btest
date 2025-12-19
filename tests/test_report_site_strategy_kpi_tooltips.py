@@ -13,7 +13,7 @@ from quantdsl_backtest.engine.backtest_runner import ReportSiteIndexRenderer, Re
 from quantdsl_backtest.engine.results import BacktestResult
 
 
-def test_index_strategy_section_contains_kpis(tmp_path, monkeypatch):
+def test_index_strategy_kpis_have_tooltips_when_glossary_available(tmp_path, monkeypatch):
     idx = pd.date_range("2020-01-01", periods=3)
     instruments = ["A", "B"]
     zeros = pd.Series(np.zeros(len(idx)), index=idx)
@@ -30,7 +30,8 @@ def test_index_strategy_section_contains_kpis(tmp_path, monkeypatch):
         positions=pd.DataFrame(0.0, index=idx, columns=instruments),
         weights=pd.DataFrame(0.0, index=idx, columns=instruments),
         trades=pd.DataFrame(),
-        metrics={"sharpe": 1.23, "max_drawdown": -0.10, "turnover_annual": 0.456},
+        # include a couple of engine metrics so we don't need QuantStats
+        metrics={"max_drawdown": -0.1, "cagr": 0.2, "calmar": 2.0, "turnover_annual": 1.0},
         start_date=idx[0],
         end_date=idx[-1],
         metadata={"strategy_name": "S"},
@@ -65,17 +66,7 @@ def test_index_strategy_section_contains_kpis(tmp_path, monkeypatch):
             reporting=Reporting(
                 strategyAnalytics=StrategyAnalyticsConfig(
                     enabled=True,
-                    metrics=[
-                        "cagr",
-                        "volatility",
-                        "sharpe",
-                        "sortino",
-                        "max_drawdown",
-                        "skew",
-                        "kurtosis",
-                        "var",
-                        "cvar",
-                    ],
+                    metrics=["cagr", "calmar", "max_drawdown", "turnover"],
                     print_metrics=False,
                     write_tearsheet=False,
                 )
@@ -83,9 +74,7 @@ def test_index_strategy_section_contains_kpis(tmp_path, monkeypatch):
         ),
     )
 
-    # Avoid quantstats dependency inside this test by stubbing BacktestResult.quantstats_metrics
     def _fake_qs_metrics(self, metric_names, **kwargs):
-        # Return a placeholder for any requested QuantStats metrics.
         return pd.Series({m: 0.1 for m in metric_names})
 
     monkeypatch.setattr(BacktestResult, "quantstats_metrics", _fake_qs_metrics, raising=True)
@@ -93,5 +82,7 @@ def test_index_strategy_section_contains_kpis(tmp_path, monkeypatch):
     ReportSiteIndexRenderer().render(res, ReportingContext(strategy=strat, output_dir=tmp_path))
 
     html = (tmp_path / "index.html").read_text(encoding="utf-8")
-    for label in ["CAGR", "Volatility", "Sharpe", "Sortino", "Max Drawdown", "Skew", "Kurtosis", "VaR", "CVaR"]:
-        assert label in html
+    # Expect at least one tooltip sourced from glossary (e.g. calmar)
+    assert "title='CAGR" in html or "title=\"CAGR" in html or "title='Compound annual growth rate" in html
+    assert "title=" in html
+

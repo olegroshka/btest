@@ -58,15 +58,23 @@ class StrategyAnalyticsConfig:
             "volatility",
             "sharpe",
             "sortino",
+            "calmar",
             # --- Drawdown / tail ---
             "max_drawdown",
+            "tail_ratio",
+            "ulcer_index",
             "var",
             "cvar",
-            # --- Distribution shape ---
+            # --- Consistency / distribution ---
+            "win_rate",
             "skew",
             "kurtosis",
-            # --- Implementability (engine-derived) ---
+            "profit_factor",
+            # --- Implementability / exposure ---
             "turnover",
+            "avg_leverage",
+            "max_leverage",
+            "pct_days_in_market",
         ]
     )
     risk_free: float = 0.0

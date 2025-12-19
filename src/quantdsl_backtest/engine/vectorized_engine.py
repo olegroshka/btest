@@ -34,6 +34,7 @@ from .backtest_runner import (
     compute_signal_analytics_and_attribution,
 )
 from pathlib import Path
+from .metrics_advanced import compute_advanced_metrics_from_result
 
 
 log = get_logger(__name__)
@@ -505,6 +506,12 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             "vectorbt_version": getattr(vbt, "__version__", "unknown"),
         },
     )
+
+    # Add advanced PM-style metrics (best-effort; should never crash the run)
+    try:
+        result.metrics.update(compute_advanced_metrics_from_result(result))
+    except Exception as exc:
+        log.warning("Vectorized engine: advanced metrics computation failed: %s", exc)
 
     # Optional analytics & attribution (same logic as event-driven)
     try:

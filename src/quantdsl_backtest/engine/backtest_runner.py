@@ -52,7 +52,9 @@ from .analytics.render_html_utils import (
     render_html_shell,
     _render_help as _html_render_help,
     _series_summary_stats,
+    metric_glossary,
 )
+from .metrics_advanced import compute_advanced_metrics_from_result
 
 from pathlib import Path
 from dataclasses import dataclass
@@ -219,10 +221,23 @@ class QuantStatsHtmlRenderer:
         if bm is None:
             bm = result.benchmark
 
-        # QuantStats can't compute engine-derived metrics like total_return / turnover.
+        # QuantStats can't compute engine-derived metrics.
         qs_metric_names = [
-            m for m in sa.metrics
-            if m not in {"total_return", "turnover"}
+            m
+            for m in sa.metrics
+            if m
+            not in {
+                "total_return",
+                "turnover",
+                "calmar",
+                "win_rate",
+                "profit_factor",
+                "tail_ratio",
+                "ulcer_index",
+                "avg_leverage",
+                "max_leverage",
+                "pct_days_in_market",
+            }
         ]
 
         qs_metrics = result.quantstats_metrics(
@@ -449,24 +464,54 @@ class ReportSiteIndexRenderer:
                 "volatility": "Volatility",
                 "sharpe": "Sharpe",
                 "sortino": "Sortino",
+                "calmar": "Calmar",
                 "max_drawdown": "Max Drawdown",
-                "skew": "Skew",
-                "kurtosis": "Kurtosis",
                 "var": "VaR",
                 "cvar": "CVaR",
+                "tail_ratio": "Tail Ratio",
+                "ulcer_index": "Ulcer Index",
+                "win_rate": "Win Rate",
+                "profit_factor": "Profit Factor",
+                "skew": "Skew",
+                "kurtosis": "Kurtosis",
+                "avg_leverage": "Avg Leverage",
+                "max_leverage": "Max Leverage",
+                "pct_days_in_market": "% Days In Market",
                 "turnover": "Turnover",
             }.get(m, m)
 
         def _format(m: str, v: float) -> str:
             if v is None or (isinstance(v, float) and (np.isnan(v) or np.isinf(v))):
                 return "—"
-            if m in ("total_return", "cagr", "volatility", "max_drawdown", "var", "cvar"):
+            if m in (
+                "total_return",
+                "cagr",
+                "volatility",
+                "max_drawdown",
+                "var",
+                "cvar",
+                "win_rate",
+                "pct_days_in_market",
+            ):
+                return f"{_html_fmt_float(float(v) * 100.0, digits=2)}%"
+            if m in ("ulcer_index",):
+                # ulcer is typically shown as a percentage drawdown magnitude
                 return f"{_html_fmt_float(float(v) * 100.0, digits=2)}%"
             return _html_fmt_float(float(v), digits=3)
 
+        gl = metric_glossary()
+
+        def _kpi_label_html(m: str) -> str:
+            lbl = _label(m)
+            tip = gl.get(m)
+            if tip:
+                # Use native HTML tooltip via title attribute.
+                return f"<span title='{_html_escape(tip)}'>{_html_escape(lbl)}</span>"
+            return _html_escape(lbl)
+
         # Render Strategy KPI grid in configured order
         kpi_html = "".join(
-            f"<div class='kpi'><div class='k'>{_html_escape(_label(m))}</div><div class='v'>{_format(m, metrics_map.get(alias.get(m, m), float('nan')))}</div></div>"
+            f"<div class='kpi'><div class='k'>{_kpi_label_html(m)}</div><div class='v'>{_format(m, metrics_map.get(alias.get(m, m), float('nan')))}</div></div>"
             for m in metrics_to_show
         )
 
@@ -1095,6 +1140,12 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             "engine": "event_driven",
         },
     )
+
+    # Add advanced PM-style metrics (best-effort; should never crash the run)
+    try:
+        result.metrics.update(compute_advanced_metrics_from_result(result))
+    except Exception as exc:
+        log.warning("Advanced metrics computation failed: %s", exc)
 
     # ------------------------------------------------------------------ #
     # 7. Optional: Signal analytics & attribution (Alphalens-style)

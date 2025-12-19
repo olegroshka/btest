@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import base64
 import html
-from dataclasses import dataclass
 from io import BytesIO
 from typing import Any, Dict, List, Optional
 
@@ -181,11 +180,25 @@ def metric_glossary() -> Dict[str, str]:
 
     return {
         # strategy-level (common)
+        "total_return": "Total return over the full backtest period (ending equity / starting equity − 1).",
         "cagr": "Compound annual growth rate of the equity curve.",
+        "volatility": "Annualized volatility of returns.",
         "sharpe": "Annualized Sharpe ratio of returns (excess over risk-free, if configured).",
         "sortino": "Annualized Sortino ratio; like Sharpe but only downside volatility.",
+        "calmar": "CAGR divided by absolute max drawdown; higher means better return per unit drawdown.",
         "max_drawdown": "Max peak-to-trough decline of equity.",
-        "volatility": "Annualized volatility of returns.",
+        "tail_ratio": "Ratio of upside tail to downside tail: |q95(returns)| / |q05(returns)|.",
+        "ulcer_index": "Ulcer Index: RMS of equity drawdown magnitudes; lower is better.",
+        "var": "Value at Risk (VaR) of daily returns at the default QuantStats confidence level.",
+        "cvar": "Conditional VaR (CVaR): average daily return in the left tail beyond VaR.",
+        "win_rate": "Fraction of days with positive returns.",
+        "skew": "Skewness of daily returns; negative means more frequent/extreme left-tail moves.",
+        "kurtosis": "Kurtosis of daily returns; higher implies heavier tails than a normal distribution.",
+        "profit_factor": "Daily profit factor: sum(positive returns) / abs(sum(negative returns)).",
+        "turnover": "Annualized turnover based on daily absolute weight changes (higher implies more trading/cost sensitivity).",
+        "avg_leverage": "Average gross leverage (gross exposure / equity).",
+        "max_leverage": "Maximum gross leverage observed.",
+        "pct_days_in_market": "Fraction of days with non-zero gross exposure (invested days).",
         # signal ex-ante
         "coverage": "Fraction of instruments with a valid signal value each day.",
         "quantile_turnover": "Fraction of names that change quantile bucket vs previous day.",
