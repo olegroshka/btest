@@ -43,17 +43,30 @@ class StrategyAnalyticsConfig:
     enabled: bool = True
 
     # Metrics summary
+    # Ordered roughly how a PM/IC would screen a strategy:
+    #  1) Return
+    #  2) Risk / risk-adjusted
+    #  3) Drawdown / tail risk
+    #  4) Distribution shape
+    #  5) Implementability
     metrics: List[str] = field(
         default_factory=lambda: [
+            # --- Return ---
+            "total_return",
             "cagr",
+            # --- Risk / risk-adjusted ---
             "volatility",
             "sharpe",
             "sortino",
+            # --- Drawdown / tail ---
             "max_drawdown",
-            "skew",
-            "kurtosis",
             "var",
             "cvar",
+            # --- Distribution shape ---
+            "skew",
+            "kurtosis",
+            # --- Implementability (engine-derived) ---
+            "turnover",
         ]
     )
     risk_free: float = 0.0

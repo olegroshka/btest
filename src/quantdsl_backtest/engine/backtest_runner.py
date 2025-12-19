@@ -45,6 +45,15 @@ from .analytics.render_tearsheets import (
     render_signal_tearsheet_html,
     render_portfolio_signal_tearsheet_html,
 )
+# NEW: shared report-site utilities
+from .analytics.render_html_utils import (
+    _escape as _html_escape,
+    _fmt_float as _html_fmt_float,
+    render_html_shell,
+    _render_help as _html_render_help,
+    _series_summary_stats,
+)
+
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -210,8 +219,14 @@ class QuantStatsHtmlRenderer:
         if bm is None:
             bm = result.benchmark
 
+        # QuantStats can't compute engine-derived metrics like total_return / turnover.
+        qs_metric_names = [
+            m for m in sa.metrics
+            if m not in {"total_return", "turnover"}
+        ]
+
         qs_metrics = result.quantstats_metrics(
-            sa.metrics,
+            qs_metric_names,
             benchmark=bm,
             risk_free=sa.risk_free,
             prefix=sa.prefix,
@@ -239,6 +254,278 @@ class QuantStatsHtmlRenderer:
             log.info("QuantStats HTML report written to: %s", html_path)
 
 
+@dataclass(slots=True)
+class ReportSiteIndexRenderer:
+    """Write outputs/<run>/index.html that links strategy + signals + attribution.
+
+    This is the entrypoint for the report site.
+    """
+
+    name: str = "report_site_index"
+
+    def render(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        if ctx.output_dir is None:
+            return
+
+        out_dir = ctx.output_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        # --- Signals summary table (kept independent of strategy KPI computation) ---
+        rows = []
+        reports = getattr(result, "signal_reports", None) or {}
+        attribs = getattr(result, "signal_attribution", None) or {}
+
+        for sname, rep in reports.items():
+            cov = float(pd.Series(rep.coverage).dropna().mean()) if rep.coverage is not None else float("nan")
+            turn = float(pd.Series(rep.quantile_turnover).dropna().mean()) if rep.quantile_turnover is not None else float("nan")
+
+            h0 = rep.config.horizons[0] if rep.config.horizons else None
+            ic_mean = float(pd.Series(rep.rank_ic.get(h0)).dropna().mean()) if (h0 is not None and h0 in rep.rank_ic) else float("nan")
+            ic_t = float(_series_summary_stats(rep.rank_ic.get(h0)).get("tstat")) if (h0 is not None and h0 in rep.rank_ic) else float("nan")
+
+            total_ls = float("nan")
+            mean_ls = float("nan")
+            if sname in attribs:
+                ls = pd.Series(attribs[sname].contrib_ret_ls).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+                total_ls = float(ls.sum())
+                mean_ls = float(ls.mean())
+
+            rows.append(
+                {
+                    "signal": sname,
+                    "ic_mean": ic_mean,
+                    "ic_tstat": ic_t,
+                    "coverage": cov,
+                    "q_turnover": turn,
+                    "ls_total": total_ls,
+                    "ls_mean": mean_ls,
+                    "links": sname,
+                }
+            )
+
+        df = pd.DataFrame(rows)
+        if not df.empty:
+            if df["ls_total"].notna().any():
+                df = df.sort_values("ls_total", ascending=False)
+            else:
+                df = df.sort_values("ic_mean", ascending=False)
+            df = df.set_index("signal")
+
+        table_html = '<div class="muted">No signal analytics attached to this run.</div>'
+        if not df.empty:
+            df2 = df.copy()
+            df2["links"] = [
+                f"<a href='signals/{_html_escape(s)}/signal_tearsheet.html'>signal</a> &nbsp;|&nbsp; "
+                f"<a href='attribution/{_html_escape(s)}/portfolio_signal_tearsheet.html'>attrib</a>"
+                for s in df2.index
+            ]
+
+            header = "".join(f"<th>{_html_escape(c)}</th>" for c in ["signal"] + list(df2.columns))
+            body_rows = []
+            for sig, r in df2.iterrows():
+                tds = [f"<td class='idx'>{_html_escape(sig)}</td>"]
+                tds.append(f"<td>{_html_fmt_float(r['ic_mean'], digits=4)}</td>")
+                tds.append(f"<td>{_html_fmt_float(r['ic_tstat'], digits=3)}</td>")
+                tds.append(f"<td>{_html_fmt_float(r['coverage'], digits=3)}</td>")
+                tds.append(f"<td>{_html_fmt_float(r['q_turnover'], digits=3)}</td>")
+                tds.append(f"<td>{_html_fmt_float(r['ls_total'], digits=6)}</td>")
+                tds.append(f"<td>{_html_fmt_float(r['ls_mean'], digits=6)}</td>")
+                tds.append(f"<td style='text-align:left'>{r['links']}</td>")
+                body_rows.append("<tr>" + "".join(tds) + "</tr>")
+
+            table_html = f"""
+            <div class='table-wrap'>
+              <table class='tbl'>
+                <thead><tr>{header}</tr></thead>
+                <tbody>{''.join(body_rows)}</tbody>
+              </table>
+            </div>
+            """
+
+        # --------------------------------------------------------------------- #
+        # --- Strategy analytics config (metrics list) ---
+        # --------------------------------------------------------------------- #
+
+        # Resolve strategy analytics config (if present) to decide which metrics to show on index
+        sa_cfg: StrategyAnalyticsConfig | None = None
+        try:
+            rep_cfg = getattr(ctx.strategy.backtest, "reporting", None)
+            sa_raw = getattr(rep_cfg, "strategyAnalytics", None) if rep_cfg is not None else None
+            if isinstance(sa_raw, StrategyAnalyticsConfig):
+                sa_cfg = sa_raw
+            elif isinstance(sa_raw, dict):
+                sa_cfg = StrategyAnalyticsConfig(**sa_raw)
+        except Exception:
+            sa_cfg = None
+
+        # Headline metrics for the Strategy card on index.html
+        # Prefer engine-computed result.metrics when available; otherwise fall back to QuantStats.
+        metrics_to_show = list(sa_cfg.metrics) if (sa_cfg is not None and sa_cfg.enabled) else [
+            "total_return",
+            "sharpe",
+            "max_drawdown",
+            "turnover",
+        ]
+
+        # Pull from result.metrics first
+        metrics_map: dict[str, float] = {}
+        try:
+            if isinstance(getattr(result, "metrics", None), dict):
+                for k, v in result.metrics.items():
+                    try:
+                        metrics_map[str(k)] = float(v)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Map QuantStats metric names -> our result.metrics key names (where different)
+        alias: dict[str, str] = {
+            "max_drawdown": "max_drawdown",
+            "sharpe": "sharpe",
+            "sortino": "sortino",
+            "volatility": "volatility",
+            "cagr": "cagr",
+            "skew": "skew",
+            "kurtosis": "kurtosis",
+            "var": "var",
+            "cvar": "cvar",
+            # non-quantstats / engine metrics
+            "turnover": "turnover_annual",
+            "total_return": "total_return",
+        }
+
+        # Compute missing QuantStats metrics once (best-effort, non-fatal)
+        qs_needed = [m for m in metrics_to_show if m in alias and alias[m] not in metrics_map and m not in ("turnover", "total_return")]
+        if qs_needed:
+            try:
+                rep_cfg = getattr(ctx.strategy.backtest, "reporting", None)
+                risk_free = float(getattr(sa_cfg, "risk_free", 0.0)) if sa_cfg is not None else 0.0
+                prefix = str(getattr(sa_cfg, "prefix", "")) if sa_cfg is not None else ""
+                bm = None
+                # Benchmark resolution follows QuantStatsHtmlRenderer logic
+                try:
+                    import pandas as _pd
+
+                    if sa_cfg is not None and isinstance(sa_cfg.benchmark, _pd.Series):
+                        bm = sa_cfg.benchmark
+                except Exception:
+                    bm = None
+                if bm is None and sa_cfg is not None and isinstance(getattr(sa_cfg, "benchmark", None), str):
+                    bm = result.benchmark
+                if bm is None:
+                    bm = result.benchmark
+
+                qs_df = result.quantstats_metrics(qs_needed, benchmark=bm, risk_free=risk_free, prefix=prefix)
+                if isinstance(qs_df, pd.Series):
+                    qs_series = qs_df
+                else:
+                    # our wrapper returns a Series in tests, but be safe
+                    try:
+                        qs_series = qs_df.iloc[:, 0]
+                    except Exception:
+                        qs_series = pd.Series(dtype="float64")
+
+                for m in qs_needed:
+                    key = prefix + m if prefix else m
+                    if key in qs_series.index:
+                        metrics_map[m] = float(qs_series.loc[key])
+                    elif m in qs_series.index:
+                        metrics_map[m] = float(qs_series.loc[m])
+            except Exception:
+                pass
+
+        # Always add total_return from BacktestResult property if not present
+        try:
+            if "total_return" not in metrics_map:
+                metrics_map["total_return"] = float(getattr(result, "total_return", np.nan))
+        except Exception:
+            pass
+
+        def _label(m: str) -> str:
+            return {
+                "total_return": "Total Return",
+                "cagr": "CAGR",
+                "volatility": "Volatility",
+                "sharpe": "Sharpe",
+                "sortino": "Sortino",
+                "max_drawdown": "Max Drawdown",
+                "skew": "Skew",
+                "kurtosis": "Kurtosis",
+                "var": "VaR",
+                "cvar": "CVaR",
+                "turnover": "Turnover",
+            }.get(m, m)
+
+        def _format(m: str, v: float) -> str:
+            if v is None or (isinstance(v, float) and (np.isnan(v) or np.isinf(v))):
+                return "—"
+            if m in ("total_return", "cagr", "volatility", "max_drawdown", "var", "cvar"):
+                return f"{_html_fmt_float(float(v) * 100.0, digits=2)}%"
+            return _html_fmt_float(float(v), digits=3)
+
+        # Render Strategy KPI grid in configured order
+        kpi_html = "".join(
+            f"<div class='kpi'><div class='k'>{_html_escape(_label(m))}</div><div class='v'>{_format(m, metrics_map.get(alias.get(m, m), float('nan')))}</div></div>"
+            for m in metrics_to_show
+        )
+
+        # Strategy snapshot pills
+        start = getattr(result, "start_date", None)
+        end = getattr(result, "end_date", None)
+        strat = ctx.strategy.name or result.metadata.get("strategy_name", "Strategy")
+        subtitle = f"Strategy: <span class='muted'>{_html_escape(strat)}</span> &nbsp;•&nbsp; Period: <span class='muted'>{_html_escape(start)} → {_html_escape(end)}</span>"
+
+        # Strategy KPI snapshot (best-effort across engines)
+        k_total_ret = float(getattr(result, "total_return", np.nan))
+        k_sharpe = float(result.metrics.get("sharpe", np.nan)) if isinstance(getattr(result, "metrics", None), dict) else np.nan
+        k_max_dd = float(result.metrics.get("max_drawdown", np.nan)) if isinstance(getattr(result, "metrics", None), dict) else np.nan
+        k_turnover = float(result.metrics.get("turnover", np.nan)) if isinstance(getattr(result, "metrics", None), dict) else np.nan
+
+        body = f"""
+        <div class='card'>
+          <div class='hd'><h2>Strategy</h2><div class='muted'>Top-level summary + reports</div></div>
+          <div class='bd'>
+            <div class='kpis'>
+              {kpi_html}
+            </div>
+            <div class='muted' style='margin-top:10px; line-height:1.45;'>
+              These are the QuantStats metrics configured in <code>StrategyAnalyticsConfig.metrics</code>. Use the full QuantStats report for deeper distribution/risk analytics.
+            </div>
+            <div class='toc' style='margin-top:12px;'>
+              <a href='tearsheet.html'>Open QuantStats strategy tearsheet</a>
+            </div>
+          </div>
+        </div>
+
+        <div class='card' id='signals'>
+          <div class='hd'><h2>Signals</h2><div class='muted'>Decision table (ex-ante + ex-post)</div></div>
+          <div class='bd'>
+            <div class='muted' style='line-height:1.45;'>
+              Use <b>IC</b> metrics to judge predictiveness and <b>L–S contribution</b> to judge realized impact under constraints.
+              Drill down into each signal for diagnostics and attribution.
+            </div>
+            {_html_render_help(["rank_ic","ic_tstat","coverage","quantile_turnover","contrib_ret_ls"])}
+            <div style='margin-top:12px;'>
+              {table_html}
+            </div>
+          </div>
+        </div>
+        """
+
+        html = render_html_shell(
+            title="Backtest Report",
+            subtitle_html=subtitle,
+            nav_links=[
+                ("Index", "index.html"),
+                ("Strategy (QuantStats)", "tearsheet.html"),
+            ],
+            body_html=body,
+        )
+
+        (out_dir / "index.html").write_text(html, encoding="utf-8")
+
+
 def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullReportingPipeline:
     """Build the reporting pipeline from `strategy.backtest.reporting`.
 
@@ -259,6 +546,9 @@ def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullRepo
         output_dir = Path("outputs") / (strategy.name or "run")
 
     renderers: List[ResultsRenderer] = [DefaultTextRenderer()]
+
+    # NEW: always write report site index when output_dir is available
+    renderers.append(ReportSiteIndexRenderer())
 
     # Optional: parquet artifacts
     try:

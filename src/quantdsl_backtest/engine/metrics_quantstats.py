@@ -115,6 +115,78 @@ def compute_quantstats_metrics(
     return out
 
 
+def _inject_report_site_shell(
+    html_text: str,
+    *,
+    title: str,
+    nav_links: list[tuple[str, str]],
+    subtitle_html: str = "",
+) -> str:
+    """Best-effort wrapper for QuantStats HTML.
+
+    We keep QuantStats' internal body content intact but:
+      - inject our CSS (dark theme)
+      - inject a small header + navigation
+
+    This is intentionally string-based and tolerant of minor QuantStats changes.
+    """
+
+    from .analytics.render_html_utils import default_css, render_topnav
+
+    css = default_css()
+    extra_css = """
+    /* QuantStats overrides: make default light theme usable on dark. */
+    body { background: var(--bg) !important; color: var(--text) !important; }
+    a { color: var(--accent) !important; }
+
+    /* Tables (QuantStats uses plain tables + pandas/stats tables) */
+    table { color: var(--text) !important; background: transparent !important; }
+    thead, tbody { background: transparent !important; }
+    th, td { border-color: var(--line) !important; background: transparent !important; }
+    th { color: var(--muted) !important; }
+
+    /* Some QuantStats templates/embedded styles set white backgrounds */
+    .table, .dataframe { background: transparent !important; }
+    .table thead th, .dataframe thead th { background: rgba(255,255,255,.03) !important; }
+
+    /* Containers */
+    .container, .content, .main { background: transparent !important; }
+
+    /* Common 'metrics' header rows (best-effort) */
+    .metrics thead th, .metrics th { background: rgba(255,255,255,.03) !important; }
+    """
+
+    header = f"""
+<div class='page'>
+  <div class='hero'>
+    <div>
+      <h1 class='title'>{title}</h1>
+      <div class='subtitle'>{subtitle_html}</div>
+      {render_topnav(links=nav_links)}
+    </div>
+  </div>
+</div>
+"""
+
+    # Inject CSS first
+    if "</head>" in html_text:
+        html_text = html_text.replace("</head>", f"<style>{css}\n{extra_css}</style></head>", 1)
+    else:
+        html_text = f"<style>{css}\n{extra_css}</style>" + html_text
+
+    # Insert header right after <body ...>
+    import re
+
+    m = re.search(r"<body[^>]*>", html_text, flags=re.IGNORECASE)
+    if m:
+        insert_at = m.end()
+        html_text = html_text[:insert_at] + header + html_text[insert_at:]
+    else:
+        html_text = header + html_text
+
+    return html_text
+
+
 def generate_quantstats_tearsheet(
     returns: pd.Series,
     benchmark: Optional[pd.Series] = None,
@@ -211,3 +283,25 @@ def generate_quantstats_tearsheet(
             title=title,
             **kwargs,
         )
+
+    # Optional: post-process generated HTML to match our dark report theme.
+    # Keep it best-effort and skip if output is None or file missing.
+    try:
+        if output:
+            from pathlib import Path
+
+            p = Path(output)
+            if p.exists():
+                txt = p.read_text(encoding="utf-8", errors="ignore")
+                wrapped = _inject_report_site_shell(
+                    txt,
+                    title=title or "Strategy",
+                    nav_links=[
+                        ("Index", "index.html"),
+                    ],
+                    subtitle_html="QuantStats strategy tearsheet",
+                )
+                p.write_text(wrapped, encoding="utf-8")
+    except Exception:
+        # Never fail the backtest because of HTML theming.
+        pass

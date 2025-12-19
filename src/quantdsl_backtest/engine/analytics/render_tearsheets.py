@@ -1,6 +1,14 @@
 # src/quantdsl_backtest/engine/analytics/render_tearsheets.py
 from __future__ import annotations
 
+# Ensure a non-interactive backend for headless/test environments (avoid Tk dependency).
+try:  # pragma: no cover
+    import matplotlib
+
+    matplotlib.use("Agg")
+except Exception:  # pragma: no cover
+    pass
+
 from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
@@ -14,11 +22,13 @@ from .types import SignalTearsheetData, PortfolioSignalAttribution
 from .render_html_utils import (
     _escape,
     _fmt_float,
-    _fmt_int,
     _series_summary_stats,
     _table_from_df,
     default_css,
     fig_to_base64_png,
+    # NEW: shared report-site helpers
+    render_topnav,
+    _render_help,
 )
 
 
@@ -159,6 +169,15 @@ def render_signal_tearsheet_html(
     title = f"Signal Tearsheet — {report.name}"
     sname = strategy_name or run_meta.get("strategy_name", "")
 
+    # Site navigation (relative to outputs/<run>/signals/<signal>/signal_tearsheet.html)
+    nav = render_topnav(
+        links=[
+            ("Index", "../../index.html"),
+            ("Strategy (QuantStats)", "../../tearsheet.html"),
+            ("Attribution (this signal)", f"../../attribution/{_escape(report.name)}/portfolio_signal_tearsheet.html"),
+        ]
+    )
+
     html_doc = f"""<!doctype html>
 <html>
 <head>
@@ -178,11 +197,24 @@ def render_signal_tearsheet_html(
         &nbsp;•&nbsp; Horizons: <span class="muted">{_escape(cfg.horizons)}</span>
         &nbsp;•&nbsp; Delay used: <span class="muted">{_escape(cfg.signal_delay_bars)} bar(s)</span>
       </div>
+      {nav}
     </div>
     <div class="meta">
       <div class="pill">Avg coverage: <b>{_fmt_float(k_cov, digits=3)}</b></div>
       <div class="pill">Avg q-turnover: <b>{_fmt_float(k_turn, digits=3)}</b></div>
       <div class="pill">Mask: <b>{_escape(cfg.within_mask or "None")}</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="hd"><h2>What is this?</h2><div class="muted">How to read this page</div></div>
+    <div class="bd">
+      <div class="muted" style="line-height:1.45;">
+        This is an <b>ex-ante</b> signal diagnostics page (Alphalens-style). It answers: does the signal predict
+        forward returns (IC / quantile return spread), and is it stable enough to trade (coverage/turnover)?
+        For realized impact under portfolio constraints and costs, use the <b>Attribution</b> page.
+      </div>
+      {_render_help(["coverage","quantile_turnover","rank_ic","ic_tstat","ls_fwd_ret"])}
     </div>
   </div>
 
@@ -210,6 +242,7 @@ def render_signal_tearsheet_html(
           <div class="kpi"><div class="k">Horizons</div><div class="v">{_escape(cfg.horizons)}</div></div>
           <div class="kpi"><div class="k">Delay Bars</div><div class="v">{_escape(cfg.signal_delay_bars)}</div></div>
         </div>
+        {_render_help(["coverage","quantile_turnover"])}
         <div class="row2" style="margin-top:12px;">
           <img class="img" src="{cov_uri}" alt="coverage"/>
           <img class="img" src="{turn_uri}" alt="turnover"/>
@@ -370,6 +403,14 @@ def render_portfolio_signal_tearsheet_html(
     title = f"Portfolio Signal Tearsheet — {signal_name}"
     sname = strategy_name or run_meta.get("strategy_name", "")
 
+    nav = render_topnav(
+        links=[
+            ("Index", "../../index.html"),
+            ("Strategy (QuantStats)", "../../tearsheet.html"),
+            ("Signal diagnostics (this signal)", f"../../signals/{_escape(signal_name)}/signal_tearsheet.html"),
+        ]
+    )
+
     html_doc = f"""<!doctype html>
 <html>
 <head>
@@ -387,11 +428,24 @@ def render_portfolio_signal_tearsheet_html(
         Strategy: <span class="muted">{_escape(sname)}</span>
         &nbsp;•&nbsp; This report maps <b>realized portfolio contributions</b> to the signal’s quantile buckets.
       </div>
+      {nav}
     </div>
     <div class="meta">
       <div class="pill">Total L–S contrib: <b>{_fmt_float(total_ls, digits=5)}</b></div>
       <div class="pill">Mean daily L–S: <b>{_fmt_float(mean_ls, digits=6)}</b></div>
       <div class="pill">Daily L–S vol: <b>{_fmt_float(vol_ls, digits=6)}</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="hd"><h2>What is this?</h2><div class="muted">How to read this page</div></div>
+    <div class="bd">
+      <div class="muted" style="line-height:1.45;">
+        This is an <b>ex-post</b> attribution page. It answers: given the actual realized weights,
+        constraints, execution and costs, which signal quantile buckets contributed to portfolio returns?
+        Use the <b>Signal diagnostics</b> page to see ex-ante predictiveness (IC / forward returns).
+      </div>
+      {_render_help(["contrib_ret_ls","contrib_ret_by_q","cost_pnl_by_q"])}
     </div>
   </div>
 

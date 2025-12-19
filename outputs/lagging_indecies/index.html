@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+<meta charset='utf-8'/>
+<meta name='viewport' content='width=device-width,initial-scale=1'/>
+<title>Backtest Report</title>
+<style>
+    :root{
+      --bg:#0b1220;
+      --card:#0f1b33;
+      --card2:#0d1730;
+      --text:#e6edf7;
+      --muted:#a9b7d0;
+      --line:#1f2d4d;
+      --accent:#77b8ff;
+      --good:#5fe1b0;
+      --bad:#ff6b8a;
+      --warn:#ffd166;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    html,body{background:var(--bg); color:var(--text); margin:0; padding:0; font-family:var(--sans);}
+    .page{max-width:1180px; margin:28px auto; padding:0 18px 60px;}
+    .hero{display:flex; justify-content:space-between; gap:16px; align-items:flex-end; margin-bottom:18px;}
+    .title{font-size:26px; font-weight:780; letter-spacing:.2px; margin:0;}
+    .subtitle{margin:6px 0 0; color:var(--muted); font-size:13px;}
+    .meta{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;}
+    .pill{border:1px solid var(--line); background:rgba(255,255,255,.03); padding:8px 10px; border-radius:999px;
+          font-size:12px; color:var(--muted);}
+    .grid{display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; align-items:stretch;}
+    .card{grid-column: span 12; background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+          border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden;}
+    .card .hd{padding:14px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center;}
+    .card .hd h2{margin:0; font-size:14px; letter-spacing:.3px; text-transform:uppercase;}
+    .card .bd{padding:14px 16px;}
+    .muted{color:var(--muted);}
+    .kpis{display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;}
+    .kpi{background:rgba(255,255,255,.02); border:1px solid var(--line); border-radius:14px; padding:12px;}
+    .kpi .k{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.25px;}
+    .kpi .v{font-size:18px; font-weight:760; margin-top:4px;}
+    .img{width:100%; border-radius:12px; border:1px solid var(--line); background:rgba(0,0,0,.15);}
+    .row2{display:grid; grid-template-columns: 1fr 1fr; gap:12px;}
+    .row3{display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;}
+    .tbl{width:100%; border-collapse:collapse; font-size:12px;}
+    .tbl th, .tbl td{padding:8px 10px; border-bottom:1px solid var(--line); text-align:right;}
+    .tbl th:first-child, .tbl td:first-child{text-align:left;}
+    .tbl thead th{color:var(--muted); font-weight:650; text-transform:uppercase; letter-spacing:.25px; font-size:11px;}
+    .tbl tbody tr:hover{background:rgba(255,255,255,.03);}
+    .tbl td.idx{font-family:var(--mono); color:var(--text);}
+    .table-wrap{overflow:auto; border-radius:12px; border:1px solid var(--line);}
+    .toc{display:flex; gap:10px; flex-wrap:wrap;}
+    .toc a{color:var(--accent); text-decoration:none; font-size:12px; border:1px solid var(--line);
+           padding:7px 9px; border-radius:999px; background:rgba(255,255,255,.02);}
+    .toc a:hover{background:rgba(119,184,255,.10);}
+    .foot{margin-top:18px; color:var(--muted); font-size:12px;}
+    .topnav{display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 0;}
+    .topnav a{color:var(--accent); text-decoration:none; font-size:12px; border:1px solid var(--line);
+              padding:7px 9px; border-radius:999px; background:rgba(255,255,255,.02);}
+    .topnav a:hover{background:rgba(119,184,255,.10);}
+    .help{margin-top:8px; font-size:12px; color:var(--muted); line-height:1.4;}
+    .help code{font-family:var(--mono); font-size:11px; color:var(--text);}
+    @media (max-width: 980px){
+      .kpis{grid-template-columns: repeat(2, 1fr);}
+      .row2, .row3{grid-template-columns: 1fr;}
+    }
+    
+</style>
+</head>
+<body>
+<div class='page'>
+  <div class='hero'>
+    <div>
+      <h1 class='title'>Backtest Report</h1>
+      <div class='subtitle'>Strategy: <span class='muted'>lagging_indecies</span> &nbsp;•&nbsp; Period: <span class='muted'>2015-01-02 00:00:00 → 2025-12-12 00:00:00</span></div>
+      <div class='topnav'><a href='index.html'>Index</a><a href='tearsheet.html'>Strategy (QuantStats)</a></div>
+    </div>
+  </div>
+  
+        <div class='card'>
+          <div class='hd'><h2>Strategy</h2><div class='muted'>Top-level summary + reports</div></div>
+          <div class='bd'>
+            <div class='kpis'>
+              <div class='kpi'><div class='k'>Total Return</div><div class='v'>128.78%</div></div><div class='kpi'><div class='k'>CAGR</div><div class='v'>7.65%</div></div><div class='kpi'><div class='k'>Volatility</div><div class='v'>14.91%</div></div><div class='kpi'><div class='k'>Sharpe</div><div class='v'>0.570</div></div><div class='kpi'><div class='k'>Sortino</div><div class='v'>0.649</div></div><div class='kpi'><div class='k'>Max Drawdown</div><div class='v'>-30.29%</div></div><div class='kpi'><div class='k'>VaR</div><div class='v'>-1.51%</div></div><div class='kpi'><div class='k'>CVaR</div><div class='v'>-2.39%</div></div><div class='kpi'><div class='k'>Skew</div><div class='v'>-1.439</div></div><div class='kpi'><div class='k'>Kurtosis</div><div class='v'>16.888</div></div><div class='kpi'><div class='k'>Turnover</div><div class='v'>45.854</div></div>
+            </div>
+            <div class='muted' style='margin-top:10px; line-height:1.45;'>
+              These are the QuantStats metrics configured in <code>StrategyAnalyticsConfig.metrics</code>. Use the full QuantStats report for deeper distribution/risk analytics.
+            </div>
+            <div class='toc' style='margin-top:12px;'>
+              <a href='tearsheet.html'>Open QuantStats strategy tearsheet</a>
+            </div>
+          </div>
+        </div>
+
+        <div class='card' id='signals'>
+          <div class='hd'><h2>Signals</h2><div class='muted'>Decision table (ex-ante + ex-post)</div></div>
+          <div class='bd'>
+            <div class='muted' style='line-height:1.45;'>
+              Use <b>IC</b> metrics to judge predictiveness and <b>L–S contribution</b> to judge realized impact under constraints.
+              Drill down into each signal for diagnostics and attribution.
+            </div>
+            <div class='help'><div><b>rank_ic</b>: Spearman rank correlation between signal and forward returns.</div><div><b>ic_tstat</b>: t-stat of the IC series; bigger magnitude suggests more consistent IC.</div><div><b>coverage</b>: Fraction of instruments with a valid signal value each day.</div><div><b>quantile_turnover</b>: Fraction of names that change quantile bucket vs previous day.</div><div><b>contrib_ret_ls</b>: Realized portfolio contribution: (top bucket contrib − bottom bucket contrib).</div></div>
+            <div style='margin-top:12px;'>
+              
+            <div class='table-wrap'>
+              <table class='tbl'>
+                <thead><tr><th>signal</th><th>ic_mean</th><th>ic_tstat</th><th>coverage</th><th>q_turnover</th><th>ls_total</th><th>ls_mean</th><th>links</th></tr></thead>
+                <tbody><tr><td class='idx'>rank_day_20</td><td>-0.0117</td><td>-0.282</td><td>0.685</td><td>0.269</td><td>0.188765</td><td>0.000067</td><td style='text-align:left'><a href='signals/rank_day_20/signal_tearsheet.html'>signal</a> &nbsp;|&nbsp; <a href='attribution/rank_day_20/portfolio_signal_tearsheet.html'>attrib</a></td></tr><tr><td class='idx'>rank_on_20</td><td>0.0231</td><td>0.573</td><td>0.672</td><td>0.239</td><td>0.145238</td><td>0.000051</td><td style='text-align:left'><a href='signals/rank_on_20/signal_tearsheet.html'>signal</a> &nbsp;|&nbsp; <a href='attribution/rank_on_20/portfolio_signal_tearsheet.html'>attrib</a></td></tr><tr><td class='idx'>rank_mom</td><td>0.0169</td><td>0.419</td><td>0.921</td><td>0.176</td><td>0.052313</td><td>0.000018</td><td style='text-align:left'><a href='signals/rank_mom/signal_tearsheet.html'>signal</a> &nbsp;|&nbsp; <a href='attribution/rank_mom/portfolio_signal_tearsheet.html'>attrib</a></td></tr></tbody>
+              </table>
+            </div>
+            
+            </div>
+          </div>
+        </div>
+        
+  <div class='foot'>Generated by quantdsl_backtest</div>
+</div>
+</body>
+</html>
