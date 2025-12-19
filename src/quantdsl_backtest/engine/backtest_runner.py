@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple, Optional
+from typing import ClassVar, Dict, List, Optional, Protocol, Sequence, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -46,8 +46,273 @@ from .analytics.render_tearsheets import (
     render_portfolio_signal_tearsheet_html,
 )
 from pathlib import Path
+from dataclasses import dataclass
 
 log = get_logger(__name__)
+
+
+# --------------------------------------------------------------------------- #
+# Reporting (rendering pipeline)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class ReportingContext:
+    """Context passed to report renderers.
+
+    Contract:
+      - Renderers MUST be safe to call when `output_dir` is None.
+      - Renderers MAY ignore `output_dir` if they don't write artifacts.
+    """
+
+    strategy: Strategy
+    output_dir: Path | None
+
+
+@runtime_checkable
+class ResultsRenderer(Protocol):
+    """A single reporting action.
+
+    Renderer implementations should be small, single-purpose, and easy to test.
+    """
+
+    name: str
+
+    def render(self, result: BacktestResult, ctx: ReportingContext) -> None:  # pragma: no cover - protocol
+        ...
+
+
+@dataclass(slots=True)
+class ReportingPipeline:
+    """Composable list of reporting actions."""
+
+    renderers: Sequence[ResultsRenderer]
+
+    def render_all(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        for r in self.renderers:
+            try:
+                r.render(result, ctx)
+            except Exception as exc:
+                # Reporting should not crash the backtest by default.
+                log.warning("Reporting renderer '%s' failed: %s", getattr(r, "name", type(r).__name__), exc)
+
+
+@dataclass(slots=True)
+class NullReportingPipeline:
+    """Null-object pipeline for tests or callers that don't want any reporting."""
+
+    def render_all(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        return
+
+
+@dataclass(slots=True)
+class DefaultTextRenderer:
+    """Minimal default output to logs (no filesystem; always safe)."""
+
+    name: str = "text"
+
+    def render(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        # Keep it intentionally small and stable.
+        try:
+            sharpe = float(result.metrics.get("sharpe", 0.0))
+            max_dd = float(result.metrics.get("max_drawdown", 0.0))
+        except Exception:
+            sharpe, max_dd = 0.0, 0.0
+
+        log.info(
+            "Backtest complete (%s): total return %.2f%%, Sharpe %.2f, max DD %.2f%%",
+            getattr(ctx.strategy.backtest, "engine", "event_driven"),
+            result.total_return * 100.0,
+            sharpe,
+            max_dd * 100.0,
+        )
+
+
+@dataclass(slots=True)
+class ParquetArtifactsRenderer:
+    """Persist core outputs to parquet folder (delegates to BacktestResult.to_parquet)."""
+
+    name: str = "parquet"
+    include_trades: bool = True
+    include_positions: bool = True
+    subdir: str = ""  # optional nesting under output_dir
+
+    def render(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        if ctx.output_dir is None:
+            return
+        out_dir = ctx.output_dir
+        if self.subdir:
+            out_dir = out_dir / self.subdir
+        out_dir.mkdir(parents=True, exist_ok=True)
+        result.to_parquet(str(out_dir), include_trades=self.include_trades, include_positions=self.include_positions)
+
+
+@dataclass(slots=True)
+class SignalAnalyticsHtmlRenderer:
+    """Write per-signal and per-signal attribution HTML tearsheets (if attached to result)."""
+
+    name: str = "signal_analytics_html"
+
+    def render(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        if ctx.output_dir is None:
+            return
+        if render_signal_tearsheet_html is None or render_portfolio_signal_tearsheet_html is None:
+            raise RuntimeError("Analytics rendering not available")
+
+        reports = getattr(result, "signal_reports", None) or {}
+        attribs = getattr(result, "signal_attribution", None) or {}
+
+        out_dir = ctx.output_dir
+        (out_dir / "signals").mkdir(parents=True, exist_ok=True)
+        (out_dir / "attribution").mkdir(parents=True, exist_ok=True)
+
+        for sname, rep in reports.items():
+            render_signal_tearsheet_html(
+                rep,
+                output_path=out_dir / "signals" / sname / "signal_tearsheet.html",
+                strategy_name=ctx.strategy.name,
+                run_meta=result.metadata,
+            )
+        for sname, attr in attribs.items():
+            render_portfolio_signal_tearsheet_html(
+                signal_name=sname,
+                attribution=attr,
+                output_path=out_dir / "attribution" / sname / "portfolio_signal_tearsheet.html",
+                strategy_name=ctx.strategy.name,
+                run_meta=result.metadata,
+            )
+
+
+@dataclass(slots=True)
+class QuantStatsHtmlRenderer:
+    """Optional QuantStats metrics + HTML tearsheet writing, driven by StrategyAnalyticsConfig."""
+
+    name: ClassVar[str] = "quantstats_html"
+    config: StrategyAnalyticsConfig
+
+    def render(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        sa = self.config
+        if not sa.enabled:
+            return
+
+        # Resolve benchmark: accept Series; for string fall back to result.benchmark
+        bm = None
+        try:
+            import pandas as _pd  # local import for isinstance check
+
+            if isinstance(sa.benchmark, _pd.Series):
+                bm = sa.benchmark
+        except Exception:
+            bm = None
+
+        if bm is None and isinstance(getattr(sa, "benchmark", None), str):
+            bm = result.benchmark
+        if bm is None:
+            bm = result.benchmark
+
+        qs_metrics = result.quantstats_metrics(
+            sa.metrics,
+            benchmark=bm,
+            risk_free=sa.risk_free,
+            prefix=sa.prefix,
+        )
+        if sa.print_metrics:
+            try:
+                log.info("\n=== QuantStats metrics ===\n%s", qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
+            except Exception:
+                log.info("QuantStats metrics: %s", dict(qs_metrics))
+
+        if sa.write_tearsheet:
+            # output_dir belongs to reporting; StrategyAnalyticsConfig can override output_dir when needed.
+            out_dir = Path(sa.output_dir) if sa.output_dir else ctx.output_dir
+            if out_dir is None:
+                return
+            out_dir.mkdir(parents=True, exist_ok=True)
+            title = sa.title or ctx.strategy.name or "Strategy"
+            html_path = out_dir / sa.file_name
+            result.quantstats_tearsheet(
+                output=str(html_path),
+                title=title,
+                benchmark=bm,
+                **(sa.html_kwargs or {}),
+            )
+            log.info("QuantStats HTML report written to: %s", html_path)
+
+
+def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullReportingPipeline:
+    """Build the reporting pipeline from `strategy.backtest.reporting`.
+
+    Design rules (per our refactor goals):
+      - Reporting has a default minimal text renderer.
+      - All file outputs belong to reporting and require an output_dir.
+      - Tests can pass a NullReportingPipeline.
+    """
+
+    rep = getattr(strategy.backtest, "reporting", None)
+
+    # Default output directory is the current convention.
+    output_dir: Path | None
+    try:
+        out_cfg = getattr(rep, "output_dir", None) if rep is not None else None
+        output_dir = Path(out_cfg) if out_cfg else (Path("outputs") / (strategy.name or "run"))
+    except Exception:
+        output_dir = Path("outputs") / (strategy.name or "run")
+
+    renderers: List[ResultsRenderer] = [DefaultTextRenderer()]
+
+    # Optional: parquet artifacts
+    try:
+        parquet_raw = getattr(rep, "parquet", None) if rep is not None else None
+        parquet_enabled = bool(getattr(parquet_raw, "enabled", False)) if parquet_raw is not None else False
+        if parquet_enabled:
+            renderers.append(
+                ParquetArtifactsRenderer(
+                    include_trades=bool(getattr(parquet_raw, "include_trades", True)),
+                    include_positions=bool(getattr(parquet_raw, "include_positions", True)),
+                    subdir=str(getattr(parquet_raw, "subdir", "") or ""),
+                )
+            )
+    except Exception:
+        # Keep best-effort: config errors shouldn't break execution.
+        pass
+
+    # Optional: signal analytics HTML
+    try:
+        # Enable if signal analytics are configured.
+        # Primary: Reporting.signal_analytics (new, preferred)
+        # Back-compat: Reporting.signalAnalytics.enabled (older refactor iteration)
+        sig_enabled = False
+        if rep is not None:
+            cfg_sa = getattr(rep, "signal_analytics", None)
+            if cfg_sa is not None:
+                sig_enabled = True
+            else:
+                sig_raw = getattr(rep, "signalAnalytics", None)
+                sig_enabled = bool(getattr(sig_raw, "enabled", False)) if sig_raw is not None else False
+        if sig_enabled:
+            renderers.append(SignalAnalyticsHtmlRenderer())
+    except Exception:
+        pass
+
+    # Optional: strategy analytics (QuantStats)
+    try:
+        sa_raw = getattr(rep, "strategyAnalytics", None) if rep is not None else None
+        if sa_raw is not None:
+            if isinstance(sa_raw, StrategyAnalyticsConfig):
+                sa = sa_raw
+            elif isinstance(sa_raw, dict):
+                sa = StrategyAnalyticsConfig(**sa_raw)
+            else:
+                raise TypeError("strategyAnalytics must be dict or StrategyAnalyticsConfig")
+            if sa.enabled:
+                renderers.append(QuantStatsHtmlRenderer(config=sa))
+    except RuntimeError as exc:
+        log.info("Strategy analytics skipped: %s", exc)
+    except Exception as exc:
+        log.warning("Strategy analytics config invalid; skipping: %s", exc)
+
+
+    return ReportingPipeline(renderers=renderers)
 
 
 # --------------------------------------------------------------------------- #
@@ -124,23 +389,10 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     positions_df = pd.DataFrame(index=dates, columns=instruments, dtype="float64").fillna(0.0)
     weights_df = pd.DataFrame(index=dates, columns=instruments, dtype="float64").fillna(0.0)
 
-    all_trades = []
-    sel_collector = SelectionTraceCollector()
-
-    init_cash = strategy.backtest.cash_initial
-    cash = float(init_cash)
-    prev_positions = pd.Series(0.0, index=instruments, dtype="float64")
-    prev_prices = prices.iloc[0].ffill()
-    prev_equity = cash
+    st = BacktestState.initialize(strategy=strategy, instruments=instruments, prices=prices)
 
     # --- Risk checks context ---
     risk = strategy.backtest.risk_checks
-    peak_equity = float(strategy.backtest.cash_initial)
-    cooldown_days = 0  # simple "no-risk" cooldown counter
-    trading_halted = False  # terminal kill-switch state (hard_kill or latched soft_scale)
-    soft_scale_latched = False  # once soft_scale reaches full de-risk, stay flat thereafter
-    # Track whether we have ever taken material exposure (sum abs weights > eps)
-    ever_had_exposure = False
 
     # ------------------------------------------------------------------ #
     # 4. Main daily loop
@@ -151,8 +403,8 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
 
         # Use effective prices for valuation/P&L: if current price is missing (holiday),
         # carry forward the previous price to avoid artificial PnL spikes.
-        price_t_eff = price_t.reindex(prev_positions.index)
-        price_t_eff = price_t_eff.where(~price_t_eff.isna(), prev_prices)
+        price_t_eff = price_t.reindex(st.prev_positions.index)
+        price_t_eff = price_t_eff.where(~price_t_eff.isna(), st.prev_prices)
 
         # Update ever_had_exposure from prior day weights (if any)
         if i > 0:
@@ -161,7 +413,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             except Exception:
                 prev_abs_w_sum = 0.0
             if prev_abs_w_sum > 1e-6:
-                ever_had_exposure = True
+                st.ever_had_exposure = True
 
             # If yesterday was fully flat after we've taken exposure at least once,
             # and soft_scale is configured to de-risk immediately (start<=0, full≈0),
@@ -177,27 +429,27 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                     ss_start, ss_full = 0.1, 0.35
             except Exception:
                 ss_start, ss_full = 0.1, 0.35
-            if ever_had_exposure and not soft_scale_latched and ss_start <= 0.0 and ss_full <= 1e-6 and prev_abs_w_sum <= 1e-9:
+            if st.ever_had_exposure and not st.soft_scale_latched and ss_start <= 0.0 and ss_full <= 1e-6 and prev_abs_w_sum <= 1e-9:
                 log.info("[RISK][soft_scale] Latching to flat on %s because prior day was flat after exposure", dt.date())
-                soft_scale_latched = True
+                st.soft_scale_latched = True
 
         if i == 0:
             # Day 0: no prior PnL, just initialize equity
-            equity_before = cash + (prev_positions * price_t_eff).sum()
+            equity_before = st.cash + (st.prev_positions * price_t_eff).sum()
             price_pnl = 0.0
         else:
             equity_before, price_pnl = mark_to_market(
-                prev_positions=prev_positions,
-                prev_prices=prev_prices,
+                prev_positions=st.prev_positions,
+                prev_prices=st.prev_prices,
                 curr_prices=price_t_eff,
-                prev_cash=cash,
+                prev_cash=st.cash,
             )
 
         # Apply carry costs (borrow + financing)
-        cash, borrow_cost, fin_pnl = apply_carry_costs(
-            positions=prev_positions,
+        st.cash, borrow_cost, fin_pnl = apply_carry_costs(
+            positions=st.prev_positions,
             prices=price_t_eff,
-            cash=cash,
+            cash=st.cash,
             borrow=strategy.costs.borrow,
             financing=strategy.costs.financing,
         )
@@ -207,17 +459,17 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         if nav_fee > 0:
             nav_fee_daily = nav_fee / 252.0
             fee_amt = equity_before * nav_fee_daily
-            cash -= fee_amt
+            st.cash -= fee_amt
 
         # Equity before trades at today's prices
-        equity_before = cash + (prev_positions * price_t_eff).sum()
+        equity_before = st.cash + (st.prev_positions * price_t_eff).sum()
 
         # Decide if we rebalance today
         do_rebalance = _is_rebalance_date(i, dates, strategy.portfolio)
 
         trades_today = pd.DataFrame()
         # --- Pre-trade drawdown vs running peak (use equity_before) ---
-        dd_pretrade = 0.0 if peak_equity == 0 else (equity_before / peak_equity - 1.0)
+        dd_pretrade = 0.0 if st.peak_equity == 0 else (equity_before / st.peak_equity - 1.0)
         dd_mag = -dd_pretrade if dd_pretrade < 0 else 0.0
 
         # Determine drawdown policy (backward-compatible):
@@ -235,7 +487,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         scale = 1.0
         if policy_mode == "hard_kill":
             if dd_mag >= (policy_threshold or 0.0):
-                trading_halted = True
+                st.trading_halted = True
                 scale = 0.0
         elif policy_mode == "soft_scale":
             _s = getattr(policy, "start", None)
@@ -249,7 +501,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             # Special-case safeguard: if configured to de-risk effectively at any DD
             # (start <= 0 and full ~ 0), then once we have ever taken risk, latch to flat
             # on subsequent days to satisfy "stay-flat-after-derisk" semantics.
-            if not soft_scale_latched and start <= 0.0 and full <= 1e-6:
+            if not st.soft_scale_latched and start <= 0.0 and full <= 1e-6:
                 try:
                     if i > 0:
                         prev_abs_w_sum = float(np.nansum(np.abs(weights_df.iloc[i - 1].values)))
@@ -259,21 +511,21 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                     prev_abs_w_sum = 0.0
                 if prev_abs_w_sum > 1e-6:
                     log.info("[RISK][soft_scale] Latching to flat on %s due to prior exposure (prev_abs_w_sum=%.6f)", dt.date(), prev_abs_w_sum)
-                    soft_scale_latched = True
-                    trading_halted = True
+                    st.soft_scale_latched = True
+                    st.trading_halted = True
                     scale = 0.0
             
             # If we previously latched to flat due to soft_scale, remain halted
-            if soft_scale_latched:
-                trading_halted = True
+            if st.soft_scale_latched:
+                st.trading_halted = True
                 scale = 0.0
             elif dd_mag <= start:
                 scale = 1.0
             elif dd_mag >= full:
                 # Hit full de-risk threshold: latch and halt for the rest of the run
                 scale = 0.0
-                soft_scale_latched = True
-                trading_halted = True
+                st.soft_scale_latched = True
+                st.trading_halted = True
             else:
                 x = (dd_mag - start) / (full - start)  # in (0,1)
                 if curve == "quadratic":
@@ -292,11 +544,11 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 portfolio=strategy.portfolio,
                 signals=signal_panels,
                 prev_weights=weights_df.iloc[i - 1] if i > 0 else pd.Series(0.0, index=instruments),
-                collector=sel_collector,
+                collector=st.sel_collector,
             )
 
             # Apply drawdown policy scaling / halting
-            if trading_halted:
+            if st.trading_halted:
                 target_weights = pd.Series(0.0, index=target_weights.index)
             elif scale < 1.0:
                 target_weights = target_weights * scale
@@ -341,16 +593,14 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                     ss_start, ss_full = 0.1, 0.35
             except Exception:
                 ss_start, ss_full = 0.1, 0.35
-            suppress_empty_liq = (ss_start <= 0.0 and ss_full <= 1e-6 and not soft_scale_latched)
+            suppress_empty_liq = (ss_start <= 0.0 and ss_full <= 1e-6 and not st.soft_scale_latched)
 
-            if not trading_halted and (hold_when_no_targets or suppress_empty_liq) and empty_targets:
+            if not st.trading_halted and (hold_when_no_targets or suppress_empty_liq) and empty_targets:
                 # Carry forward existing positions (no trades)
-                new_positions = prev_positions
+                new_positions = st.prev_positions
                 cash_delta = 0.0
                 trades_today = pd.DataFrame()
             else:
-                # Rebalance normally (if targets empty and hold_when_no_targets is False,
-                # this will liquidate to cash as target_weights are all zeros)
                 new_positions, cash_delta, trades_today = rebalance_to_target_weights(
                     date=dt,
                     execution=strategy.execution,
@@ -359,34 +609,34 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                     equity=equity_before,
                     prices=price_t_eff,
                     volumes=volume_t,
-                    prev_positions=prev_positions,
+                    prev_positions=st.prev_positions,
                     target_weights=target_weights,
                 )
 
-            cash += cash_delta
+            st.cash += cash_delta
             cur_positions = new_positions
         else:
-            cur_positions = prev_positions
+            cur_positions = st.prev_positions
 
         # If trading is halted (hard_kill or latched soft_scale), enforce flat positions
-        if trading_halted:
+        if st.trading_halted:
             cur_positions = pd.Series(0.0, index=instruments)
 
         # Final equity at end of day t
-        equity = cash + (cur_positions * price_t_eff).sum()
+        equity = st.cash + (cur_positions * price_t_eff).sum()
 
         if i == 0:
             ret = 0.0
         else:
-            ret = (equity / prev_equity) - 1.0 if prev_equity != 0 else 0.0
+            ret = (equity / st.prev_equity) - 1.0 if st.prev_equity != 0 else 0.0
 
         # --- Update peak equity & drawdown (before exposures/storage) ---
-        if equity > peak_equity:
-            peak_equity = equity
-        drawdown = 0.0 if peak_equity == 0 else (equity / peak_equity - 1.0)
+        if equity > st.peak_equity:
+            st.peak_equity = equity
+        drawdown = 0.0 if st.peak_equity == 0 else (equity / st.peak_equity - 1.0)
 
         # --- Risk checks: drawdown policy informational logging ---
-        if policy_mode == "hard_kill" and trading_halted:
+        if policy_mode == "hard_kill" and st.trading_halted:
             print(
                 f"[RISK] Kill-switch: DD {dd_mag: .2%} >= {policy_threshold: .2%} on {dt.date()}, halting trading and staying in cash."
             )
@@ -394,13 +644,13 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         # --- Risk checks: max_daily_loss + cooldown ---
         if getattr(risk, "max_daily_loss", None) is not None:
             if ret <= -risk.max_daily_loss:
-                cooldown_days = max(cooldown_days, 5)  # stay flat for 5 days
+                st.cooldown_days = max(st.cooldown_days, 5)  # stay flat for 5 days
 
-        if cooldown_days > 0:
-            cooldown_days -= 1
+        if st.cooldown_days > 0:
+            st.cooldown_days -= 1
             # Override: ensure we end the day flat & no new positions next loop
             cur_positions = pd.Series(0.0, index=instruments)
-            cash = equity
+            st.cash = equity
 
         # Exposures
         exps = compute_exposures(cur_positions, price_t_eff)
@@ -413,7 +663,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         # Store
         equity_series.iloc[i] = equity
         return_series.iloc[i] = ret
-        cash_series.iloc[i] = cash
+        cash_series.iloc[i] = st.cash
         gross_series.iloc[i] = gross
         net_series.iloc[i] = net
         long_series.iloc[i] = long_exp
@@ -452,24 +702,24 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 today_abs_w_sum = float(np.nansum(np.abs(weights_df.iloc[i].values)))
             except Exception:
                 today_abs_w_sum = 0.0
-            if not ever_had_exposure and today_abs_w_sum > 1e-6:
-                ever_had_exposure = True
+            if not st.ever_had_exposure and today_abs_w_sum > 1e-6:
+                st.ever_had_exposure = True
             # If we've ever had exposure and today is (near) fully flat and not already latched,
             # latch now so subsequent days remain halted/flat.
-            if ever_had_exposure and not soft_scale_latched and today_abs_w_sum <= 1e-9:
+            if st.ever_had_exposure and not st.soft_scale_latched and today_abs_w_sum <= 1e-9:
                 log.info("[RISK][soft_scale] Latching to flat at EOD %s because today became flat (today_abs_w_sum=%.6f)", dt.date(), today_abs_w_sum)
-                soft_scale_latched = True
+                st.soft_scale_latched = True
 
         if not trades_today.empty:
-            all_trades.append(trades_today)
+            st.all_trades.append(trades_today)
 
-        prev_prices = price_t_eff
-        prev_positions = cur_positions
-        prev_equity = equity
+        st.prev_prices = price_t_eff
+        st.prev_positions = cur_positions
+        st.prev_equity = equity
 
     trades_df = (
-        pd.concat(all_trades, ignore_index=True)
-        if all_trades
+        pd.concat(st.all_trades, ignore_index=True)
+        if st.all_trades
         else pd.DataFrame(
             columns=[
                 "datetime",
@@ -588,179 +838,39 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             except Exception:
                 pass
 
-            # Reference mask (optional)
-            mask_df: Optional[pd.DataFrame] = None
-            if cfg.within_mask is not None and cfg.within_mask in signal_panels:
-                try:
-                    mask_df = signal_panels[cfg.within_mask].astype(bool)
-                except Exception:
-                    mask_df = signal_panels[cfg.within_mask].notna()
-
-            # Forward returns from prices
-            fwd = compute_forward_returns(prices, cfg.horizons)
-
-            reports: Dict[str, SignalTearsheetData] = {}
-            attribs: Dict[str, PortfolioSignalAttribution] = {}
-
-            # Contributions (return-space) based on realized weights and asset returns
-            contrib_panel = contrib_return_panel(weights_df, prices)
-
-            for sname in cfg.signals:
-                if sname not in signal_panels:
-                    continue
-                panel = signal_panels[sname]
-                used_panel = panel.shift(cfg.signal_delay_bars)
-
-                # Optionally cap universe size (Tiering)
-                if cfg.max_instruments is not None and used_panel.shape[1] > cfg.max_instruments:
-                    used_panel = used_panel.iloc[:, : cfg.max_instruments]
-                    if mask_df is not None:
-                        mask_df = mask_df.reindex(columns=used_panel.columns)
-
-                # Assign quantiles for QC & attribution
-                qdf = assign_quantiles(used_panel, cfg.quantiles, mask=mask_df).astype("float32")
-
-                # Build report
-                rep = SignalTearsheetData(name=sname, config=cfg)
-                if cfg.store_values:
-                    rep.value = used_panel.astype("float32")
-                if cfg.store_rank:
-                    try:
-                        rep.rank = used_panel.rank(axis=1, method="average").astype("float32")
-                    except Exception:
-                        pass
-                if cfg.store_quantile:
-                    rep.quantile = qdf
-
-                rep.coverage = used_panel.notna().mean(axis=1)
-                rep.xsec_mean = used_panel.mean(axis=1, skipna=True)
-                rep.xsec_std = used_panel.std(axis=1, skipna=True)
-
-                # IC & quantile returns per horizon
-                for h in cfg.horizons:
-                    ic = compute_rank_ic(used_panel, fwd[h], mask=mask_df)
-                    rep.rank_ic[h] = ic
-                    qret, ls = mean_forward_return_by_quantile(qdf, fwd[h], cfg.quantiles)
-                    rep.mean_fwd_ret_by_q[h] = qret
-                    rep.ls_fwd_ret[h] = ls
-
-                rep.quantile_turnover = quantile_turnover(qdf, cfg.quantiles)
-                reports[sname] = rep
-
-                # Attribution by quantile (return-space)
-                contrib_by_q, ls_contrib = contrib_by_quantile(contrib_panel, qdf, cfg.quantiles)
-
-                # Costs by quantile (optional)
-                cost_panel = costs_by_instrument_day(trades_df)
-                cost_by_q = None
-                if cost_panel is not None and not cost_panel.empty:
-                    # Convert cost pnl to return space approx by dividing equity
-                    eq = result.equity.replace(0.0, np.nan)
-                    # align index to contrib dates
-                    cost_panel = cost_panel.reindex(contrib_by_q.index).fillna(0.0)
-                    cost_ret_panel = cost_panel.div(eq, axis=0).replace([np.inf, -np.inf], 0.0).fillna(0.0)
-                    cost_by_q, _ = contrib_by_quantile(cost_ret_panel, qdf, cfg.quantiles)
-
-                attribs[sname] = PortfolioSignalAttribution(
-                    contrib_ret_by_q=contrib_by_q,
-                    contrib_ret_ls=ls_contrib,
-                    cost_pnl_by_q=cost_by_q,
-                )
+            reports, attribs = compute_signal_analytics_and_attribution(
+                prices=prices,
+                signal_panels=signal_panels,
+                realized_weights=weights_df,
+                trades=trades_df,
+                cfg=cfg,
+                equity=equity_series,
+            )
 
             # Attach to result
             result.signal_reports = reports
             result.signal_attribution = attribs
-            result.selection_trace = SelectionTrace(sel_collector.finalize()) if len(sel_collector.rows) > 0 else None
+            result.selection_trace = (
+                SelectionTrace(st.sel_collector.finalize())
+                if (st.sel_collector is not None and len(st.sel_collector.rows) > 0)
+                else None
+            )
 
-            # Render HTML outputs
-            out_dir = Path("outputs") / (strategy.name or "run")
-            (out_dir / "signals").mkdir(parents=True, exist_ok=True)
-            (out_dir / "attribution").mkdir(parents=True, exist_ok=True)
-
-            for sname, rep in reports.items():
-                render_signal_tearsheet_html(
-                    rep,
-                    output_path=out_dir / "signals" / sname / "signal_tearsheet.html",
-                    strategy_name=strategy.name,
-                    run_meta=result.metadata,
-                )
-            for sname, attr in attribs.items():
-                render_portfolio_signal_tearsheet_html(
-                    signal_name=sname,
-                    attribution=attr,
-                    output_path=out_dir / "attribution" / sname / "portfolio_signal_tearsheet.html",
-                    strategy_name=strategy.name,
-                    run_meta=result.metadata,
-                )
     except Exception as exc:
         log.warning("Signal analytics generation failed: %s", exc)
 
     # ------------------------------------------------------------------ #
-    # 7. Optional: Strategy-level analytics (QuantStats)
+    # 8. Reporting (render pipeline)
     # ------------------------------------------------------------------ #
+    pipeline = build_reporting_pipeline(strategy)
+    out_dir: Path | None
     try:
-        rep = getattr(strategy.backtest, "reporting", None)
-        sa_raw = getattr(rep, "strategyAnalytics", None) if rep is not None else None
-        if sa_raw is not None:
-            if isinstance(sa_raw, StrategyAnalyticsConfig):
-                sa = sa_raw
-            elif isinstance(sa_raw, dict):
-                sa = StrategyAnalyticsConfig(**sa_raw)
-            else:
-                raise TypeError("strategyAnalytics must be dict or StrategyAnalyticsConfig")
-
-            if sa.enabled:
-                # Resolve benchmark: accept Series; for string fall back to result.benchmark
-                bm = None
-                try:
-                    import pandas as _pd  # local import for isinstance check
-                    if isinstance(sa.benchmark, _pd.Series):
-                        bm = sa.benchmark
-                except Exception:
-                    bm = None
-                if bm is None and isinstance(getattr(sa, "benchmark", None), str):
-                    # TODO: implement lookup by alias/name via data loader; for now, fallback
-                    bm = result.benchmark
-                if bm is None:
-                    bm = result.benchmark
-
-                # Metrics summary
-                qs_metrics = result.quantstats_metrics(
-                    sa.metrics,
-                    benchmark=bm,
-                    risk_free=sa.risk_free,
-                    prefix=sa.prefix,
-                )
-                if sa.print_metrics:
-                    try:
-                        log.info("\n=== QuantStats metrics ===\n%s", qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
-                    except Exception:
-                        log.info("QuantStats metrics: %s", dict(qs_metrics))
-
-                # HTML tearsheet
-                if sa.write_tearsheet:
-                    out_dir = Path(sa.output_dir) if sa.output_dir else (Path("outputs") / (strategy.name or "run"))
-                    out_dir.mkdir(parents=True, exist_ok=True)
-                    title = sa.title or strategy.name or "Strategy"
-                    html_path = out_dir / sa.file_name
-                    result.quantstats_tearsheet(
-                        output=str(html_path),
-                        title=title,
-                        benchmark=bm,
-                        **(sa.html_kwargs or {}),
-                    )
-                    log.info("QuantStats HTML report written to: %s", html_path)
-    except RuntimeError as exc:
-        log.info("Strategy analytics skipped: %s", exc)
-    except Exception as exc:
-        log.warning("Strategy analytics generation failed: %s", exc)
-
-    log.info(
-        "Backtest complete (event_driven): total return %.2f%%, Sharpe %.2f, max DD %.2f%%",
-        result.total_return * 100.0,
-        metrics.get("sharpe", 0.0),
-        metrics.get("max_drawdown", 0.0) * 100.0,
-    )
+        rep_cfg = getattr(strategy.backtest, "reporting", None)
+        out_cfg = getattr(rep_cfg, "output_dir", None) if rep_cfg is not None else None
+        out_dir = Path(out_cfg) if out_cfg else (Path("outputs") / (strategy.name or "run"))
+    except Exception:
+        out_dir = Path("outputs") / (strategy.name or "run")
+    pipeline.render_all(result, ReportingContext(strategy=strategy, output_dir=out_dir))
 
     return result
 
@@ -778,3 +888,189 @@ def _is_rebalance_date(
         return True
     # For now just do daily; you can extend later.
     return True
+
+
+# --------------------------------------------------------------------------- #
+# Event-driven engine state
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(slots=True)
+class BacktestState:
+    """Mutable state for the event-driven backtest loop.
+
+    This collects the moving parts that evolve day-to-day, so the loop can focus
+    on *transitions* instead of juggling many locals.
+
+    Contract:
+      - `prev_positions` and `prev_prices` are aligned to `instruments`.
+      - `cash` is a float scalar (not a series).
+      - `prev_equity` is end-of-day equity for return calculation.
+    """
+
+    cash: float
+    prev_positions: pd.Series
+    prev_prices: pd.Series
+    prev_equity: float
+
+    # risk-related evolving state
+    peak_equity: float
+    cooldown_days: int = 0
+    trading_halted: bool = False
+    soft_scale_latched: bool = False
+    ever_had_exposure: bool = False
+
+    # collectors
+    sel_collector: SelectionTraceCollector = None  # type: ignore[assignment]
+    all_trades: list = None  # type: ignore[assignment]
+
+    @classmethod
+    def initialize(
+        cls,
+        *,
+        strategy: Strategy,
+        instruments: pd.Index,
+        prices: pd.DataFrame,
+    ) -> "BacktestState":
+        init_cash = float(strategy.backtest.cash_initial)
+        prev_positions = pd.Series(0.0, index=instruments, dtype="float64")
+        prev_prices = prices.iloc[0].ffill().reindex(instruments)
+        return cls(
+            cash=init_cash,
+            prev_positions=prev_positions,
+            prev_prices=prev_prices,
+            prev_equity=init_cash,
+            peak_equity=init_cash,
+            cooldown_days=0,
+            trading_halted=False,
+            soft_scale_latched=False,
+            ever_had_exposure=False,
+            sel_collector=SelectionTraceCollector(),
+            all_trades=[],
+        )
+
+
+def compute_signal_analytics_and_attribution(
+    *,
+    prices: pd.DataFrame,
+    signal_panels: Dict[str, pd.DataFrame],
+    realized_weights: pd.DataFrame,
+    trades: pd.DataFrame,
+    cfg: SignalAnalyticsConfig,
+    equity: Optional[pd.Series] = None,
+) -> tuple[Dict[str, SignalTearsheetData], Dict[str, PortfolioSignalAttribution]]:
+    """Compute per-signal diagnostics + portfolio attribution (pure function).
+
+    Inputs
+    ------
+    prices:
+        Close prices [t x instrument].
+    signal_panels:
+        Mapping signal name -> signal panel [t x instrument].
+    realized_weights:
+        Realized portfolio weights [t x instrument]. Used for return-space attribution.
+    trades:
+        Trades table used to compute costs per instrument/day (optional).
+    cfg:
+        Signal analytics config.
+
+    Returns
+    -------
+    (reports, attribs)
+        reports:
+            Dict[signal_name, SignalTearsheetData]
+        attribs:
+            Dict[signal_name, PortfolioSignalAttribution]
+
+    Notes
+    -----
+    This intentionally does *no IO* and does not mutate the config.
+    """
+
+    # Reference mask (optional)
+    mask_df: Optional[pd.DataFrame] = None
+    if cfg.within_mask is not None and cfg.within_mask in signal_panels:
+        try:
+            mask_df = signal_panels[cfg.within_mask].astype(bool)
+        except Exception:
+            mask_df = signal_panels[cfg.within_mask].notna()
+
+    # Forward returns from prices
+    fwd = compute_forward_returns(prices, cfg.horizons)
+
+    reports: Dict[str, SignalTearsheetData] = {}
+    attribs: Dict[str, PortfolioSignalAttribution] = {}
+
+    # Contributions (return-space) based on realized weights and asset returns
+    contrib_panel = contrib_return_panel(realized_weights, prices)
+
+    for sname in cfg.signals:
+        if sname not in signal_panels:
+            continue
+        panel = signal_panels[sname]
+        used_panel = panel.shift(int(getattr(cfg, "signal_delay_bars", 1)))
+
+        # Optionally cap universe size (Tiering)
+        _mask_df = mask_df
+        if cfg.max_instruments is not None and used_panel.shape[1] > cfg.max_instruments:
+            used_panel = used_panel.iloc[:, : cfg.max_instruments]
+            if _mask_df is not None:
+                _mask_df = _mask_df.reindex(columns=used_panel.columns)
+
+        # Assign quantiles for QC & attribution
+        qdf = assign_quantiles(used_panel, cfg.quantiles, mask=_mask_df).astype("float32")
+
+        # Build report
+        rep = SignalTearsheetData(name=sname, config=cfg)
+        if cfg.store_values:
+            rep.value = used_panel.astype("float32")
+        if cfg.store_rank:
+            try:
+                rep.rank = used_panel.rank(axis=1, method="average").astype("float32")
+            except Exception:
+                pass
+        if cfg.store_quantile:
+            rep.quantile = qdf
+
+        rep.coverage = used_panel.notna().mean(axis=1)
+        rep.xsec_mean = used_panel.mean(axis=1, skipna=True)
+        rep.xsec_std = used_panel.std(axis=1, skipna=True)
+
+        # IC & quantile returns per horizon
+        for h in cfg.horizons:
+            ic = compute_rank_ic(used_panel, fwd[h], mask=_mask_df)
+            rep.rank_ic[h] = ic
+            qret, ls = mean_forward_return_by_quantile(qdf, fwd[h], cfg.quantiles)
+            rep.mean_fwd_ret_by_q[h] = qret
+            rep.ls_fwd_ret[h] = ls
+
+        rep.quantile_turnover = quantile_turnover(qdf, cfg.quantiles)
+        reports[sname] = rep
+
+        # Attribution by quantile (return-space)
+        contrib_by_q, ls_contrib = contrib_by_quantile(contrib_panel, qdf, cfg.quantiles)
+
+        # Costs by quantile (optional)
+        cost_panel = costs_by_instrument_day(trades)
+        cost_by_q = None
+        if cost_panel is not None and not cost_panel.empty:
+            # Convert cost PnL ($) to return-space drag.
+            cost_panel = cost_panel.reindex(contrib_by_q.index).fillna(0.0)
+
+            if equity is not None:
+                eq_prev = pd.Series(equity, index=cost_panel.index).shift(1).replace(0.0, np.nan)
+                cost_ret_panel = cost_panel.div(eq_prev, axis=0).replace([np.inf, -np.inf], 0.0).fillna(0.0)
+            else:
+                # Fallback for callers that don't have equity series available.
+                # In this case, treat costs as already in return space (legacy); renderer will label units.
+                cost_ret_panel = cost_panel.astype("float64")
+
+            cost_by_q, _ = contrib_by_quantile(cost_ret_panel, qdf, cfg.quantiles)
+
+        attribs[sname] = PortfolioSignalAttribution(
+            contrib_ret_by_q=contrib_by_q,
+            contrib_ret_ls=ls_contrib,
+            cost_pnl_by_q=cost_by_q,
+        )
+
+    return reports, attribs

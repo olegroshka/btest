@@ -26,26 +26,12 @@ from ..utils.logging import get_logger
 from .analytics.selection_trace import SelectionTraceCollector
 from .analytics.types import (
     SignalAnalyticsConfig,
-    StrategyAnalyticsConfig,
-    SignalTearsheetData,
-    PortfolioSignalAttribution,
     SelectionTrace,
 )
-from .analytics.signal_analytics import (
-    compute_forward_returns,
-    assign_quantiles,
-    compute_rank_ic,
-    mean_forward_return_by_quantile,
-    quantile_turnover,
-)
-from .analytics.attribution import (
-    contrib_return_panel,
-    contrib_by_quantile,
-    costs_by_instrument_day,
-)
-from .analytics.render_tearsheets import (
-    render_signal_tearsheet_html,
-    render_portfolio_signal_tearsheet_html,
+from .backtest_runner import (
+    build_reporting_pipeline,
+    ReportingContext,
+    compute_signal_analytics_and_attribution,
 )
 from pathlib import Path
 
@@ -549,161 +535,31 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             except Exception:
                 pass
 
-            # Optional mask
-            mask_df: Optional[pd.DataFrame] = None
-            if cfg.within_mask is not None and cfg.within_mask in signal_panels:
-                try:
-                    mask_df = signal_panels[cfg.within_mask].astype(bool)
-                except Exception:
-                    mask_df = signal_panels[cfg.within_mask].notna()
-
-            fwd = compute_forward_returns(prices, cfg.horizons)
-
-            reports: Dict[str, SignalTearsheetData] = {}
-            attribs: Dict[str, PortfolioSignalAttribution] = {}
-
-            contrib_panel = contrib_return_panel(weights_full, prices)
-
-            for sname in cfg.signals:
-                if sname not in signal_panels:
-                    continue
-                panel = signal_panels[sname]
-                used_panel = panel.shift(cfg.signal_delay_bars)
-
-                if cfg.max_instruments is not None and used_panel.shape[1] > cfg.max_instruments:
-                    used_panel = used_panel.iloc[:, : cfg.max_instruments]
-                    if mask_df is not None:
-                        mask_df = mask_df.reindex(columns=used_panel.columns)
-
-                qdf = assign_quantiles(used_panel, cfg.quantiles, mask=mask_df).astype("float32")
-
-                rep = SignalTearsheetData(name=sname, config=cfg)
-                if cfg.store_values:
-                    rep.value = used_panel.astype("float32")
-                if cfg.store_rank:
-                    try:
-                        rep.rank = used_panel.rank(axis=1, method="average").astype("float32")
-                    except Exception:
-                        pass
-                if cfg.store_quantile:
-                    rep.quantile = qdf
-
-                rep.coverage = used_panel.notna().mean(axis=1)
-                rep.xsec_mean = used_panel.mean(axis=1, skipna=True)
-                rep.xsec_std = used_panel.std(axis=1, skipna=True)
-
-                for h in cfg.horizons:
-                    ic = compute_rank_ic(used_panel, fwd[h], mask=mask_df)
-                    rep.rank_ic[h] = ic
-                    qret, ls = mean_forward_return_by_quantile(qdf, fwd[h], cfg.quantiles)
-                    rep.mean_fwd_ret_by_q[h] = qret
-                    rep.ls_fwd_ret[h] = ls
-
-                rep.quantile_turnover = quantile_turnover(qdf, cfg.quantiles)
-                reports[sname] = rep
-
-                contrib_by_q, ls_contrib = contrib_by_quantile(contrib_panel, qdf, cfg.quantiles)
-
-                cost_panel = costs_by_instrument_day(trades_df)
-                cost_by_q = None
-                if cost_panel is not None and not cost_panel.empty:
-                    eq = result.equity.replace(0.0, np.nan)
-                    cost_panel = cost_panel.reindex(contrib_by_q.index).fillna(0.0)
-                    cost_ret_panel = cost_panel.div(eq, axis=0).replace([np.inf, -np.inf], 0.0).fillna(0.0)
-                    cost_by_q, _ = contrib_by_quantile(cost_ret_panel, qdf, cfg.quantiles)
-
-                attribs[sname] = PortfolioSignalAttribution(
-                    contrib_ret_by_q=contrib_by_q,
-                    contrib_ret_ls=ls_contrib,
-                    cost_pnl_by_q=cost_by_q,
-                )
+            reports, attribs = compute_signal_analytics_and_attribution(
+                prices=prices,
+                signal_panels=signal_panels,
+                realized_weights=weights_full,
+                trades=trades_df,
+                cfg=cfg,
+                equity=result.equity,
+            )
 
             result.signal_reports = reports
             result.signal_attribution = attribs
             result.selection_trace = SelectionTrace(sel_collector.finalize()) if len(sel_collector.rows) > 0 else None
-
-            out_dir = Path("outputs") / (strategy.name or "run")
-            (out_dir / "signals").mkdir(parents=True, exist_ok=True)
-            (out_dir / "attribution").mkdir(parents=True, exist_ok=True)
-
-            for sname, rep in reports.items():
-                render_signal_tearsheet_html(
-                    rep,
-                    output_path=out_dir / "signals" / sname / "signal_tearsheet.html",
-                    strategy_name=strategy.name,
-                    run_meta=result.metadata,
-                )
-            for sname, attr in attribs.items():
-                render_portfolio_signal_tearsheet_html(
-                    signal_name=sname,
-                    attribution=attr,
-                    output_path=out_dir / "attribution" / sname / "portfolio_signal_tearsheet.html",
-                    strategy_name=strategy.name,
-                    run_meta=result.metadata,
-                )
     except Exception as exc:
         log.warning("Vectorized engine: signal analytics generation failed: %s", exc)
 
-    # Strategy-level analytics (QuantStats)
+    # Reporting (render pipeline)
+    pipeline = build_reporting_pipeline(strategy)
+    out_dir: Path | None
     try:
-        rep = getattr(strategy.backtest, "reporting", None)
-        sa_raw = getattr(rep, "strategyAnalytics", None) if rep is not None else None
-        if sa_raw is not None:
-            if isinstance(sa_raw, StrategyAnalyticsConfig):
-                sa = sa_raw
-            elif isinstance(sa_raw, dict):
-                sa = StrategyAnalyticsConfig(**sa_raw)
-            else:
-                raise TypeError("strategyAnalytics must be dict or StrategyAnalyticsConfig")
-
-            if sa.enabled:
-                bm = None
-                try:
-                    import pandas as _pd
-                    if isinstance(sa.benchmark, _pd.Series):
-                        bm = sa.benchmark
-                except Exception:
-                    bm = None
-                if bm is None and isinstance(getattr(sa, "benchmark", None), str):
-                    bm = result.benchmark
-                if bm is None:
-                    bm = result.benchmark
-
-                qs_metrics = result.quantstats_metrics(
-                    sa.metrics,
-                    benchmark=bm,
-                    risk_free=sa.risk_free,
-                    prefix=sa.prefix,
-                )
-                if sa.print_metrics:
-                    try:
-                        log.info("\n=== QuantStats metrics ===\n%s", qs_metrics.to_string(float_format=lambda x: f"{x:0.4f}"))
-                    except Exception:
-                        log.info("QuantStats metrics: %s", dict(qs_metrics))
-
-                if sa.write_tearsheet:
-                    out_dir = Path(sa.output_dir) if sa.output_dir else (Path("outputs") / (strategy.name or "run"))
-                    out_dir.mkdir(parents=True, exist_ok=True)
-                    title = sa.title or strategy.name or "Strategy"
-                    html_path = out_dir / sa.file_name
-                    result.quantstats_tearsheet(
-                        output=str(html_path),
-                        title=title,
-                        benchmark=bm,
-                        **(sa.html_kwargs or {}),
-                    )
-                    log.info("QuantStats HTML report written to: %s", html_path)
-    except RuntimeError as exc:
-        log.info("Strategy analytics skipped: %s", exc)
-    except Exception as exc:
-        log.warning("Vectorized engine: strategy analytics generation failed: %s", exc)
-
-    log.info(
-        "Vectorized backtest complete: total return %.2f%%, Sharpe %.2f, max DD %.2f%%",
-        result.total_return * 100.0,
-        metrics.get("sharpe", 0.0),
-        metrics.get("max_drawdown", 0.0) * 100.0,
-    )
+        rep_cfg = getattr(strategy.backtest, "reporting", None)
+        out_cfg = getattr(rep_cfg, "output_dir", None) if rep_cfg is not None else None
+        out_dir = Path(out_cfg) if out_cfg else (Path("outputs") / (strategy.name or "run"))
+    except Exception:
+        out_dir = Path("outputs") / (strategy.name or "run")
+    pipeline.render_all(result, ReportingContext(strategy=strategy, output_dir=out_dir))
 
     return result
 

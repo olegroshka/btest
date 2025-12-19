@@ -168,3 +168,68 @@ def test_end_to_end_attribution_matches_manual(monkeypatch):
     mls = manual_ls.loc[common_index].fillna(0.0)
     als = attr.contrib_ret_ls.loc[common_index].fillna(0.0)
     assert np.isclose(mls.values, als.values, atol=1e-12, rtol=1e-9).all()
+
+
+def test_end_to_end_cost_attribution_matches_manual_return_space(monkeypatch):
+    """Guard against unit regressions in cost attribution.
+
+    Contract we want:
+      - trades contain dollar costs (commission/fees + slippage proxy)
+      - cost attribution in SignalAnalytics is reported in *return space*:
+            cost_ret[t] ~= cost_usd[t] / equity[t-1]
+    """
+
+    from quantdsl_backtest.engine import backtest_runner as br
+
+    md, prices, volumes = _make_synth_prices(n_days=25)
+
+    def _stub_loader(_strategy):
+        return md, prices, volumes
+
+    monkeypatch.setattr(br, "load_data_for_strategy", _stub_loader)
+
+    # Avoid file writes from HTML renderers during test
+    import quantdsl_backtest.engine.analytics.render_tearsheets as rt
+
+    monkeypatch.setattr(rt, "render_signal_tearsheet_html", lambda *a, **k: None, raising=False)
+    monkeypatch.setattr(rt, "render_portfolio_signal_tearsheet_html", lambda *a, **k: None, raising=False)
+
+    strat = _build_strategy(signal_delay_bars=0)
+
+    # Force non-zero costs so we can validate units
+    strat.costs.commission.amount = 10.0  # bps notional
+    strat.execution.slippage.base_bps = 5.0
+
+    result = run_backtest(strat)
+
+    # Pull attribution object from result
+    attr = result.signal_attribution["rank_s1"]
+    assert attr.cost_pnl_by_q is not None
+
+    # Manual: rebuild daily $ cost panel from trades
+    trades = result.trades.copy()
+    trades["date"] = pd.to_datetime(trades["datetime"]).dt.normalize()
+
+    # costs_by_instrument_day already matches our cost definition
+    from quantdsl_backtest.engine.analytics.attribution import costs_by_instrument_day
+
+    cost_usd_panel = costs_by_instrument_day(trades).reindex(result.returns.index).fillna(0.0)
+
+    # Convert to return space using equity_{t-1}
+    eq_prev = result.equity.shift(1).replace(0.0, np.nan)
+    cost_ret_panel = cost_usd_panel.div(eq_prev, axis=0).replace([np.inf, -np.inf], 0.0).fillna(0.0)
+
+    # Bucket by the same quantiles used by the engine
+    qdf = result.signal_reports["rank_s1"].quantile
+    q = int(result.signal_reports["rank_s1"].config.quantiles)
+
+    from quantdsl_backtest.engine.analytics.attribution import contrib_by_quantile
+
+    manual_by_q, _ = contrib_by_quantile(cost_ret_panel, qdf, q=q)
+
+    # Compare totals by bucket; these should be close at the run level.
+    got = attr.cost_pnl_by_q.fillna(0.0).sum(axis=0).sort_index()
+    exp = manual_by_q.fillna(0.0).sum(axis=0).sort_index()
+
+    assert np.isclose(got.values, exp.values, atol=1e-10, rtol=1e-6).all()
+

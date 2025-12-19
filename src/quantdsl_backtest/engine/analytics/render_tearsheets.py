@@ -322,22 +322,46 @@ def render_portfolio_signal_tearsheet_html(
     cost_block = ""
     if attribution.cost_pnl_by_q is not None and not attribution.cost_pnl_by_q.empty:
         cost_by_q = attribution.cost_pnl_by_q
-        cost_cum_uri = _plot_cum_lines(cost_by_q, "Cumulative cost drag by quantile (return space approx)")
+
+        # Heuristic: if typical daily values are > 0.1, they are almost certainly $ costs
+        # (since return-space cost drag should be ~bps).
+        try:
+            daily_scale = float(cost_by_q.sum(axis=1).abs().median())
+        except Exception:
+            daily_scale = 0.0
+        is_dollars = daily_scale > 0.1
+
+        if is_dollars:
+            cost_title = "Cumulative costs by quantile ($)"
+            total_col = "total_cost_usd"
+            avg_col = "avg_daily_cost_usd"
+        else:
+            cost_title = "Cumulative cost drag by quantile (return space approx)"
+            total_col = "total_cost_drag"
+            avg_col = "avg_daily_cost_drag"
+
+        cost_cum_uri = _plot_cum_lines(cost_by_q, cost_title)
         cost_tbl = pd.DataFrame({
-            "total_cost_drag": cost_by_q.replace([np.inf, -np.inf], np.nan).fillna(0.0).sum(axis=0),
-            "avg_daily_cost_drag": cost_by_q.replace([np.inf, -np.inf], np.nan).fillna(0.0).mean(axis=0),
+            total_col: cost_by_q.replace([np.inf, -np.inf], np.nan).fillna(0.0).sum(axis=0),
+            avg_col: cost_by_q.replace([np.inf, -np.inf], np.nan).fillna(0.0).mean(axis=0),
         })
         cost_tbl.index = [f"Q{int(i)}" for i in cost_tbl.index]
         cost_tbl = cost_tbl.sort_index()
+
+        unit_note = (
+            "Costs are shown in $ PnL (commission/fees + slippage proxy)."
+            if is_dollars
+            else "Costs are shown in return space as <code>cost_pnl / equity</code> (approx)."
+        )
+
         cost_block = f"""
-        <div class="card" id="costs">
-          <div class="hd"><h2>Costs by Quantile</h2><div class="muted">Commission/fees + slippage proxy if available</div></div>
-          <div class="bd">
+        <div class=\"card\" id=\"costs\">
+          <div class=\"hd\"><h2>Costs by Quantile</h2><div class=\"muted\">Commission/fees + slippage proxy if available</div></div>
+          <div class=\"bd\">
             {_table_from_df(cost_tbl, float_digits=6)}
-            <div style="margin-top:12px;"><img class="img" src="{cost_cum_uri}" alt="cost cum"/></div>
-            <div class="muted" style="margin-top:10px;">
-              Costs are shown in return space as <code>cost_pnl / equity</code> (approx). For exact PnL attribution,
-              extend the trade log with explicit slippage/borrow/financing components.
+            <div style=\"margin-top:12px;\"><img class=\"img\" src=\"{cost_cum_uri}\" alt=\"cost cum\"/></div>
+            <div class=\"muted\" style=\"margin-top:10px;\">
+              {unit_note} For exact PnL attribution, extend the trade log with explicit slippage/borrow/financing components.
             </div>
           </div>
         </div>
