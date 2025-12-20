@@ -293,6 +293,7 @@ def test_simple_momentum_long_short_matches_vectorbt():
     """
     # Build DSL strategy and run our engine
     strategy = build_simple_momentum_ls_strategy()
+    strategy.backtest.reporting.output_dir = None
     result = run_backtest(strategy)
 
     # Load same data (using the same adapter the engine uses)

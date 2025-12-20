@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from quantdsl_backtest.dsl.data_config import DataConfig
 from quantdsl_backtest.dsl.universe import Universe
@@ -91,7 +90,7 @@ def _build_strategy() -> Strategy:
         order_policy=OrderPolicy(),
         latency=LatencyModel(),
         slippage=PowerLawSlippageModel(base_bps=0.0, k=0.0, exponent=1.0),
-        volume_limits=VolumeParticipation(max_participation=None, mode="proportional", min_fill_notional=0.0),
+        volume_limits=VolumeParticipation(max_participation=1.0, mode="proportional", min_fill_notional=0.0),
     )
     costs = Costs(
         commission=Commission(type="bps_notional", amount=0.0),
@@ -116,6 +115,8 @@ def _build_strategy() -> Strategy:
 
 def test_backtest_runner_smoke_monkeypatched_loader(monkeypatch):
     strategy = _build_strategy()
+    # Prevent tests from writing report HTML/parquet into repo-level `outputs/`.
+    strategy.backtest.reporting.output_dir = None
 
     def _fake_loader(_strategy):
         return _build_synthetic_md()

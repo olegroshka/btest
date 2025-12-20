@@ -22,6 +22,7 @@ def test_indices_example_trades_and_has_variance():
     weights and a flat equity curve.
     """
     strat = build_strategy()
+    strat.backtest.reporting.output_dir = None
 
     # Constrain to a period with good overlap; keep engine event-driven
     strat.data.start = "2018-01-01"

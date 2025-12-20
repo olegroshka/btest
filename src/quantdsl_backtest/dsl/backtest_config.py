@@ -67,6 +67,11 @@ class Reporting:
     Output controls: what to store, what metrics to compute.
     """
 
+    # When set:
+    #   - str/Path: write any reporting artifacts under this directory
+    #   - None: disable all file outputs (useful for tests)
+    output_dir: Optional[str] = ""
+
     store_trades: bool = True
     store_positions: bool = True
     metrics: List[str] = field(default_factory=list)

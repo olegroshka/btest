@@ -172,6 +172,7 @@ def test_vectorized_turnover_is_nonzero():
     vary over time, leading to strictly positive turnover_annual.
     """
     strat_vec = _build_simple_strategy_vectorized()
+    strat_vec.backtest.reporting.output_dir = None
     res_vec = run_backtest(strat_vec)
 
     # Compute metrics via shared accounting logic

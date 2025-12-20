@@ -201,6 +201,7 @@ def _build_simple_momentum_ls_strategy(engine: str) -> Strategy:
             max_gross_leverage=None,
         ),
         reporting=Reporting(
+            output_dir=None,
             store_trades=True,
             store_positions=True,
             metrics=[],

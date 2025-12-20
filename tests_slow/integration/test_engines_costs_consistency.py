@@ -83,7 +83,7 @@ def _build_strategy_with_costs(*, engine: str, per_share: float, base_bps: float
         cash_initial=100_000_000.0,
         margin=MarginConfig(long_initial=0.5, short_initial=0.5, maintenance=0.3),
         risk_checks=RiskChecks(max_drawdown=None, max_gross_leverage=None),
-        reporting=Reporting(store_trades=True, store_positions=True, metrics=[]),
+        reporting=Reporting(output_dir=None, store_trades=True, store_positions=True, metrics=[]),
     )
 
     return Strategy(

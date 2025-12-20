@@ -50,6 +50,7 @@ def test_drawdown_policy_soft_scale_derisks_and_stays_flat():
     This validates that soft-scaling is applied before rebalance.
     """
     strat = build_strategy()
+    strat.backtest.reporting.output_dir = None
 
     # Derisk on any non-zero drawdown
     _set_drawdown_policy(
@@ -95,6 +96,7 @@ def test_drawdown_policy_hard_kill_immediate():
     Verify positions/weights remain zero.
     """
     strat = build_strategy()
+    strat.backtest.reporting.output_dir = None
     _set_drawdown_policy(
         strat,
         DrawdownPolicy(

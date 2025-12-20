@@ -138,6 +138,7 @@ def _build_equal_weight_strategy(engine: str) -> Strategy:
         cash_initial=1_000_000,
         risk_checks=RiskChecks(),
         reporting=Reporting(
+            output_dir=None,
             store_trades=True,
             store_positions=True,
             metrics=["sharpe", "max_drawdown", "turnover"],

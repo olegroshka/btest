@@ -24,9 +24,11 @@ def test_sp500_example_event_vs_vectorized_engines():
     # Build two independent strategy instances to avoid shared mutation
     strat_event = build_strategy()
     strat_event.backtest.engine = "event_driven"
+    strat_event.backtest.reporting.output_dir = None
 
     strat_vec = build_strategy()
     strat_vec.backtest.engine = "vectorized"
+    strat_vec.backtest.reporting.output_dir = None
 
     # Run both engines
     res_event = run_backtest(strat_event)

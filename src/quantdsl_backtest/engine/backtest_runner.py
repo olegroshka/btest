@@ -582,6 +582,14 @@ def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullRepo
 
     rep = getattr(strategy.backtest, "reporting", None)
 
+    # Respect explicit opt-out. If output_dir is explicitly set to None, we do not write any files.
+    # (This is used by tests to ensure no writes to repo-level `outputs/`.)
+    try:
+        if rep is not None and hasattr(rep, "output_dir") and getattr(rep, "output_dir") is None:
+            return NullReportingPipeline()
+    except Exception:
+        pass
+
     # Default output directory is the current convention.
     output_dir: Path | None
     try:
@@ -593,7 +601,8 @@ def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullRepo
     renderers: List[ResultsRenderer] = [DefaultTextRenderer()]
 
     # NEW: always write report site index when output_dir is available
-    renderers.append(ReportSiteIndexRenderer())
+    if output_dir is not None:
+        renderers.append(ReportSiteIndexRenderer())
 
     # Optional: parquet artifacts
     try:
@@ -1203,17 +1212,35 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # ------------------------------------------------------------------ #
     # 8. Reporting (render pipeline)
     # ------------------------------------------------------------------ #
+    out_dir = _resolve_reporting_output_dir(strategy)
     pipeline = build_reporting_pipeline(strategy)
-    out_dir: Path | None
-    try:
-        rep_cfg = getattr(strategy.backtest, "reporting", None)
-        out_cfg = getattr(rep_cfg, "output_dir", None) if rep_cfg is not None else None
-        out_dir = Path(out_cfg) if out_cfg else (Path("outputs") / (strategy.name or "run"))
-    except Exception:
-        out_dir = Path("outputs") / (strategy.name or "run")
     pipeline.render_all(result, ReportingContext(strategy=strategy, output_dir=out_dir))
 
     return result
+
+
+def _resolve_reporting_output_dir(strategy: Strategy) -> Path | None:
+    """Resolve reporting output_dir for this run.
+
+    Contract:
+      - If `strategy.backtest.reporting.output_dir` exists and is explicitly None => disable file outputs.
+      - If it's a non-empty string/path => use it.
+      - Otherwise default to `outputs/<strategy.name>`.
+    """
+    rep_cfg = getattr(strategy.backtest, "reporting", None)
+
+    # Explicit opt-out
+    try:
+        if rep_cfg is not None and hasattr(rep_cfg, "output_dir") and getattr(rep_cfg, "output_dir") is None:
+            return None
+    except Exception:
+        return None
+
+    try:
+        out_cfg = getattr(rep_cfg, "output_dir", None) if rep_cfg is not None else None
+        return Path(out_cfg) if out_cfg else (Path("outputs") / (strategy.name or "run"))
+    except Exception:
+        return Path("outputs") / (strategy.name or "run")
 
 
 def _is_rebalance_date(

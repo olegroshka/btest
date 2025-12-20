@@ -307,6 +307,11 @@ def _build_vbt_from_weights(prices: pd.DataFrame, weights: pd.DataFrame, *, comm
 def test_momentum_ls_with_signal_delay_matches_vectorbt():
     # DSL strategy with 1-bar signal delay
     strategy = _build_strategy(signal_delay_bars=1)
+    # Disable report writes (HTML/parquet) during tests
+    try:
+        strategy.backtest.reporting.output_dir = None
+    except Exception:
+        pass
     result = run_backtest(strategy)
 
     # Baseline with identical logic
@@ -359,6 +364,11 @@ def test_momentum_ls_with_commission_and_turnover_matches_vectorbt():
     commission_bps = 5.0
     turnover_cap = 0.10
     strategy = _build_strategy(signal_delay_bars=0, commission_bps=commission_bps, turnover_limit=turnover_cap)
+    # Disable report writes (HTML/parquet) during tests
+    try:
+        strategy.backtest.reporting.output_dir = None
+    except Exception:
+        pass
     result = run_backtest(strategy)
 
     prices = _build_prices_for_vectorbt(strategy)
