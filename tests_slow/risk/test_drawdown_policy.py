@@ -1,9 +1,34 @@
+# tests_slow/risk/test_drawdown_policy.py
+
+import pytest
+
+pytestmark = pytest.mark.slow
+
 import numpy as np
-import pandas as pd
 
 from quantdsl_backtest.examples.lagging_indecies import build_strategy
 from quantdsl_backtest.dsl.backtest_config import DrawdownPolicy
 from quantdsl_backtest.engine.backtest_runner import run_backtest
+
+
+def _set_drawdown_policy(strat, policy: DrawdownPolicy) -> None:
+    """Attach drawdown policy in a backward/forward compatible way."""
+    try:
+        strat.backtest.risk_checks.drawdown = policy
+        return
+    except Exception:
+        pass
+
+    # Fallback for legacy configs: store it in backtest.extra
+    extra = getattr(strat.backtest, "extra", None)
+    if extra is None:
+        try:
+            strat.backtest.extra = {}
+            extra = strat.backtest.extra
+        except Exception:
+            extra = {}
+
+    extra["drawdown"] = policy
 
 
 def _assert_all_zero_weights(res):
@@ -27,28 +52,24 @@ def test_drawdown_policy_soft_scale_derisks_and_stays_flat():
     strat = build_strategy()
 
     # Derisk on any non-zero drawdown
-    strat.backtest.risk_checks.drawdown = DrawdownPolicy(
-        mode="soft_scale",
-        start=0.0,
-        full=1e-6,
-        curve="linear",
+    _set_drawdown_policy(
+        strat,
+        DrawdownPolicy(
+            mode="soft_scale",
+            start=0.0,
+            full=1e-6,
+            curve="linear",
+        ),
     )
 
     # Ensure empty selection behavior does not accidentally carry positions.
     # We want liquidation on empty targets for this test.
+    extra = getattr(strat.backtest, "extra", {}) or {}
     try:
-        if not hasattr(strat.backtest, "extra") or strat.backtest.extra is None:
-            strat.backtest.extra = {}
-        strat.backtest.extra["hold_when_no_targets"] = False
+        strat.backtest.extra = extra
     except Exception:
         pass
-    try:
-        # Also allow overriding via risk_checks.extra for back-compat
-        if not hasattr(strat.backtest.risk_checks, "extra") or strat.backtest.risk_checks.extra is None:
-            strat.backtest.risk_checks.extra = {}
-        strat.backtest.risk_checks.extra["hold_when_no_targets"] = False
-    except Exception:
-        pass
+    extra["hold_when_no_targets"] = False
 
     res = run_backtest(strat)
     # Sum absolute weights per day
@@ -74,9 +95,12 @@ def test_drawdown_policy_hard_kill_immediate():
     Verify positions/weights remain zero.
     """
     strat = build_strategy()
-    strat.backtest.risk_checks.drawdown = DrawdownPolicy(
-        mode="hard_kill",
-        threshold=0.0,
+    _set_drawdown_policy(
+        strat,
+        DrawdownPolicy(
+            mode="hard_kill",
+            threshold=0.0,
+        ),
     )
 
     res = run_backtest(strat)

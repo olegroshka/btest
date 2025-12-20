@@ -30,6 +30,7 @@ dev = [
   "ipykernel",
   "pytest>=8.0",
   "pytest-mock>=3.12",
+  "pytest-xdist>=3.6",
   "mypy>=1.10",
   "black>=24.0",
   "isort>=5.13",
@@ -45,6 +46,11 @@ Repository = "https://github.com/olegroshka/btest"
 markers = [
   "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
+# Default: run only fast unit tests. Run slow tests explicitly via:
+#   pytest -q tests_slow
+# or
+#   pytest -q -m slow
+addopts = ""
 testpaths = [
-  "tests",
+  "tests/unit",
 ]

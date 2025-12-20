@@ -1,4 +1,4 @@
-# tests_slow/test_integration_simple_momentum_vectorbt.py
+# tests_slow/integration/test_simple_momentum_vectorbt.py
 
 import numpy as np
 import pandas as pd

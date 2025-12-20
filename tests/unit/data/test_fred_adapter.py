@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-from datetime import datetime
 
 import pandas as pd
 import pytest
@@ -41,14 +39,11 @@ def test_fred_adapter_cache_flow_with_tail_fetch(temp_arctic_uri, monkeypatch):
             self.store[k] = df.copy()
 
     memlib = _MemLib()
-    from quantdsl_backtest import data as _data_pkg  # noqa: F401
 
     from quantdsl_backtest.data import cache_arctic as ca
-    from quantdsl_backtest.data import adapters as adapters_mod
 
-    # Patch both the module where it's defined and where it's used (imported as symbol)
+    # Patch cache entry point used by ArcticCacheStore
     monkeypatch.setattr(ca, "get_cache_lib", lambda provider, frequency: memlib)
-    monkeypatch.setattr(adapters_mod, "get_cache_lib", lambda provider, frequency: memlib)
 
     # Monkeypatch fetch_fred_series to a deterministic function and count calls
     call_counter = {"n": 0}
@@ -60,10 +55,11 @@ def test_fred_adapter_cache_flow_with_tail_fetch(temp_arctic_uri, monkeypatch):
         return df
 
     import quantdsl_backtest.data.market as market_mod
-    from quantdsl_backtest.data import adapters as adapters_mod2
+    import quantdsl_backtest.data.sources.fred as fred_source_mod
 
     monkeypatch.setattr(market_mod, "fetch_fred_series", fake_fetch)
-    monkeypatch.setattr(adapters_mod2, "fetch_fred_series", fake_fetch)
+    # Provider imports fetch_fred_series lazily from market module, but we patch this too
+    monkeypatch.setattr(fred_source_mod, "pd", pd)
 
     cfg = DataConfig(
         source="fred://CPIAUCSL",
@@ -107,6 +103,7 @@ def test_fred_adapter_cache_flow_with_tail_fetch(temp_arctic_uri, monkeypatch):
     assert len(bars3) == 15
     # Should have fetched once more for the tail
     assert call_counter["n"] == 2
+
     # And now loading the original range again should not fetch
     md4 = load_market_data(cfg, uni)
     bars4 = md4.get_bar_data("CPIAUCSL")

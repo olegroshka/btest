@@ -301,19 +301,32 @@ With the virtual environment active:
 pytest -q
 ```
 
+### Fast unit tests only (default)
 
-Run slow integration tests
---------------------------
-The slower end-to-end/integration tests live under `tests_slow/`.
+By default, `pytest` is configured to run the fast unit test suite under `tests/unit/`.
 
-- Run only the slow test suite:
+- Fast unit tests (single process):
 ```
-uv run pytest tests_slow -q
+pytest -q
 ```
 
-- Run slow tests with live logging to the console (INFO level):
+- Fast unit tests (parallel):
 ```
-uv run pytest -q tests_slow -m slow -o log_cli=true --log-cli-level=INFO
+pytest -q -n auto
+```
+
+### Slow integration tests
+
+Slow integration tests live under `tests_slow/` and are typically strategy-level or engine-level checks.
+
+- Run slow tests (single process):
+```
+pytest -q tests_slow -m slow
+```
+
+- Speed up slow tests by running in parallel (recommended):
+```
+pytest -q -n auto tests_slow -m slow
 ```
 
 
@@ -323,6 +336,31 @@ Troubleshooting
 - Python version: must be 3.11.x as specified in `pyproject.toml`.
 - Missing data: run the download script and verify output under `equities/sp500_daily`.
 - Yahoo rate limiting: re‑run the script later or reduce the ticker set via `--tickers-csv`.
+
+## Local ArcticDB cache reset
+
+If you see errors like `MDB_INVALID: File is not an LMDB file` when loading data, your local
+ArcticDB cache may be corrupted.
+
+Use the helper script to inspect or reset it:
+
+```powershell
+# see what would happen
+python .\scripts\reset_arctic_cache.py --dry-run
+
+# safe option: keep a backup
+python .\scripts\reset_arctic_cache.py --backup
+
+# delete without a prompt
+python .\scripts\reset_arctic_cache.py --force
+```
+
+## Data layer caching notes
+
+- Remote sources (e.g., `fred://`, `yf://`) default to ArcticDB caching, but the cache layer is
+  fail-safe: if the local LMDB store can't be opened, caching is automatically disabled rather
+  than breaking the run.
+- Local parquet sources (`parquet://...`) do not use ArcticDB caching by default.
 
 
 License

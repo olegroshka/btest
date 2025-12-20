@@ -1,10 +1,12 @@
-# tests/test_metrics_quantstats.py
+# tests_slow/integration/test_metrics_quantstats.py
 
 import math
 
 import numpy as np
 import pandas as pd
 import pytest
+
+pytestmark = pytest.mark.slow
 
 qs = pytest.importorskip("quantstats")  # skip all tests here if quantstats missing
 

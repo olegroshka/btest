@@ -3,9 +3,13 @@ from __future__ import annotations
 import math
 
 import pandas as pd
+import pytest
 
 from quantdsl_backtest.examples.lagging_indecies import build_strategy
 from quantdsl_backtest.engine.backtest_runner import run_backtest
+from quantdsl_backtest.dsl.backtest_config import BacktestConfig
+
+pytestmark = pytest.mark.slow
 
 
 def test_indices_example_trades_and_has_variance():
@@ -22,7 +26,14 @@ def test_indices_example_trades_and_has_variance():
     # Constrain to a period with good overlap; keep engine event-driven
     strat.data.start = "2018-01-01"
     strat.data.end = "2023-01-01"
-    strat.backtest.engine = "event_driven"
+    strat.backtest = BacktestConfig(
+        engine="event_driven",
+        cash_initial=strat.backtest.cash_initial,
+        margin=strat.backtest.margin,
+        risk_checks=strat.backtest.risk_checks,
+        reporting=strat.backtest.reporting,
+        extra=getattr(strat.backtest, "extra", {}) or {},
+    )
 
     result = run_backtest(strat)
 

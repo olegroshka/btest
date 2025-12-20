@@ -1,4 +1,4 @@
-# tests_slow/test_integration_engines_costs_consistency.py
+# tests_slow/integration/test_engines_costs_consistency.py
 
 import numpy as np
 import pytest

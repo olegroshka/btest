@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Literal, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING
+
+from .frequency import Frequency
 
 if TYPE_CHECKING:
     from .transforms import DataTransform
 
 
-PriceAdjustment = Literal["none", "split_only", "split_dividend"]
+PriceAdjustment = str  # keep as string-literal-like values; validated elsewhere if needed.
 
 
 @dataclass(slots=True)
@@ -21,18 +23,32 @@ class DataConfig:
     load the right data from the right place.
     """
 
-    source: str                          # e.g. "parquet://equities/sp500_daily"
-    calendar: str                        # e.g. "XNYS"
-    frequency: Literal["1d", "1m", "5m"] # etc.
-    start: str                           # ISO date, e.g. "2015-01-01"
-    end: str                             # ISO date, e.g. "2025-01-01"
-    price_adjustment: PriceAdjustment = "split_dividend"
+    source: str
+    calendar: str
+
+    # Bar frequency, canonical format like "1d", "5m", "15m", "1h".
+    # We validate in __post_init__ via Frequency.parse.
+    frequency: str
+
+    start: str
+    end: str
+
+    price_adjustment: str = "split_dividend"
+
     fields: List[str] = field(
         default_factory=lambda: ["open", "high", "low", "close", "volume"]
     )
 
     # Optional: additional metadata
-    tz: Optional[str] = None             # e.g. "America/New_York"
+    tz: Optional[str] = None
 
     # Optional: data transforms to apply after loading
     transforms: Optional[List["DataTransform"]] = None
+
+    def __post_init__(self) -> None:
+        # Validate/normalize frequency early so invalid configs fail fast.
+        # Preserve original string, but ensure it parses and is in canonical form.
+        self.frequency = str(Frequency.parse(self.frequency))
+
+        # Normalize common price_adjustment values
+        self.price_adjustment = (self.price_adjustment or "").strip().lower()
