@@ -6,7 +6,12 @@ from quantdsl_backtest.data.requests import DataRequest
 from quantdsl_backtest.data.sources.cache import MemoryCacheStore, TailCachedFrameLoader
 
 
-def test_tail_cache_loader_tail_fetch_and_merge():
+def test_tail_cache_loader_tail_fetch_and_merge(monkeypatch):
+    # Disable platform meta side-effect for this unit test
+    import quantdsl_backtest.data.sources.cache as cache_mod
+
+    monkeypatch.setattr(cache_mod, "_try_upsert_platform_meta", lambda **_: None)
+
     cache = MemoryCacheStore()
     loader = TailCachedFrameLoader(provider="TEST")
 

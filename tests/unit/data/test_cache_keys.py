@@ -7,15 +7,16 @@ from quantdsl_backtest.data.sources.cache import build_cache_key
 def test_cache_key_includes_provider_kind_frequency_entity():
     req = DataRequest(
         source="fred://CPIAUCSL",
-        kind=KIND_MARKET_BARS,
-        start="2024-01-01",
-        end="2024-01-02",
+        kind="market_bars",
         frequency="1d",
-        fields=["close"],
+        start="2020-01-01",
+        end="2020-02-01",
         dataset_id="macro",
     )
+
     k = build_cache_key(provider="FRED", request=req, entity="CPIAUCSL")
-    assert k.startswith("v1/FRED/market_bars/1d/macro/CPIAUCSL")
+    # New convention is per-library symbol key: <kind>/<dataset>/<entity>
+    assert k == "market_bars/macro/CPIAUCSL"
 
 
 def test_cache_key_separates_kinds_for_same_entity():

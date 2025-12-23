@@ -179,6 +179,77 @@ uv sync
 ```
 
 
+Testing
+-------
+This repo separates **fast unit tests** (default) from **slow / integration-style tests** and **smoke tests**.
+
+- **Fast tests** live under `tests/unit` and are what you should run most of the time.
+- **Slow tests** live under `tests_slow/` (excluding `smoke/`) and cover end-to-end flows, multi-engine consistency, and risk policies.
+- **Smoke tests** live under `tests_slow/smoke/` and are intended to be run against a live server. They are marked as `manual` and skipped by default in automated runs.
+
+### Install test dependencies
+
+Some tests cover the platform API layer (FastAPI/Pydantic) or browser E2E (Playwright).
+
+```bash
+# Core + fast unit tests
+uv sync
+
+# Platform API tests
+uv sync --extra platform --extra dev
+
+# Browser E2E tests (Playwright)
+uv sync --extra e2e
+uv run playwright install chromium
+```
+
+### Run fast unit tests (default)
+
+By default, `pytest` is configured to run the fast unit test suite under `tests/unit/`.
+
+- Fast unit tests (single process):
+```bash
+uv run pytest -q
+```
+
+- Fast unit tests (parallel):
+```bash
+uv run pytest -q -n auto
+```
+
+### Run slow tests
+
+Slow tests cover heavier integration scenarios:
+
+- Run slow tests (single process):
+```bash
+uv run pytest -q tests_slow
+```
+
+- Speed up slow tests by running in parallel (recommended):
+```bash
+uv run pytest -q -n auto tests_slow
+```
+
+(This will skip manual smoke tests by default).
+
+### Run smoke tests (manual)
+
+Smoke tests require a running platform server.
+
+1. Start the server in one terminal:
+```powershell
+uv run python scripts/run_platform_ui.py
+```
+
+2. Run the smoke tests in another terminal:
+```powershell
+uv run pytest -q tests_slow/smoke -m manual
+```
+
+Tip: iterate fast by running only unit tests during development, and run `tests_slow` once before pushing.
+
+
 Get the data (S&P 500 daily OHLCV to parquet)
 ---------------------------------------------
 The example strategy expects a parquet dataset at `equities/sp500_daily` in a long format (date, ticker, ohlcv[, sector]). A helper script is provided to download and prepare data using Yahoo Finance via vectorbt.
@@ -292,42 +363,6 @@ Project layout
 - `scripts/` — Utilities for data acquisition and preparation.
 - `equities/sp500_daily/` — Expected local parquet dataset path for the sample (created by the script).
 - `tests/` — Unit/E2E tests for factors, signals, execution, and the example.
-
-
-Run tests
----------
-With the virtual environment active:
-```
-pytest -q
-```
-
-### Fast unit tests only (default)
-
-By default, `pytest` is configured to run the fast unit test suite under `tests/unit/`.
-
-- Fast unit tests (single process):
-```
-pytest -q
-```
-
-- Fast unit tests (parallel):
-```
-pytest -q -n auto
-```
-
-### Slow integration tests
-
-Slow integration tests live under `tests_slow/` and are typically strategy-level or engine-level checks.
-
-- Run slow tests (single process):
-```
-pytest -q tests_slow -m slow
-```
-
-- Speed up slow tests by running in parallel (recommended):
-```
-pytest -q -n auto tests_slow -m slow
-```
 
 
 Troubleshooting

@@ -52,13 +52,13 @@ def _parquet_next_fetch_start(last_dt: pd.Timestamp, frequency: str) -> pd.Times
 
 
 def _should_use_cache_for_parquet(request: DataRequest, cache: Optional[CacheStore]) -> bool:
-    """Parquet caching is opt-in.
+    """Parquet caching is on by default when a cache is present.
 
-    Rationale: the current test environment contains a pre-created local_cache folder
-    that may not be a valid ArcticDB LMDB store, and slow tests must not fail due to
-    cache backend issues.
+    This implements the "golden store" behavior: even if data originates locally
+    (parquet), we still persist it into the cache so the platform catalog can see it
+    and future runs can share the same storage layer.
 
-    We still support the "golden cache" ingestion path when explicitly enabled.
+    Safety is handled by SafeArcticCacheStore: if LMDB is corrupted, writes are no-ops.
     """
 
     if cache is None:
@@ -68,8 +68,8 @@ def _should_use_cache_for_parquet(request: DataRequest, cache: Optional[CacheSto
     if isinstance(cache, MemoryCacheStore):
         return True
 
-    # Explicit opt-in via dataset_id (platform use)
-    return request.dataset_id == "golden_cache"
+    # Default: write-through to whatever cache was injected
+    return True
 
 
 @dataclass(slots=True)

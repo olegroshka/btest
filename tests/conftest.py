@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Ensure the project package under `src/` is importable when tests run without an editable install.
+# This keeps `pytest` / `uv run pytest` working in fresh environments.
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,6 +11,14 @@ import pytest
 def _repo_root_from_here() -> Path:
     # tests/conftest.py -> repo root
     return Path(__file__).resolve().parent.parent
+
+
+# Add repo/src to sys.path as early as possible.
+# Note: pytest imports conftest before importing tests, so this is safe.
+_repo_root = _repo_root_from_here()
+_src = str((_repo_root / "src").resolve())
+if _src not in sys.path:
+    sys.path.insert(0, _src)
 
 
 @pytest.fixture(autouse=True)
@@ -69,3 +80,15 @@ def _prevent_repo_outputs_write(monkeypatch, request):
     monkeypatch.setattr(Path, "write_bytes", guarded_write_bytes, raising=True)
     monkeypatch.setattr(Path, "open", guarded_open, raising=True)
 
+
+def pytest_configure(config: pytest.Config) -> None:
+    # Suppress a known external deprecation warning triggered by ArcticDB returning
+    # DataFrames backed by unconsolidated pandas managers.
+    # We keep this scoped to the exact warning text to avoid hiding real issues.
+    import warnings
+
+    warnings.filterwarnings(
+        "ignore",
+        message=r".*BlockManagerUnconsolidated.*",
+        category=DeprecationWarning,
+    )

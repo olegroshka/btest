@@ -24,21 +24,20 @@ def default_registry() -> DataSourceRegistry:
 def default_cache_for_request(request: DataRequest):
     """Default cache selection.
 
-    Parquet sources are local and deterministic in tests; they should not require
-    ArcticDB.
-
-    Remote sources default to SafeArcticCacheStore: if the on-disk LMDB store is
-    corrupted/incompatible, caching degrades gracefully instead of failing.
+    Golden-store behavior:
+    - We *always* try to use ArcticDB as the write-through cache, including parquet sources,
+      so that running any strategy ingests its requested raw data into the cache catalog.
+    - We wrap with SafeArcticCacheStore so a corrupted/missing LMDB store degrades
+      gracefully (strategy still runs), while the platform API can show a clear 503.
     """
-
-    if request.source.lower().startswith("parquet://"):
-        return None
 
     provider = "GLOBAL"
     if request.source.lower().startswith("fred://"):
         provider = "FRED"
     if request.source.lower().startswith("yf://"):
         provider = "YF"
+    if request.source.lower().startswith("parquet://"):
+        provider = "PARQUET"
 
     return SafeArcticCacheStore(provider=provider, frequency=request.frequency)
 

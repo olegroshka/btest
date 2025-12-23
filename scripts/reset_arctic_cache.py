@@ -54,8 +54,13 @@ def main() -> int:
 
     action = "move" if args.backup else "delete"
 
+    # Always print a minimal banner so it's clear the script ran
+    print(f"Arctic cache reset tool")
+    print(f"  target: {cache_path}")
+    print(f"  exists: {cache_path.exists()}")
+    print(f"  action: {action}{' (dry-run)' if args.dry_run else ''}")
+
     if not cache_path.exists():
-        print(f"Cache path does not exist: {cache_path}")
         return 0
 
     if args.dry_run:

@@ -11,6 +11,7 @@ from ..requests import DataRequest, KIND_TIME_SERIES
 from ..resolver import resolve_source
 from .base import CacheStore
 from .cache import TailCachedFrameLoader
+from .stats import CacheStatsMixin
 
 
 FRED_PREFIX = "fred://"
@@ -37,21 +38,23 @@ class FredNormalizer:
 
     def __call__(self, df: pd.DataFrame) -> pd.DataFrame:
         if df is None or df.empty:
-            return pd.DataFrame(
-                columns=[self.value_col], index=pd.DatetimeIndex([], name="date")
-            )
+            return pd.DataFrame(columns=[self.value_col], index=pd.DatetimeIndex([], name="date"))
 
         out = df.copy()
 
         if "date" in out.columns:
-            # avoid .dt.tz_localize(None) to keep type checkers happy
-            out["date"] = pd.to_datetime(out["date"]).map(lambda x: x.tz_localize(None) if hasattr(x, "tz_localize") else x)
-            out = out.set_index("date")
+            # Vectorized + explicit tz-naive conversion
+            dt = pd.to_datetime(out["date"], errors="coerce")
+            # .dt is valid on datetime-like Series; guard for object dtype / NaT
+            if hasattr(dt, "dt"):
+                dt = dt.dt.tz_localize(None)
+            out = out.drop(columns=["date"]).set_index(dt)
+            out.index.name = "date"
 
         if not isinstance(out.index, pd.DatetimeIndex):
-            out.index = pd.to_datetime(out.index)
+            out.index = pd.to_datetime(out.index, errors="coerce")
 
-        out.index = pd.to_datetime(out.index).tz_localize(None)
+        out.index = out.index.tz_localize(None)
         out = out.sort_index()
 
         if self.value_col not in out.columns:
@@ -85,7 +88,7 @@ def _parse_fred_source(source: str) -> str:
 
 
 @dataclass(slots=True)
-class FredMarketBarsSource:
+class FredMarketBarsSource(CacheStatsMixin):
     """FRED provider that exposes a series as market-style bars."""
 
     name: str = "fred_market_bars"
@@ -108,6 +111,9 @@ class FredMarketBarsSource:
         resolved_source = resolve_source(request.source)
         series_id = _parse_fred_source(resolved_source)
 
+        # snapshot stats for per-entity reporting
+        before = self.cache_loader.stats.snapshot()
+
         norm = FredNormalizer("close")
 
         def _fetch(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
@@ -126,6 +132,12 @@ class FredMarketBarsSource:
             last_needed_ts=_fred_last_needed_ts,
             next_fetch_start=_fred_next_fetch_start,
         )
+
+        after = self.cache_loader.stats.snapshot()
+        try:
+            object.__setattr__(self, "_last_entity_cache_stats", {series_id: after.delta(before).as_dict()})  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
         cols: dict[str, pd.Series] = {}
         if "close" in request.fields:
@@ -154,9 +166,12 @@ class FredMarketBarsSource:
             fields=list(df_bars.columns),
         )
 
+    def last_entity_cache_stats(self) -> dict[str, dict[str, int]]:
+        return getattr(self, "_last_entity_cache_stats", {}) or {}
+
 
 @dataclass(slots=True)
-class FredTimeSeriesSource:
+class FredTimeSeriesSource(CacheStatsMixin):
     """FRED provider that exposes a series as generic time series (alt data)."""
 
     name: str = "fred_timeseries"
@@ -179,6 +194,8 @@ class FredTimeSeriesSource:
         resolved_source = resolve_source(request.source)
         series_id = _parse_fred_source(resolved_source)
 
+        before = self.cache_loader.stats.snapshot()
+
         norm = FredNormalizer("value")
 
         def _fetch(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
@@ -194,6 +211,12 @@ class FredTimeSeriesSource:
             next_fetch_start=_fred_next_fetch_start,
         )
 
+        after = self.cache_loader.stats.snapshot()
+        try:
+            object.__setattr__(self, "_last_entity_cache_stats", {series_id: after.delta(before).as_dict()})  # type: ignore[attr-defined]
+        except Exception:
+            pass
+
         return TimeSeriesBundle(
             kind=KIND_TIME_SERIES,
             source=resolved_source,
@@ -206,3 +229,7 @@ class FredTimeSeriesSource:
             entities=[series_id],
             fields=list(df.columns),
         )
+
+    def last_entity_cache_stats(self) -> dict[str, dict[str, int]]:
+        return getattr(self, "_last_entity_cache_stats", {}) or {}
+

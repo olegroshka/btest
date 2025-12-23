@@ -11,6 +11,7 @@ from ..requests import DataRequest
 from .base import CacheStore
 from .cache import TailCachedFrameLoader
 from .universe_filtering import UniverseFilterEngine
+from .stats import CacheStatsMixin
 
 
 YF_PREFIX = "yf://"
@@ -139,7 +140,7 @@ def _extract_symbols(source: str, universe: Optional[Universe]) -> List[str]:
 
 
 @dataclass(slots=True)
-class YahooMarketBarsSource:
+class YahooMarketBarsSource(CacheStatsMixin):
     """Yahoo (YF) market bars provider with ArcticDB caching + tail fetch.
 
     Uses composition:
@@ -157,6 +158,11 @@ class YahooMarketBarsSource:
         default_factory=lambda: TailCachedFrameLoader(provider="YF")
     )
     universe_filters: UniverseFilterEngine = field(default_factory=UniverseFilterEngine)
+
+    # last per-entity stats snapshot (platform/UI)
+    _last_entity_cache_stats: Dict[str, Dict[str, int]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def can_load(self, request: DataRequest) -> bool:
         return request.kind == "market_bars" and request.source.startswith(YF_PREFIX)
@@ -177,7 +183,12 @@ class YahooMarketBarsSource:
         interval = YahooNormalizer.infer_interval(request.frequency)
 
         raw_frames: Dict[str, pd.DataFrame] = {}
+        # Per-entity cache stats deltas for platform/UI
+        entity_stats: Dict[str, dict[str, int]] = {}
+
         for sym in symbols:
+            before = self.cache_loader.stats.snapshot()
+
             def _fetch(start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
                 # vectorbt expects strings / end semantics are provider-specific
                 frames = self.client.download([sym], start=str(start.date()), end=str(end.date()), interval=interval)
@@ -193,6 +204,12 @@ class YahooMarketBarsSource:
                 next_fetch_start=self.coverage.next_fetch_start,
             )
             raw_frames[sym] = df
+
+            after = self.cache_loader.stats.snapshot()
+            entity_stats[sym] = after.delta(before).as_dict()
+
+        # attach stats for platform consumers
+        self._last_entity_cache_stats = entity_stats
 
         bars_by_instr: Dict[str, pd.DataFrame] = {}
         instruments: List[str] = []
@@ -223,3 +240,6 @@ class YahooMarketBarsSource:
             instruments=instruments,
             fields=list(request.fields or []),
         )
+
+    def last_entity_cache_stats(self) -> Dict[str, dict[str, int]]:
+        return self._last_entity_cache_stats or {}

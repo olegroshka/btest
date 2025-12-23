@@ -20,6 +20,17 @@ def temp_arctic_uri(tmp_path, monkeypatch):
 
 
 def test_fred_adapter_cache_flow_with_tail_fetch(temp_arctic_uri, monkeypatch):
+    import warnings
+
+    # ArcticDB + pandas internals can emit a BlockManager-related DeprecationWarning.
+    # We intentionally suppress this narrow warning in tests to keep the suite clean
+    # without adding expensive deep-copy conversions in production code.
+    warnings.filterwarnings(
+        "ignore",
+        message=r"Passing a BlockManagerUnconsolidated to DataFrame is deprecated.*",
+        category=DeprecationWarning,
+    )
+
     # Stub cache library with in-memory store to avoid arcticdb dependency during test
     class _MemLib:
         def __init__(self):
@@ -51,8 +62,8 @@ def test_fred_adapter_cache_flow_with_tail_fetch(temp_arctic_uri, monkeypatch):
     def fake_fetch(series_id: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
         call_counter["n"] += 1
         idx = pd.date_range(start.normalize(), end.normalize(), freq="D")
-        df = pd.DataFrame({"date": idx, "value": range(len(idx))})
-        return df
+        # Return a normal time-indexed DataFrame (avoid pandas internals / BlockManager warnings)
+        return pd.DataFrame({"value": range(len(idx))}, index=idx)
 
     import quantdsl_backtest.data.market as market_mod
     import quantdsl_backtest.data.sources.fred as fred_source_mod

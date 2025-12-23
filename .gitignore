@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+
+# Local caches / data
+local_cache*/
+
+# ArcticDB E2E caches (tests create these under repo root if configured)
+.arctic_e2e_cache*/
+
+# Pytest cache
+.pytest_cache/
+
+# Outputs
+outputs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# JetBrains
+.idea/
+
+# Local temp artifacts
+.tmp_*
+.uv_import_check.txt
+.pytest_durations.txt
+pytest_slow_out.txt
+
+# Packaging/build metadata
+src/*.egg-info/
+
+# uv lockfile (can be committed if you prefer; ignoring keeps repo clean for local work)
+uv.lock
