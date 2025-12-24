@@ -19,8 +19,64 @@ def _router():
 router = _router()
 
 
+@router.get("/favicon.ico")
+def favicon_ico():
+    """Serve a minimal favicon to avoid noisy 404s in browser consoles."""
+
+    from starlette.responses import Response
+
+    # Empty 204 is fine; browsers stop retrying and console stays clean.
+    return Response(status_code=204)
+
+
+@router.get("/apple-touch-icon.png")
+def apple_touch_icon():
+    """Serve apple-touch-icon to avoid 404 noise."""
+
+    from starlette.responses import Response
+
+    return Response(status_code=204)
+
+
+@router.get("/robots.txt")
+def robots_txt():
+    """Serve minimal robots.txt to avoid 404 noise."""
+
+    from starlette.responses import PlainTextResponse
+
+    return PlainTextResponse("User-agent: *\nDisallow:\n")
+
+
+@router.get("/manifest.json")
+def manifest_json():
+    """Serve minimal web manifest to avoid 404 noise."""
+
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({"name": "Platform UI", "short_name": "Platform UI"})
+
+
 @router.get("/", response_class=HTMLResponse)
 def ui_index():
+    """Serve the Platform UI shell.
+
+    Milestone A: serve a committed static index.html from platform_ui/assets_dist.
+    This keeps pytest fast (no Node build required) and lets us migrate feature-by-feature.
+
+    Fallback: if assets_dist is missing, return the legacy inline HTML from site.py.
+    """
+
+    base = pathlib.Path(__file__).resolve().parents[2] / "platform_ui" / "assets_dist"
+    index_path = (base / "index.html").resolve()
+
+    try:
+        if index_path.exists() and index_path.is_file():
+            return HTMLResponse(index_path.read_text(encoding="utf-8"))
+    except Exception:
+        # Fall back to legacy inline HTML if reading fails.
+        pass
+
+    # Legacy fallback
     from quantdsl_backtest.platform_ui.site import html_index
 
     return HTMLResponse(html_index())
@@ -37,13 +93,30 @@ def ui_static(path: str):
     if path == "plotly.min.js":
         try:
             import importlib.resources
+
             # In Python 3.9+, .files() is the modern way to access package data.
             plotly_js = importlib.resources.files("plotly").joinpath("package_data/plotly.min.js")
-            if plotly_js.exists():
+            try:
+                # Traversable objects don't always have .exists() according to type checkers.
+                opened = plotly_js.open("rb")  # type: ignore[attr-defined]
+            except Exception:
+                opened = None
+            if opened is not None:
+                opened.close()
                 return FileResponse(str(plotly_js))
         except (ImportError, AttributeError, TypeError):
             pass
 
+    # Prefer committed SPA build assets first
+    base_dist = pathlib.Path(__file__).resolve().parents[2] / "platform_ui" / "assets_dist"
+    file_path = (base_dist / path).resolve()
+
+    # Prevent path traversal
+    if base_dist in file_path.parents or file_path == base_dist:
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+
+    # Fallback to legacy assets folder
     base = pathlib.Path(__file__).resolve().parents[2] / "platform_ui" / "assets"
     file_path = (base / path).resolve()
 
@@ -55,3 +128,86 @@ def ui_static(path: str):
         return Response(status_code=404)
 
     return FileResponse(str(file_path))
+
+
+@router.get("/apple-touch-icon-precomposed.png")
+def apple_touch_icon_precomposed():
+    from starlette.responses import Response
+
+    return Response(status_code=204)
+
+
+@router.get("/favicon-16x16.png")
+def favicon_16():
+    from starlette.responses import Response
+
+    return Response(status_code=204)
+
+
+@router.get("/favicon-32x32.png")
+def favicon_32():
+    from starlette.responses import Response
+
+    return Response(status_code=204)
+
+
+@router.get("/site.webmanifest")
+def site_webmanifest():
+    from starlette.responses import JSONResponse
+
+    return JSONResponse({"name": "Platform UI", "short_name": "Platform UI"})
+
+
+@router.get("/browserconfig.xml")
+def browserconfig_xml():
+    from starlette.responses import Response
+    return Response(status_code=204)
+
+
+@router.get("/sitemap.xml")
+def sitemap_xml():
+    from starlette.responses import Response
+    return Response(status_code=204)
+
+
+@router.get("/humans.txt")
+def humans_txt():
+    from starlette.responses import Response
+    return Response(status_code=204)
+
+
+@router.get("/favicon.svg")
+def favicon_svg():
+    from starlette.responses import Response
+    return Response(status_code=204)
+
+
+@router.get("/favicon.png")
+def favicon_png():
+    from starlette.responses import Response
+    return Response(status_code=204)
+
+
+@router.get("/static/favicon.ico")
+def static_favicon_ico():
+    from starlette.responses import Response
+    return Response(status_code=204)
+
+
+@router.get("/static/manifest.json")
+def static_manifest_json():
+    from starlette.responses import JSONResponse
+    return JSONResponse({"name": "Platform UI", "short_name": "Platform UI"})
+
+
+@router.get("/static/site.webmanifest")
+def static_site_webmanifest():
+    from starlette.responses import JSONResponse
+    return JSONResponse({"name": "Platform UI", "short_name": "Platform UI"})
+
+
+@router.get("/static/apple-touch-icon.png")
+def static_apple_touch_icon():
+    from starlette.responses import Response
+    return Response(status_code=204)
+

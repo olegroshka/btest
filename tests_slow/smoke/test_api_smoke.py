@@ -1,22 +1,59 @@
+from __future__ import annotations
+
+import pathlib
+
 import httpx
-import sys
 import pytest
+
+
+def _read_base_url() -> str:
+    root = pathlib.Path(__file__).resolve().parents[2]
+    port_file = root / ".platform_ui" / "server.port"
+    port = 8000
+    try:
+        if port_file.exists():
+            port = int(port_file.read_text(encoding="utf-8").strip())
+    except Exception:
+        port = 8000
+    return f"http://127.0.0.1:{port}/api"
+
+
+def _assert_server_up(base_url: str) -> None:
+    try:
+        r = httpx.get(base_url.replace("/api", "/health"), timeout=2.5)
+        assert r.status_code == 200
+    except Exception as e:
+        raise AssertionError(
+            f"Smoke tests require a running server. Could not reach {base_url}. "
+            f"Start it with: uv run python scripts/run_platform_ui.py (or scripts/run_platform_ui.ps1). "
+            f"Underlying error: {e!r}"
+        )
+
 
 @pytest.mark.slow
 @pytest.mark.smoke
 @pytest.mark.manual
 def test_api_filters_smoke():
     """Manual smoke test: check API filters on a live server.
-    
-    This test is intended to be run against a live server (default http://127.0.0.1:8000/).
-    """
-    check_meta()
 
-def check_meta(port="8000"):
-    base_url = f"http://127.0.0.1:{port}/api"
-    print("--- Fetching all meta ---")
+    This test is intended to be run against a live server.
+
+    NOTE: base_url is resolved from .platform_ui/server.port when present.
+    """
+
+    base_url = _read_base_url()
+    _assert_server_up(base_url)
+
+    check_meta(base_url)
+
+
+def check_meta(base_url: str) -> None:
+    print('--- Fetching all meta ---')
     r = httpx.get(f"{base_url}/catalog/meta")
+    assert r.status_code == 200
     data = r.json()
+    assert isinstance(data.get('rows'), list)
+
     rows = data.get("rows", [])
     print(f"Total rows: {len(rows)}")
     
@@ -43,10 +80,3 @@ def check_meta(port="8000"):
     else:
         print("FAILED TO FIND BY LIB/SYM")
         assert False, "Failed to find row by library and symbol"
-
-if __name__ == "__main__":
-    try:
-        p = sys.argv[1] if len(sys.argv) > 1 else "8000"
-        check_meta(p)
-    except Exception as e:
-        print(f"Error: {e}")

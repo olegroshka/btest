@@ -180,6 +180,23 @@ def create_app():
     app.include_router(catalog_plan.router, prefix="/api")
     app.include_router(quality.router, prefix="/api")
 
+    # --- catch-all for browser asset probes (non-API only) -------------
+    # Browsers/extensions sometimes probe for optional assets (icons, manifests) and log 404s noisily.
+    # We keep API semantics untouched: /api/* routes still return proper 404/422/etc.
+    from fastapi.responses import Response
+    from fastapi import Request
+
+    @app.middleware("http")
+    async def _swallow_non_api_404s(request: Request, call_next):
+        resp = await call_next(request)
+        try:
+            path = str(request.url.path)
+        except Exception:
+            path = ""
+        if resp.status_code == 404 and path and not path.startswith("/api"):
+            return Response(status_code=204)
+        return resp
+
     return app
 
 

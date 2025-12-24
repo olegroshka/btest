@@ -50,6 +50,18 @@ def get_catalog_meta(
         meta_lib = get_meta_library(arctic=arctic)
         df = read_catalog_index(meta_lib=meta_lib)
 
+        # Back-compat: older local caches can have library=null in the meta index.
+        # Derive it from provider/frequency so UI queries using (library, symbol) work.
+        try:
+            if "library" in df.columns and "provider" in df.columns and "frequency" in df.columns:
+                missing = df["library"].isna() | (df["library"].astype(str).str.strip() == "")
+                if missing.any():
+                    df.loc[missing, "library"] = (
+                        "market_data/" + df.loc[missing, "provider"].astype(str).str.upper() + "/" + df.loc[missing, "frequency"].astype(str).str.lower()
+                    )
+        except Exception:
+            pass
+
         df = filter_meta_df(
             df,
             provider=provider,

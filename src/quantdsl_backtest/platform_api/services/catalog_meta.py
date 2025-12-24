@@ -94,6 +94,9 @@ def build_meta_row_from_df(
 
 
 def _meta_to_record(m: CacheSymbolMeta) -> dict[str, Any]:
+    # NOTE: Ensure values are JSON-serializable primitives.
+    # Some Arctic/pandas round-trips can preserve `library` as a non-plain dtype
+    # which then gets encoded as null in the API layer.
     return {
         "provider": m.provider,
         "frequency": m.frequency,
@@ -101,7 +104,7 @@ def _meta_to_record(m: CacheSymbolMeta) -> dict[str, Any]:
         "dataset": m.dataset,
         "entity": m.entity,
         "symbol": m.symbol,
-        "library": m.library,
+        "library": str(m.library) if m.library is not None else None,
         "start": m.start,
         "end": m.end,
         "updated_at": m.updated_at,
@@ -130,6 +133,12 @@ def _records_to_df(records: list[dict[str, Any]]) -> pd.DataFrame:
         )
 
     df = pd.DataFrame.from_records(records)
+
+    # Normalize potentially mixed dtypes to keep ArcticDB + JSON encoding predictable.
+    # IMPORTANT: avoid pandas 'string' extension dtype (string[python]) which ArcticDB can't normalize.
+    if "library" in df.columns:
+        df["library"] = df["library"].astype(object)
+
     for c in ["start", "end", "updated_at"]:
         if c in df.columns:
             df[c] = pd.to_datetime(df[c], utc=True, errors="coerce")

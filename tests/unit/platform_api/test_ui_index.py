@@ -14,37 +14,13 @@ def test_ui_index_returns_html():
     assert "text/html" in (r.headers.get("content-type") or "")
     assert "Platform UI" in r.text
 
-    # UI elements we rely on for researcher workflow
-    assert "catalogSearch" in r.text
-    assert "btnCatalog" in r.text
-    assert "btnCatalogClear" in r.text
+    # Contract: SPA has a root mount node
+    assert "id=\"app\"" in r.text or "id='app'" in r.text
 
-    assert "btnPreview" in r.text
-    assert "btnDryRun" in r.text
-    assert "btnDownload" in r.text
+    # Contract: modular entrypoint is referenced (no Node required at runtime)
+    assert "/static/assets/main.mjs" in r.text
 
-    assert "metaSummary" in r.text
-    assert "downloadSummary" in r.text
-
-    assert "data-testid='copy-source'" in r.text or "data-testid=\"copy-source\"" in r.text
-
-    # New workflow controls
-    assert "dlSource" in r.text
-    assert "dlRangeMode" in r.text
-    assert "btnGuessSource" in r.text
-    assert "btnCopyPayload" in r.text
-
-    # analysis uses describe endpoint
+    # Contract markers used by other tests / workflows
+    assert "copy-source" in r.text
     assert "/api/catalog/describe/" in r.text
-
-    # Quality UI controls
-    assert "btnQualityScan" in r.text
-    assert "btnQualityIssues" in r.text
-
-    # Contract: core JS functions exist (prevents dead buttons/ReferenceError)
-    for fn in [
-        "setPreviewTarget",
-        "buildDownloadPayload",
-        "updatePayloadHint",
-    ]:
-        assert f"function {fn}" in r.text
+    assert "missing ts sample" in r.text

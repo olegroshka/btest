@@ -16,26 +16,25 @@ Notes:
 - To stop the server, run: .\scripts\stop_platform_ui.ps1
 #>
 
+param(
+    [string]$HostAddress = '127.0.0.1',
+    [int]$Port = 8000
+)
+
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $stateDir = Join-Path $root '.platform_ui'
 $pidFile = Join-Path $stateDir 'server.pid'
 $logFile = Join-Path $stateDir 'server.log'
+$errFile = Join-Path $stateDir 'server.err.log'
 $portFile = Join-Path $stateDir 'server.port'
 
-param(
-    [string]$HostAddress = '127.0.0.1',
-    [int]$Port = 8000
-)
-
-if (!(Test-Path $stateDir)) {
-    New-Item -ItemType Directory -Path $stateDir | Out-Null
-}
-
-# Ensure log file exists so Start-Process redirection always has a target.
-if (!(Test-Path $logFile)) {
-    New-Item -ItemType File -Path $logFile -Force | Out-Null
+# Ensure log files exist so Start-Process redirection always has a target.
+foreach ($f in @($logFile, $errFile)) {
+    if (!(Test-Path $f)) {
+        New-Item -ItemType File -Path $f -Force | Out-Null
+    }
 }
 
 if (Test-Path $pidFile) {
@@ -56,7 +55,7 @@ if (Test-Path $pidFile) {
     Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host ("Starting Platform UI... host={0} port={1} log={2}" -f $HostAddress, $Port, $logFile)
+Write-Host ("Starting Platform UI... host={0} port={1} stdout={2} stderr={3}" -f $HostAddress, $Port, $logFile, $errFile)
 
 # Fail fast if port is already in use.
 $ownerPid = $null
@@ -118,7 +117,7 @@ try {
         -PassThru `
         -NoNewWindow `
         -RedirectStandardOutput $logFile `
-        -RedirectStandardError $logFile
+        -RedirectStandardError $errFile
 } catch {
     throw ("Failed to launch server process via uv. Exception: {0}" -f $_.Exception.Message)
 }
@@ -130,4 +129,4 @@ if ($null -eq $proc -or $proc.Id -le 0) {
 Set-Content -LiteralPath $pidFile -Value ([string]$proc.Id) -Encoding ascii
 Set-Content -LiteralPath $portFile -Value ([string]$Port) -Encoding ascii
 Write-Host ("Started Platform UI (PID {0})." -f $proc.Id)
-Write-Host ("Open http://{0}:{1} (or see server log: {2})" -f $HostAddress, $Port, $logFile)
+Write-Host ("Open http://{0}:{1} (or see server logs: {2} / {3})" -f $HostAddress, $Port, $logFile, $errFile)
