@@ -239,13 +239,25 @@ Smoke tests require a running platform server.
 
 1. Start the server in one terminal:
 ```powershell
+# canonical
 uv run python scripts/run_platform_ui.py
+
+# convenience wrappers (PID + log files under .platform_ui/)
+.\scripts\run_platform_ui.ps1
+# or on a different port:
+.\scripts\run_platform_ui.ps1 -Port 8001
 ```
 
 2. Run the smoke tests in another terminal:
 ```powershell
 uv run pytest -q tests_slow/smoke -m manual
 ```
+
+3. Stop the server (if you started it via the wrapper):
+```powershell
+.\scripts\stop_platform_ui.ps1
+```
+
 
 Tip: iterate fast by running only unit tests during development, and run `tests_slow` once before pushing.
 
