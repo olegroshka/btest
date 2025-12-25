@@ -80,19 +80,19 @@ export function renderPreviewTables(data) {
     (idx1 ? ` <span style="margin-right:8px">end: <code>${escapeHtml(String(idx1))}</code></span>` : '');
 
   function renderTable(title, arr) {
-    if (!Array.isArray(arr) || !arr.length) return `<div style="color:#666">(${escapeHtml(title)} empty)</div>`;
+    if (!Array.isArray(arr) || !arr.length) return `<div style="color:var(--muted)">(${escapeHtml(title)} empty)</div>`;
     const cols = Array.isArray(data.columns) && data.columns.length ? data.columns : Object.keys(arr[0] || {});
-    let h = `<div style="color:#666;margin:6px 0"><b>${escapeHtml(title)}</b> (${arr.length})</div>`;
-    h += '<div style="overflow:auto;border:1px solid #eee;border-radius:10px">';
-    h += '<table style="width:100%;border-collapse:collapse;font-size:12px">';
-    h += '<thead><tr style="text-align:left;background:#fafafa">';
-    for (const c of cols) h += `<th style="padding:8px 10px;border-bottom:1px solid #eee">${escapeHtml(c)}</th>`;
+    let h = `<div style="color:var(--muted);margin:6px 0"><b>${escapeHtml(title)}</b> (${arr.length})</div>`;
+    h += '<div class="card" style="overflow:auto;padding:0">';
+    h += '<table class="table">';
+    h += '<thead><tr>';
+    for (const c of cols) h += `<th>${escapeHtml(c)}</th>`;
     h += '</tr></thead><tbody>';
     for (const r of arr) {
       h += '<tr>';
       for (const c of cols) {
         const v = (r && Object.prototype.hasOwnProperty.call(r, c)) ? r[c] : '';
-        h += `<td style="padding:8px 10px;border-bottom:1px solid #f3f3f3">${escapeHtml(v ?? '')}</td>`;
+        h += `<td>${escapeHtml(v ?? '')}</td>`;
       }
       h += '</tr>';
     }
