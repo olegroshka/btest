@@ -1,5 +1,5 @@
 import { fetchJson, escapeHtml, renderJsonError } from './api.js';
-import { patchUiState, readQuery, replaceQuery } from './state.js';
+import { patchUiState, readQuery, replaceQuery, getUiState } from './state.js';
 
 function flattenCatalogToRows(data) {
   const rows = [];
@@ -56,6 +56,11 @@ function setSelection(lib, sym, tab = 'catalog') {
 
   patchUiState({ pLib: lib, pSym: sym, lastSelectedLibrary: lib, lastSelectedSymbol: sym });
   replaceQuery({ tab, lib, sym });
+
+  // Allow other tabs (Meta/Inspector/etc.) to react immediately.
+  try {
+    window.dispatchEvent(new CustomEvent('quantdsl:selection', { detail: { lib, sym } }));
+  } catch (e) {}
 }
 
 function renderRows(host, rows, q) {
@@ -155,11 +160,62 @@ export function mountCatalog(containerId = 'pageCatalog') {
     if (search) {
       search.addEventListener('input', () => {
         renderRows(host, allRows, search.value);
+        try {
+          const term = String(search.value || '').trim();
+          // Contract: Catalog search should not leave a stale selection that can drive Meta queries.
+          // Clear selection and remove lib/sym from the URL.
+
+          const prev = getUiState();
+          const prevSuggested = String(prev.__catalogEntitySuggest || '').trim();
+          const currentMEntity = String(prev.mEntity || '').trim();
+          const shouldSuggestEntity = (currentMEntity === '' || currentMEntity === prevSuggested);
+
+          patchUiState({
+            catalogSearch: term,
+            pLib: '',
+            pSym: '',
+            lastSelectedLibrary: '',
+            lastSelectedSymbol: '',
+            __catalogEntitySuggest: term,
+            ...(shouldSuggestEntity ? { mEntity: term } : {}),
+          });
+          try { replaceQuery({ lib: '', sym: '' }); } catch (e3) {}
+          try {
+            const pl = document.getElementById('pLib');
+            const ps = document.getElementById('pSym');
+            if (pl) pl.value = '';
+            if (ps) ps.value = '';
+          } catch (e2) {}
+        } catch (e) {}
         updateMetaLink();
       });
       // Some browsers may not fire input for autofill; this keeps it consistent.
       search.addEventListener('change', () => {
         renderRows(host, allRows, search.value);
+        try {
+          const term = String(search.value || '').trim();
+          const prev = getUiState();
+          const prevSuggested = String(prev.__catalogEntitySuggest || '').trim();
+          const currentMEntity = String(prev.mEntity || '').trim();
+          const shouldSuggestEntity = (currentMEntity === '' || currentMEntity === prevSuggested);
+
+          patchUiState({
+            catalogSearch: term,
+            pLib: '',
+            pSym: '',
+            lastSelectedLibrary: '',
+            lastSelectedSymbol: '',
+            __catalogEntitySuggest: term,
+            ...(shouldSuggestEntity ? { mEntity: term } : {}),
+          });
+          try { replaceQuery({ lib: '', sym: '' }); } catch (e3) {}
+          try {
+            const pl = document.getElementById('pLib');
+            const ps = document.getElementById('pSym');
+            if (pl) pl.value = '';
+            if (ps) ps.value = '';
+          } catch (e2) {}
+        } catch (e) {}
         updateMetaLink();
       });
     }
@@ -174,14 +230,9 @@ export function mountCatalog(containerId = 'pageCatalog') {
       const lib = a.getAttribute('data-lib') || '';
       const sym = a.getAttribute('data-sym') || '';
 
-      // Select and navigate in one step to avoid URL/tab races.
-      setSelection(lib, sym, 'inspector');
-
-      // Move user to Inspector (if layout exists)
-      try {
-        const tab = document.getElementById('tabInspector');
-        if (tab) tab.click();
-      } catch (e) {}
+      // Contract: clicking a catalog row selects it but does NOT force navigation away from Catalog.
+      // (Inspector can still be reached via its tab.)
+      setSelection(lib, sym, 'catalog');
     });
   } catch (e) {}
 

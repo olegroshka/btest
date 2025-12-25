@@ -94,7 +94,7 @@ def test_platform_ui_browser_e2e_playwright(tmp_path, monkeypatch):
 
     # wait for server
     t0 = time.time()
-    while time.time() - t0 < 10:
+    while time.time() - t0 < 6:
         try:
             import httpx
 
@@ -102,7 +102,7 @@ def test_platform_ui_browser_e2e_playwright(tmp_path, monkeypatch):
             if r.status_code == 200:
                 break
         except Exception:
-            time.sleep(0.2)
+            time.sleep(0.05)
     else:
         raise AssertionError("Server did not start")
 
@@ -168,7 +168,7 @@ def test_platform_ui_browser_e2e_playwright(tmp_path, monkeypatch):
             html = (page.inner_html("#catalog") or "").lower()
             return ("http_" in html) or ("error" in html)
 
-        def _wait_until(predicate, *, timeout_s: float = 60.0, step_s: float = 0.2, on_timeout: str = ""):
+        def _wait_until(predicate, *, timeout_s: float = 10.0, step_s: float = 0.05, on_timeout: str = ""):
             t0 = time.time()
             while time.time() - t0 < timeout_s:
                 try:
@@ -182,7 +182,7 @@ def test_platform_ui_browser_e2e_playwright(tmp_path, monkeypatch):
         try:
             _wait_until(
                 _catalog_ready_dom,
-                timeout_s=60.0,
+                timeout_s=10.0,
                 on_timeout=f"Catalog did not become ready. diagnostics={diag_path}",
             )
         except Exception:
@@ -236,8 +236,16 @@ def test_platform_ui_browser_e2e_playwright(tmp_path, monkeypatch):
             )
 
             # Switch to Inspector tab and verify it renders
-            page.click("#tabInspector")
-            page.wait_for_timeout(250)
+            # In the new UI the Inspector tab button is "disabled" when active,
+            # so a plain click can hang waiting for it to become enabled.
+            try:
+                if page.is_enabled("#tabInspector"):
+                    page.click("#tabInspector")
+                else:
+                    page.click("#tabInspector", force=True)
+            except Exception:
+                page.click("#tabInspector", force=True)
+            page.wait_for_timeout(50)
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
 
             # Preview and ensure outputs render

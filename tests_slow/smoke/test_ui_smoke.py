@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import time
 import pytest
 import pathlib
 from playwright.sync_api import ConsoleMessage, sync_playwright
@@ -41,6 +40,63 @@ def _read_base_url() -> str:
     except Exception:
         port = 8000
     return f"http://127.0.0.1:{port}/"
+
+
+def _wait_until(page, predicate_js: str, *, timeout_ms: int = 1500) -> None:
+    """Fast local wait helper.
+
+    We intentionally keep timeouts low because this runs against localhost.
+    If something is truly slow/broken, failing fast is better than sleeping.
+    """
+    page.wait_for_function(predicate_js, timeout=timeout_ms)
+
+
+def _wait_catalog_has_rows(page, *, timeout_ms: int = 1500) -> None:
+    _wait_until(
+        page,
+        "() => document.querySelectorAll(\"#catalog a[data-act='preview']\").length > 0",
+        timeout_ms=timeout_ms,
+    )
+
+
+def _wait_selection_populated(page, *, timeout_ms: int = 800) -> None:
+    _wait_until(
+        page,
+        "() => (document.getElementById('pLib')?.value||'').trim().length>0 && (document.getElementById('pSym')?.value||'').trim().length>0",
+        timeout_ms=timeout_ms,
+    )
+
+
+def _wait_plot_ready(page, *, timeout_ms: int = 2500) -> None:
+    # Either plotStatus says ready OR plot div contains an svg/canvas from plotly.
+    _wait_until(
+        page,
+        """() => {
+          const st = (document.getElementById('plotStatus')?.textContent||'').toLowerCase();
+          if (st.includes('ready')) return true;
+          const el = document.getElementById('plot');
+          if (!el) return false;
+          // Plotly typically renders svg nodes
+          return el.querySelectorAll('svg').length > 0 || el.querySelectorAll('.js-plotly-plot').length > 0;
+        }""",
+        timeout_ms=timeout_ms,
+    )
+
+
+def _wait_meta_summary(page, *, timeout_ms: int = 1500) -> None:
+    _wait_until(
+        page,
+        "() => (document.getElementById('metaSummary')?.innerText||'').toLowerCase().includes('count')",
+        timeout_ms=timeout_ms,
+    )
+
+
+def _wait_quality_grid(page, *, timeout_ms: int = 2500) -> None:
+    _wait_until(
+        page,
+        "() => document.querySelectorAll('#quality table').length >= 1",
+        timeout_ms=timeout_ms,
+    )
 
 
 def main() -> None:
@@ -158,7 +214,7 @@ def main() -> None:
                 raise
 
             # It might not be visible depending on CSS/layout; ensure it exists then click.
-            time.sleep(0.25)
+            page.wait_for_timeout(25)
 
             steps: list[dict[str, object]] = out["steps"]  # type: ignore[assignment]
 
@@ -171,7 +227,7 @@ def main() -> None:
             )
 
             page.click("#btnCatalog")
-            page.wait_for_timeout(1500)
+            _wait_catalog_has_rows(page, timeout_ms=1500)
             steps.append(
                 {
                     "name": "after_catalog",
@@ -184,7 +240,7 @@ def main() -> None:
             links = page.query_selector_all("a[data-act='preview']")
             if links:
                 links[0].click()
-                page.wait_for_timeout(800)
+                _wait_selection_populated(page, timeout_ms=800)
 
                 # ensure Inspector tab activated
                 try:
@@ -197,7 +253,7 @@ def main() -> None:
 
                 page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
                 page.click("#btnPreview")
-                page.wait_for_timeout(2500)
+                _wait_plot_ready(page, timeout_ms=2500)
                 assert page.is_visible("#plot")
 
             steps.append(
@@ -219,7 +275,7 @@ def main() -> None:
                     page.click("#mainTabs [data-tab='inspector']", force=True)
             except Exception:
                 page.click("#mainTabs [data-tab='inspector']", force=True)
-            page.wait_for_timeout(600)
+            page.wait_for_timeout(25)
 
             # Ensure the Inspector pane is visible.
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
@@ -232,7 +288,7 @@ def main() -> None:
             if not preview_disabled:
                 page.locator("#btnPreview").scroll_into_view_if_needed()
                 page.click("#btnPreview")
-                page.wait_for_timeout(2500)
+                _wait_plot_ready(page, timeout_ms=2500)
 
             steps.append(
                 {
@@ -255,14 +311,14 @@ def main() -> None:
             page.wait_for_selector("#catalogSearch", state="visible", timeout=10000)
 
             page.fill("#catalogSearch", "CAC")
-            page.wait_for_timeout(600)
+            _wait_until(page, "() => (document.getElementById('catalog')?.innerText||'').includes('CAC')", timeout_ms=800)
             txt = (page.inner_text("#catalog") or "")
             assert "CAC" in txt
 
             links = page.query_selector_all("a[data-act='preview']")
             assert links
             links[0].click()
-            page.wait_for_timeout(800)
+            _wait_selection_populated(page, timeout_ms=800)
 
             # ensure Inspector tab activated
             try:
@@ -275,7 +331,7 @@ def main() -> None:
 
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
             page.click("#btnPreview")
-            page.wait_for_timeout(2500)
+            _wait_plot_ready(page, timeout_ms=2500)
             assert page.is_visible("#plot")
 
             # Switch back to Catalog, pick another symbol, and preview again
@@ -290,11 +346,11 @@ def main() -> None:
             page.wait_for_selector("#catalogSearch", state="visible", timeout=10000)
 
             page.fill("#catalogSearch", "CCMP")
-            page.wait_for_timeout(600)
+            _wait_until(page, "() => (document.getElementById('catalog')?.innerText||'').includes('CCMP')", timeout_ms=800)
             links2 = page.query_selector_all("a[data-act='preview']")
             assert links2
             links2[0].click()
-            page.wait_for_timeout(800)
+            _wait_selection_populated(page, timeout_ms=800)
 
             try:
                 if page.is_enabled("#tabInspector"):
@@ -306,7 +362,7 @@ def main() -> None:
 
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
             page.click("#btnPreview")
-            page.wait_for_timeout(2500)
+            _wait_plot_ready(page, timeout_ms=2500)
             assert page.is_visible("#plot")
             assert "error" not in (page.inner_text("#plotStatus") or "").lower()
 
@@ -322,7 +378,7 @@ def main() -> None:
 
             page.wait_for_selector("#btnMetaQuery", state="visible", timeout=10000)
             page.click("#btnMetaQuery")
-            page.wait_for_timeout(1500)
+            _wait_meta_summary(page, timeout_ms=1500)
             ms = (page.inner_text("#metaSummary") or "").lower()
             assert "count" in ms
 
@@ -335,7 +391,7 @@ def main() -> None:
                     page.click("#mainTabs [data-tab='inspector']", force=True)
             except Exception:
                 page.click("#mainTabs [data-tab='inspector']", force=True)
-            page.wait_for_timeout(600)
+            page.wait_for_timeout(25)
 
             # Ensure the Inspector pane is visible.
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
@@ -348,7 +404,7 @@ def main() -> None:
             if not preview_disabled:
                 page.locator("#btnPreview").scroll_into_view_if_needed()
                 page.click("#btnPreview")
-                page.wait_for_timeout(2500)
+                _wait_plot_ready(page, timeout_ms=2500)
 
             steps.append(
                 {
@@ -365,13 +421,13 @@ def main() -> None:
 
             # Run quality scan and ensure it renders a table (grid)
             page.click("#btnQualityScan")
-            page.wait_for_timeout(2500)
+            _wait_quality_grid(page, timeout_ms=2500)
             # should render a table within #quality
             assert page.locator("#quality table").count() >= 1
 
             # Issues view should also render something (either no issues or a grid)
             page.click("#btnQualityIssues")
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(100)
             assert page.is_visible("#quality")
 
             # At end, record console + ensure no unexpected failed requests
@@ -394,7 +450,7 @@ def main() -> None:
             bad_console = [c for c in console if 'failed to load resource' in (c.get('text','').lower())]
             out["console_resource_errors"] = bad_console[-10:]
 
-            page.wait_for_timeout(600)
+            page.wait_for_timeout(50)
             browser.close()
     except Exception as e:
         errs: list[str] = out["errors"]  # type: ignore[assignment]

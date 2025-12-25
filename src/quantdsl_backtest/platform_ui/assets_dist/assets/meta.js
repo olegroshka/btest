@@ -43,6 +43,7 @@ export function mountMeta(containerId = 'pageMeta') {
         <label class="label">library<input id="mLibrary" class="input" placeholder="market_data/..."/></label>
         <label class="label">symbol<input id="mSymbol" class="input" placeholder="market_bars/..."/></label>
         <label class="label">limit<input id="mLimit" class="input" value="500" style="max-width:90px"/></label>
+        <button id="btnMetaFromSelection" class="btn">From selection</button>
         <button id="btnMetaQuery" class="btn">Query</button>
       </div>
       <div id="metaSummary" style="margin-top:10px"></div>
@@ -63,6 +64,10 @@ export function mountMeta(containerId = 'pageMeta') {
   set('mDataset', String(q.dataset || st.mDataset || ''));
   set('mKind', String(q.kind || st.mKind || ''));
   set('mEntity', String(q.entity || st.mEntity || ''));
+  // Strict precedence:
+  // - explicit meta URL params
+  // - explicit meta persisted state
+  // - selection (URL lib/sym or persisted pLib/pSym)
   set('mLibrary', String(q.library || st.mLibrary || selectedLib || ''));
   set('mSymbol', String(q.symbol || st.mSymbol || selectedSym || ''));
 
@@ -109,12 +114,41 @@ export function mountMeta(containerId = 'pageMeta') {
 
   try { document.getElementById('btnMetaQuery').onclick = () => runQuery(); } catch (e) {}
 
-  // auto-run when arriving with any params OR a current selection
-  if (
-    (q && Object.keys(q).some((k) => ['provider','frequency','dataset','kind','entity','library','symbol','lib','sym'].includes(k))) ||
-    selectedLib || selectedSym
-  ) {
-    runQuery();
+  function applyFromSelection() {
+    const st2 = getUiState();
+    const q2 = readQuery();
+    const lib = String(q2.lib || st2.pLib || '').trim();
+    const sym = String(q2.sym || st2.pSym || '').trim();
+    if (!lib && !sym) return;
+    if (lib) set('mLibrary', lib);
+    if (sym) set('mSymbol', sym);
+    // Don't force provider/entity/etc here. Those can be refined by the user.
+  }
+
+  // Live sync: when the Catalog selection changes, always reflect it in Meta's library/symbol.
+  // This is a strict UI contract so a trader can select a row and immediately query Meta for it.
+  function onSelectionEv(ev) {
+    try {
+      const d = (ev && ev.detail) ? ev.detail : {};
+      const lib = String(d.lib || '').trim();
+      const sym = String(d.sym || '').trim();
+      if (lib) set('mLibrary', lib);
+      if (sym) set('mSymbol', sym);
+      // Persist only library/symbol
+      patchUiState({ mLibrary: lib || val('mLibrary'), mSymbol: sym || val('mSymbol') });
+    } catch (e) {}
+  }
+  try { window.addEventListener('quantdsl:selection', onSelectionEv); } catch (e) {}
+
+  // Wire "From selection" button.
+  try {
+    const btn = document.getElementById('btnMetaFromSelection');
+    if (btn) btn.onclick = () => applyFromSelection();
+  } catch (e) {}
+
+  // If we already have a selection (via URL or persisted state), apply it once on mount.
+  if ((selectedLib || selectedSym) && (!val('mLibrary') || !val('mSymbol'))) {
+    applyFromSelection();
   }
 }
 

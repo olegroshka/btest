@@ -26,14 +26,14 @@ $stopped = @()
 if (Test-Path $pidFile) {
     $pidText = (Get-Content -LiteralPath $pidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
     if ($pidText) {
-        $pid = 0
-        [void][int]::TryParse($pidText.Trim(), [ref]$pid)
-        if ($pid -gt 0) {
-            $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+        $serverPid = 0
+        [void][int]::TryParse($pidText.Trim(), [ref]$serverPid)
+        if ($serverPid -gt 0) {
+            $proc = Get-Process -Id $serverPid -ErrorAction SilentlyContinue
             if ($null -ne $proc) {
-                Write-Output ("Stopping PID {0} (from {1})..." -f $pid, $pidFile)
-                Stop-Process -Id $pid -Force
-                $stopped += $pid
+                Write-Output ("Stopping PID {0} (from {1})..." -f $serverPid, $pidFile)
+                Stop-Process -Id $serverPid -Force
+                $stopped += $serverPid
             }
         }
     }

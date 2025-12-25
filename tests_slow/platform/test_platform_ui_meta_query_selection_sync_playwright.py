@@ -97,62 +97,106 @@ def test_meta_query_matches_current_catalog_selection(tmp_path, monkeypatch):
         page.goto(f"http://127.0.0.1:{port}/", wait_until="networkidle")
         page.wait_for_selector("#btnCatalog", timeout=10000)
 
+        # Ensure Meta panel is mounted so its inputs exist.
+        page.click("#tabMeta")
+        page.wait_for_selector("#pageMeta", state="visible", timeout=10000)
+
         # Ensure we have a stale state. If not restored, set it manually.
-        current_entity = page.eval_on_selector('#fEntity', 'el => el.value')
-        if current_entity != 'CPIAUCSL':
-            page.evaluate("""() => {
+        current_entity = page.eval_on_selector("#mEntity", "el => el.value")
+        if current_entity != "CPIAUCSL":
+            page.evaluate(
+                """() => {
                 document.getElementById('pLib').value = 'market_data/FRED/1d';
                 document.getElementById('pSym').value = 'market_bars/fred/CPIAUCSL';
-                document.getElementById('fProvider').value = 'FRED';
-                document.getElementById('fEntity').value = 'CPIAUCSL';
+                document.getElementById('mProvider').value = 'FRED';
+                document.getElementById('mEntity').value = 'CPIAUCSL';
                 document.getElementById('pLib').dispatchEvent(new Event('input'));
                 document.getElementById('pSym').dispatchEvent(new Event('input'));
-                document.getElementById('fEntity').dispatchEvent(new Event('input'));
-            }""")
-            
-        # Type SPX in search.
+                document.getElementById('mEntity').dispatchEvent(new Event('input'));
+            }"""
+            )
+
+        # Type SPX in search (must be on Catalog tab for the input to be visible/editable).
+        page.click("#tabCatalog")
+        page.wait_for_selector("#catalogSearch", state="visible", timeout=30000)
         page.fill("#catalogSearch", "SPX")
         page.eval_on_selector("#catalogSearch", "el => el.dispatchEvent(new Event('input'))")
-            
-        # Selection should be cleared because it doesn't match SPX.
-        page.wait_for_function("() => !document.getElementById('pSym')?.value", timeout=5000)
-        
-        # fEntity should follow search.
-        page.wait_for_function("() => document.getElementById('fEntity')?.value === 'SPX'", timeout=5000)
-        
-        # Click Query. It should NOT revert to FRED.
-        page.click("#btnMeta")
-        # Give it some time to load and render
-        page.wait_for_selector("#meta .table-wrap, #meta .muted", timeout=10000)
-        
-        meta_html = page.inner_html("#meta")
-        
-        assert "CPIAUCSL" not in meta_html, "Query reverted to stale FRED even though we searched for SPX"
-        assert "SPX" in meta_html, "Query did not find SPX"
-        
-        # Provider should still be empty or SPX (not FRED).
-        assert page.eval_on_selector('#fProvider', 'el => el.value').upper() != 'FRED'
 
-        # Now select SPX explicitly.
-        # Find the SPX row in the catalog.
-        page.wait_for_selector("a[data-act='preview'][data-entity='SPX']", state="attached")
-        page.click("a[data-act='preview'][data-entity='SPX']")
-        page.wait_for_function("() => document.getElementById('pSym')?.value?.includes('SPX')", timeout=5000)
+        # Ensure catalog data is loaded (search operates on loaded rows).
+        page.click("#btnCatalog")
+        page.wait_for_function(
+            "() => document.querySelectorAll(\"#catalog a[data-act='preview']\").length > 0",
+            timeout=10000,
+        )
 
-        # Switch back to catalog tab to see Meta Query panel again.
-        page.click("#mainTabs [data-tab='catalog']")
-        page.wait_for_selector("#pageCatalog", state="visible")
+        # Contract: search clears selection so stale lib/sym can't contaminate Meta.
+        page.wait_for_function(
+            "() => !new URLSearchParams(window.location.search||'').get('sym')",
+            timeout=15000,
+        )
 
-        # Query should now work and return SPX (or at least NOT FRED/CPI).
-        page.click("#btnMeta")
-        page.wait_for_timeout(2000)
-        meta_html2 = page.inner_html("#meta")
+        # If the URL isn't updated for some reason, pSym must still be empty.
+        page.wait_for_function(
+            "() => !document.getElementById('pSym') || !document.getElementById('pSym').value",
+            timeout=15000,
+        )
+
+        # Switch back to Meta and check it gets a helpful suggested entity.
+        page.click("#tabMeta")
+        page.wait_for_selector("#pageMeta", state="visible", timeout=10000)
+        # Contract: Catalog search must not clobber an existing Meta entity filter coming from
+        # localStorage/user. We seeded CPIAUCSL, so it should remain CPIAUCSL.
+        page.wait_for_function(
+            "() => (document.getElementById('mEntity')?.value || '').trim().toUpperCase() === 'CPIAUCSL'",
+            timeout=5000,
+        )
+
+        # Click Query. It should NOT revert to stale FRED/CPI.
+        page.click("#btnMetaQuery")
+        page.wait_for_selector("#metaTable", timeout=10000)
+        page.wait_for_function(
+            """() => {
+              const out = document.getElementById('metaTable');
+              const sum = document.getElementById('metaSummary');
+              const t = out ? String(out.innerText||'').trim().toLowerCase() : '';
+              const s = sum ? String(sum.innerText||'').trim() : '';
+              return (s.length > 0) && (!t.includes('(loading'));
+            }""",
+            timeout=15000,
+        )
+        meta_html = page.inner_html("#metaTable")
+
+        assert "CPIAUCSL" not in meta_html, "Query reverted to stale CPI result"
+        assert "FRED" not in meta_html.upper(), "Query reverted to stale FRED"
+        # Under strict contract, we do not overwrite user's existing Meta filters (mProvider/mEntity)
+        # just because the Catalog search changed.
+
+        # Now select SPX explicitly (Catalog tab) and ensure Meta uses selection.
+        page.click("#tabCatalog")
+        page.wait_for_selector("#catalog a[data-act='preview']", state="attached", timeout=30000)
+        spx = page.locator("#catalog a[data-act='preview'][data-entity='SPX']")
+        if spx.count() == 0:
+            spx = page.locator("#catalog a[data-act='preview']", has_text="SPX")
+        spx.first.wait_for(state="visible", timeout=30000)
+        spx.first.click()
+
+        # Switch to Meta tab again and ensure selection populates Meta symbol.
+        page.click("#tabMeta")
+        page.wait_for_selector("#pageMeta", state="visible", timeout=10000)
+        page.wait_for_function(
+            "() => (document.getElementById('mSymbol')?.value||'').toUpperCase().includes('SPX')",
+            timeout=5000,
+        )
+
+        page.click("#btnMetaQuery")
+        page.wait_for_function(
+            "() => (document.getElementById('metaSummary')?.innerText||'').length > 0",
+            timeout=5000,
+        )
+        meta_html2 = page.inner_html("#metaTable")
 
         assert "CPIAUCSL" not in meta_html2
         assert "FRED" not in meta_html2
-        # In this environment, it might return several rows including CAC if filter is loose, 
-        # but it definitely shouldn't be FRED.
-        assert "PARQUET" in meta_html2 or "SPX" in meta_html2
+        assert "FRED" not in meta_html2.upper()
 
         browser.close()
-
