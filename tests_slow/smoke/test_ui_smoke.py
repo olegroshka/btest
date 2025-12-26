@@ -52,9 +52,15 @@ def _wait_until(page, predicate_js: str, *, timeout_ms: int = 1500) -> None:
 
 
 def _wait_catalog_has_rows(page, *, timeout_ms: int = 1500) -> None:
+    # Require the new AG Grid catalog (ag-root-wrapper) to be present.
     _wait_until(
         page,
-        "() => document.querySelectorAll(\"#catalog a[data-act='preview']\").length > 0",
+        """() => {
+          const ag = document.querySelectorAll('.ag-root-wrapper').length > 0;
+          // rows might virtualize; detect at least one row container
+          const rows = document.querySelectorAll('.ag-center-cols-container .ag-row').length > 0;
+          return ag && rows;
+        }""",
         timeout_ms=timeout_ms,
     )
 
@@ -96,6 +102,49 @@ def _wait_quality_grid(page, *, timeout_ms: int = 2500) -> None:
         page,
         "() => document.querySelectorAll('#quality table').length >= 1",
         timeout_ms=timeout_ms,
+    )
+
+
+def _click_first_catalog_symbol(page) -> None:
+    # First column renders a link (<a>) with the symbol text.
+    # Click the first visible link inside the grid.
+    page.locator(".ag-center-cols-container a").first.click()
+
+
+def _wait_catalog_filter_menu_available(page, *, timeout_ms: int = 1500) -> None:
+    # No floating filter row. Ensure column menu (filter/sort) can be opened from headers.
+    _wait_until(
+        page,
+        """() => {
+          const h = document.querySelector('.ag-header');
+          return !!h;
+        }""",
+        timeout_ms=timeout_ms,
+    )
+
+
+def _wait_inspector_panels(page, *, timeout_ms: int = 2500) -> None:
+    _wait_until(
+        page,
+        """() => {
+          const dl = document.getElementById('downloadPanel');
+          const ql = document.getElementById('qualityPanel');
+          const ws = document.getElementById('workspace');
+          return !!dl && !!ql && !!ws;
+        }""",
+        timeout_ms=timeout_ms,
+    )
+
+
+def _goto_tab(page, name: str) -> None:
+    page.evaluate(
+        """(name) => {
+          const u = new URL(window.location.href);
+          u.searchParams.set('tab', name);
+          window.history.replaceState({}, '', u.toString());
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }""",
+        name,
     )
 
 
@@ -196,11 +245,13 @@ def main() -> None:
                 out["responses_4xx_5xx_tail"] = responses_4xx_5xx[-200:]
                 raise
 
-            # Now the UI should have mounted real controls.
+            # Now the UI should have mounted real controls AND tabs.
             try:
                 page.wait_for_selector("#btnCatalog", state="attached", timeout=15000)
+                page.wait_for_selector("#tabCatalog", state="attached", timeout=15000)
+                page.wait_for_selector("#tabInspector", state="attached", timeout=15000)
             except Exception as e:
-                out["errors"] = [f"UI mounted but #btnCatalog not attached. {e!r}"]
+                out["errors"] = [f"UI mounted but required controls not attached. {e!r}"]
                 try:
                     out["app_html_tail"] = page.inner_html("#app")[-4000:]
                 except Exception:
@@ -209,7 +260,21 @@ def main() -> None:
                 out["console_tail"] = console[-200:]
                 out["page_errors"] = page_errors[-50:]
                 out["failed_requests_tail"] = failed_requests[-50:]
-                out["all_requests_tail"] = all_requests[-500:]
+                out["responses_4xx_5xx_tail"] = responses_4xx_5xx[-200:]
+                raise
+
+            # Harden: catalog must render either legacy preview links OR AG Grid.
+            try:
+                _wait_catalog_has_rows(page, timeout_ms=20000)
+            except Exception as e:
+                out["errors"] = [f"Catalog did not render rows/grid. {e!r}"]
+                try:
+                    out["app_html_tail"] = page.inner_html("#app")[-4000:]
+                except Exception:
+                    pass
+                out["console_tail"] = console[-200:]
+                out["page_errors"] = page_errors[-50:]
+                out["failed_requests_tail"] = failed_requests[-50:]
                 out["responses_4xx_5xx_tail"] = responses_4xx_5xx[-200:]
                 raise
 
@@ -237,19 +302,17 @@ def main() -> None:
                 }
             )
 
-            links = page.query_selector_all("a[data-act='preview']")
-            if links:
-                links[0].click()
-                _wait_selection_populated(page, timeout_ms=800)
+            _click_first_catalog_symbol(page)
+            _wait_selection_populated(page, timeout_ms=800)
 
-                # Clicking a catalog preview link must switch the active tab to Inspector.
-                page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
-                assert (_snap_value(page, "#pLib") or "").strip(), "Catalog preview did not populate #pLib"
-                assert (_snap_value(page, "#pSym") or "").strip(), "Catalog preview did not populate #pSym"
+            # Clicking a catalog preview link must switch the active tab to Inspector.
+            page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
+            assert (_snap_value(page, "#pLib") or "").strip(), "Catalog preview did not populate #pLib"
+            assert (_snap_value(page, "#pSym") or "").strip(), "Catalog preview did not populate #pSym"
 
-                page.click("#btnPreview")
-                _wait_plot_ready(page, timeout_ms=2500)
-                assert page.is_visible("#plot")
+            page.click("#btnPreview")
+            _wait_plot_ready(page, timeout_ms=2500)
+            assert page.is_visible("#plot")
 
             steps.append(
                 {
@@ -260,20 +323,15 @@ def main() -> None:
                 }
             )
 
-            # Switch to Inspector using the visible tab control.
-            # New UI uses #tabInspector.
-            try:
-                # Prefer the explicit id
-                if page.is_enabled("#tabInspector"):
-                    page.click("#tabInspector")
-                else:
-                    page.click("#mainTabs [data-tab='inspector']", force=True)
-            except Exception:
-                page.click("#mainTabs [data-tab='inspector']", force=True)
+            # Switch to Inspector using URL (tab buttons are disabled when active).
+            _goto_tab(page, "inspector")
             page.wait_for_timeout(25)
 
             # Ensure the Inspector pane is visible.
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
+
+            # Inspector must include Download/Quality panels + Workspace.
+            _wait_inspector_panels(page, timeout_ms=20000)
 
             # Preview button must be visible and enabled.
             page.wait_for_selector("#btnPreview", state="visible", timeout=10000)
@@ -295,13 +353,7 @@ def main() -> None:
             )
 
             # --- Catalog search + selection scenarios (must be on Catalog tab) ---
-            try:
-                if page.is_enabled("#tabCatalog"):
-                    page.click("#tabCatalog")
-                else:
-                    page.click("#mainTabs [data-tab='catalog']", force=True)
-            except Exception:
-                page.click("#mainTabs [data-tab='catalog']", force=True)
+            _goto_tab(page, "catalog")
             page.wait_for_selector("#pageCatalog", state="visible", timeout=10000)
             page.wait_for_selector("#catalogSearch", state="visible", timeout=10000)
 
@@ -310,19 +362,11 @@ def main() -> None:
             txt = (page.inner_text("#catalog") or "")
             assert "CAC" in txt
 
-            links = page.query_selector_all("a[data-act='preview']")
-            assert links
-            links[0].click()
+            _click_first_catalog_symbol(page)
             _wait_selection_populated(page, timeout_ms=800)
 
             # ensure Inspector tab activated
-            try:
-                if page.is_enabled("#tabInspector"):
-                    page.click("#tabInspector")
-                else:
-                    page.click("#mainTabs [data-tab='inspector']", force=True)
-            except Exception:
-                page.click("#mainTabs [data-tab='inspector']", force=True)
+            _goto_tab(page, "inspector")
 
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
             page.click("#btnPreview")
@@ -330,21 +374,13 @@ def main() -> None:
             assert page.is_visible("#plot")
 
             # Switch back to Catalog, pick another symbol, and preview again
-            try:
-                if page.is_enabled("#tabCatalog"):
-                    page.click("#tabCatalog")
-                else:
-                    page.click("#mainTabs [data-tab='catalog']", force=True)
-            except Exception:
-                page.click("#mainTabs [data-tab='catalog']", force=True)
+            _goto_tab(page, "catalog")
             page.wait_for_selector("#pageCatalog", state="visible", timeout=10000)
             page.wait_for_selector("#catalogSearch", state="visible", timeout=10000)
 
             page.fill("#catalogSearch", "CCMP")
             _wait_until(page, "() => (document.getElementById('catalog')?.innerText||'').includes('CCMP')", timeout_ms=800)
-            links2 = page.query_selector_all("a[data-act='preview']")
-            assert links2
-            links2[0].click()
+            _click_first_catalog_symbol(page)
             _wait_selection_populated(page, timeout_ms=800)
 
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
@@ -356,13 +392,7 @@ def main() -> None:
             assert "error" not in (page.inner_text("#plotStatus") or "").lower()
 
             # Meta query uses current selection
-            try:
-                if page.is_enabled("#tabMeta"):
-                    page.click("#tabMeta")
-                else:
-                    page.click("#mainTabs [data-tab='meta']", force=True)
-            except Exception:
-                page.click("#mainTabs [data-tab='meta']", force=True)
+            _goto_tab(page, "meta")
             page.wait_for_selector("#pageMeta", state="visible", timeout=10000)
 
             page.wait_for_selector("#btnMetaQuery", state="visible", timeout=10000)
@@ -372,18 +402,14 @@ def main() -> None:
             assert "count" in ms
 
             # Back to Inspector
-            try:
-                # Prefer the explicit id
-                if page.is_enabled("#tabInspector"):
-                    page.click("#tabInspector")
-                else:
-                    page.click("#mainTabs [data-tab='inspector']", force=True)
-            except Exception:
-                page.click("#mainTabs [data-tab='inspector']", force=True)
+            _goto_tab(page, "inspector")
             page.wait_for_timeout(25)
 
             # Ensure the Inspector pane is visible.
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
+
+            # Inspector must include Download/Quality panels + Workspace.
+            _wait_inspector_panels(page, timeout_ms=20000)
 
             # Preview button must be visible and enabled.
             page.wait_for_selector("#btnPreview", state="visible", timeout=10000)

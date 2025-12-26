@@ -56,7 +56,7 @@ export function mountInspector(containerId = 'pageInspector') {
           <button id="btnPreview" class="btn">Preview</button>
         </div>
 
-        <div id="metaSummary" style="margin-top:10px"></div>
+        <div id="inspectorMetaSummary" style="margin-top:10px"></div>
 
         <div id="downloadPanel"></div>
         <div id="qualityPanel"></div>
@@ -96,7 +96,7 @@ export function mountInspector(containerId = 'pageInspector') {
       const m = await fetchJson(`/api/catalog/meta?library=${encodeURIComponent(lib3)}&symbol=${encodeURIComponent(sym3)}`);
       const results = (m && (m.rows || m.results)) || [];
       const first = results && results.length ? results[0] : null;
-      const ms = document.getElementById('metaSummary');
+      const ms = document.getElementById('inspectorMetaSummary');
       if (ms && first) {
         const provider = first.provider || '';
         const freq = first.frequency || first.freq || '';

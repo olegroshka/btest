@@ -4,35 +4,25 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Platform UI</title>
+
   <link rel="stylesheet" href="/static/static/ui.css" />
-  <!-- Local-first: Plotly is served by the API under /static/plotly.min.js (from Python plotly pkg). -->
   <script src="/static/plotly.min.js"></script>
-  <!-- Explicitly avoid browser auto-fetching unspecified icons/manifests -->
+
   <link rel="icon" href="/favicon.ico" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="manifest" href="/manifest.json" />
+
+  <link rel="stylesheet" href="/static/assets/main.css" />
 </head>
 <body>
-  <!-- Stable SPA mount node expected by unit tests -->
   <div id="app">(loading Platform UI...)</div>
 
-  <!--
-    Contract markers preserved for unit/httpx tests.
-    IMPORTANT: do NOT create hidden elements that conflict with real UI IDs,
-    otherwise selectors like #btnCatalog resolve to a hidden stub.
-  -->
   <div style="display:none">
-    <!-- used by tests_slow/platform/test_platform_ui_httpx_e2e.py -->
     missing ts sample
-
-    <!-- analysis uses describe endpoint -->
     /api/catalog/describe/
-
-    <!-- keep stable marker for copy payload button -->
     copy-source
   </div>
 
-  <!-- modular JS bundle entrypoint -->
-  <script type="module" src="/static/assets/main.mjs"></script>
+  <script type="module" src="/static/assets/main.js"></script>
 </body>
 </html>

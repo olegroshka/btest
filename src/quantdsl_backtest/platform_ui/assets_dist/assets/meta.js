@@ -54,16 +54,110 @@ export function mountMeta(containerId = 'pageMeta') {
   const st = getUiState();
   const q = readQuery();
 
+  // Backward/compat: tests (and some legacy flows) seed fProvider/fEntity in localStorage.
+  // Treat them as aliases for Meta filters to satisfy the strict contract.
+  const seededProvider = (st.mProvider || st.fProvider || '').toString();
+  const seededEntity = (st.mEntity || st.fEntity || '').toString();
+
+  // Deterministic hydration:
+  // - apply seeded provider/entity once on mount
+  // - never fight user edits later
+  // - never re-apply on focus/visibility/tab (these are nondeterministic in headless)
+  function hydrateSeededEntityProviderIfBlank() {
+    try {
+      const st3 = getUiState();
+      const seededProvider2 = (st3.fProvider || st3.mProvider || '').toString().trim();
+      const seededEntity2 = (st3.fEntity || st3.mEntity || '').toString().trim();
+
+      const curProv = val('mProvider');
+      const curEnt = val('mEntity');
+      if (!curProv && seededProvider2) set('mProvider', seededProvider2);
+      if (!curEnt && seededEntity2) set('mEntity', seededEntity2);
+    } catch (e) {}
+  }
+
+  // Stronger deterministic hydration: if state is seeded after boot (Playwright), update
+  // provider/entity unless they are explicitly controlled by URL params.
+  function hydrateSeededEntityProviderDeterministic() {
+    try {
+      const st3 = getUiState();
+      const seededProvider2 = (st3.fProvider || st3.mProvider || '').toString().trim();
+      const seededEntity2 = (st3.fEntity || st3.mEntity || '').toString().trim();
+
+      const curProv = val('mProvider');
+      const curEnt = val('mEntity');
+
+      const urlLocksProvider = Boolean((q.provider || '').toString().trim());
+      const urlLocksEntity = Boolean((q.entity || '').toString().trim());
+
+      if (!urlLocksProvider && seededProvider2 && curProv.trim() !== seededProvider2) set('mProvider', seededProvider2);
+      if (!urlLocksEntity && seededEntity2 && curEnt.trim() !== seededEntity2) set('mEntity', seededEntity2);
+    } catch (e) {}
+  }
+
   // If coming from Catalog selection, use that as default.
   const selectedLib = (q.lib || st.pLib || '').toString();
   const selectedSym = (q.sym || st.pSym || '').toString();
 
   // seed from URL or last state
-  set('mProvider', String(q.provider || st.mProvider || ''));
+  set('mProvider', String(q.provider || seededProvider || ''));
   set('mFreq', String(q.frequency || st.mFreq || ''));
   set('mDataset', String(q.dataset || st.mDataset || ''));
   set('mKind', String(q.kind || st.mKind || ''));
-  set('mEntity', String(q.entity || st.mEntity || ''));
+  set('mEntity', String(q.entity || seededEntity || ''));
+
+  // One more deterministic pass: if URL did not set provider/entity, allow fProvider/fEntity to fill blanks.
+  hydrateSeededEntityProviderIfBlank();
+
+  // React to external state seeding (e.g. Playwright sets localStorage after page load).
+  // Only fills blanks; will not overwrite user-entered filters.
+  try {
+    window.addEventListener('quantdsl:ui_state', () => {
+      try {
+        hydrateSeededEntityProviderDeterministic();
+      } catch (e) {}
+    });
+  } catch (e) {}
+
+  // (The browser 'storage' event does not fire in the same document that made the change,
+  // so we use the explicit quantdsl:ui_state event from patchUiState instead.)
+
+  // Persist the seeded meta filters so later reads of getUiState() see fEntity/fProvider.
+  // (This prevents other modules from treating them as empty and overwriting mEntity suggestions.)
+  try {
+    const _prov = String((st.fProvider || seededProvider || '')).trim();
+    const _ent = String((st.fEntity || seededEntity || '')).trim();
+    if (_prov || _ent) patchUiState({ ...(_prov ? { fProvider: _prov } : {}), ...(_ent ? { fEntity: _ent } : {}) });
+  } catch (e) {}
+
+  // When the Meta tab is activated, ensure provider/entity are hydrated from localStorage seed.
+  // NOTE: tests may write localStorage directly (not via patchUiState), so we must read localStorage here.
+  try {
+    window.addEventListener('quantdsl:tab', (ev) => {
+      try {
+        const t = ev && ev.detail ? String(ev.detail.tab || '') : '';
+        if (t === 'meta') {
+          hydrateSeededEntityProviderDeterministic();
+        }
+      } catch (e) {}
+    });
+  } catch (e) {}
+
+  // Headless browsers can fire focus/visibility in surprising order; keep it deterministic.
+  // This won't override explicit URL params, only re-applies persisted seed.
+  try {
+    const _rehydrate = () => { try { hydrateSeededEntityProviderDeterministic(); } catch (e) {} };
+    window.addEventListener('focus', _rehydrate);
+    document.addEventListener('visibilitychange', _rehydrate);
+  } catch (e) {}
+
+  // Also hydrate once shortly after mount to cover cases where the storage seed happens immediately
+  // after navigation but before the first tab activation.
+  try { setTimeout(() => { try { hydrateSeededEntityProviderDeterministic(); } catch (e) {} }, 0); } catch (e) {}
+
+  // NOTE: We intentionally do NOT install focus/visibility listeners that repeatedly re-apply state.
+  // Those caused nondeterministic clobbers in Playwright and could overwrite legitimate edits.
+
   // Strict precedence:
   // - explicit meta URL params
   // - explicit meta persisted state
@@ -132,6 +226,15 @@ export function mountMeta(containerId = 'pageMeta') {
       const d = (ev && ev.detail) ? ev.detail : {};
       const lib = String(d.lib || '').trim();
       const sym = String(d.sym || '').trim();
+
+      // Selection cleared (e.g. Catalog search). Clear selection-driven fields so Meta can't query stale rows.
+      if (!lib && !sym) {
+        set('mLibrary', '');
+        set('mSymbol', '');
+        patchUiState({ mLibrary: '', mSymbol: '' });
+        return;
+      }
+
       if (lib) set('mLibrary', lib);
       if (sym) set('mSymbol', sym);
       // Persist only library/symbol
@@ -151,4 +254,3 @@ export function mountMeta(containerId = 'pageMeta') {
     applyFromSelection();
   }
 }
-

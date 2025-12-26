@@ -18,6 +18,12 @@ export function patchUiState(patch) {
     const st = getUiState();
     const next = { ...st, ...(patch || {}) };
     localStorage.setItem(LS_KEY, JSON.stringify(next));
+
+    // In-page notification (unlike the 'storage' event, this fires in the same document).
+    try {
+      window.dispatchEvent(new CustomEvent('quantdsl:ui_state', { detail: { patch: patch || {}, state: next } }));
+    } catch (e2) {}
+
     return next;
   } catch (e) {
     return {};
@@ -43,4 +49,3 @@ export function replaceQuery(patch) {
     history.replaceState({}, '', url);
   } catch (e) {}
 }
-

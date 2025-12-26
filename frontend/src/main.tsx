@@ -1,6 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { PlatformApp } from './platform/PlatformApp';
+import './ag-theme-quant.css';
+
+// AG Grid v34+ requires explicit module registration.
+import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 function mount() {
   // Mount into the legacy-stable #app node in the server shell.
@@ -15,4 +21,3 @@ function mount() {
 }
 
 mount();
-

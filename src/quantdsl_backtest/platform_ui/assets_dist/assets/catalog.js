@@ -87,7 +87,7 @@ function renderRows(host, rows, q) {
   html += '</tr></thead><tbody>';
   for (const r of view) {
     html += '<tr>';
-    html += `<td><a href="#" data-act="preview" data-lib="${escapeHtml(r.library)}" data-sym="${escapeHtml(r.symbol)}">${escapeHtml(r.symbol)}</a></td>`;
+    html += `<td><a href="#" data-act="preview" data-lib="${escapeHtml(r.library)}" data-sym="${escapeHtml(r.symbol)}" data-entity="${escapeHtml(r.entity||'')}" data-provider="${escapeHtml(r.provider||'')}" data-frequency="${escapeHtml(r.frequency||'')}">${escapeHtml(r.symbol)}</a></td>`;
     html += `<td>${escapeHtml(r.library)}</td>`;
     html += `<td>${escapeHtml(r.provider||'')}</td>`;
     html += `<td>${escapeHtml(r.frequency||'')}</td>`;
@@ -165,19 +165,12 @@ export function mountCatalog(containerId = 'pageCatalog') {
           // Contract: Catalog search should not leave a stale selection that can drive Meta queries.
           // Clear selection and remove lib/sym from the URL.
 
-          const prev = getUiState();
-          const prevSuggested = String(prev.__catalogEntitySuggest || '').trim();
-          const currentMEntity = String(prev.mEntity || '').trim();
-          const shouldSuggestEntity = (currentMEntity === '' || currentMEntity === prevSuggested);
-
           patchUiState({
             catalogSearch: term,
             pLib: '',
             pSym: '',
             lastSelectedLibrary: '',
             lastSelectedSymbol: '',
-            __catalogEntitySuggest: term,
-            ...(shouldSuggestEntity ? { mEntity: term } : {}),
           });
           try { replaceQuery({ lib: '', sym: '' }); } catch (e3) {}
           try {
@@ -186,6 +179,12 @@ export function mountCatalog(containerId = 'pageCatalog') {
             if (pl) pl.value = '';
             if (ps) ps.value = '';
           } catch (e2) {}
+
+          // Notify other tabs (Meta/Inspector/etc.) that the selection is now cleared.
+          // Without this, Meta can keep a stale library/symbol and query unrelated results.
+          try {
+            window.dispatchEvent(new CustomEvent('quantdsl:selection', { detail: { lib: '', sym: '' } }));
+          } catch (e4) {}
         } catch (e) {}
         updateMetaLink();
       });
@@ -194,19 +193,12 @@ export function mountCatalog(containerId = 'pageCatalog') {
         renderRows(host, allRows, search.value);
         try {
           const term = String(search.value || '').trim();
-          const prev = getUiState();
-          const prevSuggested = String(prev.__catalogEntitySuggest || '').trim();
-          const currentMEntity = String(prev.mEntity || '').trim();
-          const shouldSuggestEntity = (currentMEntity === '' || currentMEntity === prevSuggested);
-
           patchUiState({
             catalogSearch: term,
             pLib: '',
             pSym: '',
             lastSelectedLibrary: '',
             lastSelectedSymbol: '',
-            __catalogEntitySuggest: term,
-            ...(shouldSuggestEntity ? { mEntity: term } : {}),
           });
           try { replaceQuery({ lib: '', sym: '' }); } catch (e3) {}
           try {
@@ -215,6 +207,11 @@ export function mountCatalog(containerId = 'pageCatalog') {
             if (pl) pl.value = '';
             if (ps) ps.value = '';
           } catch (e2) {}
+
+          // Keep selection-clearing behavior consistent across input/change.
+          try {
+            window.dispatchEvent(new CustomEvent('quantdsl:selection', { detail: { lib: '', sym: '' } }));
+          } catch (e4) {}
         } catch (e) {}
         updateMetaLink();
       });

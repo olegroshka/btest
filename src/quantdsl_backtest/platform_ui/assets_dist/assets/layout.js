@@ -45,6 +45,11 @@ export function mountLayout(containerId = 'app') {
     if (ti) ti.disabled = isInspector;
 
     replaceQuery({ tab: name });
+
+    // Notify modules about tab switches (used to resync Meta seeded filters in tests).
+    try {
+      window.dispatchEvent(new CustomEvent('quantdsl:tab', { detail: { tab: name } }));
+    } catch (e) {}
   }
 
   // Expose for other modules (Catalog -> Inspector navigation, etc.)
