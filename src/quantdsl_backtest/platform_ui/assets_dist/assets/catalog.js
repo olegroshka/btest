@@ -230,9 +230,23 @@ export function mountCatalog(containerId = 'pageCatalog') {
       const lib = a.getAttribute('data-lib') || '';
       const sym = a.getAttribute('data-sym') || '';
 
-      // Contract: clicking a catalog row selects it but does NOT force navigation away from Catalog.
-      // (Inspector can still be reached via its tab.)
-      setSelection(lib, sym, 'catalog');
+      // Contract: clicking a catalog symbol is the primary workflow entrypoint.
+      // It should populate Inspector inputs and switch to the Inspector tab.
+      setSelection(lib, sym, 'inspector');
+
+      // Prefer the explicit navigation API (avoids disabled buttons / overlays)
+      try {
+        if (window.workspaceApi && typeof window.workspaceApi.setTab === 'function') {
+          window.workspaceApi.setTab('inspector');
+          return;
+        }
+      } catch (e) {}
+
+      // Fallback: click the tab button
+      try {
+        const tabBtn = document.getElementById('tabInspector') || document.querySelector("#mainTabs [data-tab='inspector']");
+        if (tabBtn && tabBtn.click) tabBtn.click();
+      } catch (e) {}
     });
   } catch (e) {}
 

@@ -47,6 +47,12 @@ export function mountLayout(containerId = 'app') {
     replaceQuery({ tab: name });
   }
 
+  // Expose for other modules (Catalog -> Inspector navigation, etc.)
+  try {
+    window.workspaceApi = window.workspaceApi || {};
+    window.workspaceApi.setTab = setTab;
+  } catch (e) {}
+
   // wire
   const tabs = host.querySelectorAll('#mainTabs [data-tab]');
   for (const t of tabs) {

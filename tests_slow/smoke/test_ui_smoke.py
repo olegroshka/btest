@@ -242,16 +242,11 @@ def main() -> None:
                 links[0].click()
                 _wait_selection_populated(page, timeout_ms=800)
 
-                # ensure Inspector tab activated
-                try:
-                    if page.is_enabled("#tabInspector"):
-                        page.click("#tabInspector")
-                    else:
-                        page.click("#mainTabs [data-tab='inspector']", force=True)
-                except Exception:
-                    page.click("#mainTabs [data-tab='inspector']", force=True)
-
+                # Clicking a catalog preview link must switch the active tab to Inspector.
                 page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
+                assert (_snap_value(page, "#pLib") or "").strip(), "Catalog preview did not populate #pLib"
+                assert (_snap_value(page, "#pSym") or "").strip(), "Catalog preview did not populate #pSym"
+
                 page.click("#btnPreview")
                 _wait_plot_ready(page, timeout_ms=2500)
                 assert page.is_visible("#plot")
@@ -352,15 +347,9 @@ def main() -> None:
             links2[0].click()
             _wait_selection_populated(page, timeout_ms=800)
 
-            try:
-                if page.is_enabled("#tabInspector"):
-                    page.click("#tabInspector")
-                else:
-                    page.click("#mainTabs [data-tab='inspector']", force=True)
-            except Exception:
-                page.click("#mainTabs [data-tab='inspector']", force=True)
-
             page.wait_for_selector("#pageInspector", state="visible", timeout=10000)
+            assert (_snap_value(page, "#pSym") or "").strip(), "Second Catalog preview did not populate #pSym"
+
             page.click("#btnPreview")
             _wait_plot_ready(page, timeout_ms=2500)
             assert page.is_visible("#plot")
