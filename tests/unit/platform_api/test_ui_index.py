@@ -18,15 +18,14 @@ def test_ui_index_returns_html():
     assert "id=\"app\"" in r.text or "id='app'" in r.text
 
     # Contract: JS entrypoint is referenced.
-    # We support multiple runtime modes:
-    #  - modular framework-free UI: /static/assets/main.mjs
-    #  - deprecated legacy stub:     /static/assets/main.js
-    #  - React shell (Option B):     /static/assets/main.react.js
+    # Current UI shell is React/Vite-driven.
     assert (
-        ("/static/assets/main.mjs" in r.text)
-        or ("/static/assets/main.react.js" in r.text)
-        or ("/static/assets/main.js" in r.text)
+        ("/static/assets/main.react.js" in r.text)
+        or ("/static/assets/main.js" in r.text)  # fallback/older builds
     )
+
+    # Contract: CSS bundle is referenced (Vite)
+    assert ("/static/assets/main.css" in r.text) or ("/static/assets/main-" in r.text)
 
     # Contract markers used by other tests / workflows
     assert "copy-source" in r.text

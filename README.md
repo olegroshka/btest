@@ -187,6 +187,63 @@ This repo separates **fast unit tests** (default) from **slow / integration-styl
 - **Slow tests** live under `tests_slow/` (excluding `smoke/`) and cover end-to-end flows, multi-engine consistency, and risk policies.
 - **Smoke tests** live under `tests_slow/smoke/` and are intended to be run against a live server. They are marked as `manual` and skipped by default in automated runs.
 
+### Platform UI (API + React UI)
+
+The Platform UI is a **React/Vite** app, but it is served by the Python backend from committed build artifacts under:
+
+- `src/quantdsl_backtest/platform_ui/assets_dist/index.html`
+- `src/quantdsl_backtest/platform_ui/assets_dist/assets/*`
+
+So there are two “modes” you’ll use:
+
+- **Backend-served UI (default for this repo/tests):** build the frontend and copy the artifacts into `assets_dist/`, then run `scripts/run_platform_ui.py`.
+- **Frontend dev server (optional):** run Vite from `frontend/` for fast iteration; you’ll still need the Python API running. (Not required for tests.)
+
+### First-time UI quickstart (recommended)
+
+These steps are what you want if you just pulled the repo and want the UI fully working.
+
+1) Install Python deps (platform extras recommended)
+
+```bash
+uv sync --extra platform --extra dev
+```
+
+2) Populate the local ArcticDB cache by running the sample strategy
+
+This creates catalog/meta entries the UI can browse.
+
+```bash
+uv run python -m quantdsl_backtest.examples.lagging_indecies
+```
+
+3) Build the frontend (React/Vite)
+
+From `frontend/`:
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+4) Copy the build output into the backend-served `assets_dist/`
+
+The backend serves from `src/quantdsl_backtest/platform_ui/assets_dist/`.
+
+- Copy `frontend/dist/index.html` → `src/quantdsl_backtest/platform_ui/assets_dist/index.html`
+- Copy `frontend/dist/assets/*` → `src/quantdsl_backtest/platform_ui/assets_dist/assets/`
+
+(If you’ve changed filenames/hashes, the unit test `tests/unit/platform_ui/test_platform_ui_assets_contract.py` will catch missing/incorrect references.)
+
+5) Run the Platform UI server
+
+```bash
+uv run python scripts/run_platform_ui.py --port 8000
+```
+
+Then open: http://127.0.0.1:8000/
+
 ### Install test dependencies
 
 Some tests cover the platform API layer (FastAPI/Pydantic) or browser E2E (Playwright).
@@ -238,6 +295,7 @@ uv run pytest -q -n auto tests_slow
 Smoke tests require a running platform server.
 
 1. Start the server in one terminal:
+
 ```powershell
 # canonical
 uv run python scripts/run_platform_ui.py
@@ -249,15 +307,33 @@ uv run python scripts/run_platform_ui.py
 ```
 
 2. Run the smoke tests in another terminal:
+
 ```powershell
 uv run pytest -q tests_slow/smoke -m manual
 ```
 
 3. Stop the server (if you started it via the wrapper):
+
 ```powershell
 .\scripts\stop_platform_ui.ps1
 ```
 
+### Browser E2E (Playwright) notes
+
+Some tests under `tests_slow/platform/` are marked `manual` because they:
+- spin up a real server
+- drive a real browser via Playwright
+- can be sensitive to local machine/browser setup
+
+To run Playwright tests:
+
+```bash
+uv sync --extra e2e
+uv run playwright install chromium
+
+# example (manual-marked) selection sync test
+uv run pytest -q tests_slow/platform -m manual
+```
 
 Tip: iterate fast by running only unit tests during development, and run `tests_slow` once before pushing.
 

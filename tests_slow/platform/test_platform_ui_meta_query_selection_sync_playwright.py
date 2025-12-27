@@ -74,7 +74,7 @@ def test_meta_query_matches_current_catalog_selection(tmp_path, monkeypatch):
         page = browser.new_page()
 
         diagnostics_path = tmp_path / "meta_query_selection_sync_diagnostics.txt"
-        workspace_diag = "C:/Users/olegr/PycharmProjects/btest/_meta_query_selection_sync_diagnostics_last.txt"
+        workspace_diag = None  # type: ignore[assignment]
         console_msgs: list[str] = []
 
         def _log(msg: str) -> None:
@@ -133,16 +133,21 @@ def test_meta_query_matches_current_catalog_selection(tmp_path, monkeypatch):
                 pass
 
             # Best-effort mirror into a stable workspace file for easier inspection.
-            try:
-                with open(workspace_diag, "w", encoding="utf-8") as f2:
-                    f2.write(f"Latest state dump: {tag}\n\n")
-                    f2.write("STATE:\n")
-                    f2.write(repr(state) + "\n\n")
-                    if console_msgs:
-                        f2.write("CONSOLE/ERROR MESSAGES:\n")
-                        f2.write("\n".join(console_msgs[-200:]))
-            except Exception:
-                pass
+            if workspace_diag:
+                try:
+                    from pathlib import Path
+
+                    ws_path = Path(str(workspace_diag))
+                    with open(ws_path, "w", encoding="utf-8") as f2:
+                        f2.write(f"Latest state dump: {tag}\n\n")
+                        f2.write("STATE:\n")
+                        f2.write(repr(state) + "\n\n")
+                        if console_msgs:
+                            f2.write("CONSOLE/ERROR MESSAGES:\n")
+                            for m in console_msgs[-200:]:
+                                f2.write(m + "\n")
+                except Exception:
+                    pass
 
         # Seed misleading/stale selection to reproduce the issue.
         # NOTE: The app may write to localStorage during boot; to avoid races we seed twice:

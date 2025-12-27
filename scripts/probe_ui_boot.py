@@ -11,15 +11,8 @@ def main() -> None:
 
     paths = [
         "/",
-        "/static/assets/main.mjs",
-        "/static/assets/layout.js",
-        "/static/assets/catalog.js",
-        "/static/assets/inspector.js",
-        "/static/assets/api.js",
-        "/static/assets/state.js",
-        "/static/assets/download.js",
-        "/static/assets/quality.js",
-        "/static/assets/workspace.js",
+        "/static/assets/main.react.js",
+        "/static/assets/main.css",
         "/static/plotly.min.js",
     ]
 
@@ -43,6 +36,7 @@ def main() -> None:
                 out["paths"][p] = {
                     "status": r.status_code,
                     "content_type": r.headers.get("content-type"),
+                    # Don't dump long bodies to logs.
                     "head": (r.text or "")[:200],
                 }
             except Exception as e:
@@ -53,4 +47,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

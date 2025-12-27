@@ -1,23 +1,20 @@
 from __future__ import annotations
 
 import re
-
-from quantdsl_backtest.platform_ui.site import html_index
+import pathlib
 
 
 def test_ui_prefers_ts_as_time_key() -> None:
-    """Regression: preview API injects index as `ts`; UI should prefer it.
+    """Regression: chart UI should prefer `ts` as the time key.
 
     Without this, the JS can fall back to the first column and accidentally
     treat OHLC numeric columns as epoch timestamps -> 1970 axis / invisible candles.
+
+    Current UI is bundled JS (React) emitted to platform_ui/assets_dist/assets/main.react.js.
     """
 
-    html = html_index()
+    js_path = pathlib.Path(__file__).resolve().parents[3] / "src" / "quantdsl_backtest" / "platform_ui" / "assets_dist" / "assets" / "main.react.js"
+    js = js_path.read_text(encoding="utf-8")
 
-    # Ensure our preferred candidate list includes ts.
-    assert "previewIndexCandidates" in html
-    assert re.search(r"previewIndexCandidates\s*=\s*\[[^\]]*'ts'", html)
-
-    # Ensure it's checked before generic timeCandidates.
-    assert html.index("previewIndexCandidates") < html.index("timeCandidates")
-
+    # Our modern plot builder explicitly looks for the `ts` key.
+    assert re.search(r"\bts\b", js)

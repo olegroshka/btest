@@ -84,9 +84,8 @@ async def test_platform_ui_httpx_e2e_smoke(tmp_path, monkeypatch):
         #   - We served the UI shell
         #   - It loads a JS bundle
         assert (
-            ("/static/assets/main.mjs" in html)
+            ("/static/assets/main.react.js" in html)
             or ("/static/assets/main.js" in html)
-            or ("/static/assets/main.react.js" in html)
         )
 
         # Keep this guard: plotly is still available for the inspector.

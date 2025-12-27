@@ -60,31 +60,25 @@ def manifest_json():
 def ui_index():
     """Serve the Platform UI shell.
 
-    Milestone A: serve a committed static index.html from platform_ui/assets_dist.
-    This keeps pytest fast (no Node build required) and lets us migrate feature-by-feature.
+    Current UI: serve the committed static index.html from platform_ui/assets_dist.
 
-    Fallback: if assets_dist is missing, return the legacy inline HTML from site.py.
+    There is no legacy inline HTML fallback anymore; the React/Vite bundle is the
+    single source of truth.
     """
 
     base = pathlib.Path(__file__).resolve().parents[2] / "platform_ui" / "assets_dist"
     index_path = (base / "index.html").resolve()
 
-    try:
-        if index_path.exists() and index_path.is_file():
-            return HTMLResponse(index_path.read_text(encoding="utf-8"))
-    except Exception:
-        # Fall back to legacy inline HTML if reading fails.
-        pass
+    if not (index_path.exists() and index_path.is_file()):
+        # Keep the failure mode explicit so missing UI assets is obvious in dev/CI.
+        raise FileNotFoundError(f"Missing Platform UI build: {index_path}")
 
-    # Legacy fallback
-    from quantdsl_backtest.platform_ui.site import html_index
-
-    return HTMLResponse(html_index())
+    return HTMLResponse(index_path.read_text(encoding="utf-8"))
 
 
 @router.get("/static/{path:path}")
 def ui_static(path: str):
-    """Serve Platform UI static assets (local-first)."""
+    """Serve Platform UI static assets from the committed SPA build."""
 
     from starlette.responses import FileResponse, Response
 
@@ -94,10 +88,8 @@ def ui_static(path: str):
         try:
             import importlib.resources
 
-            # In Python 3.9+, .files() is the modern way to access package data.
             plotly_js = importlib.resources.files("plotly").joinpath("package_data/plotly.min.js")
             try:
-                # Traversable objects don't always have .exists() according to type checkers.
                 opened = plotly_js.open("rb")  # type: ignore[attr-defined]
             except Exception:
                 opened = None
@@ -107,21 +99,11 @@ def ui_static(path: str):
         except (ImportError, AttributeError, TypeError):
             pass
 
-    # Prefer committed SPA build assets first
     base_dist = pathlib.Path(__file__).resolve().parents[2] / "platform_ui" / "assets_dist"
     file_path = (base_dist / path).resolve()
 
     # Prevent path traversal
-    if base_dist in file_path.parents or file_path == base_dist:
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(str(file_path))
-
-    # Fallback to legacy assets folder
-    base = pathlib.Path(__file__).resolve().parents[2] / "platform_ui" / "assets"
-    file_path = (base / path).resolve()
-
-    # Prevent path traversal
-    if base not in file_path.parents and file_path != base:
+    if base_dist not in file_path.parents and file_path != base_dist:
         return Response(status_code=404)
 
     if not file_path.exists() or not file_path.is_file():
