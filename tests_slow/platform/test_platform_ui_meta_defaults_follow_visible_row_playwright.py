@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import threading
 import time
@@ -14,6 +15,23 @@ def _get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return str(v).strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _env_int(name: str, default: int) -> int:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    try:
+        return int(str(v).strip())
+    except Exception:
+        return default
 
 
 def test_meta_defaults_follow_visible_catalog_row(tmp_path, monkeypatch):
@@ -73,7 +91,10 @@ def test_meta_defaults_follow_visible_catalog_row(tmp_path, monkeypatch):
     sync_playwright = playwright.sync_playwright
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        headless = _env_flag("UI_HEADLESS", True)
+        slow_mo = _env_int("UI_SLOW_MO_MS", 0)
+        devtools = _env_flag("UI_DEVTOOLS", False)
+        browser = p.chromium.launch(headless=headless, slow_mo=slow_mo, devtools=devtools)
         page = browser.new_page()
 
         # Seed stale meta query state and a catalog search filter to SPX.

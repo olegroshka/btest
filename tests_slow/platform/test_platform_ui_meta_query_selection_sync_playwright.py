@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import socket
 import threading
 import time
@@ -70,7 +71,10 @@ def test_meta_query_matches_current_catalog_selection(tmp_path, monkeypatch):
     sync_playwright = playwright.sync_playwright
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        headless = _env_flag("UI_HEADLESS", True)
+        slow_mo = _env_int("UI_SLOW_MO_MS", 0)
+        devtools = _env_flag("UI_DEVTOOLS", False)
+        browser = p.chromium.launch(headless=headless, slow_mo=slow_mo, devtools=devtools)
         page = browser.new_page()
 
         diagnostics_path = tmp_path / "meta_query_selection_sync_diagnostics.txt"
@@ -310,3 +314,20 @@ def test_meta_query_matches_current_catalog_selection(tmp_path, monkeypatch):
         assert "FRED" not in meta_html2.upper()
 
         browser.close()
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return str(v).strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _env_int(name: str, default: int) -> int:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    try:
+        return int(str(v).strip())
+    except Exception:
+        return default

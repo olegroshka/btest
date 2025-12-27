@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Iterable, Optional, Protocol
+from typing import Any, Optional, Protocol
 
 import pandas as pd
 
@@ -57,6 +57,34 @@ def _normalize_created_at_utc(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _is_lmdb_corruption_error(exc: Exception) -> bool:
+    msg = str(exc)
+    # Known LMDB/arcticdb low-level corruption patterns
+    return (
+        "MDB_PAGE_NOTFOUND" in msg
+        or "MDB_CORRUPTED" in msg
+        or "MDB_INVALID" in msg
+        or "LMDBError" in msg
+        or "File is not an LMDB file" in msg
+    )
+
+
+def _reset_meta_library(arctic: _ArcticLike) -> None:
+    """Best-effort reset for the meta library used by quality registry.
+
+    ArcticDB stores the meta library under platform_meta/catalog.
+    If the environment is corrupted, recreating just this library is usually enough.
+
+    Note: this is intentionally defensive and should never raise.
+    """
+
+    try:
+        # Re-open with create_if_missing to trigger re-init.
+        arctic.get_library("platform_meta/catalog", create_if_missing=True)
+    except Exception:
+        pass
+
+
 def _safe_read_df(meta_lib: _MetaLibLike, symbol: str, columns: list[str]) -> pd.DataFrame:
     try:
         if not meta_lib.has_symbol(symbol):
@@ -79,6 +107,21 @@ def _safe_write_df(meta_lib: _MetaLibLike, symbol: str, df: pd.DataFrame) -> Non
     if df is not None and not df.empty:
         df = _normalize_created_at_utc(df)
     meta_lib.write(symbol, df)
+
+
+def _safe_write_df_resilient(*, arctic: _ArcticLike, meta_lib: _MetaLibLike, symbol: str, df: pd.DataFrame) -> None:
+    """Write with a single retry if the underlying LMDB store is corrupted."""
+
+    try:
+        _safe_write_df(meta_lib, symbol, df)
+        return
+    except Exception as e:
+        if not _is_lmdb_corruption_error(e):
+            raise
+        # Attempt to recover once.
+        _reset_meta_library(arctic)
+        meta_lib2 = get_meta_library(arctic=arctic)
+        _safe_write_df(meta_lib2, symbol, df)
 
 
 @dataclass(frozen=True, slots=True)
@@ -454,7 +497,7 @@ def run_quality_scan(
 
         # Only write if we actually added something
         if len(issues_df) > initial_issues_count:
-            _safe_write_df(meta_lib, ISSUES_SYMBOL, issues_df)
+            _safe_write_df_resilient(arctic=arctic, meta_lib=meta_lib, symbol=ISSUES_SYMBOL, df=issues_df)
 
         scan = QualityScan(
             scan_id=scan_id,
@@ -492,7 +535,7 @@ def run_quality_scan(
             scans_df = scan_rec_df
         else:
             scans_df = pd.concat([scans_df, scan_rec_df], ignore_index=True)
-        _safe_write_df(meta_lib, SCANS_SYMBOL, scans_df)
+        _safe_write_df_resilient(arctic=arctic, meta_lib=meta_lib, symbol=SCANS_SYMBOL, df=scans_df)
 
         return {"scan": _scan_to_record(scan), "created_issue_ids": created_issue_ids, "results": results}
 
@@ -532,6 +575,5 @@ def run_quality_scan(
             scans_df = scan_rec_df
         else:
             scans_df = pd.concat([scans_df, scan_rec_df], ignore_index=True)
-        _safe_write_df(meta_lib, SCANS_SYMBOL, scans_df)
+        _safe_write_df_resilient(arctic=arctic, meta_lib=meta_lib, symbol=SCANS_SYMBOL, df=scans_df)
         return {"scan": _scan_to_record(scan), "created_issue_ids": created_issue_ids, "results": results}
-
