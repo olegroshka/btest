@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import subprocess
 import time
 
 import pytest
@@ -15,9 +16,14 @@ UI_ATTACH_TIMEOUT_MS = 4_000
 TAB_TIMEOUT_MS = 5_000
 CATALOG_TIMEOUT_MS = 3_000
 PANEL_TIMEOUT_MS = 4_000
-PLOT_TIMEOUT_MS = 2_000
-# Quality UI render should be essentially instant on localhost once the response returns.
-QUALITY_TIMEOUT_MS = 2_000
+# UI render time should be very fast on localhost.
+PLOT_TIMEOUT_MS = 1_500
+# Quality UI render should be instant on localhost once the response returns.
+QUALITY_TIMEOUT_MS = 1_500
+
+# Reduce backend work for smoke runs (still exercises the full UI contract).
+SMOKE_CHART_LIMIT = 300
+SMOKE_QUALITY_LIMIT = 25
 
 
 @pytest.mark.slow
@@ -333,6 +339,134 @@ def _wait_quality_rendered(page, *, timeout_ms: int = QUALITY_TIMEOUT_MS) -> Non
     )
 
 
+def _set_value(page, selector: str, value: str) -> None:
+    """Best-effort set value + dispatch input/change for React-controlled inputs."""
+    try:
+        page.eval_on_selector(
+            selector,
+            """(el, v) => {
+              try { el.focus(); } catch (e) {}
+              try { (el as any).value = v; } catch (e) {}
+              try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+              try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+            }""",
+            value,
+        )
+    except Exception:
+        try:
+            page.fill(selector, value)
+        except Exception:
+            pass
+
+
+# --- Optional pre-step: rebuild UI assets ---
+
+def _maybe_rebuild_ui_assets(out: dict[str, object]) -> None:
+    """Optionally rebuild the committed Platform UI assets before running the smoke.
+
+    This is intentionally opt-in to keep CI stable and avoid surprising npm calls.
+
+    Enable with:
+      UI_SMOKE_REBUILD_ASSETS=1
+    """
+
+    if not _env_flag("UI_SMOKE_REBUILD_ASSETS", False):
+        return
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+    script = root / "scripts" / "rebuild_platform_ui_assets.py"
+    if not script.exists():
+        raise FileNotFoundError(f"Missing rebuild script: {script}")
+
+    t0 = time.perf_counter()
+    try:
+        # Use the same Python environment (uv) to run the script.
+        # We avoid shell=True for safety.
+        subprocess.check_call(["uv", "run", "python", "-u", str(script)], cwd=str(root))
+        out["rebuild_assets"] = {"enabled": True, "ok": True, "script": str(script)}
+    except Exception as e:
+        out["rebuild_assets"] = {"enabled": True, "ok": False, "script": str(script), "error": repr(e)}
+        raise
+    finally:
+        out.setdefault("timing_ms", {})
+        timing = out.get("timing_ms")
+        if isinstance(timing, dict):
+            timing["rebuild_assets"] = int((time.perf_counter() - t0) * 1000)
+
+
+def _ensure_server_running(base_url: str) -> str:
+    """Ensure the UI server is reachable and return the final base_url.
+
+    If SMOKE_AUTOSTART_SERVER=1 we will try to start the server.
+    If the default port is taken, we will fall back to another port.
+    """
+
+    try:
+        import httpx
+    except Exception as e:  # pragma: no cover
+        raise AssertionError(f"httpx is required for smoke tests: {e!r}")
+
+    def _health(url: str) -> str:
+        return url.rstrip("/") + "/health"
+
+    def _up(url: str) -> bool:
+        try:
+            r = httpx.get(_health(url), timeout=1.5)
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    if _up(base_url):
+        return base_url
+
+    if not _env_flag("SMOKE_AUTOSTART_SERVER", False):
+        raise AssertionError(
+            f"UI smoke requires a running server. Could not reach {_health(base_url)}. "
+            f"Start it with: uv run python scripts/run_platform_ui.py (or scripts/run_platform_ui.ps1). "
+            f"Or set SMOKE_AUTOSTART_SERVER=1 to auto-start it."
+        )
+
+    root = pathlib.Path(__file__).resolve().parents[2]
+
+    def _start_on_port(port: int) -> str:
+        url = f"http://127.0.0.1:{port}/"
+        ps1 = root / "scripts" / "run_platform_ui.ps1"
+        py = root / "scripts" / "run_platform_ui.py"
+
+        try:
+            if os.name == "nt" and ps1.exists():
+                subprocess.check_call(
+                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ps1), "-Port", str(port)],
+                    cwd=str(root),
+                )
+            else:
+                subprocess.check_call(["uv", "run", "python", str(py), "--port", str(port)], cwd=str(root))
+        except subprocess.CalledProcessError:
+            # If the port is already in use, it might be a valid running server.
+            if _up(url):
+                return url
+            raise
+
+        deadline = time.time() + 10.0
+        while time.time() < deadline:
+            if _up(url):
+                return url
+            time.sleep(0.1)
+        raise AssertionError(f"Started server but {_health(url)} did not become healthy within 10s")
+
+    # Try default port first, then a small list of fallbacks.
+    for port in [8000, 8001, 8002, 8010]:
+        url = f"http://127.0.0.1:{port}/"
+        if _up(url):
+            return url
+        try:
+            return _start_on_port(port)
+        except Exception:
+            continue
+
+    raise AssertionError("Failed to auto-start server on ports 8000/8001/8002/8010")
+
+
 def main() -> None:
     out: dict[str, object] = {
         "steps": [],
@@ -348,7 +482,11 @@ def main() -> None:
     timing_ms: dict[str, int] = {}
     out["timing_ms"] = timing_ms
 
+    # Optional pre-step for fast local iteration: ensure the served bundle matches the TS sources.
+    _maybe_rebuild_ui_assets(out)
+
     base_url = _read_base_url()
+    base_url = _ensure_server_running(base_url)
 
     t0_all = time.perf_counter()
 
@@ -508,9 +646,13 @@ def main() -> None:
 
             # 3) Preview → plot ready
             steps.append({"name": "before_preview_click"})
-            page.click("#btnPreview")
-            # First wait for the chart request to succeed.
-            _wait_plot_request_ok(page, timeout_ms=8000)
+            # Reduce chart workload for smoke runs.
+            _set_value(page, "#pLimit", str(SMOKE_CHART_LIMIT))
+            with page.expect_response(lambda r: ("/api/catalog/chart/" in (r.url or "")), timeout=8000) as resp_info:
+                page.click("#btnPreview")
+            resp = resp_info.value
+            if int(resp.status) != 200:
+                raise AssertionError(f"Chart request failed: {resp.status} {resp.url}")
             # Then quickly wait for UI render markers.
             _wait_plot_ready(page, timeout_ms=PLOT_TIMEOUT_MS)
             assert page.is_visible("#plot")
@@ -530,6 +672,8 @@ def main() -> None:
             _wait_tab_visible(page, "inspector")
             _wait_inspector_panels(page, timeout_ms=PANEL_TIMEOUT_MS)
 
+            # Reduce scan workload for smoke runs.
+            _set_value(page, "#qLimit", str(SMOKE_QUALITY_LIMIT))
             page.click("#btnQualityScan")
             _wait_quality_scan_ok(page, timeout_ms=15_000)
             _wait_quality_rendered(page, timeout_ms=QUALITY_TIMEOUT_MS)
@@ -557,11 +701,23 @@ def main() -> None:
     finally:
         # Mark outcome and avoid stale/previous run errors lingering.
         out["ok"] = bool(ok)
-        if ok:
+        if ok and not out.get("errors"):
+            # Only clear if run is fully clean.
             out["errors"] = []
         with open("ui_clickthrough_results.json", "w", encoding="utf-8") as f:
             json.dump(out, f, indent=2)
 
-    # If we recorded any errors, fail the test so CI/dev sees it.
-    if not out.get("ok") or out.get("errors"):
-        raise AssertionError(json.dumps({"ok": out.get("ok"), "errors": out.get("errors"), "url": out.get("url")}, indent=2))
+    # Always fail if we recorded any errors OR ok is false.
+    errors = out.get("errors") or []
+    if not out.get("ok") or (isinstance(errors, list) and len(errors) > 0):
+        # Print a short summary to stdout to make failures obvious in pytest output.
+        print("\n[ui_smoke] FAILURE summary:")
+        try:
+            print(json.dumps({"ok": out.get("ok"), "errors": errors, "url": out.get("url")}, indent=2))
+        except Exception:
+            print({"ok": out.get("ok"), "errors": errors, "url": out.get("url")})
+
+        raise AssertionError(
+            "UI clickthrough smoke recorded errors. See ui_clickthrough_results.json for full diagnostics. "
+            + json.dumps({"ok": out.get("ok"), "errors": errors, "url": out.get("url")})
+        )

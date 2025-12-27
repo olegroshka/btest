@@ -20,6 +20,18 @@ type ChartPayload = {
   data?: Array<Record<string, any>>;
 };
 
+function readLegacyChartLimit(defaultLimit: number = 1500): number {
+  try {
+    const el = document.getElementById('pLimit') as HTMLInputElement | null;
+    const raw = String(el?.value || '').trim();
+    const n = raw ? Number(raw) : NaN;
+    if (!Number.isFinite(n)) return defaultLimit;
+    return Math.max(50, Math.min(5000, Math.floor(n)));
+  } catch {
+    return defaultLimit;
+  }
+}
+
 async function fetchJson<T>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...(opts || {}),
@@ -296,6 +308,9 @@ export function InspectorPageReact() {
   React.useEffect(() => {
     getOrCreateHiddenInput('pLib');
     getOrCreateHiddenInput('pSym');
+    // Optional legacy tuning knobs used by smoke tests.
+    // If absent, default logic in readLegacyChartLimit() will fall back to 1500.
+    getOrCreateHiddenInput('pLimit');
   }, []);
 
   const qs = React.useMemo(() => readQuery(), []);
@@ -426,8 +441,11 @@ export function InspectorPageReact() {
 
       try {
         const params = new URLSearchParams({ symbol: sym2, limit: '1500' });
-        if (start.trim()) params.set('start', start.trim());
-        if (end.trim()) params.set('end', end.trim());
+        // Allow smoke tests (and power-users) to tune chart size via the legacy hidden input.
+        // Default stays 1500.
+        params.set('limit', String(readLegacyChartLimit(1500)));
+         if (start.trim()) params.set('start', start.trim());
+         if (end.trim()) params.set('end', end.trim());
         const urlChart = `/api/catalog/chart/${encodeURIComponent(lib2)}?` + params.toString();
         const chart = await fetchJson<ChartPayload>(urlChart);
         setLastChart(chart);

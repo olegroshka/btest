@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 import pathlib
+import subprocess
+import time
 
 import httpx
 import pytest
@@ -18,16 +21,53 @@ def _read_base_url() -> str:
     return f"http://127.0.0.1:{port}/api"
 
 
-def _assert_server_up(base_url: str) -> None:
-    try:
-        r = httpx.get(base_url.replace("/api", "/health"), timeout=2.5)
-        assert r.status_code == 200
-    except Exception as e:
-        raise AssertionError(
-            f"Smoke tests require a running server. Could not reach {base_url}. "
-            f"Start it with: uv run python scripts/run_platform_ui.py (or scripts/run_platform_ui.ps1). "
-            f"Underlying error: {e!r}"
-        )
+def _env_flag(name: str, default: bool) -> bool:
+    v = os.getenv(name)
+    if v is None:
+        return default
+    return str(v).strip().lower() not in {"0", "false", "no", "off", ""}
+
+
+def _ensure_server_running(base_url: str) -> None:
+    """Ensure a local server is reachable. Optionally auto-start it for dev flows."""
+
+    health = base_url.replace("/api", "/health")
+
+    def _up() -> bool:
+        try:
+            r = httpx.get(health, timeout=1.5)
+            return r.status_code == 200
+        except Exception:
+            return False
+
+    if _up():
+        return
+
+    # Dev-friendly mode: start server automatically for smoke tests.
+    if _env_flag("SMOKE_AUTOSTART_SERVER", False):
+        root = pathlib.Path(__file__).resolve().parents[2]
+        # Use the PowerShell wrapper if available on Windows; it's already PID/log aware.
+        ps1 = root / "scripts" / "run_platform_ui.ps1"
+        py = root / "scripts" / "run_platform_ui.py"
+
+        if os.name == "nt" and ps1.exists():
+            subprocess.check_call(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ps1)], cwd=str(root))
+        else:
+            subprocess.check_call(["uv", "run", "python", str(py)], cwd=str(root))
+
+        # Wait briefly for boot.
+        deadline = time.time() + 10.0
+        while time.time() < deadline:
+            if _up():
+                return
+            time.sleep(0.1)
+
+    # Still down -> fail with actionable message.
+    raise AssertionError(
+        f"Smoke tests require a running server. Could not reach {base_url}. "
+        f"Start it with: uv run python scripts/run_platform_ui.py (or scripts/run_platform_ui.ps1). "
+        f"Or set SMOKE_AUTOSTART_SERVER=1 to auto-start it during smoke runs."
+    )
 
 
 @pytest.mark.slow
@@ -36,13 +76,11 @@ def _assert_server_up(base_url: str) -> None:
 def test_api_filters_smoke():
     """Manual smoke test: check API filters on a live server.
 
-    This test is intended to be run against a live server.
-
     NOTE: base_url is resolved from .platform_ui/server.port when present.
     """
 
     base_url = _read_base_url()
-    _assert_server_up(base_url)
+    _ensure_server_running(base_url)
 
     check_meta(base_url)
 
@@ -56,7 +94,7 @@ def check_meta(base_url: str) -> None:
 
     rows = data.get("rows", [])
     print(f"Total rows: {len(rows)}")
-    
+
     if not rows:
         print("Empty catalog index!")
         return
@@ -66,7 +104,7 @@ def check_meta(base_url: str) -> None:
     sym = first.get("symbol")
     ent = first.get("entity")
     print(f"First row: lib={lib}, sym={sym}, ent={ent}")
-    
+
     print(f"--- Querying specifically for lib={lib}, sym={sym} ---")
     params = {"library": lib, "symbol": sym}
     r2 = httpx.get(f"{base_url}/catalog/meta", params=params)

@@ -209,6 +209,19 @@ function installSelectionDomBridgeOnce() {
     if (w.__quantdslSelectionDomBridgeInstalled) return;
     w.__quantdslSelectionDomBridgeInstalled = true;
 
+    // Ensure the legacy hidden inputs exist for tests and legacy integrations.
+    try {
+      for (const id of ['pLib', 'pSym', 'pLimit']) {
+        let el = document.getElementById(id) as HTMLInputElement | null;
+        if (!el) {
+          el = document.createElement('input');
+          el.id = id;
+          el.style.display = 'none';
+          document.body.appendChild(el);
+        }
+      }
+    } catch {}
+
     window.addEventListener('quantdsl:selection', (ev: any) => {
       try {
         const d = ev?.detail || {};

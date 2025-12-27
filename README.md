@@ -294,6 +294,20 @@ uv run pytest -q -n auto tests_slow
 
 Smoke tests require a running platform server.
 
+Optional (recommended for UI dev): rebuild the committed Platform UI assets automatically
+before running the click-through smoke. This ensures the backend-served bundle matches
+your latest TypeScript/React edits.
+
+- Enable with environment variable: `UI_SMOKE_REBUILD_ASSETS=1`
+- What it does: runs `scripts/rebuild_platform_ui_assets.py` (which runs `npm run build` in `frontend/`)
+
+Example:
+
+```powershell
+$env:UI_SMOKE_REBUILD_ASSETS = "1"
+uv run pytest -q tests_slow/smoke -m manual
+```
+
 1. Start the server in one terminal:
 
 ```powershell
@@ -489,3 +503,5 @@ python .\scripts\reset_arctic_cache.py --force
 License
 -------
 This project is licensed under the terms of the MIT License (see `LICENSE`).
+
+
