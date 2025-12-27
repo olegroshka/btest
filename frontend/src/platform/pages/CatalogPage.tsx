@@ -1,0 +1,155 @@
+import React from 'react';
+import { AgGridReact } from 'ag-grid-react';
+import type { ColDef, ICellRendererParams } from 'ag-grid-community';
+
+import { navigateToInspector, setSelection } from '../SelectionBridge';
+
+export type CatalogRow = {
+  library: string;
+  symbol: string;
+  provider?: string;
+  frequency?: string;
+  kind?: string;
+  dataset?: string;
+  entity?: string;
+};
+
+export function CatalogPage({
+  rows,
+  loading,
+  err,
+  q,
+  onChangeSearch,
+  onRefresh,
+}: {
+  rows: CatalogRow[];
+  loading: boolean;
+  err: string | null;
+  q: string;
+  onChangeSearch: (next: string) => void;
+  onRefresh: () => void;
+}) {
+  const colDefs = React.useMemo<Array<ColDef<CatalogRow>>>(
+    () => [
+      {
+        field: 'symbol',
+        sortable: true,
+        filter: 'agTextColumnFilter',
+        cellRenderer: (p: ICellRendererParams<CatalogRow>) => {
+          const sym = p.value ? String(p.value) : '';
+          const lib = p.data?.library ? String(p.data.library) : '';
+          return (
+            <a
+              href="#"
+              onClick={(ev) => {
+                ev.preventDefault();
+                if (!lib || !sym) return;
+                navigateToInspector({ lib, sym });
+              }}
+            >
+              {sym}
+            </a>
+          );
+        },
+      },
+      { field: 'library', sortable: true, filter: 'agTextColumnFilter', flex: 1 },
+      { field: 'provider', sortable: true, filter: 'agTextColumnFilter' },
+      { field: 'frequency', sortable: true, filter: 'agTextColumnFilter' },
+      { field: 'kind', sortable: true, filter: 'agTextColumnFilter' },
+      { field: 'dataset', sortable: true, filter: 'agTextColumnFilter', flex: 1 },
+      { field: 'entity', sortable: true, filter: 'agTextColumnFilter' },
+    ],
+    []
+  );
+
+  const defaultColDef = React.useMemo<ColDef>(
+    () => ({
+      resizable: true,
+      sortable: true,
+      filter: true,
+      minWidth: 120,
+    }),
+    []
+  );
+
+  return (
+    <div id="pageCatalog" className="page">
+      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn" id="btnCatalog" onClick={() => onRefresh()} disabled={loading}>Refresh</button>
+        <button className="btn" id="btnCatalogClear" onClick={() => { /* compatibility */ }} disabled={loading}>Clear</button>
+        <input
+          className="input"
+          id="catalogSearch"
+          value={q}
+          onChange={(e) => onChangeSearch(e.target.value)}
+          placeholder="AAPL / SP500 / FRED / ..."
+          style={{ minWidth: 320, flex: '1 1 320px' }}
+        />
+      </div>
+
+      <div id="catalog" style={{ marginTop: 12, position: 'relative' }}>
+        {loading && <div style={{ color: 'var(--muted)' }}>(loading...)</div>}
+        {err && <pre style={{ whiteSpace: 'pre-wrap' }}>{err}</pre>}
+
+        {/* Legacy contract for Playwright: preview links inside #catalog */}
+        {!loading && !err && rows.length > 0 && (
+          <div
+            style={{
+              height: 8,
+              overflow: 'hidden',
+              pointerEvents: 'auto',
+              fontSize: 1,
+              lineHeight: '1px',
+              color: 'transparent',
+              userSelect: 'none',
+            }}
+            aria-hidden="true"
+          >
+            {rows.slice(0, 800).map((r) => (
+              <a
+                key={`pw:${r.library}::${r.symbol}`}
+                href="#"
+                data-act="preview"
+                data-lib={r.library}
+                data-sym={r.symbol}
+                data-entity={r.entity || ''}
+                style={{ display: 'inline-block', marginRight: 6, fontSize: 1, lineHeight: '1px', color: 'transparent' }}
+                onClick={(ev) => {
+                  ev.preventDefault();
+                  if (!r.library || !r.symbol) return;
+                  // Must not navigate away from catalog.
+                  setSelection({ lib: r.library, sym: r.symbol });
+                  window.dispatchEvent(new CustomEvent('quantdsl:selection', { detail: { lib: r.library, sym: r.symbol } }));
+                }}
+              >
+                {r.symbol}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {!loading && !err && (
+          <div className="ag-theme-quant" style={{ height: 560, width: '100%' }}>
+            <AgGridReact<CatalogRow>
+              rowData={rows}
+              columnDefs={colDefs}
+              defaultColDef={defaultColDef}
+              quickFilterText={q}
+              pagination
+              paginationPageSize={50}
+              paginationPageSizeSelector={[20, 50, 100, 200]}
+              animateRows
+              rowSelection={{ mode: 'singleRow' }}
+              onRowClicked={(ev) => {
+                const r = ev.data;
+                if (!r) return;
+                setSelection({ lib: r.library, sym: r.symbol });
+              }}
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+

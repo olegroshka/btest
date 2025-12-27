@@ -14,13 +14,9 @@ export default defineConfig({
       // Do not emit index.html; backend serves its own committed shell.
       input: 'src/main.tsx',
       output: {
-        entryFileNames: 'assets/main.js',
-        chunkFileNames: 'assets/chunk-[name].js',
-        assetFileNames: (assetInfo) => {
-          const name = String(assetInfo.name || '');
-          if (name.slice(-4) === '.css') return 'assets/main.css';
-          return 'assets/[name][extname]';
-        },
+        entryFileNames: 'assets/main.react.js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
       },
     },
   },

@@ -17,8 +17,16 @@ def test_ui_index_returns_html():
     # Contract: SPA has a root mount node
     assert "id=\"app\"" in r.text or "id='app'" in r.text
 
-    # Contract: JS entrypoint is referenced (no Node required at runtime)
-    assert ("/static/assets/main.mjs" in r.text) or ("/static/assets/main.js" in r.text)
+    # Contract: JS entrypoint is referenced.
+    # We support multiple runtime modes:
+    #  - modular framework-free UI: /static/assets/main.mjs
+    #  - deprecated legacy stub:     /static/assets/main.js
+    #  - React shell (Option B):     /static/assets/main.react.js
+    assert (
+        ("/static/assets/main.mjs" in r.text)
+        or ("/static/assets/main.react.js" in r.text)
+        or ("/static/assets/main.js" in r.text)
+    )
 
     # Contract markers used by other tests / workflows
     assert "copy-source" in r.text
