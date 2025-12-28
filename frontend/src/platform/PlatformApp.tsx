@@ -185,8 +185,7 @@ export function PlatformApp() {
         <div id="metaSummary"></div>
         <div id="downloadSummary"></div>
 
-        <input id="dlSource" />
-        <select id="dlRangeMode"></select>
+        {/* Do NOT include dlSource/dlRangeMode duplicates; these are rendered by the real DownloadPanel. */}
         <button id="btnGuessSource"></button>
         <button id="btnCopyPayload" data-testid="copy-source"></button>
 

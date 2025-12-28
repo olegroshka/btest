@@ -482,19 +482,49 @@ export function InspectorPageReact() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <label className="label">
               library
-              <input className="input" value={lib} onChange={(e) => setLib(e.target.value)} style={{ width: '100%' }} />
+              <input
+                id="dLibrary"
+                name="dLibrary"
+                className="input"
+                value={lib}
+                onChange={(e) => setLib(e.target.value)}
+                style={{ width: '100%' }}
+              />
             </label>
             <label className="label">
               symbol
-              <input className="input" value={sym} onChange={(e) => setSym(e.target.value)} style={{ width: '100%' }} />
+              <input
+                id="dSymbol"
+                name="dSymbol"
+                className="input"
+                value={sym}
+                onChange={(e) => setSym(e.target.value)}
+                style={{ width: '100%' }}
+              />
             </label>
             <label className="label">
               start
-              <input id="dStart" className="input" value={start} onChange={(e) => setStart(e.target.value)} placeholder="YYYY-MM-DD" style={{ width: '100%' }} />
+              <input
+                id="dStart"
+                name="dStart"
+                className="input"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                placeholder="YYYY-MM-DD"
+                style={{ width: '100%' }}
+              />
             </label>
             <label className="label">
               end
-              <input id="dEnd" className="input" value={end} onChange={(e) => setEnd(e.target.value)} placeholder="YYYY-MM-DD" style={{ width: '100%' }} />
+              <input
+                id="dEnd"
+                name="dEnd"
+                className="input"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+                placeholder="YYYY-MM-DD"
+                style={{ width: '100%' }}
+              />
             </label>
           </div>
 

@@ -6,6 +6,7 @@ import './ag-theme-quant.css';
 // AG Grid v34+ requires explicit module registration.
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 
+// Register the full Community module bundle.
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 function mount() {

@@ -33,8 +33,11 @@ export function CatalogPage({
     () => [
       {
         field: 'symbol',
+        headerName: 'Symbol',
         sortable: true,
         filter: 'agTextColumnFilter',
+        flex: 2,
+        minWidth: 320,
         cellRenderer: (p: ICellRendererParams<CatalogRow>) => {
           const sym = p.value ? String(p.value) : '';
           const lib = p.data?.library ? String(p.data.library) : '';
@@ -52,12 +55,12 @@ export function CatalogPage({
           );
         },
       },
-      { field: 'library', sortable: true, filter: 'agTextColumnFilter', flex: 1 },
+      { field: 'entity', headerName: 'Entity', sortable: true, filter: 'agTextColumnFilter', minWidth: 140 },
+      { field: 'library', headerName: 'Library', sortable: true, filter: 'agTextColumnFilter', minWidth: 160, flex: 1 },
       { field: 'provider', sortable: true, filter: 'agTextColumnFilter' },
       { field: 'frequency', sortable: true, filter: 'agTextColumnFilter' },
       { field: 'kind', sortable: true, filter: 'agTextColumnFilter' },
       { field: 'dataset', sortable: true, filter: 'agTextColumnFilter', flex: 1 },
-      { field: 'entity', sortable: true, filter: 'agTextColumnFilter' },
     ],
     []
   );
@@ -68,10 +71,6 @@ export function CatalogPage({
       sortable: true,
       filter: true,
       minWidth: 120,
-      // Ensure this grid never shows selection checkboxes.
-      // (Some AG Grid versions can infer checkboxes from selection settings.)
-      checkboxSelection: false,
-      headerCheckboxSelection: false,
     }),
     []
   );
@@ -79,7 +78,6 @@ export function CatalogPage({
   const rowSelection = React.useMemo(
     () => ({
       mode: 'singleRow' as const,
-      // No checkbox UI; we only want row highlight when clicked.
       checkboxes: false,
       headerCheckbox: false,
       enableClickSelection: true,
@@ -90,8 +88,12 @@ export function CatalogPage({
   return (
     <div id="pageCatalog" className="page">
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button className="btn" id="btnCatalog" onClick={() => onRefresh()} disabled={loading}>Refresh</button>
-        <button className="btn" id="btnCatalogClear" onClick={() => { /* compatibility */ }} disabled={loading}>Clear</button>
+        <button className="btn" id="btnCatalog" onClick={() => onRefresh()} disabled={loading}>
+          Refresh
+        </button>
+        <button className="btn" id="btnCatalogClear" onClick={() => { /* compatibility */ }} disabled={loading}>
+          Clear
+        </button>
         <input
           className="input"
           id="catalogSearch"
@@ -167,4 +169,3 @@ export function CatalogPage({
     </div>
   );
 }
-
