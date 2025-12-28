@@ -68,6 +68,21 @@ export function CatalogPage({
       sortable: true,
       filter: true,
       minWidth: 120,
+      // Ensure this grid never shows selection checkboxes.
+      // (Some AG Grid versions can infer checkboxes from selection settings.)
+      checkboxSelection: false,
+      headerCheckboxSelection: false,
+    }),
+    []
+  );
+
+  const rowSelection = React.useMemo(
+    () => ({
+      mode: 'singleRow' as const,
+      // No checkbox UI; we only want row highlight when clicked.
+      checkboxes: false,
+      headerCheckbox: false,
+      enableClickSelection: true,
     }),
     []
   );
@@ -139,7 +154,7 @@ export function CatalogPage({
               paginationPageSize={50}
               paginationPageSizeSelector={[20, 50, 100, 200]}
               animateRows
-              rowSelection={{ mode: 'singleRow' }}
+              rowSelection={rowSelection}
               onRowClicked={(ev) => {
                 const r = ev.data;
                 if (!r) return;
