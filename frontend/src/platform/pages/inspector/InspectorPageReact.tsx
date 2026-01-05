@@ -3,7 +3,6 @@ import { AgGridReact } from 'ag-grid-react';
 import type { ColDef } from 'ag-grid-community';
 
 import { setSelection } from '../../SelectionBridge';
-import { DownloadPanel } from './DownloadPanel';
 import { QualityPanel } from './QualityPanel';
 
 type PreviewPayload = {
@@ -540,7 +539,7 @@ export function InspectorPageReact() {
             {loading ? '(loading...)' : '(ready)'}
           </div>
 
-          <DownloadPanel lib={lib} sym={sym} start={start} end={end} />
+          {/* Download moved to Catalog under the grid to avoid duplicate contract IDs. */}
           <QualityPanel />
         </div>
 

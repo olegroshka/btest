@@ -3,6 +3,7 @@ import { AgGridReact } from 'ag-grid-react';
 import type { ColDef, ICellRendererParams } from 'ag-grid-community';
 
 import { navigateToInspector, setSelection } from '../SelectionBridge';
+import { DownloadPanel } from './inspector/DownloadPanel';
 
 export type CatalogRow = {
   library: string;
@@ -85,6 +86,31 @@ export function CatalogPage({
     []
   );
 
+  const [sel, setSel] = React.useState<{ lib: string; sym: string }>(() => {
+    try {
+      const pLib = document.getElementById('pLib') as HTMLInputElement | null;
+      const pSym = document.getElementById('pSym') as HTMLInputElement | null;
+      return { lib: (pLib?.value || '').trim(), sym: (pSym?.value || '').trim() };
+    } catch {
+      return { lib: '', sym: '' };
+    }
+  });
+
+  React.useEffect(() => {
+    const onSel = (ev: any) => {
+      try {
+        const d = ev?.detail || {};
+        const lib = String(d.lib || '').trim();
+        const sym = String(d.sym || '').trim();
+        setSel({ lib, sym });
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('quantdsl:selection', onSel as any);
+    return () => window.removeEventListener('quantdsl:selection', onSel as any);
+  }, []);
+
   return (
     <div id="pageCatalog" className="page">
       <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -161,8 +187,19 @@ export function CatalogPage({
                 const r = ev.data;
                 if (!r) return;
                 setSelection({ lib: r.library, sym: r.symbol });
+                // Ensure Catalog-side panels update immediately.
+                try {
+                  window.dispatchEvent(new CustomEvent('quantdsl:selection', { detail: { lib: r.library, sym: r.symbol } }));
+                } catch {}
               }}
             />
+          </div>
+        )}
+
+        {!loading && !err && (
+          <div className="card" style={{ marginTop: 12 }}>
+            {/* Download should be driven by the user's input, not by existing catalog selection. */}
+            <DownloadPanel lib={sel.lib} sym={sel.sym} start={''} end={''} />
           </div>
         )}
       </div>

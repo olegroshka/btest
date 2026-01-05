@@ -4,7 +4,7 @@ from quantdsl_backtest.data.requests import DataRequest, KIND_MARKET_BARS, KIND_
 from quantdsl_backtest.data.sources.cache import build_cache_key
 
 
-def test_cache_key_includes_provider_kind_frequency_entity():
+def test_cache_key_includes_kind_dataset_entity():
     req = DataRequest(
         source="fred://CPIAUCSL",
         kind="market_bars",
@@ -40,3 +40,14 @@ def test_cache_key_separates_kinds_for_same_entity():
     k2 = build_cache_key(provider="FRED", request=req2, entity="CPIAUCSL")
     assert k1 != k2
 
+
+def test_cache_key_parquet_uses_basename_only():
+    req = DataRequest(
+        source="parquet://C:/some/deep/path/equities/sp500_daily",
+        kind=KIND_MARKET_BARS,
+        frequency="1d",
+        start="2024-01-01",
+        end="2024-01-02",
+    )
+    k = build_cache_key(provider="PARQUET", request=req, entity="AAPL")
+    assert k == "market_bars/sp500_daily/AAPL"

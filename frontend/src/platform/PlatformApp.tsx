@@ -183,10 +183,10 @@ export function PlatformApp() {
         <button id="btnDownload"></button>
 
         <div id="metaSummary"></div>
-        <div id="downloadSummary"></div>
+
+        {/* Download section now mounts a real #downloadSummary via DownloadPanel on Catalog. */}
 
         {/* Do NOT include dlSource/dlRangeMode duplicates; these are rendered by the real DownloadPanel. */}
-        <button id="btnGuessSource"></button>
         <button id="btnCopyPayload" data-testid="copy-source"></button>
 
         missing ts sample

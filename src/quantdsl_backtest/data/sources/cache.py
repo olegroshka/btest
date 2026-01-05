@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-import hashlib
 from typing import Callable, Optional
+
+import os
 
 import pandas as pd
 
@@ -110,6 +111,10 @@ class SafeArcticCacheStore:
 # Cache keys
 # ---------------------------------------------------------------------------
 
+# Track dataset partition collisions within the current process.
+# This keeps keys readable without embedding full filesystem paths.
+_DATASET_PARTITION_COUNTS: dict[str, int] = {}
+
 
 def _sanitize_key_part(x: str) -> str:
     """Make a safe, readable key segment for Arctic symbols.
@@ -124,14 +129,36 @@ def _sanitize_key_part(x: str) -> str:
     return s.replace("/", "_")
 
 
+def _dedupe_dataset_partition(base: str) -> str:
+    """Return a unique dataset partition token for this process.
+
+    If the same base name is requested multiple times (e.g., two different parquet
+    files named sp500_daily in different folders), we suffix: <base>_1, <base>_2, ...
+
+    Note: this is a best-effort readability feature. Collisions across different
+    processes/runs are acceptable and naturally de-conflicted by varying arctic roots.
+    """
+
+    b = _sanitize_key_part(base)
+    if not b:
+        b = "default"
+
+    n = _DATASET_PARTITION_COUNTS.get(b, 0)
+    _DATASET_PARTITION_COUNTS[b] = n + 1
+    if n == 0:
+        return b
+    return f"{b}_{n}"
+
+
 def dataset_partition(request: DataRequest) -> str:
     """Dataset identifier for cache keying.
 
     Preferred: explicit request.dataset_id (stable, user-controlled).
+
     Fallback: a readable token derived from the source scheme.
 
-    Note: we intentionally do NOT hash by default. The cache is meant to be
-    inspectable and debuggable.
+    For parquet, we intentionally use only the file basename (not full path) to
+    keep cache keys short and portable.
     """
 
     if request.dataset_id:
@@ -139,8 +166,11 @@ def dataset_partition(request: DataRequest) -> str:
 
     src = str(request.source or "")
     if src.lower().startswith("parquet://"):
-        # e.g. parquet://equities/indicies.parquet -> equities/indicies.parquet
-        return _sanitize_key_part(src[len("parquet://") :])
+        raw_path = src[len("parquet://") :]
+        # Only basename to avoid embedding absolute paths in cache keys.
+        base = os.path.basename(raw_path.replace("\\", "/").rstrip("/"))
+        return _dedupe_dataset_partition(base)
+
     if "://" in src:
         # e.g. yf://SPY -> SPY
         return _sanitize_key_part(src.split("://", 1)[1])

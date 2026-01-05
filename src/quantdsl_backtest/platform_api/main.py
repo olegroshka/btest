@@ -15,6 +15,7 @@ def create_app():
     from .routes import catalog_symbol
     from .routes import catalog_download
     from .routes import catalog_plan
+    from .routes import catalog_sources
     from .routes import ui
     from .routes import quality
 
@@ -178,6 +179,7 @@ def create_app():
     app.include_router(catalog_symbol.router, prefix="/api")
     app.include_router(catalog_download.router, prefix="/api")
     app.include_router(catalog_plan.router, prefix="/api")
+    app.include_router(catalog_sources.router, prefix="/api")
     app.include_router(quality.router, prefix="/api")
 
     # --- catch-all for browser asset probes (non-API only) -------------
