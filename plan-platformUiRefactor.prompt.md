@@ -34,18 +34,36 @@ This plan is designed to be used as a “prompt” for future chats.
 
 ---
 
-## Phase 2 — “Option B” UI implementation (IN PROGRESS / tinkering)
+## Phase 2 — “Option B” UI implementation (IN PROGRESS / stabilizing)
 **Goal:** coherent React component model across all tabs, with no regression in features.
 
 ### Current state (what should work today)
 - **Catalog tab**: AG Grid Community, quick filter search box, row click selection.
+  - **Download panel lives on Catalog** (not Inspector) and is **input-driven** (not gated by selecting an existing cached dataset).
+  - Download layout: inputs on the left, output/progress/errors on the right.
 - **Meta tab**: React implementation with AG Grid for results.
 - **Inspector tab**: React implementation with:
   - Preview (head/tail grids)
   - Plotly chart (with range buttons like 1m/6m/YTD/1y/5y/All)
-  - Download panel
   - Quality panel
-- **Smoke tests / contracts**: `tests_slow/smoke/test_ui_smoke.py -m manual` remains the UI contract.
+  - (Download is no longer the primary workflow here)
+
+### Download: current contract + behavior
+- UI is driven by supported sources returned from:
+  - `GET /api/catalog/sources` (returns source ids + capabilities like file-based)
+- **Parquet** (file-based): requires a file/path input; dates optional.
+- **YF / FRED** (network sources): require:
+  - entity (e.g. `AAPL` / `CPIAUCSL`)
+  - start + end dates
+  - frequency (e.g. `1d`)
+  - UI formats provider URI (`yf://AAPL`) behind the scenes; user does not type schemes.
+- Buttons are enabled only when required fields are present, and disabled while request is in progress.
+
+### Tests / contracts
+- **Manual UI smoke contract**: `tests_slow/smoke/test_ui_smoke.py -m manual` (server-required click-through).
+- Playwright E2E remains under `tests_slow/platform/`.
+- Optional network-dependent verification:
+  - YF real download test exists but is **skipped by default** unless `QUANTDSL_RUN_NET=1`.
 
 ### Phase 2 cleanup tasks (keep doing until stable)
 1. **Stabilize Plotly lifecycle**
@@ -90,7 +108,7 @@ Exit criteria for Phase 2:
    - Add “copy query” / “share link” affordances (URL is source-of-truth).
 
 3. **Inspector data ergonomics**
-   - Download: validate payload, show request preview, show last result summary.
+   - Tighten Preview/Plot UX and error states.
    - Quality: better presentation of scan summary and issues list.
 
 4. **Diagnostics panel (optional)**
