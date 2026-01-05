@@ -121,7 +121,142 @@ Exit criteria:
 
 ---
 
-## Phase 4 — Signals UI (NEXT after Phase 3)
+## Phase 3.5 — Notebook-first Strategy UI (NEW / preferred next step)
+**Goal:** enable a quant-friendly workflow to edit/run/compare strategies via Jupyter notebooks, while keeping runs reproducible and comparable.
+
+This phase intentionally leans on notebooks for *interaction* and *analysis*, but keeps the **backend run registry + artifacts** as the source of truth.
+
+### Product shape (Phase 3.5)
+- A new top-level tab/section: **Strategies**
+  - Strategies grid: list available strategies (name, tags, last run, key metrics)
+  - Actions: **Open Notebook**, Clone, Run, Compare, Reports
+- A new top-level tab/section: **Runs**
+  - Runs grid: run id, strategy version/hash, dataset version, start/end, status, key metrics
+  - Actions: open reports, open analysis notebook, add to compare basket
+- Compare (MVP): select 2–10 runs → show metrics table + a couple key overlays; also provide **Open compare notebook**.
+
+### Guardrails (avoid breaking existing functionality)
+- Phase 3.5 must be **additive**:
+  - do not modify existing `/api/catalog/*` contracts
+  - UI smoke tests continue to pass (Catalog/Meta/Inspector)
+- Notebook-first must not turn into “ad-hoc stateful runs”:
+  - notebooks may do exploration, but **official runs** must still record artifacts + metrics predictably.
+
+### Where do strategy HTML reports live?
+We already generate static HTML reports under `outputs/` today. For Phase 3.5 we should keep this convention, but make it **run-scoped** and **indexable**.
+
+**Hard rule:** a run must write into a unique directory and must NOT overwrite prior outputs.
+
+- Per-run directory:
+  - `outputs/runs/<run_id>/` (preferred)
+  - OR `outputs/<strategy_name>/<run_id>/` (acceptable if it matches current naming)
+- Reports remain static HTML (e.g. `index.html`, `tearsheet.html`, attribution pages).
+- The run record stores:
+  - `reports_root` (filesystem path)
+  - `reports_url` (served URL prefix) and/or an explicit list of known report entrypoints
+
+> Implementation detail (later): serve `outputs/` (or `outputs/runs/`) via the platform server as static files so the UI can link directly.
+
+### Minimal stats storage (MVP)
+We do **not** need full historical experiment tracking on day one.
+
+**Strategy-level snapshot (enables Strategies grid):**
+- `last_run_id`
+- `last_status` (success/fail)
+- `last_run_at`
+- `last_metrics` (a compact JSON: Sharpe, CAGR, maxDD, turnover, etc.)
+- `last_reports_url` / `last_reports_entrypoints`
+
+**Run-level minimal index (enables Compare and Runs grid):**
+- Keep only the most recent **N** runs (configurable; start with N=200).
+- Each run index row stores: `run_id`, `strategy_id`, `strategy_hash`, `params`, `status`, `ended_at`, `metrics`, `reports_url`.
+
+**Persistence choice (MVP):**
+- prefer simple local-first persistence under ignored folders:
+  - JSONL file under `.platform_ui/` or `local_cache/` (easiest)
+  - OR SQLite under `.platform_ui/` (slightly more structure)
+
+### Key design decisions (for reproducibility)
+- **Notebooks are not the official execution substrate** for full runs.
+  - Notebooks submit runs to a backend job runner/worker.
+  - Worker executes in a clean environment; notebook polls status and loads artifacts.
+- Each run is recorded with:
+  - strategy identifier + strategy version hash
+  - dataset/source + dataset version tag (best-effort at first)
+  - resolved params (start/end/frequency + overrides)
+  - environment hash (optional early)
+  - links to artifacts + reports
+
+### Minimal backend/API contracts (add incrementally)
+> Keep these small and explicit; this is the glue between Web UI, notebooks, and the backtest runner.
+
+1) Strategies
+- `GET /api/strategies` → list strategies (id, name, path, tags, last_run_id, last_metrics)
+- `POST /api/strategies/clone` → clone strategy (source_id/path → new_id/path)
+- `GET /api/strategies/{id}` → metadata + resolved path
+
+2) Runs
+- `POST /api/runs` → submit run (strategy_id, params, optional overrides)
+- `GET /api/runs/{id}` → status + metrics + artifact index + report links
+- `GET /api/runs` → list runs (filters by strategy/date/status/tag)
+
+3) Notebook integration
+- `GET /api/notebooks/open?strategy_id=...` → returns a URL/path to open in JupyterLab
+- `GET /api/notebooks/compare?run_ids=...` → returns a prefilled compare notebook URL/path
+
+### Artifact contract (must be machine-readable)
+HTML reports remain great for humans, but comparison requires structured outputs.
+Emit per-run (minimum):
+- `summary.json` (key stats)
+- `returns.parquet`
+- `weights.parquet`
+- `trades.parquet` (if available)
+- `signal_attribution.parquet` and/or `factor_pnl.parquet` (as available)
+- `config_resolved.json`
+- `logs.txt`
+- HTML reports (static): `index.html`, `tearsheet.html`, etc.
+
+### Notebook UX (templates)
+- Per strategy: a starter notebook template that:
+  - loads the strategy
+  - runs a small dry-run sample (fast feedback)
+  - submits an official run via the run API
+  - loads artifacts for deeper analysis
+- Compare notebook template:
+  - accepts run_ids
+  - overlays equity/returns
+  - ranks summary metrics
+  - compares attribution/exposures
+
+### Suggested milestone breakdown (keeps complexity controlled)
+1) **Run directory + artifact index (no notebook yet)**
+   - Introduce `run_id` + run-scoped output directory.
+   - Emit `summary.json` + keep existing HTML reports.
+   - Add minimal run index persistence (JSONL/SQLite).
+
+2) **Strategies + Runs grids (web UI)**
+   - Show strategies list with last-run snapshot.
+   - Show runs list from the run index.
+   - Link to HTML reports.
+
+3) **Compare MVP (web)**
+   - Compare table reads `summary.json` or run index metrics.
+   - Minimal overlays (equity/returns) from artifacts.
+
+4) **Notebook integration**
+   - “Open notebook” and “open compare notebook” endpoints.
+   - Notebook templates submit runs via API and load artifacts.
+
+### Exit criteria
+- A quant can:
+  1) run a strategy and get run-scoped HTML reports
+  2) see last-run metrics in Strategies grid
+  3) select multiple runs and compare metrics + open reports
+  4) open a notebook that can submit runs and load outputs
+
+---
+
+## Phase 4 — Signals UI (NEXT after Phase 3.5)
 **Goal:** introduce first-class UX around signals computed from data.
 
 ### Scope
@@ -142,11 +277,12 @@ Exit criteria:
 
 ---
 
-## Phase 5 — Strategies UI (NEXT after Signals)
-**Goal:** run strategies and visualize outputs in the same Platform UI.
+## Phase 5 — Strategies UI (AFTER notebook-first; custom DSL editor later)
+**Goal:** evolve from notebook-first to a custom visual DSL editor + rich strategy UI, without losing reproducibility.
 
 ### Deliverables
-- Strategy picker + parameters
+- Guided editor for Strategy DSL (graph/nodes for factors/signals/etc.)
+- Parameters UI + validation + dry-run checks
 - Run strategy (locally) and show:
   - performance / equity curve
   - attribution tear sheet links (existing `outputs/*`)
@@ -158,20 +294,3 @@ Exit criteria:
   1) populate the cache
   2) run a strategy
   3) open UI and inspect results end-to-end.
-
----
-
-## Engineering guardrails (apply to all phases)
-- Keep APIs stable unless a new feature truly needs a new route.
-- If adding a route, document it here (inputs/outputs, error modes, IDs used by tests).
-- Keep Playwright E2E under `tests_slow/` only.
-- Keep `assets_dist/` committed and rebuild via the repo script.
-- Prefer small steps + keep tests green.
-
-## Testing & commands (reference)
-- Fast unit tests:
-  - `uv run pytest -q`
-- UI manual/smoke contract:
-  - `uv run pytest -q tests_slow/smoke/test_ui_smoke.py -m manual`
-- Slow suite gate:
-  - `uv run pytest -q -n auto tests_slow -m "slow or manual"`
