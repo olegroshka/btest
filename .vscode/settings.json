@@ -1,0 +1,39 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.venvPath": "${workspaceFolder}",
+    "python.terminal.activateEnvironment": true,
+    "python.terminal.activateEnvInCurrentTerminal": false,
+    "jupyter.jupyterServerType": "local",
+    
+    // Fix markdown cell visibility - PREVENT AUTO-COLLAPSE
+    "notebook.cellToolbarLocation": {
+        "default": "right",
+        "jupyter-notebook": "left"
+    },
+    "notebook.showCellStatusBar": "visible",
+    "notebook.consolidatedRunButton": false,
+    "notebook.markup.fontSize": 14,
+    "notebook.output.wordWrap": true,
+    "notebook.cellFolding": false,
+    "notebook.compactView": false,
+    "notebook.undoRedoPerCell": false,
+    "notebook.outline.showMarkdownHeadersOnly": false,
+    "jupyter.kernels.excludePythonEnvironments": [
+        "**/AppData/Roaming/uv/python/**"
+    ],
+    "python.condaPath": "C:\\Users\\andre\\anaconda3\\Scripts\\conda.exe",
+    "python.poetryPath": "",
+    "python.interpreter.infoVisibility": "always",
+    "files.associations": {
+        "*.ipynb": "jupyter-notebook"
+    },
+    "terminal.integrated.env.windows": {},
+
+    // Disable auto kernel connection
+    "jupyter.disableJupyterAutoStart": true,
+    "jupyter.widgetScriptSources": ["jsdelivr.com", "unpkg.com"],
+    "jupyter.enableExtendedKernelCompletions": false,
+    "jupyter.experiments.enabled": false,
+    "jupyter.runStartupCommands": [],
+    "jupyter.notebookFileRoot": "${workspaceFolder}"
+}

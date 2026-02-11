@@ -18,6 +18,7 @@ def create_app():
     from .routes import catalog_sources
     from .routes import ui
     from .routes import quality
+    from .routes import dsl_builder
 
     app = FastAPI(
         title="quantdsl-backtest platform API",
@@ -181,6 +182,7 @@ def create_app():
     app.include_router(catalog_plan.router, prefix="/api")
     app.include_router(catalog_sources.router, prefix="/api")
     app.include_router(quality.router, prefix="/api")
+    app.include_router(dsl_builder.router, prefix="/api")
 
     # --- catch-all for browser asset probes (non-API only) -------------
     # Browsers/extensions sometimes probe for optional assets (icons, manifests) and log 404s noisily.

@@ -10,7 +10,7 @@ Notes/assumptions:
   simple and compatible with the current engine. Extending to native calendars
   per index can be a follow‑up.
 - Many index series may lack intraday fields (open/high/low). The strategy
-  relies primarily on close‑to‑close returns across multiple windows.
+  relies primarily 
 - Costs approximate Interactive Brokers style by using bps on notional,
   plus slippage and financing/borrow models.
 

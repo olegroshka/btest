@@ -86,6 +86,7 @@ src/quantdsl_backtest/platform_api/routes/catalog.py
 src/quantdsl_backtest/platform_api/routes/catalog_download.py
 src/quantdsl_backtest/platform_api/routes/catalog_meta.py
 src/quantdsl_backtest/platform_api/routes/catalog_plan.py
+src/quantdsl_backtest/platform_api/routes/catalog_sources.py
 src/quantdsl_backtest/platform_api/routes/catalog_symbol.py
 src/quantdsl_backtest/platform_api/routes/health.py
 src/quantdsl_backtest/platform_api/routes/providers.py
@@ -104,7 +105,6 @@ src/quantdsl_backtest/platform_api/services/catalog_stats_classify.py
 src/quantdsl_backtest/platform_api/services/catalog_symbol.py
 src/quantdsl_backtest/platform_api/services/quality_registry.py
 src/quantdsl_backtest/platform_ui/__init__.py
-src/quantdsl_backtest/platform_ui/site.py
 src/quantdsl_backtest/utils/__init__.py
 src/quantdsl_backtest/utils/logging.py
 src/quantdsl_backtest/utils/time.py
