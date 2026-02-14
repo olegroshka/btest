@@ -29,9 +29,11 @@ src/quantdsl_backtest/data/sources/universe_filtering.py
 src/quantdsl_backtest/data/sources/yahoo.py
 src/quantdsl_backtest/dsl/__init__.py
 src/quantdsl_backtest/dsl/backtest_config.py
+src/quantdsl_backtest/dsl/cli.py
 src/quantdsl_backtest/dsl/costs.py
 src/quantdsl_backtest/dsl/data_config.py
 src/quantdsl_backtest/dsl/execution.py
+src/quantdsl_backtest/dsl/explorer.py
 src/quantdsl_backtest/dsl/factors.py
 src/quantdsl_backtest/dsl/frequency.py
 src/quantdsl_backtest/dsl/portfolio.py
@@ -88,6 +90,7 @@ src/quantdsl_backtest/platform_api/routes/catalog_meta.py
 src/quantdsl_backtest/platform_api/routes/catalog_plan.py
 src/quantdsl_backtest/platform_api/routes/catalog_sources.py
 src/quantdsl_backtest/platform_api/routes/catalog_symbol.py
+src/quantdsl_backtest/platform_api/routes/dsl_builder.py
 src/quantdsl_backtest/platform_api/routes/health.py
 src/quantdsl_backtest/platform_api/routes/providers.py
 src/quantdsl_backtest/platform_api/routes/quality.py

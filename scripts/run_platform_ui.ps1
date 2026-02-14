@@ -25,10 +25,12 @@ $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
 $stateDir = Join-Path $root '.platform_ui'
-$pidFile = Join-Path $stateDir 'server.pid'
-$logFile = Join-Path $stateDir 'server.log'
-$errFile = Join-Path $stateDir 'server.err.log'
-$portFile = Join-Path $stateDir 'server.port'
+
+# Make state/log files port-specific so multiple instances can run concurrently.
+$pidFile = Join-Path $stateDir ("server_{0}.pid" -f $Port)
+$logFile = Join-Path $stateDir ("server_{0}.log" -f $Port)
+$errFile = Join-Path $stateDir ("server_{0}.err.log" -f $Port)
+$portFile = Join-Path $stateDir ("server_{0}.port" -f $Port)
 
 # Ensure log files exist so Start-Process redirection always has a target.
 foreach ($f in @($logFile, $errFile)) {
@@ -45,7 +47,7 @@ if (Test-Path $pidFile) {
         if ($oldPid -gt 0) {
             $oldProc = Get-Process -Id $oldPid -ErrorAction SilentlyContinue
             if ($null -ne $oldProc) {
-                Write-Output ("Platform UI already running (PID {0}). Log: {1}" -f $oldPid, $logFile)
+                Write-Output ("Platform UI already running on port {0} (PID {1}). Log: {2}" -f $Port, $oldPid, $logFile)
                 exit 0
             }
         }
@@ -57,25 +59,45 @@ if (Test-Path $pidFile) {
 
 Write-Host ("Starting Platform UI... host={0} port={1} stdout={2} stderr={3}" -f $HostAddress, $Port, $logFile, $errFile)
 
-# Fail fast if port is already in use.
-$ownerPid = $null
-try {
-    # netstat output includes PID in the last column.
-    $line = (netstat -aon | Select-String -Pattern (':'+$Port+'\s') | Select-Object -First 1)
-    if ($null -ne $line) {
-        $parts = ($line.Line -split '\s+') | Where-Object { $_ -ne '' }
-        if ($parts.Count -ge 5) {
-            $ownerPid = $parts[-1]
+function Get-ListeningOwnerPid {
+    param([Parameter(Mandatory = $true)][int]$Port)
+
+    # Prefer Get-NetTCPConnection (more structured than parsing netstat)
+    try {
+        $c = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Stop | Select-Object -First 1)
+        if ($c.Count -gt 0 -and $null -ne $c[0]) {
+            $pid = [int]$c[0].OwningProcess
+            if ($pid -gt 0 -and $pid -ne 4) { return $pid }
         }
+    } catch {
+        # ignore and fall back
     }
-} catch {
-    $ownerPid = $null
+
+    # Fallback: netstat parsing, but only accept LISTENING lines.
+    try {
+        $lines = @(netstat -aon | Select-String -Pattern (':'+$Port+'\s') | ForEach-Object { $_.Line })
+        foreach ($l in $lines) {
+            if ($l -match '\sLISTENING\s+(\d+)\s*$') {
+                $pid = 0
+                if ([int]::TryParse($Matches[1], [ref]$pid) -and $pid -gt 0 -and $pid -ne 4) {
+                    return $pid
+                }
+            }
+        }
+    } catch {
+        # ignore
+    }
+
+    return $null
 }
 
-if ($null -ne $ownerPid -and $ownerPid -ne '') {
+# Fail fast if port is already in use.
+$ownerPid = Get-ListeningOwnerPid -Port $Port
+
+if ($null -ne $ownerPid) {
     $procName = $null
     try {
-        $p = Get-Process -Id ([int]$ownerPid) -ErrorAction Stop
+        $p = Get-Process -Id $ownerPid -ErrorAction Stop
         $procName = $p.ProcessName
     } catch {
         $procName = $null
@@ -108,6 +130,28 @@ if ([string]::IsNullOrWhiteSpace($uvCmd)) {
 
 $uvArgs = @('run','python','scripts\\run_platform_ui.py','--host',$HostAddress,'--port',[string]$Port)
 
+function Get-ListenerPidForPort {
+    param([Parameter(Mandatory = $true)][int]$Port)
+
+    $lines = @()
+    try {
+        $lines = @(netstat -aon | Select-String -Pattern (':'+$Port+'\s') | ForEach-Object { $_.Line })
+    } catch {
+        $lines = @()
+    }
+
+    foreach ($l in $lines) {
+        if ($l -match '\sLISTENING\s+(\d+)\s*$') {
+            $listenerPid = 0
+            if ([int]::TryParse($Matches[1], [ref]$listenerPid) -and $listenerPid -gt 0) {
+                return $listenerPid
+            }
+        }
+    }
+
+    return $null
+}
+
 try {
     # Use Start-Process so we can capture PID and redirect output.
     $proc = Start-Process `
@@ -126,7 +170,25 @@ if ($null -eq $proc -or $proc.Id -le 0) {
     throw "Failed to start the platform UI server process (no PID returned). See log: $logFile"
 }
 
-Set-Content -LiteralPath $pidFile -Value ([string]$proc.Id) -Encoding ascii
+# Wait briefly for the actual server to bind to the port, then record the listener PID.
+$listenerPid = $null
+$deadline = (Get-Date).AddSeconds(20)
+while ((Get-Date) -lt $deadline) {
+    $listenerPid = Get-ListenerPidForPort -Port $Port
+    if ($null -ne $listenerPid) { break }
+    Start-Sleep -Milliseconds 200
+}
+
+# Fall back to launcher PID if we can't detect the listener PID (still useful as a hint).
+$pidToRecord = if ($null -ne $listenerPid) { $listenerPid } else { $proc.Id }
+
+Set-Content -LiteralPath $pidFile -Value ([string]$pidToRecord) -Encoding ascii
 Set-Content -LiteralPath $portFile -Value ([string]$Port) -Encoding ascii
-Write-Host ("Started Platform UI (PID {0})." -f $proc.Id)
+
+if ($null -ne $listenerPid) {
+    Write-Host ("Started Platform UI (PID {0})." -f $listenerPid)
+} else {
+    Write-Host ("Started Platform UI (launcher PID {0}; listener PID not detected yet)." -f $proc.Id)
+}
+
 Write-Host ("Open http://{0}:{1} (or see server logs: {2} / {3})" -f $HostAddress, $Port, $logFile, $errFile)
