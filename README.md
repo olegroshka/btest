@@ -183,9 +183,85 @@ Testing
 -------
 This repo separates **fast unit tests** (default) from **slow / integration-style tests** and **smoke tests**.
 
-- **Fast tests** live under `tests/unit` and are what you should run most of the time.
+- **Fast tests** live under `tests/unit`.
 - **Slow tests** live under `tests_slow/` (excluding `smoke/`) and cover end-to-end flows, multi-engine consistency, and risk policies.
-- **Smoke tests** live under `tests_slow/smoke/` and are intended to be run against a live server. They are marked as `manual` and skipped by default in automated runs.
+- **Smoke tests** live under `tests_slow/smoke/` and are intended to be run against a live server. They are marked as `manual` and skipped by default.
+
+### Recommended: unified test runner
+
+Use the single runner script below. It:
+- runs the full **automated** suite by default: **unit + slow (excluding manual/smoke)**
+- prints the exact pytest commands it runs
+- streams output live and writes logs under `.test_logs/`
+
+PowerShell (Windows):
+
+```powershell
+# default: unit + slow (not manual)
+uv run python scripts/run_tests.py
+
+# all UI tests: Playwright web UI + smoke UI/API (manual)
+uv run python scripts/run_tests.py --ui
+
+# REALLY all: unit + slow + platform + smoke
+uv run python scripts/run_tests.py --all
+
+# unit only
+uv run python scripts/run_tests.py --unit
+
+# slow only (excluding smoke/manual)
+uv run python scripts/run_tests.py --slow
+
+# include manual tests in the selected suite(s)
+uv run python scripts/run_tests.py --manual --slow
+
+# pass-through args to pytest
+uv run python scripts/run_tests.py -- --maxfail=1 -x -k signal
+```
+
+### Smoke tests (manual)
+
+Smoke tests require a running platform server.
+
+1) Start the server in one terminal:
+
+```powershell
+# canonical
+uv run python scripts/run_platform_ui.py
+
+# convenience wrapper (PID + logs under .platform_ui/)
+.\scripts\run_platform_ui.ps1
+```
+
+2) Run smoke tests in another terminal:
+
+```powershell
+uv run python scripts/run_tests.py --smoke
+```
+
+Notes:
+- The runner does **not** auto-start the server. If it can't detect a listening server, it prints the start command before running pytest.
+- Smoke tests are `manual`-marked; the runner automatically adds `-m manual` for the smoke suite.
+
+### Direct pytest (advanced)
+
+You can still run suites directly via pytest:
+
+- Fast unit tests (single process):
+```bash
+uv run pytest -q
+```
+
+- Slow tests:
+```bash
+uv run pytest -q tests_slow
+```
+
+- Smoke tests (manual):
+```powershell
+uv run pytest -q tests_slow/smoke -m manual
+```
+
 
 ### Platform UI (API + React UI)
 
@@ -503,5 +579,3 @@ python .\scripts\reset_arctic_cache.py --force
 License
 -------
 This project is licensed under the terms of the MIT License (see `LICENSE`).
-
-
