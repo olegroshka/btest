@@ -84,23 +84,37 @@ export function RunsPage() {
   const [strategyId, setStrategyId] = React.useState<string>('');
   const [status, setStatus] = React.useState<string>('');
 
+  // Applied filters (so you can stage changes then Apply, pro UX).
+  const [appliedStrategyId, setAppliedStrategyId] = React.useState<string>('');
+  const [appliedStatus, setAppliedStatus] = React.useState<string>('');
+
+  const [selectedRun, setSelectedRun] = React.useState<RunRecord | null>(null);
+
+  const [logModal, setLogModal] = React.useState<{ title: string; text: string; runId: string } | null>(null);
+
   const refresh = React.useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
       const qs = new URLSearchParams();
       qs.set('limit', '50');
-      if (strategyId) qs.set('strategy_id', strategyId);
-      if (status) qs.set('status', status);
+      if (appliedStrategyId) qs.set('strategy_id', appliedStrategyId);
+      if (appliedStatus) qs.set('status', appliedStatus);
       const data = await fetchJson<RunsListResponse>(`/api/runs?${qs.toString()}`);
-      setRows(Array.isArray(data.runs) ? data.runs : []);
+      const nextRows = Array.isArray(data.runs) ? data.runs : [];
+      setRows(nextRows);
+      // Keep selectedRun fresh if present.
+      if (selectedRun) {
+        const upd = nextRows.find((r) => r.run_id === selectedRun.run_id) || null;
+        setSelectedRun(upd);
+      }
     } catch (e: any) {
       const msg = e?.error?.message || e?.detail || (typeof e === 'string' ? e : JSON.stringify(e));
       setErr(String(msg));
     } finally {
       setLoading(false);
     }
-  }, [status, strategyId]);
+  }, [appliedStatus, appliedStrategyId, selectedRun]);
 
   // Only poll while there is something non-terminal visible.
   React.useEffect(() => {
@@ -121,6 +135,97 @@ export function RunsPage() {
     window.addEventListener('quantdsl:tab', onTab as any);
     setTimeout(refresh, 0);
     return () => window.removeEventListener('quantdsl:tab', onTab as any);
+  }, [refresh]);
+
+  // SSE live tail for the logs modal.
+  React.useEffect(() => {
+    if (!logModal) return;
+
+    let es: EventSource | null = null;
+    let cancelled = false;
+
+    const runId = logModal.runId;
+
+    const fetchFullOnce = async () => {
+      try {
+        const j = await fetchJson<any>(`/api/runs/${runId}/logs`);
+        if (cancelled) return;
+        const txt = String(j?.logs || '').slice(0, 200_000);
+        setLogModal((prev) => (prev ? { ...prev, text: txt || '(empty)' } : prev));
+      } catch {
+        // ignore seed failure; SSE/fallback below will handle.
+      }
+    };
+
+    const fallbackFetch = async (msg?: string) => {
+      try {
+        const j = await fetchJson<any>(`/api/runs/${runId}/logs`);
+        if (cancelled) return;
+        setLogModal((prev) => (prev ? { ...prev, text: String(j?.logs || '').slice(0, 200_000) || '(empty)' } : prev));
+      } catch (e: any) {
+        if (cancelled) return;
+        const m = msg || e?.error?.message || 'failed to load logs';
+        setLogModal((prev) => (prev ? { ...prev, text: String(m) } : prev));
+      }
+    };
+
+    // Seed immediately so completed runs show content even if SSE ends quickly.
+    fetchFullOnce();
+
+    try {
+      es = new EventSource(`/api/runs/${runId}/logs/stream`);
+
+      es.onmessage = (ev) => {
+        if (cancelled) return;
+        const data = String(ev?.data || '');
+        if (!data) return;
+        setLogModal((prev) => {
+          if (!prev) return prev;
+          const next = (prev.text || '') + data + '\n';
+          const bounded = next.length > 200_000 ? next.slice(next.length - 200_000) : next;
+          return { ...prev, text: bounded };
+        });
+      };
+
+      es.addEventListener('done', () => {
+        try {
+          es?.close();
+        } catch {}
+      });
+
+      es.onerror = () => {
+        try {
+          es?.close();
+        } catch {}
+        fallbackFetch('SSE disconnected; loaded full logs instead.');
+      };
+    } catch {
+      fallbackFetch('SSE not available; loaded full logs instead.');
+    }
+
+    return () => {
+      cancelled = true;
+      try {
+        es?.close();
+      } catch {}
+    };
+  }, [logModal?.runId]);
+
+  const onApplyFilters = React.useCallback(() => {
+    setAppliedStrategyId(strategyId);
+    setAppliedStatus(status);
+    // selection is per-list; clear it on filter change.
+    setSelectedRun(null);
+    setTimeout(refresh, 0);
+  }, [refresh, status, strategyId]);
+
+  const onClearFilters = React.useCallback(() => {
+    setStrategyId('');
+    setStatus('');
+    setAppliedStrategyId('');
+    setAppliedStatus('');
+    setSelectedRun(null);
+    setTimeout(refresh, 0);
   }, [refresh]);
 
   const colDefs = React.useMemo<Array<ColDef<RunRecord>>>(
@@ -208,14 +313,9 @@ export function RunsPage() {
                 className="btn"
                 data-testid={`btnRunLogs-${shortId(runId)}`}
                 disabled={!runId}
-                onClick={async () => {
+                onClick={() => {
                   if (!runId) return;
-                  try {
-                    const j = await fetchJson<any>(`/api/runs/${runId}/logs`);
-                    alert(String(j?.logs || '').slice(0, 4000));
-                  } catch (e: any) {
-                    alert(e?.error?.message || 'failed to load logs');
-                  }
+                  setLogModal({ title: `Logs — ${shortId(runId)}`, text: '', runId });
                 }}
               >
                 View Logs
@@ -246,45 +346,66 @@ export function RunsPage() {
 
   return (
     <div id="pageRuns" className="page">
-      <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button className="btn" id="btnRunsRefresh" data-testid="btnRunsRefresh" onClick={() => refresh()} disabled={loading}>
-          Refresh
-        </button>
+      <div className="card" style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 650, marginBottom: 6 }}>Filters</div>
+        <div className="runFilters">
+          <div className="runFiltersLeft">
+            <div className="runField">
+              <label style={{ color: 'var(--muted)' }}>Strategy</label>
+              <select
+                className="input runSelect"
+                id="runsFilterStrategy"
+                data-testid="runsFilterStrategy"
+                value={strategyId}
+                onChange={(e) => setStrategyId(String(e.target.value || ''))}
+                disabled={loading}
+              >
+                <option value="">(all)</option>
+                {availableStrategies.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        <label style={{ color: 'var(--muted)' }}>Strategy</label>
-        <select
-          className="input"
-          id="runsFilterStrategy"
-          data-testid="runsFilterStrategy"
-          value={strategyId}
-          onChange={(e) => setStrategyId(String(e.target.value || ''))}
-          disabled={loading}
-        >
-          <option value="">(all)</option>
-          {availableStrategies.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+            <div className="runField">
+              <label style={{ color: 'var(--muted)' }}>Status</label>
+              <select
+                className="input runSelect"
+                id="runsFilterStatus"
+                data-testid="runsFilterStatus"
+                value={status}
+                onChange={(e) => setStatus(String(e.target.value || ''))}
+                disabled={loading}
+              >
+                <option value="">(all)</option>
+                <option value="pending">pending</option>
+                <option value="running">running</option>
+                <option value="succeeded">succeeded</option>
+                <option value="failed">failed</option>
+              </select>
+            </div>
+          </div>
 
-        <label style={{ color: 'var(--muted)' }}>Status</label>
-        <select
-          className="input"
-          id="runsFilterStatus"
-          data-testid="runsFilterStatus"
-          value={status}
-          onChange={(e) => setStatus(String(e.target.value || ''))}
-          disabled={loading}
-        >
-          <option value="">(all)</option>
-          <option value="pending">pending</option>
-          <option value="running">running</option>
-          <option value="succeeded">succeeded</option>
-          <option value="failed">failed</option>
-        </select>
-
-        {loading && <span style={{ color: 'var(--muted)' }}>(loading...)</span>}
+          <div className="runFiltersRight">
+            <button className="btn" data-testid="btnRunsApply" onClick={onApplyFilters} disabled={loading}>
+              Apply
+            </button>
+            <button className="btn" data-testid="btnRunsClear" onClick={onClearFilters} disabled={loading}>
+              Clear
+            </button>
+            <button className="btn" id="btnRunsRefresh" data-testid="btnRunsRefresh" onClick={() => refresh()} disabled={loading}>
+              Refresh
+            </button>
+            {loading && <span style={{ color: 'var(--muted)' }}>(loading...)</span>}
+          </div>
+        </div>
+        {(appliedStrategyId || appliedStatus) && (
+          <div style={{ marginTop: 8, color: 'var(--muted)', fontSize: 12 }} data-testid="runsAppliedFilters">
+            Applied: {appliedStrategyId || '(all strategies)'} / {appliedStatus || '(all statuses)'}
+          </div>
+        )}
       </div>
 
       {err && (
@@ -296,12 +417,110 @@ export function RunsPage() {
 
       {!err && rows.length === 0 && !loading && <div style={{ color: 'var(--muted)', marginTop: 10 }}>(no runs)</div>}
 
-      <div className="card" style={{ marginTop: 10 }}>
-        <div style={{ fontWeight: 650, marginBottom: 6 }}>Runs</div>
-        <div className="ag-theme-quant" style={{ width: '100%', height: 520 }} data-testid="runs-grid">
-          <AgGridReact rowData={rows} columnDefs={colDefs} defaultColDef={defaultColDef} animateRows={false} />
+      <div style={{ display: 'grid', gridTemplateColumns: selectedRun ? '2fr 1fr' : '1fr', gap: 12, marginTop: 10 }}>
+        <div className="card">
+          <div style={{ fontWeight: 650, marginBottom: 6 }}>Runs</div>
+          <div className="ag-theme-quant" style={{ width: '100%', height: 520 }} data-testid="runs-grid">
+            <AgGridReact
+              rowData={rows}
+              columnDefs={colDefs}
+              defaultColDef={defaultColDef}
+              animateRows={false}
+              rowSelection={'single'}
+              onRowClicked={(ev) => {
+                const r = ev.data as any;
+                if (!r) return;
+                setSelectedRun(r as RunRecord);
+              }}
+            />
+          </div>
         </div>
+
+        {selectedRun && (
+          <div className="card" data-testid="runDetails">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontWeight: 700 }}>Run Details</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <select
+                  className="input"
+                  data-testid="runDetailsSelect"
+                  value={selectedRun.run_id}
+                  onChange={(e) => {
+                    const rid = String(e.target.value || '');
+                    const r = rows.find((x) => x.run_id === rid) || null;
+                    setSelectedRun(r);
+                  }}
+                >
+                  {rows.map((r) => (
+                    <option key={r.run_id} value={r.run_id}>
+                      {shortId(r.run_id)}…{String(r.run_id).slice(-4)} — {r.strategy_id}
+                    </option>
+                  ))}
+                </select>
+                <button className="btn" data-testid="btnRunDetailsClose" onClick={() => setSelectedRun(null)}>
+                  Close
+                </button>
+              </div>
+            </div>
+            <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '110px 1fr', gap: 8, fontSize: 12 }}>
+              <div style={{ color: 'var(--muted)' }}>Status</div>
+              <div>{statusBadge(selectedRun.status)}</div>
+              <div style={{ color: 'var(--muted)' }}>Strategy</div>
+              <div>{selectedRun.strategy_id}</div>
+              <div style={{ color: 'var(--muted)' }}>Run ID</div>
+              <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}>{selectedRun.run_id}</div>
+              <div style={{ color: 'var(--muted)' }}>Error</div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>{selectedRun.error || ''}</div>
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                className="btn"
+                data-testid="btnRunDetailsLogs"
+                onClick={() => setLogModal({ title: `Logs — ${shortId(selectedRun.run_id)}`, text: '', runId: selectedRun.run_id })}
+              >
+                View Logs
+              </button>
+              <button
+                className="btn"
+                data-testid="btnRunDetailsReport"
+                onClick={() => {
+                  const runId = selectedRun.run_id;
+                  const reportUrl = selectedRun.reports_url || (runId ? `/reports/runs/${runId}/index.html` : '');
+                  if (!reportUrl) return;
+                  window.open(reportUrl, '_blank');
+                }}
+              >
+                View Report
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {logModal && (
+        <div
+          className="runModalBackdrop"
+          data-testid="runLogsModal"
+          onClick={(e) => {
+            // Only close when user clicks the backdrop itself (not inside the modal panel).
+            if (e.target === e.currentTarget) setLogModal(null);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="runModal" onClick={(e) => e.stopPropagation()}>
+            <div className="runModalHeader">
+              <div className="runModalTitle">{logModal.title}</div>
+              <button className="btn" data-testid="btnRunLogsClose" onClick={() => setLogModal(null)}>
+                Close
+              </button>
+            </div>
+            <div className="runModalBody">
+              <pre className="runModalPre" data-testid="runLogsText">{logModal.text}</pre>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

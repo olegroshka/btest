@@ -316,3 +316,85 @@ def get_run_logs(run_id: str, request: Request) -> dict[str, Any]:
                 request_id=_rid(request),
             ),
         )
+
+
+@router.get("/runs/{run_id}/logs/stream")
+def stream_run_logs(run_id: str, request: Request):
+    """SSE live tail for run logs.
+
+    Yields appended log content as SSE `data:` events and terminates once the run
+    reaches a terminal state (succeeded/failed).
+
+    Notes:
+      - Clients should use EventSource.
+      - Fallback for non-SSE clients: GET /api/runs/{id}/logs.
+    """
+
+    try:
+        from pathlib import Path
+
+        from starlette.responses import StreamingResponse
+
+        from ..services.log_streamer import iter_sse_log_tail
+
+        store = _get_store(request)
+        run = store.get_run(run_id)
+        if run is None:
+            raise HTTPException(
+                status_code=404,
+                detail=to_api_error(
+                    code="RUN_NOT_FOUND",
+                    message=f"Run not found: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+            )
+
+        if not run.artifacts_dir:
+            raise HTTPException(
+                status_code=404,
+                detail=to_api_error(
+                    code="LOGS_NOT_FOUND",
+                    message=f"logs.txt not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+            )
+
+        run_dir = Path(run.artifacts_dir).resolve()
+        log_path = (run_dir / "logs.txt").resolve()
+        if run_dir not in log_path.parents:
+            raise HTTPException(
+                status_code=404,
+                detail=to_api_error(
+                    code="LOGS_NOT_FOUND",
+                    message=f"logs.txt not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+            )
+
+        def _is_terminal() -> bool:
+            try:
+                r2 = store.get_run(run_id)
+                if r2 is None:
+                    return True
+                return str(r2.status) in {"succeeded", "failed"}
+            except Exception:
+                return True
+
+        gen = iter_sse_log_tail(log_path=log_path, is_terminal=_is_terminal)
+        return StreamingResponse(gen, media_type="text/event-stream")
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=to_api_error(
+                code="RUNS_UNAVAILABLE",
+                message=str(exc),
+                status=503,
+                request_id=_rid(request),
+            ),
+        )
