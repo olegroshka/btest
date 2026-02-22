@@ -19,12 +19,35 @@ def create_app():
     from .routes import ui
     from .routes import quality
     from .routes import dsl_builder
+    from .routes import strategies
+    from .routes import runs
 
     app = FastAPI(
         title="quantdsl-backtest platform API",
         version="0.1.0",
         description="Local-first API for data catalog and strategy-centric backtesting platform.",
     )
+
+    # --- app state -----------------------------------------------------
+    # Run index is local-first; initialize by default so /api/runs endpoints work out-of-the-box.
+    try:
+        from .services.run_store_factory import create_default_run_store
+
+        app.state.run_store = create_default_run_store()
+    except Exception:
+        # Never prevent API boot; routes will surface 503 if accessed.
+        app.state.run_store = None
+
+    # Task runner: small in-process skeleton.
+    try:
+        from .services.task_runner import TaskRunner
+
+        if app.state.run_store is not None:
+            app.state.task_runner = TaskRunner(run_store=app.state.run_store)
+        else:
+            app.state.task_runner = None
+    except Exception:
+        app.state.task_runner = None
 
     # --- error handling -------------------------------------------------
     from fastapi import Request
@@ -183,6 +206,8 @@ def create_app():
     app.include_router(catalog_sources.router, prefix="/api")
     app.include_router(quality.router, prefix="/api")
     app.include_router(dsl_builder.router, prefix="/api")
+    app.include_router(strategies.router, prefix="/api")
+    app.include_router(runs.router, prefix="/api")
 
     # --- catch-all for browser asset probes (non-API only) -------------
     # Browsers/extensions sometimes probe for optional assets (icons, manifests) and log 404s noisily.
