@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type TabKey = 'catalog' | 'meta' | 'inspector' | 'dsl_builder';
+export type TabKey = 'catalog' | 'meta' | 'inspector' | 'dsl_builder' | 'runs';
 
 export function TabsShell({
   tab,
@@ -31,10 +31,12 @@ export function TabsShell({
         <button className="tab" id="tabDSLBuilder" disabled={tab === 'dsl_builder'} onClick={() => onTab('dsl_builder')}>
           DSL Builder
         </button>
+        <button className="tab" id="tabRuns" disabled={tab === 'runs'} onClick={() => onTab('runs')}>
+          Runs
+        </button>
       </div>
 
       {children}
     </div>
   );
 }
-

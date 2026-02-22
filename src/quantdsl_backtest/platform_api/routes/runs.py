@@ -239,3 +239,80 @@ def get_run_summary(run_id: str, request: Request) -> dict[str, Any]:
                 request_id=_rid(request),
             ),
         )
+
+
+@router.get("/runs/{run_id}/logs")
+def get_run_logs(run_id: str, request: Request) -> dict[str, Any]:
+    """Return full captured logs for a run (logs.txt).
+
+    Contract:
+      - Returns {"logs": "..."}
+      - 404 if run or logs.txt not found
+    """
+
+    try:
+        from pathlib import Path
+
+        store = _get_store(request)
+        run = store.get_run(run_id)
+        if run is None:
+            raise HTTPException(
+                status_code=404,
+                detail=to_api_error(
+                    code="RUN_NOT_FOUND",
+                    message=f"Run not found: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+            )
+
+        if not run.artifacts_dir:
+            raise HTTPException(
+                status_code=404,
+                detail=to_api_error(
+                    code="LOGS_NOT_FOUND",
+                    message=f"logs.txt not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+            )
+
+        run_dir = Path(run.artifacts_dir).resolve()
+        log_path = (run_dir / "logs.txt").resolve()
+        if run_dir not in log_path.parents:
+            raise HTTPException(
+                status_code=404,
+                detail=to_api_error(
+                    code="LOGS_NOT_FOUND",
+                    message=f"logs.txt not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+            )
+
+        if not log_path.exists() or not log_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=to_api_error(
+                    code="LOGS_NOT_FOUND",
+                    message=f"logs.txt not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+            )
+
+        txt = log_path.read_text(encoding="utf-8", errors="replace")
+        return {"logs": txt}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=to_api_error(
+                code="RUNS_UNAVAILABLE",
+                message=str(exc),
+                status=503,
+                request_id=_rid(request),
+            ),
+        )

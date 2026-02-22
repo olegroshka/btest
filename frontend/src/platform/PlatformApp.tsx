@@ -7,6 +7,7 @@ import { CatalogPage } from './pages/CatalogPage';
 import { MetaPage } from './pages/MetaPage';
 import { InspectorPage } from './pages/InspectorPage';
 import { DSLBuilderPage } from './pages/DSLBuilderPage';
+import { RunsPage } from './pages/RunsPage';
 
 // NOTE: Avoid importing ag-grid.css/alpine.css; these conflict with the v34 Theming API.
 // Our project styling is provided by ./ag-theme-quant.css imported in main.tsx.
@@ -63,7 +64,7 @@ function readTabFromUrl(): TabKey {
   try {
     const u = new URL(window.location.href);
     const t = (u.searchParams.get('tab') || 'catalog').toLowerCase();
-    if (t === 'meta' || t === 'inspector' || t === 'catalog' || t === 'dsl_builder') return t as TabKey;
+    if (t === 'meta' || t === 'inspector' || t === 'catalog' || t === 'dsl_builder' || t === 'runs') return t as TabKey;
   } catch {}
   return 'catalog';
 }
@@ -179,6 +180,10 @@ export function PlatformApp() {
 
       <div style={{ display: tab === 'dsl_builder' ? 'block' : 'none' }}>
         <DSLBuilderPage />
+      </div>
+
+      <div style={{ display: tab === 'runs' ? 'block' : 'none' }}>
+        <RunsPage />
       </div>
 
       {/* Keep hidden legacy placeholders for tests and future migration */}

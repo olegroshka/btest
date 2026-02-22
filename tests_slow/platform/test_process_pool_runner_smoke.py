@@ -170,12 +170,15 @@ def test_process_pool_runner_succeeds_and_writes_core_artifacts(tmp_path, monkey
 
     out_dir = pathlib.Path(run["artifacts_dir"])
     assert (out_dir / "logs.txt").exists()
+    assert (out_dir / "config_resolved.json").exists()
     assert (out_dir / "index.html").exists()
     assert (out_dir / "summary.json").exists()
 
     j = json.loads((out_dir / "summary.json").read_text(encoding="utf-8"))
     assert "artifacts" in j
+    # parquet contract
     assert "returns.parquet" in j["artifacts"]
+    assert "equity.parquet" in j["artifacts"]
 
     # Summary endpoint should work
     rsum = client.get(f"/api/runs/{run_id}/summary")
@@ -185,6 +188,10 @@ def test_process_pool_runner_succeeds_and_writes_core_artifacts(tmp_path, monkey
     rx = client.get(f"/api/runs/{run_id}/artifact/returns.parquet")
     assert rx.status_code == 200
     assert len(rx.content) > 0
+
+    rxe = client.get(f"/api/runs/{run_id}/artifact/equity.parquet")
+    assert rxe.status_code == 200
+    assert len(rxe.content) > 0
 
 
 @pytest.mark.slow
@@ -292,5 +299,7 @@ strategy = Strategy(
 
     out_dir = pathlib.Path(run["artifacts_dir"])
     assert (out_dir / "logs.txt").exists()
+    # Worker should at least attempt to snapshot resolved config for reproducibility.
+    assert (out_dir / "config_resolved.json").exists()
     txt = (out_dir / "logs.txt").read_text(encoding="utf-8", errors="replace")
     assert ("Exception" in txt) or ("Traceback" in txt)

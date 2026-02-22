@@ -1,0 +1,28 @@
+.runStatus {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  border: 1px solid var(--border);
+}
+
+.runStatus--succeeded {
+  color: #0a7a2f;
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.runStatus--failed {
+  color: #b42318;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.runStatus--running {
+  color: #155eef;
+  background: rgba(59, 130, 246, 0.14);
+}
+
+.runStatus--pending {
+  color: var(--muted);
+  background: var(--panel2);
+}

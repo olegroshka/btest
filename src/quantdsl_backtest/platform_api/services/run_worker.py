@@ -91,11 +91,12 @@ def execute_run_in_worker(rec: RunRecord) -> dict[str, Any]:
         metrics = dict(getattr(result, "metrics", {}) or {})
         return metrics
 
-    except Exception as exc:
+    except Exception:
         tb = traceback.format_exc()
         buf.write("\n[run_worker] Exception:\n")
         buf.write(tb)
-        raise RuntimeError(str(exc))
+        # Re-raise with the full traceback so the parent process can mark the run as failed.
+        raise
 
     finally:
         try:
