@@ -81,6 +81,14 @@ export function RunsPage() {
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState<string | null>(null);
 
+  // Prevent overlapping refresh() calls (which can cause loading flicker and stale state races).
+  const refreshInFlight = React.useRef(false);
+  const lastReqId = React.useRef(0);
+
+  // "busy" means: the user explicitly triggered a refresh/apply/clear and buttons should be disabled.
+  // Background polling should NOT set busy (otherwise controls flicker/disable and intercept clicks).
+  const [busy, setBusy] = React.useState(false);
+
   const [strategyId, setStrategyId] = React.useState<string>('');
   const [status, setStatus] = React.useState<string>('');
 
@@ -92,35 +100,62 @@ export function RunsPage() {
 
   const [logModal, setLogModal] = React.useState<{ title: string; text: string; runId: string } | null>(null);
 
-  const refresh = React.useCallback(async () => {
-    setLoading(true);
-    setErr(null);
-    try {
-      const qs = new URLSearchParams();
-      qs.set('limit', '50');
-      if (appliedStrategyId) qs.set('strategy_id', appliedStrategyId);
-      if (appliedStatus) qs.set('status', appliedStatus);
-      const data = await fetchJson<RunsListResponse>(`/api/runs?${qs.toString()}`);
-      const nextRows = Array.isArray(data.runs) ? data.runs : [];
-      setRows(nextRows);
-      // Keep selectedRun fresh if present.
-      if (selectedRun) {
-        const upd = nextRows.find((r) => r.run_id === selectedRun.run_id) || null;
-        setSelectedRun(upd);
+  const refresh = React.useCallback(
+    async ({ showSpinner }: { showSpinner: boolean } = { showSpinner: true }) => {
+      if (refreshInFlight.current) return;
+      refreshInFlight.current = true;
+
+      const reqId = ++lastReqId.current;
+
+      if (showSpinner) {
+        setLoading(true);
+        setBusy(true);
       }
-    } catch (e: any) {
-      const msg = e?.error?.message || e?.detail || (typeof e === 'string' ? e : JSON.stringify(e));
-      setErr(String(msg));
-    } finally {
-      setLoading(false);
-    }
-  }, [appliedStatus, appliedStrategyId, selectedRun]);
+      setErr(null);
+
+      try {
+        const qs = new URLSearchParams();
+        qs.set('limit', '50');
+        if (appliedStrategyId) qs.set('strategy_id', appliedStrategyId);
+        if (appliedStatus) qs.set('status', appliedStatus);
+        const data = await fetchJson<RunsListResponse>(`/api/runs?${qs.toString()}`);
+
+        // Ignore stale responses.
+        if (reqId != lastReqId.current) return;
+
+        const nextRows = Array.isArray(data.runs) ? data.runs : [];
+        setRows(nextRows);
+        // Keep selectedRun fresh if present.
+        if (selectedRun) {
+          const upd = nextRows.find((r) => r.run_id === selectedRun.run_id) || null;
+          setSelectedRun(upd);
+        }
+      } catch (e: any) {
+        if (reqId != lastReqId.current) return;
+        const msg = e?.error?.message || e?.detail || (typeof e === 'string' ? e : JSON.stringify(e));
+        setErr(String(msg));
+      } finally {
+        if (reqId == lastReqId.current) {
+          if (showSpinner) {
+            setBusy(false);
+            setLoading(false);
+          }
+        }
+        refreshInFlight.current = false;
+      }
+    },
+    [appliedStatus, appliedStrategyId, selectedRun]
+  );
 
   // Only poll while there is something non-terminal visible.
   React.useEffect(() => {
     let timer: any = null;
     const needsPoll = rows.some((r) => r.status === 'pending' || r.status === 'running');
-    if (needsPoll) timer = setInterval(refresh, 3000);
+    if (needsPoll)
+      timer = setInterval(() => {
+        // Background refresh: keep controls usable and avoid flicker.
+        refresh({ showSpinner: false });
+      }, 3000);
     return () => {
       if (timer) clearInterval(timer);
     };
@@ -130,10 +165,10 @@ export function RunsPage() {
   React.useEffect(() => {
     const onTab = (ev: any) => {
       const t = String(ev?.detail?.tab || '').toLowerCase();
-      if (t === 'runs') refresh();
+      if (t === 'runs') refresh({ showSpinner: false });
     };
     window.addEventListener('quantdsl:tab', onTab as any);
-    setTimeout(refresh, 0);
+    setTimeout(() => refresh({ showSpinner: true }), 0);
     return () => window.removeEventListener('quantdsl:tab', onTab as any);
   }, [refresh]);
 
@@ -214,9 +249,9 @@ export function RunsPage() {
   const onApplyFilters = React.useCallback(() => {
     setAppliedStrategyId(strategyId);
     setAppliedStatus(status);
-    // selection is per-list; clear it on filter change.
     setSelectedRun(null);
-    setTimeout(refresh, 0);
+    // Trigger an explicit refresh with spinner => disables buttons briefly.
+    setTimeout(() => refresh({ showSpinner: true }), 0);
   }, [refresh, status, strategyId]);
 
   const onClearFilters = React.useCallback(() => {
@@ -225,7 +260,7 @@ export function RunsPage() {
     setAppliedStrategyId('');
     setAppliedStatus('');
     setSelectedRun(null);
-    setTimeout(refresh, 0);
+    setTimeout(() => refresh({ showSpinner: true }), 0);
   }, [refresh]);
 
   const colDefs = React.useMemo<Array<ColDef<RunRecord>>>(
@@ -350,15 +385,15 @@ export function RunsPage() {
         <div style={{ fontWeight: 650, marginBottom: 6 }}>Filters</div>
         <div className="runFilters">
           <div className="runFiltersLeft">
-            <div className="runField">
-              <label style={{ color: 'var(--muted)' }}>Strategy</label>
+            <label className="label" style={{ minWidth: 0 }}>
+              Strategy
               <select
                 className="input runSelect"
                 id="runsFilterStrategy"
                 data-testid="runsFilterStrategy"
                 value={strategyId}
                 onChange={(e) => setStrategyId(String(e.target.value || ''))}
-                disabled={loading}
+                disabled={busy}
               >
                 <option value="">(all)</option>
                 {availableStrategies.map((s) => (
@@ -367,17 +402,17 @@ export function RunsPage() {
                   </option>
                 ))}
               </select>
-            </div>
+            </label>
 
-            <div className="runField">
-              <label style={{ color: 'var(--muted)' }}>Status</label>
+            <label className="label" style={{ minWidth: 0 }}>
+              Status
               <select
                 className="input runSelect"
                 id="runsFilterStatus"
                 data-testid="runsFilterStatus"
                 value={status}
                 onChange={(e) => setStatus(String(e.target.value || ''))}
-                disabled={loading}
+                disabled={busy}
               >
                 <option value="">(all)</option>
                 <option value="pending">pending</option>
@@ -385,20 +420,33 @@ export function RunsPage() {
                 <option value="succeeded">succeeded</option>
                 <option value="failed">failed</option>
               </select>
-            </div>
+            </label>
           </div>
 
           <div className="runFiltersRight">
-            <button className="btn" data-testid="btnRunsApply" onClick={onApplyFilters} disabled={loading}>
+            <button className="btn" data-testid="btnRunsApply" onClick={onApplyFilters} disabled={busy}>
               Apply
             </button>
-            <button className="btn" data-testid="btnRunsClear" onClick={onClearFilters} disabled={loading}>
+            <button className="btn" data-testid="btnRunsClear" onClick={onClearFilters} disabled={busy}>
               Clear
             </button>
-            <button className="btn" id="btnRunsRefresh" data-testid="btnRunsRefresh" onClick={() => refresh()} disabled={loading}>
+            <button
+              className="btn"
+              id="btnRunsRefresh"
+              data-testid="btnRunsRefresh"
+              onClick={() => refresh({ showSpinner: true })}
+              disabled={busy}
+            >
               Refresh
             </button>
-            {loading && <span style={{ color: 'var(--muted)' }}>(loading...)</span>}
+            {loading && (
+              <span
+                style={{ color: 'var(--muted)', pointerEvents: 'none', userSelect: 'none' }}
+                data-testid="runsLoading"
+              >
+                (loading...)
+              </span>
+            )}
           </div>
         </div>
         {(appliedStrategyId || appliedStatus) && (

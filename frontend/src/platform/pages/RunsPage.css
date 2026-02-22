@@ -5,60 +5,72 @@
   font-size: 12px;
   font-weight: 650;
   border: 1px solid var(--border);
+  background: transparent;
 }
 
 .runStatus--succeeded {
   color: #0a7a2f;
-  background: rgba(16, 185, 129, 0.12);
+  background: transparent;
 }
 
 .runStatus--failed {
   color: #b42318;
-  background: rgba(239, 68, 68, 0.12);
+  background: transparent;
 }
 
 .runStatus--running {
   color: #155eef;
-  background: rgba(59, 130, 246, 0.14);
+  background: transparent;
 }
 
 .runStatus--pending {
   color: var(--muted);
-  background: var(--panel2);
+  background: transparent;
 }
 
 .runFilters {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: nowrap;
+  gap: 18px;
+  flex-wrap: wrap;
 }
 
 .runFiltersLeft {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
 .runFiltersRight {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 10px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  margin-left: 24px;
 }
 
-.runField {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
+/* Override global .input { width:100% } so these selects don't stretch page-wide */
 .runSelect {
-  min-width: 180px;
+  width: 240px !important;
+  max-width: 240px !important;
+  min-width: 240px !important;
+}
+
+@media (max-width: 1100px) {
+  .runSelect {
+    width: 200px !important;
+    max-width: 200px !important;
+    min-width: 200px !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .runFiltersRight {
+    margin-left: 0;
+  }
 }
 
 .runModalBackdrop {
