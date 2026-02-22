@@ -571,6 +571,70 @@ class ReportSiteIndexRenderer:
         (out_dir / "index.html").write_text(html, encoding="utf-8")
 
 
+@dataclass(slots=True)
+class SummaryJsonRenderer:
+    """Write a machine-readable summary.json next to other artifacts.
+
+    This is designed for Platform UI (Runs tab + Compare), so it should:
+      - never raise
+      - only write when output_dir is set
+      - keep JSON numpy-safe
+    """
+
+    name: str = "summary_json"
+    filename: str = "summary.json"
+
+    def render(self, result: BacktestResult, ctx: ReportingContext) -> None:
+        if ctx.output_dir is None:
+            return
+
+        out_dir = ctx.output_dir
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        def _jsonable(v):
+            try:
+                import numpy as _np
+
+                if isinstance(v, (_np.floating, _np.integer)):
+                    return v.item()
+            except Exception:
+                pass
+            if hasattr(v, "isoformat"):
+                try:
+                    return v.isoformat()
+                except Exception:
+                    return str(v)
+            return v
+
+        # List artifacts currently present on disk (relative paths)
+        artifacts: list[str] = []
+        try:
+            for p in sorted(out_dir.rglob("*")):
+                if p.is_file():
+                    artifacts.append(str(p.relative_to(out_dir)).replace("\\", "/"))
+        except Exception:
+            artifacts = []
+
+        metrics: dict[str, object] = {}
+        try:
+            for k, v in (getattr(result, "metrics", None) or {}).items():
+                metrics[str(k)] = _jsonable(v)
+        except Exception:
+            metrics = {}
+
+        payload = {
+            "strategy_name": getattr(getattr(ctx, "strategy", None), "name", None),
+            "engine": getattr(getattr(getattr(ctx, "strategy", None), "backtest", None), "engine", None),
+            "metrics": metrics,
+            "metadata": {str(k): _jsonable(v) for k, v in (getattr(result, "metadata", None) or {}).items()},
+            "artifacts": artifacts,
+        }
+
+        import json
+
+        (out_dir / self.filename).write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
 def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullReportingPipeline:
     """Build the reporting pipeline from `strategy.backtest.reporting`.
 
@@ -604,16 +668,21 @@ def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullRepo
     if output_dir is not None:
         renderers.append(ReportSiteIndexRenderer())
 
-    # Optional: parquet artifacts
+    # Parquet artifacts: default-on when output_dir is available (unless explicitly disabled)
     try:
         parquet_raw = getattr(rep, "parquet", None) if rep is not None else None
-        parquet_enabled = bool(getattr(parquet_raw, "enabled", False)) if parquet_raw is not None else False
-        if parquet_enabled:
+        if parquet_raw is None:
+            parquet_enabled = True
+        else:
+            enabled_attr = getattr(parquet_raw, "enabled", None)
+            parquet_enabled = True if enabled_attr is None else bool(enabled_attr)
+
+        if parquet_enabled and output_dir is not None:
             renderers.append(
                 ParquetArtifactsRenderer(
-                    include_trades=bool(getattr(parquet_raw, "include_trades", True)),
-                    include_positions=bool(getattr(parquet_raw, "include_positions", True)),
-                    subdir=str(getattr(parquet_raw, "subdir", "") or ""),
+                    include_trades=bool(getattr(parquet_raw, "include_trades", True)) if parquet_raw is not None else True,
+                    include_positions=bool(getattr(parquet_raw, "include_positions", True)) if parquet_raw is not None else True,
+                    subdir=str(getattr(parquet_raw, "subdir", "") or "") if parquet_raw is not None else "",
                 )
             )
     except Exception:
@@ -655,6 +724,12 @@ def build_reporting_pipeline(strategy: Strategy) -> ReportingPipeline | NullRepo
     except Exception as exc:
         log.warning("Strategy analytics config invalid; skipping: %s", exc)
 
+    # Summary json should be last so it can list all previously-written artifacts.
+    try:
+        if output_dir is not None:
+            renderers.append(SummaryJsonRenderer())
+    except Exception:
+        pass
 
     return ReportingPipeline(renderers=renderers)
 

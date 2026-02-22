@@ -159,3 +159,83 @@ def submit_run(request: Request, body: RunSubmitRequest) -> RunSubmitResponse:
                 request_id=_rid(request),
             ),
         )
+
+
+@router.get("/runs/{run_id}/summary")
+def get_run_summary(run_id: str, request: Request) -> dict[str, Any]:
+    """Return run summary.json (if available).
+
+    This is meant for the Runs UI to load metrics + artifact listing quickly.
+    """
+
+    try:
+        import json
+        from pathlib import Path
+
+        from fastapi.responses import JSONResponse
+
+        store = _get_store(request)
+        run = store.get_run(run_id)
+        if run is None:
+            return JSONResponse(
+                status_code=404,
+                content=to_api_error(
+                    code="RUN_NOT_FOUND",
+                    message=f"Run not found: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+                headers={"X-Request-Id": _rid(request) or ""},
+            )
+
+        if not run.artifacts_dir:
+            return JSONResponse(
+                status_code=404,
+                content=to_api_error(
+                    code="SUMMARY_NOT_FOUND",
+                    message=f"summary.json not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+                headers={"X-Request-Id": _rid(request) or ""},
+            )
+
+        run_dir = Path(run.artifacts_dir).resolve()
+        summary_path = (run_dir / "summary.json").resolve()
+        if run_dir not in summary_path.parents:
+            return JSONResponse(
+                status_code=404,
+                content=to_api_error(
+                    code="SUMMARY_NOT_FOUND",
+                    message=f"summary.json not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+                headers={"X-Request-Id": _rid(request) or ""},
+            )
+
+        if not summary_path.exists() or not summary_path.is_file():
+            return JSONResponse(
+                status_code=404,
+                content=to_api_error(
+                    code="SUMMARY_NOT_FOUND",
+                    message=f"summary.json not found for run: {run_id}",
+                    status=404,
+                    request_id=_rid(request),
+                ),
+                headers={"X-Request-Id": _rid(request) or ""},
+            )
+
+        payload = json.loads(summary_path.read_text(encoding="utf-8"))
+        return {"summary": payload}
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=to_api_error(
+                code="RUNS_UNAVAILABLE",
+                message=str(exc),
+                status=503,
+                request_id=_rid(request),
+            ),
+        )

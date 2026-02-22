@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from ..models.run import RunRecord, RunStatus
 from .run_store import RunStore
+from .run_paths import run_output_dir, run_reports_url
 
 
 @dataclass(frozen=True)
@@ -19,14 +20,14 @@ class SubmitResult:
 class TaskRunner:
     """Very small in-process task runner (skeleton).
 
-    MVP scope (this step):
+    MVP scope:
       - submit a run and transition status: pending -> running -> succeeded/failed
       - store transitions in RunStore
-      - no real backtest execution yet
+      - create run-scoped artifacts dir under outputs/runs/<run_id>
 
     Notes:
       - uses background threads to avoid blocking request handling
-      - will be replaced by a ProcessPoolExecutor-based runner later
+      - real backtest execution is a later milestone (process-based runner)
     """
 
     def __init__(
@@ -36,6 +37,7 @@ class TaskRunner:
         worker: Callable[[RunRecord], dict[str, Any]] | None = None,
     ) -> None:
         self._store = run_store
+        # Default worker is intentionally simple and safe.
         self._worker = worker or (lambda rec: {"ok": True})
 
     def submit(
@@ -51,6 +53,9 @@ class TaskRunner:
         run_id = uuid.uuid4().hex
         now = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
 
+        out_dir = run_output_dir(run_id)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
         record = RunRecord(
             run_id=run_id,
             strategy_id=str(strategy_id),
@@ -59,8 +64,8 @@ class TaskRunner:
             params=dict(params or {}),
             status="pending",
             submitted_at=now,
-            artifacts_dir=artifacts_dir,
-            reports_url=reports_url,
+            artifacts_dir=str(out_dir),
+            reports_url=run_reports_url(run_id),
         )
         self._store.insert_run(record)
 
@@ -77,7 +82,9 @@ class TaskRunner:
             rec = self._store.get_run(run_id)
             if rec is None:
                 return
+
             out = self._worker(rec)
+
             ended = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
             dt_s = max(0.0, (ended - started).total_seconds())
             self._store.update_run(run_id, status="succeeded", ended_at=ended, duration_s=dt_s, metrics=out)

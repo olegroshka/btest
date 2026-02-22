@@ -21,6 +21,8 @@ def create_app():
     from .routes import dsl_builder
     from .routes import strategies
     from .routes import runs
+    from .routes import reports
+    from .routes import run_artifacts
 
     app = FastAPI(
         title="quantdsl-backtest platform API",
@@ -208,6 +210,8 @@ def create_app():
     app.include_router(dsl_builder.router, prefix="/api")
     app.include_router(strategies.router, prefix="/api")
     app.include_router(runs.router, prefix="/api")
+    app.include_router(run_artifacts.router, prefix="/api")
+    app.include_router(reports.router)
 
     # --- catch-all for browser asset probes (non-API only) -------------
     # Browsers/extensions sometimes probe for optional assets (icons, manifests) and log 404s noisily.
@@ -222,7 +226,8 @@ def create_app():
             path = str(request.url.path)
         except Exception:
             path = ""
-        if resp.status_code == 404 and path and not path.startswith("/api"):
+        # Keep normal semantics for API and report artifact routes.
+        if resp.status_code == 404 and path and not (path.startswith("/api") or path.startswith("/reports")):
             return Response(status_code=204)
         return resp
 

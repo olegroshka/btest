@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, Optional, Sequence, Tuple
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Sequence
 
 import pandas as pd
 
@@ -224,6 +224,7 @@ class BacktestResult:
 
             path/
               equity.parquet
+              returns.parquet
               positions.parquet
               weights.parquet
               trades.parquet       (optional)
@@ -235,6 +236,14 @@ class BacktestResult:
         os.makedirs(path, exist_ok=True)
 
         self.equity_frame().to_parquet(os.path.join(path, "equity.parquet"))
+
+        # Returns are a first-class artifact for comparisons.
+        try:
+            self.returns.to_frame(name="returns").to_parquet(os.path.join(path, "returns.parquet"))
+        except Exception:
+            # Best-effort: don't fail parquet writing if returns aren't available
+            pass
+
         if include_positions:
             self.positions.to_parquet(os.path.join(path, "positions.parquet"))
             self.weights.to_parquet(os.path.join(path, "weights.parquet"))
@@ -582,5 +591,4 @@ class BacktestResult:
             strategy_name=strategy_name or self.metadata.get("strategy_name"),
             run_meta=self.metadata,
         )
-
 
