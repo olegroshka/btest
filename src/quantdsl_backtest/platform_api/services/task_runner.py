@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import os
 import threading
 import uuid
 from dataclasses import dataclass
@@ -35,10 +36,24 @@ class TaskRunner:
         *,
         run_store: RunStore,
         worker: Callable[[RunRecord], dict[str, Any]] | None = None,
+        enable_process_pool: bool | None = None,
+        max_workers: int | None = None,
     ) -> None:
         self._store = run_store
+
         # Default worker is intentionally simple and safe.
         self._worker = worker or (lambda rec: {"ok": True})
+
+        if enable_process_pool is None:
+            enable_process_pool = str(os.environ.get("QDSL_PLATFORM_RUNNER_PROCESS_POOL", "0")).strip() in {"1", "true", "True"}
+        self._enable_process_pool = bool(enable_process_pool)
+        self._max_workers = int(max_workers) if max_workers is not None else 1
+
+        self._pool = None
+        if self._enable_process_pool:
+            from concurrent.futures import ProcessPoolExecutor
+
+            self._pool = ProcessPoolExecutor(max_workers=self._max_workers)
 
     def submit(
         self,
@@ -83,7 +98,13 @@ class TaskRunner:
             if rec is None:
                 return
 
-            out = self._worker(rec)
+            if self._pool is not None:
+                from .run_worker import execute_run_in_worker
+
+                fut = self._pool.submit(execute_run_in_worker, rec)
+                out = fut.result()
+            else:
+                out = self._worker(rec)
 
             ended = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
             dt_s = max(0.0, (ended - started).total_seconds())
