@@ -75,8 +75,8 @@ def generate_dsl_code(config: DSLConfigRequest) -> str:
         "from quantdsl_backtest.dsl.portfolio import LongShortPortfolio, Book, TopN, BottomN, EqualWeight",
         "from quantdsl_backtest.dsl.execution import Execution, OrderPolicy, LatencyModel, PowerLawSlippageModel, VolumeParticipation",
         "from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees",
-        "from quantdsl_backtest.dsl.backtest_config import BacktestConfig",
-        "from quantdsl_backtest.engine.backtest_runner import run_backtest",
+        "from quantdsl_backtest.dsl.backtest_config import BacktestConfig, Reporting",
+        "from quantdsl_backtest.engine.analytics.types import SignalAnalyticsConfig, StrategyAnalyticsConfig",
         "",
         "# 1) Data Configuration",
         "data = DataConfig(",
@@ -134,15 +134,40 @@ def generate_dsl_code(config: DSLConfigRequest) -> str:
                     f'    "{signal_name}": CrossSectionRank(factor_name="{factor}", name="{signal_name}"),'
                 )
 
+    # Determine which signal name to use for portfolio selectors.
+    signal_names = list((config.signals or {}).keys())
+    selector_signal = signal_names[0] if signal_names else "rank_momentum"
+
+    # Use reasonable N for portfolio (must be < number of instruments).
+    n_select = 3
+
+    # Determine portfolio type from config.
+    portfolio_type = (config.portfolio.type if config.portfolio else "long_short")
+
     lines.extend([
         "}",
         "",
         "# 5) Portfolio",
-        "portfolio = LongShortPortfolio(",
-        '    long_book=Book(name="long", selector=TopN(factor_name="rank_momentum", n=50), weighting=EqualWeight()),',
-        '    short_book=Book(name="short", selector=BottomN(factor_name="rank_momentum", n=50), weighting=EqualWeight()),',
-        '    rebalance_frequency="1d",',
-        ")",
+    ])
+
+    if portfolio_type == "long_only":
+        lines.extend([
+            "portfolio = LongShortPortfolio(",
+            f'    long_book=Book(name="long", selector=TopN(factor_name="{selector_signal}", n={n_select}), weighting=EqualWeight()),',
+            '    short_book=None,',
+            '    rebalance_frequency="1d",',
+            ")",
+        ])
+    else:
+        lines.extend([
+            "portfolio = LongShortPortfolio(",
+            f'    long_book=Book(name="long", selector=TopN(factor_name="{selector_signal}", n={n_select}), weighting=EqualWeight()),',
+            f'    short_book=Book(name="short", selector=BottomN(factor_name="{selector_signal}", n={n_select}), weighting=EqualWeight()),',
+            '    rebalance_frequency="1d",',
+            ")",
+        ])
+
+    lines.extend([
         "",
         "# 6) Execution & Costs",
         "execution = Execution(",
@@ -157,14 +182,26 @@ def generate_dsl_code(config: DSLConfigRequest) -> str:
         "    financing=FinancingCost(),",
         "    fees=StaticFees(),",
         ")",
+    ])
+
+    # Build the signal names list for signal_analytics config.
+    signal_names_repr = repr(signal_names) if signal_names else "[]"
+
+    lines.extend([
         "",
-        "# 7) Backtest Config",
+        "# 7) Backtest Config (with reporting for tearsheet + signal analytics)",
         "backtest_config = BacktestConfig(",
         '    engine="event_driven",',
         "    cash_initial=1_000_000,",
+        "    reporting=Reporting(",
+        f"        signal_analytics=SignalAnalyticsConfig(signals={signal_names_repr}),",
+        '        strategyAnalytics=StrategyAnalyticsConfig(title="Custom Strategy (QuantDSL)"),',
+        "    ),",
         ")",
         "",
         "# 8) Compose Strategy",
+        "# NOTE: the platform runner calls run_backtest(strategy) automatically.",
+        "# Do not call it here; just define the `strategy` object.",
         "strategy = Strategy(",
         '    name="custom_strategy",',
         "    data=data,",
@@ -176,10 +213,6 @@ def generate_dsl_code(config: DSLConfigRequest) -> str:
         "    costs=costs,",
         "    backtest=backtest_config,",
         ")",
-        "",
-        "# 9) Run Backtest",
-        "result = run_backtest(strategy)",
-        "print(result.summary())",
     ])
 
     return "\n".join(lines)

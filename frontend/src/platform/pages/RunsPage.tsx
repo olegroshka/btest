@@ -342,7 +342,7 @@ export function RunsPage() {
           const runId = r?.run_id || '';
           const reportUrl = r?.reports_url || (runId ? `/reports/runs/${runId}/index.html` : '');
           return (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', height: '100%' }}>
               <button
                 className="btn"
                 data-testid={`btnRunReport-${shortId(runId)}`}

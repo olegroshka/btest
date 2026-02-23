@@ -9,7 +9,7 @@
 
 .dsl-container {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 370px 1fr;
   gap: 12px;
   padding: 12px;
   /* Fill the viewport below the tab bar */
@@ -24,6 +24,7 @@
   border-radius: 14px;
   padding: 12px;
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -95,7 +96,7 @@
 }
 
 .form-name-input {
-  width: 80px;
+  width: 80px !important;
   flex-shrink: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;

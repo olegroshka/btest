@@ -103,6 +103,7 @@ class TaskRunner:
         started = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
         self._store.update_run(run_id, status="running", started_at=started)
 
+        rec = None
         try:
             rec = self._store.get_run(run_id)
             if rec is None:
@@ -125,9 +126,10 @@ class TaskRunner:
             err_msg = str(exc)
             # Append traceback to logs.txt (don't overwrite — worker may have written partial logs).
             try:
-                if rec and rec.artifacts_dir:
+                artifacts = getattr(rec, "artifacts_dir", None) if rec is not None else None
+                if artifacts:
                     from pathlib import Path
-                    log_path = Path(rec.artifacts_dir) / "logs.txt"
+                    log_path = Path(artifacts) / "logs.txt"
                     with open(log_path, "a", encoding="utf-8") as f:
                         f.write(f"\n[task_runner] Run failed:\n{_tb.format_exc()}\n")
             except Exception:

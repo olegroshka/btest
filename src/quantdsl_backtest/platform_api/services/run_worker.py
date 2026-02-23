@@ -88,7 +88,16 @@ def execute_run_in_worker(rec: RunRecord) -> dict[str, Any]:
 
             result = run_backtest(strat)
 
-        metrics = dict(getattr(result, "metrics", {}) or {})
+        metrics = {}
+        raw = getattr(result, "metrics", None)
+        if raw and isinstance(raw, dict):
+            for k, v in raw.items():
+                try:
+                    metrics[k] = float(v) if v is not None else None
+                except (TypeError, ValueError):
+                    metrics[k] = str(v)
+
+
         return metrics
 
     except Exception:

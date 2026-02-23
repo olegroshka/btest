@@ -30,6 +30,8 @@ def _safe_file_response(*, run_id: str, path: str) -> Response:
 
 @router.get("/reports/runs/{run_id}")
 @router.get("/reports/runs/{run_id}/")
+@router.head("/reports/runs/{run_id}")
+@router.head("/reports/runs/{run_id}/")
 def run_reports_root(run_id: str, request: Request):
     """Serve the report index for a run.
 
@@ -45,6 +47,7 @@ def run_reports_root(run_id: str, request: Request):
 
 
 @router.get("/reports/runs/{run_id}/{path:path}")
+@router.head("/reports/runs/{run_id}/{path:path}")
 def run_reports(run_id: str, path: str, request: Request):
     """Serve run-scoped report artifacts.
 

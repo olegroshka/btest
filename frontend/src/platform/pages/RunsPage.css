@@ -1,10 +1,8 @@
 .runStatus {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
   font-size: 12px;
   font-weight: 650;
-  border: 1px solid var(--border);
+  border: none;
   background: transparent;
 }
 

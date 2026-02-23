@@ -264,6 +264,53 @@ class TestDSLBuilderGenerateEndpoint:
         assert "ReturnFactor" in j["python_code"]
         assert "Strategy" in j["python_code"]
 
+    def test_generated_code_does_not_call_run_backtest(self, tmp_path, monkeypatch):
+        """Generated code must NOT call run_backtest() — the worker does that."""
+        from fastapi.testclient import TestClient
+
+        app, _, _ = _make_app(tmp_path, monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        config = {
+            "data": {"source": "test.parquet", "calendar": "XNYS",
+                     "start_date": "2020-01-01", "end_date": "2021-01-01"},
+            "universe": {"name": "Test"},
+            "factors": {"f1": {"type": "momentum", "params": {"lookback": 60}}},
+            "signals": {"s1": {"type": "cross_section_rank", "params": {"factor": "f1"}}},
+            "portfolio": {"type": "long_short"},
+        }
+
+        r = client.post("/api/dsl/generate", json=config)
+        assert r.status_code == 200
+        code = r.json()["python_code"]
+        # There should be no `result = run_backtest(strategy)` line.
+        assert "\nresult = run_backtest(" not in code
+        # But the `strategy` variable must be defined.
+        assert "strategy = Strategy(" in code
+
+    def test_generated_code_uses_signal_for_portfolio_selector(self, tmp_path, monkeypatch):
+        """Portfolio selectors must use the actual signal name, not a hardcoded default."""
+        from fastapi.testclient import TestClient
+
+        app, _, _ = _make_app(tmp_path, monkeypatch)
+        client = TestClient(app, raise_server_exceptions=False)
+
+        config = {
+            "data": {"source": "test.parquet", "calendar": "XNYS",
+                     "start_date": "2020-01-01", "end_date": "2021-01-01"},
+            "universe": {"name": "Test"},
+            "factors": {"vol_63": {"type": "volatility", "params": {"lookback": 63}}},
+            "signals": {"my_custom_signal": {"type": "cross_section_rank", "params": {"factor": "vol_63"}}},
+            "portfolio": {"type": "long_short"},
+        }
+
+        r = client.post("/api/dsl/generate", json=config)
+        assert r.status_code == 200
+        code = r.json()["python_code"]
+        # Portfolio selectors should reference "my_custom_signal", not "rank_momentum".
+        assert 'factor_name="my_custom_signal"' in code
+        assert 'factor_name="rank_momentum"' not in code
+
     def test_generate_empty_factors(self, tmp_path, monkeypatch):
         """Edge case: generate code with no factors."""
         from fastapi.testclient import TestClient
