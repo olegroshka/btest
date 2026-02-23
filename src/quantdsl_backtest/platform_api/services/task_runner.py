@@ -41,8 +41,16 @@ class TaskRunner:
     ) -> None:
         self._store = run_store
 
-        # Default worker is intentionally simple and safe.
-        self._worker = worker or (lambda rec: {"ok": True})
+        # Default worker runs the real backtest via execute_run_in_worker.
+        # Only fall back to the simple stub if the real worker can't be imported.
+        if worker is not None:
+            self._worker = worker
+        else:
+            try:
+                from .run_worker import execute_run_in_worker as _real_worker
+                self._worker = _real_worker
+            except Exception:
+                self._worker = lambda rec: {"ok": True}
 
         if enable_process_pool is None:
             enable_process_pool = str(os.environ.get("QDSL_PLATFORM_RUNNER_PROCESS_POOL", "0")).strip() in {"1", "true", "True"}
@@ -90,6 +98,8 @@ class TaskRunner:
         return SubmitResult(run_id=run_id, status="pending")
 
     def _run_background(self, run_id: str) -> None:
+        import traceback as _tb
+
         started = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
         self._store.update_run(run_id, status="running", started_at=started)
 
@@ -112,4 +122,14 @@ class TaskRunner:
         except Exception as exc:
             ended = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0)
             dt_s = max(0.0, (ended - started).total_seconds())
-            self._store.update_run(run_id, status="failed", ended_at=ended, duration_s=dt_s, error=str(exc))
+            err_msg = str(exc)
+            # Append traceback to logs.txt (don't overwrite — worker may have written partial logs).
+            try:
+                if rec and rec.artifacts_dir:
+                    from pathlib import Path
+                    log_path = Path(rec.artifacts_dir) / "logs.txt"
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        f.write(f"\n[task_runner] Run failed:\n{_tb.format_exc()}\n")
+            except Exception:
+                pass
+            self._store.update_run(run_id, status="failed", ended_at=ended, duration_s=dt_s, error=err_msg)

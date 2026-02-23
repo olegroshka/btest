@@ -25,6 +25,15 @@ def test_post_runs_submits_and_transitions_status(tmp_path, monkeypatch):
     (strategies_dir / "s1.py").write_text("print('hi')\n", encoding="utf-8")
 
     app = main.create_app()
+
+    # Override with a noop worker — this test verifies the run lifecycle,
+    # not real strategy execution.
+    from quantdsl_backtest.platform_api.services.task_runner import TaskRunner
+    app.state.task_runner = TaskRunner(
+        run_store=app.state.run_store,
+        worker=lambda rec: {"ok": True},
+    )
+
     client = TestClient(app, raise_server_exceptions=False)
 
     r = client.post(

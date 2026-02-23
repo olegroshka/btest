@@ -97,6 +97,9 @@ export function RunsPage() {
   const [appliedStatus, setAppliedStatus] = React.useState<string>('');
 
   const [selectedRun, setSelectedRun] = React.useState<RunRecord | null>(null);
+  const selectedRunRef = React.useRef<RunRecord | null>(null);
+  // Keep ref in sync with state.
+  React.useEffect(() => { selectedRunRef.current = selectedRun; }, [selectedRun]);
 
   const [logModal, setLogModal] = React.useState<{ title: string; text: string; runId: string } | null>(null);
 
@@ -125,9 +128,10 @@ export function RunsPage() {
 
         const nextRows = Array.isArray(data.runs) ? data.runs : [];
         setRows(nextRows);
-        // Keep selectedRun fresh if present.
-        if (selectedRun) {
-          const upd = nextRows.find((r) => r.run_id === selectedRun.run_id) || null;
+        // Keep selectedRun fresh if present (read from ref, not state, to avoid dep cascade).
+        const currentSel = selectedRunRef.current;
+        if (currentSel) {
+          const upd = nextRows.find((r) => r.run_id === currentSel.run_id) || null;
           setSelectedRun(upd);
         }
       } catch (e: any) {
@@ -144,7 +148,7 @@ export function RunsPage() {
         refreshInFlight.current = false;
       }
     },
-    [appliedStatus, appliedStrategyId, selectedRun]
+    [appliedStatus, appliedStrategyId]
   );
 
   // Only poll while there is something non-terminal visible.
@@ -161,16 +165,22 @@ export function RunsPage() {
     };
   }, [rows, refresh]);
 
+  // Stable ref for refresh so effects don't re-trigger on dep changes.
+  const refreshRef = React.useRef(refresh);
+  React.useEffect(() => { refreshRef.current = refresh; }, [refresh]);
+
   // Refresh when tab is activated.
   React.useEffect(() => {
     const onTab = (ev: any) => {
       const t = String(ev?.detail?.tab || '').toLowerCase();
-      if (t === 'runs') refresh({ showSpinner: false });
+      if (t === 'runs') refreshRef.current({ showSpinner: false });
     };
     window.addEventListener('quantdsl:tab', onTab as any);
-    setTimeout(() => refresh({ showSpinner: true }), 0);
+    // Initial load (once).
+    setTimeout(() => refreshRef.current({ showSpinner: true }), 0);
     return () => window.removeEventListener('quantdsl:tab', onTab as any);
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // SSE live tail for the logs modal.
   React.useEffect(() => {
@@ -336,10 +346,19 @@ export function RunsPage() {
               <button
                 className="btn"
                 data-testid={`btnRunReport-${shortId(runId)}`}
-                disabled={!runId}
-                onClick={() => {
+                disabled={!runId || r?.status === 'pending' || r?.status === 'running'}
+                onClick={async () => {
                   if (!reportUrl) return;
-                  window.open(reportUrl, '_blank');
+                  try {
+                    const probe = await fetch(reportUrl, { method: 'HEAD' });
+                    if (probe.ok) {
+                      window.open(reportUrl, '_blank');
+                    } else {
+                      alert('Report not available yet. The backtest may still be running, or no report was generated for this run.');
+                    }
+                  } catch {
+                    window.open(reportUrl, '_blank');
+                  }
                 }}
               >
                 View Report
@@ -531,11 +550,21 @@ export function RunsPage() {
               <button
                 className="btn"
                 data-testid="btnRunDetailsReport"
-                onClick={() => {
+                disabled={selectedRun.status === 'pending' || selectedRun.status === 'running'}
+                onClick={async () => {
                   const runId = selectedRun.run_id;
                   const reportUrl = selectedRun.reports_url || (runId ? `/reports/runs/${runId}/index.html` : '');
                   if (!reportUrl) return;
-                  window.open(reportUrl, '_blank');
+                  try {
+                    const probe = await fetch(reportUrl, { method: 'HEAD' });
+                    if (probe.ok) {
+                      window.open(reportUrl, '_blank');
+                    } else {
+                      alert('Report not available. The backtest may not have generated a report for this run.');
+                    }
+                  } catch {
+                    window.open(reportUrl, '_blank');
+                  }
                 }}
               >
                 View Report
