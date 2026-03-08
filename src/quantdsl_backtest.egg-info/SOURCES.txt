@@ -1,6 +1,12 @@
 LICENSE
 README.md
 pyproject.toml
+src/gui/__init__.py
+src/gui/charts.py
+src/gui/dashboard.py
+src/gui/metrics.py
+src/gui/theme.py
+src/gui/utils.py
 src/quantdsl_backtest/__init__.py
 src/quantdsl_backtest.egg-info/PKG-INFO
 src/quantdsl_backtest.egg-info/SOURCES.txt
