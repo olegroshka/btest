@@ -1,0 +1,91 @@
+# experiments/mvp_energy_us_uk.yaml
+#
+# Minimum viable experiment: energy sector, US + UK, ~200 actors.
+# This is the default experiment for the first complete pass (WP0–WP5).
+
+scope:
+  domain: energy
+  geographies: [US, UK]
+  actor_universe_max: 200
+  date_range: ["2005-01-01", "2025-01-01"]
+
+data:
+  fred:
+    enable_vintage: true
+    cache_ttl_hours: 24
+  edgar:
+    xbrl_tags: [CapitalExpenditures, ResearchAndDevelopmentExpense, Assets]
+    filing_types: ["10-K", "10-Q"]
+  gdelt:
+    themes: [ECON_ENERGY, ENV_ENERGY, GOV_ENERGY]
+  imf:
+    datasets: [IFS]
+  oecd:
+    datasets: [QNA]
+  bea:
+    table_ids: [InputOutput]
+    year_range: [2010, 2024]
+  pit_store_path: data/smim/pit_store
+  publication_lag_buffer_days: 5
+
+edges:
+  channels: [financial, narrative, supply_chain]
+  granger:
+    max_lag: 4
+    p_threshold: 0.05
+    bic_selection: true
+  narrative:
+    method: tfidf
+    similarity_threshold: 0.3
+  supply_chain:
+    coefficient_threshold: 0.01
+  sparsification:
+    method: l1_shrinkage
+    target_density: 0.15
+  null_model_instances: 100
+
+spectral:
+  methods: [schur, polar, hermitian_dilation, dmd]
+  max_modes: 30
+  mode_selection:
+    mdl: true
+    compressibility_min: 0.1
+    rg_relevance: true
+  rolling_window_quarters: 20
+
+dynamics:
+  regime_candidates: [1, 2, 3, 4]
+  regime_selection: mdl_bic
+  em_max_iterations: 200
+  em_convergence_tol: 0.0001
+  observability_condition_max: 1000000
+  order_parameter_dims: [1, 2, 3]
+  criticality_window_quarters: 8
+
+emergence:
+  pid:
+    method: mmi_gaussian
+    bootstrap_samples: 200
+    confidence_level: 0.95
+  transfer_entropy:
+    lag: 1
+    ksg_neighbours: 5
+    conditional: true
+  tda:
+    window_size: 20
+    overlap: 10
+    max_homology_dim: 2
+    n_windows_min: 50
+
+validation:
+  holdout_strategy: rolling_5yr
+  falsification_null_instances: 100
+  falsification_p_threshold: 0.05
+  event_studies:
+    - fed_tightening_2018
+    - covid_2020
+    - ukraine_energy_2022
+    - inflation_reduction_act_2022
+    - boe_rate_cycle_2022
+  event_study_window_quarters: 2
+  dm_test_significance: 0.10
