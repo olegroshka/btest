@@ -64,6 +64,13 @@ uv run python scripts/rebuild_platform_ui_assets.py
 ```
 This copies the built assets into `src/quantdsl_backtest/platform_ui/assets_dist/` which is **committed to git** and served by FastAPI at runtime.
 
+### Linting and Type-Checking
+```bash
+uv run black .                  # format
+uv run isort .                  # sort imports
+uv run mypy src/                # type-check
+```
+
 ### Data Management
 ```bash
 uv run python scripts/download_sp500_to_parquet.py --start 2015-01-01 --end 2025-01-01 --out equities/sp500_daily
@@ -157,7 +164,7 @@ Playwright tests require a running platform server and are marked `manual`. The 
 - Type hints on all public functions and methods
 - Google-style docstrings
 - No hardcoded parameters — all tunables read from YAML config via Pydantic
-- `ruff` for formatting and linting
+- `black` for formatting, `isort` for import ordering, `mypy` for type-checking
 - Imports: stdlib → third-party → local, separated by blank lines
 
 ## Architecture Rules
@@ -179,15 +186,19 @@ Playwright tests require a running platform server and are marked `manual`. The 
 
 ## SMIM-Specific Context
 
-Read `src/quantdsl_backtest/smim/CLAUDE.md` for mathematical notation, standing
-assumptions, milestone status, and implementation patterns specific to the SMIM framework.
+Read `docs/smim/CLAUDE.md` for mathematical notation, standing assumptions,
+milestone status, and implementation patterns specific to the SMIM framework.
 
 ## Reference Documents (read when needed, not upfront)
 
 - `docs/smim/PROPOSAL_SUMMARY.md` — condensed research proposal (mathematical architecture, work packages)
 - `docs/smim/IMPLEMENTATION_PLAN.md` — milestones, quality gates, acceptance criteria
 - `docs/smim/TASK_REGISTRY.md` — Claude Code task decomposition with current status
-- `docs/smim/DECISIONS.md` — architectural decision log (append after each gate)
+- `docs/smim/notation.md` — every mathematical symbol: LaTeX, Python variable, shape, module (G0 artefact)
+- `docs/smim/actor_taxonomy.md` — MVP actor universe with layer assignments and exemplars (G0 artefact)
+- `docs/smim/benchmark_specs.md` — formal definitions for all 5 benchmark families (G0 artefact)
+- `docs/smim/scope_selection.md` — justification for energy US+UK MVP scope (G0 artefact)
+- `docs/smim/DECISIONS.md` — architectural decision log (created at Gate G0; append after each gate)
 - `docs/smim/ADAPTER_GUIDE.md` — how to write a new data adapter (created in M1.2-T1)
 - `smim/interfaces.py` — all Protocol definitions (read this before implementing anything)
 - `smim/config.py` — Pydantic config models (all tuneable parameters)
