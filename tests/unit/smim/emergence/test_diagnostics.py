@@ -1,39 +1,51 @@
-"""Stub tests for smim/emergence/ diagnostics (M5.x tasks)."""
+"""Integration tests for smim/emergence/ diagnostics (M4.6 tasks).
 
+The dedicated tests are in test_pid.py, test_transfer_entropy.py, test_tda.py.
+This file provides smoke tests verifying the emergence modules are importable
+and produce sensible results.
+"""
+
+from __future__ import annotations
+
+import numpy as np
 import pytest
 
+from quantdsl_backtest.smim.emergence.pid import PIDResult, gaussian_mmi_pid
+from quantdsl_backtest.smim.dynamics.phase_transition import criticality_index
 
-@pytest.mark.xfail(reason="PIDSynergy not yet implemented", strict=False)
+
 class TestPIDSynergy:
-    def test_compute_returns_diagnostic_result(self) -> None:
-        pytest.fail("not implemented")
+    def test_compute_returns_pid_result(self) -> None:
+        rng = np.random.default_rng(0)
+        T = 60
+        alpha_j = rng.standard_normal(T)
+        alpha_k = rng.standard_normal(T)
+        target = rng.standard_normal(T)
+        result = gaussian_mmi_pid(alpha_j, alpha_k, target)
+        assert isinstance(result, PIDResult)
 
     def test_name_is_pid_synergy(self) -> None:
-        pytest.fail("not implemented")
+        """Verify the PIDResult dataclass has the expected fields."""
+        result = PIDResult(redundancy=0.1, unique_j=0.0, unique_k=0.0, synergy=0.05)
+        assert hasattr(result, "synergy")
+        assert hasattr(result, "redundancy")
 
     def test_confidence_intervals_shape(self) -> None:
-        pytest.fail("not implemented")
+        """Bootstrap CI returns (observed, lower, upper) — length 3."""
+        from quantdsl_backtest.smim.emergence.pid import bootstrap_synergy
+        rng = np.random.default_rng(1)
+        T = 50
+        a = rng.standard_normal(T)
+        b = rng.standard_normal(T)
+        c = rng.standard_normal(T)
+        ci = bootstrap_synergy(a, b, c, n_bootstrap=20)
+        assert len(ci) == 3
 
 
-@pytest.mark.xfail(reason="TransferEntropyProfile not yet implemented", strict=False)
-class TestTransferEntropyProfile:
-    def test_compute_returns_diagnostic_result(self) -> None:
-        pytest.fail("not implemented")
-
-    def test_conditional_te_controlled_for_intermediaries(self) -> None:
-        pytest.fail("not implemented")
-
-
-@pytest.mark.xfail(reason="TopologicalComplexity not yet implemented", strict=False)
-class TestTopologicalComplexity:
-    def test_compute_returns_diagnostic_result(self) -> None:
-        pytest.fail("not implemented")
-
-    def test_min_window_count_respected(self) -> None:
-        pytest.fail("not implemented")
-
-
-@pytest.mark.xfail(reason="CriticalityIndex not yet implemented", strict=False)
 class TestCriticalityIndex:
     def test_compute_returns_diagnostic_result(self) -> None:
-        pytest.fail("not implemented")
+        T = 80
+        psi = np.random.default_rng(2).standard_normal(T)
+        C = criticality_index(psi, window_size=8)
+        assert C.shape == (T,)
+        assert np.all(np.isfinite(C))
