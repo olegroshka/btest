@@ -18,11 +18,11 @@ def lz_complexity(sequence: np.ndarray) -> int:
     the LZ76 sequential parsing algorithm.
     """
     seq = np.asarray(sequence, dtype=float)
+    if seq.size == 0:
+        return 0
     binary = (seq > np.median(seq)).astype(int)
     s = "".join(map(str, binary))
     n = len(s)
-    if n == 0:
-        return 0
     complexity = 1
     # c: current pointer into already-parsed string
     c = 1
