@@ -27,6 +27,8 @@ dependencies = [
   "streamlit>=1.53.1",
   "nbformat>=5.10.4",
   "ipywidgets>=8.1.8",
+  "statsmodels>=0.14.6",
+  "scikit-learn>=1.7.2",
 ]
 
 [project.optional-dependencies]
