@@ -331,7 +331,7 @@ def test_I_DMD_1_reconstruction_fidelity():
 @pytest.mark.section("spectral_decomposition")
 def test_R_DMD_1_pydmd_agreement():
     """R-DMD-1: Our eigenvalues agree with PyDMD TIGHT; mode subspace angles < 5°."""
-    pydmd = pytest.importorskip("pydmd", reason="PyDMD not installed — skipping R-DMD-1")
+    import pydmd  # pydmd is a required dev dependency
 
     N, T = 10, 100
     rng = np.random.default_rng(404)

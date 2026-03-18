@@ -44,6 +44,8 @@ dev = [
   "isort>=5.13",
   # Type stubs should be dev-only to avoid unnecessary runtime installs
   "pandas-stubs==2.3.3.251201",
+  # SMIM acceptance test reference implementations
+  "pydmd>=1.0",
 ]
 
 platform = [
