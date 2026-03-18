@@ -219,27 +219,35 @@ class KalmanFilter:
             )
 
             # M-step: update F
-            cross = sum(
-                np.outer(alpha_s[t], alpha_s[t - 1]) + P_s[t] @ self.F
-                for t in range(1, T)
-            )
-            lag0_prev = sum(
-                np.outer(alpha_s[t - 1], alpha_s[t - 1]) + P_s[t - 1]
-                for t in range(1, T)
-            )
+            # Correct lag-one smoothed cross-covariance via RTS gain:
+            #   P_{t,t-1|T} = P_s[t] @ G_{t-1}^T
+            # where G_{t-1} = P_filt[t-1] @ F^T @ P_pred[t]^{-1}.
+            cross = np.zeros((K, K))
+            lag0_prev = np.zeros((K, K))
+            for t in range(1, T):
+                G_tm1 = P_filt[t - 1] @ self.F.T @ np.linalg.solve(
+                    P_pred[t] + np.eye(K) * 1e-8, np.eye(K)
+                )
+                P_lag_t = P_s[t] @ G_tm1.T           # P_{t, t-1 | T}
+                cross += np.outer(alpha_s[t], alpha_s[t - 1]) + P_lag_t
+                lag0_prev += np.outer(alpha_s[t - 1], alpha_s[t - 1]) + P_s[t - 1]
             self.F = cross @ np.linalg.solve(lag0_prev + np.eye(K) * 1e-8, np.eye(K))
 
             # M-step: update Q
             lag0_curr = sum(
                 np.outer(alpha_s[t], alpha_s[t]) + P_s[t] for t in range(1, T)
             )
-            self.Q = (lag0_curr - self.F @ cross.T) / (T - 1)
+            self.Q = (lag0_curr - self.F @ cross.T) / max(T - 1, 1)
             self.Q = (self.Q + self.Q.T) / 2  # symmetrize
             self.Q += np.eye(K) * 1e-8
 
-            # M-step: update R
+            # M-step: update R (Shumway-Stoffer formula)
+            # R_new = (1/T) Σ_t [r_t r_t^T + U P_s[t] U^T]
+            # The correction U P_s_mean U^T accounts for smoothing uncertainty;
+            # omitting it biases R downward by exactly U @ P_s @ U^T.
             resid = observations - alpha_s @ U.T
-            self.R = (resid.T @ resid) / T
+            P_s_mean = P_s.mean(axis=0)   # (K, K)
+            self.R = (resid.T @ resid) / T + U @ P_s_mean @ U.T
             self.R = (self.R + self.R.T) / 2
             self.R += np.eye(N) * 1e-8
 
