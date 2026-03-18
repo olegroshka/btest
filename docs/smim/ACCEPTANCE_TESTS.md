@@ -9,6 +9,10 @@ is **black-box verification** of each transformation against known ground truth.
 A component passes acceptance only when ALL tests in its section pass. A single
 failure blocks the entire experiment programme until fixed and re-verified.
 
+## Important
+
+Do not feet the test code to the existing implementation, rather make sure that the current implementation is correct.
+
 ---
 
 ## Verification Strategy
