@@ -7,6 +7,8 @@ References: docs/smim/ACCEPTANCE_TESTS.md, Section 1.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -647,42 +649,118 @@ def test_I_NM_3_randomness():
     )
 
 
-def _circulant_digraph(N: int, offsets: tuple[int, ...]) -> csr_matrix:
-    """Build a k-regular circulant directed graph.
+# ═══════════════════════════════════════════════════════════
+# Null-model graph builder abstraction
+# ═══════════════════════════════════════════════════════════
 
-    Node i connects to (i+offset) % N for each offset in offsets.
-    The resulting graph is vertex-transitive (every position equally likely
-    in the degree-sequence-preserving null model), guaranteeing max_freq ≈ k/N.
+@runtime_checkable
+class NullModelGraph(Protocol):
+    """Protocol for test-graph builders used in null-model rewiring distribution tests.
+
+    Both ``ErdosRenyiGraph`` and ``CirculantGraph`` satisfy this protocol.
+    Swap implementations by changing ``_DEFAULT_NULL_MODEL_GRAPH`` below, or by
+    overriding the ``null_model_graph`` fixture in a conftest.py.
     """
-    data = np.zeros((N, N))
-    for i in range(N):
-        for off in offsets:
-            j = (i + off) % N
-            if i != j:
-                data[i, j] = 1.0
-    return csr_matrix(data)
+
+    @property
+    def name(self) -> str: ...
+
+    def build(self) -> csr_matrix: ...
+
+
+@dataclass(frozen=True)
+class ErdosRenyiGraph:
+    """Random directed Erdős–Rényi digraph G(N, p).
+
+    Each ordered pair (i, j) with i ≠ j is included independently with
+    probability ``edge_prob``.  The resulting degree sequence is heterogeneous
+    (out-degree ~ Binomial(N-1, p)), which can create structurally "congested"
+    edge positions in the degree-sequence-preserving null model.  Some
+    positions may appear in >50 % of rewirings for certain random seeds, so
+    this builder is *not* the default for ``test_A_NM_1`` — but it is kept for
+    exploratory use and as a contrast to ``CirculantGraph``.
+    """
+
+    N: int = 20
+    edge_prob: float = 0.35
+    seed: int = 77
+
+    @property
+    def name(self) -> str:
+        return f"ErdosRenyi(N={self.N}, p={self.edge_prob}, seed={self.seed})"
+
+    def build(self) -> csr_matrix:
+        return _random_sparse_adj(N=self.N, edge_prob=self.edge_prob, seed=self.seed)
+
+
+@dataclass(frozen=True)
+class CirculantGraph:
+    """k-regular circulant directed graph (vertex-transitive).
+
+    Node *i* connects to ``(i + offset) % N`` for each value in ``offsets``.
+    Because every node plays the same structural role (vertex-transitive), the
+    degree-sequence-preserving null model assigns equal marginal probability
+    ≈ k / N to every edge position.  For the default N=20, k=4 this is 0.20,
+    well below the 50 % acceptance threshold in ``test_A_NM_1``.
+    """
+
+    N: int = 20
+    offsets: tuple[int, ...] = (1, 2, 3, 4)
+
+    @property
+    def name(self) -> str:
+        return f"Circulant(N={self.N}, offsets={self.offsets})"
+
+    def build(self) -> csr_matrix:
+        data = np.zeros((self.N, self.N))
+        for i in range(self.N):
+            for off in self.offsets:
+                j = (i + off) % self.N
+                if i != j:
+                    data[i, j] = 1.0
+        return csr_matrix(data)
+
+
+# ── single point of change ──────────────────────────────────────────────────
+# Default graph used by ``test_A_NM_1`` and the ``null_model_graph`` fixture.
+# To switch to Erdős–Rényi (for investigation or comparison), replace with:
+#     _DEFAULT_NULL_MODEL_GRAPH: NullModelGraph = ErdosRenyiGraph()
+_DEFAULT_NULL_MODEL_GRAPH: NullModelGraph = CirculantGraph()
+# ────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def null_model_graph() -> csr_matrix:
+    """Adjacency matrix for null-model rewiring distribution tests.
+
+    Delegates to ``_DEFAULT_NULL_MODEL_GRAPH.build()``.
+    Override in a conftest.py to switch implementations::
+
+        @pytest.fixture
+        def null_model_graph():
+            return ErdosRenyiGraph(N=20, edge_prob=0.25, seed=0).build()
+    """
+    return _DEFAULT_NULL_MODEL_GRAPH.build()
 
 
 @pytest.mark.acceptance
 @pytest.mark.section("graph_construction")
-def test_A_NM_1_rewiring_distribution_entropy():
-    """A-NM-1: 1000 rewirings — no edge in >50% of rewirings; entropy >80% of maximum.
+def test_A_NM_1_rewiring_distribution_entropy(null_model_graph: csr_matrix):
+    """A-NM-1: 1000 rewirings — no edge in >50 % of rewirings; entropy >80 % of maximum.
 
-    Uses a k-regular circulant digraph (vertex-transitive) so no position is
-    structurally over-represented in the degree-sequence-preserving null model.
-    Expected marginal frequency per position ≈ k/N = 4/20 = 0.20.
+    Graph used: controlled by ``_DEFAULT_NULL_MODEL_GRAPH`` (default: CirculantGraph).
+    CirculantGraph is vertex-transitive so every edge position has equal structural
+    probability ≈ k/N = 4/20 = 0.20, guaranteeing the acceptance criteria are met.
     """
-    N = 20
-    # 4-regular circulant: each node connects to its 4 nearest successors (mod N)
-    adj = _circulant_digraph(N=N, offsets=(1, 2, 3, 4))
-    E = adj.nnz  # edges per rewiring (conserved by degree-preserving rewire)
+    adj = null_model_graph
+    N = adj.shape[0]
+    E = adj.nnz
 
     if E == 0:
         pytest.skip("Graph has no edges — rewiring test not applicable")
 
-    # Count occurrences of each edge position across 1000 rewirings
-    # Use 100×nnz swap attempts to ensure good mixing (default 10×nnz is too few
-    # for measuring distributional spread — edges "stick" without enough swaps).
+    # Use 100×nnz swap attempts for thorough mixing (default 10×nnz may leave
+    # edges "stuck" in highly constrained degree-sequence null models).
     counts = np.zeros((N, N), dtype=int)
     n_rewirings = 1000
     for k in range(n_rewirings):
@@ -692,20 +770,22 @@ def test_A_NM_1_rewiring_distribution_entropy():
         for r, c in zip(rows, cols):
             counts[r, c] += 1
 
-    # No single edge should appear in >50% of rewirings
+    # No single edge position should dominate
     max_freq = counts.max() / n_rewirings
     assert max_freq <= 0.50, (
+        f"[{_DEFAULT_NULL_MODEL_GRAPH.name}] "
         f"An edge appears in {max_freq:.1%} of rewirings (>50%)"
     )
 
-    # Compute entropy of the edge frequency distribution
+    # Edge frequency distribution has high entropy (well-spread rewiring)
     flat_counts = counts.flatten()
     nonzero_counts = flat_counts[flat_counts > 0]
     total = nonzero_counts.sum()
     probs = nonzero_counts / total
     H = float(-np.sum(probs * np.log(probs)))
-    H_max = math.log(len(probs))  # maximum entropy (uniform over all seen positions)
+    H_max = math.log(len(probs))
 
     assert H > 0.80 * H_max, (
-        f"Rewiring entropy H={H:.4f} ≤ 80% of H_max={H_max:.4f} ({0.80*H_max:.4f})"
+        f"[{_DEFAULT_NULL_MODEL_GRAPH.name}] "
+        f"Rewiring entropy H={H:.4f} <= 80% of H_max={H_max:.4f}"
     )
