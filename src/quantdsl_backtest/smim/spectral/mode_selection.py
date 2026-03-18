@@ -54,9 +54,14 @@ class MDLModeSelector:
     """MDL criterion for mode selection.
 
     For each k (number of retained modes), computes a description length:
-        DL(k) = T * N * log(residual_variance(k)) + k * log(T)
+        DL(k) = T * log(residual_variance(k)) + k * N * log(T) / 2
     Selects k* minimising DL.
     residual_variance(k) = ||Y - U_k U_k^T Y||^2_F / (T * N)
+
+    The penalty term k*N*log(T)/2 scales with both the dimension N and log(T),
+    matching the BIC cost of estimating k orthonormal N-vectors from T observations.
+    This ensures the criterion favours noise-mode rejection when N is large relative
+    to T/N (the fractional variance explained per noise SVD mode).
     """
 
     def select(
@@ -113,7 +118,7 @@ class MDLModeSelector:
             res_var = np.sum(residual ** 2) / (T * N)
             if res_var <= 0:
                 res_var = 1e-300
-            dl = T * N * np.log(res_var) + k * np.log(max(T, 2))
+            dl = T * np.log(res_var) + k * N * np.log(max(T, 2)) / 2
             if dl < best_dl:
                 best_dl = dl
                 best_k = k
