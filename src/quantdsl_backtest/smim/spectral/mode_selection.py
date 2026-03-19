@@ -144,7 +144,12 @@ class MDLModeSelector:
 class CompressibilityFilter:
     """Retain modes whose LZ compressibility rho >= min_compressibility.
 
-    rho_k = 1 - lz_complexity(c_k) / len(c_k)
+    rho_k = 1 - lz_complexity(c_k) * log2(len(c_k)) / len(c_k)
+
+    This is the standard normalisation from Lempel & Ziv (1976): c(s)·log₂(n)/n
+    converges to the entropy rate for ergodic sources (Cover & Thomas, Thm 12.10.1).
+    Under this formula random sequences give rho ≈ 0 (incompressible) while
+    constant/periodic sequences give rho close to 1.
     """
 
     def __init__(self, min_compressibility: float = 0.1) -> None:
@@ -174,7 +179,8 @@ class CompressibilityFilter:
         for k in range(K):
             c_k = amplitudes[:, k]
             lz = lz_complexity(c_k)
-            rho = 1.0 - lz / max(len(c_k), 1)
+            n = max(len(c_k), 2)
+            rho = float(np.clip(1.0 - lz * np.log2(n) / n, 0.0, 1.0))
             if rho >= self.min_compressibility:
                 retained.append(k)
 

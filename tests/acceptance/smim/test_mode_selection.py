@@ -47,8 +47,9 @@ def _svd_modal_frame(Y: np.ndarray, K: int) -> ModalFrame:
 
 
 def _lz_rho(seq: np.ndarray) -> float:
-    """Lempel-Ziv compressibility ρ = 1 − C / len(seq)."""
-    return 1.0 - lz_complexity(seq) / max(len(seq), 1)
+    """Lempel-Ziv compressibility ρ = 1 − C·log₂(n) / n (Lempel & Ziv 1976), clamped to [0, 1]."""
+    n = max(len(seq), 2)
+    return float(np.clip(1.0 - lz_complexity(seq) * np.log2(n) / n, 0.0, 1.0))
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -196,19 +197,15 @@ def test_A_LZ_2_periodic_sequence():
 @pytest.mark.acceptance
 @pytest.mark.section("mode_selection")
 def test_A_LZ_3_random_sequence():
-    """A-LZ-3: Random sequence length 1000 — ρ < 0.95.
+    """A-LZ-3: Random sequence length 1000 — ρ < 0.15 (nearly incompressible).
 
-    Implementation note: the spec stated ρ < 0.15 (nearly incompressible), which
-    assumed the normalized LZ complexity C·log₂(n)/n.  The implementation uses
-    the simpler ρ = 1 − C/n; for a random binary string of length 1000,
-    C ≈ n/log₂(n) ≈ 100, giving ρ ≈ 0.90.  Threshold 0.95 reliably separates
-    random sequences from the structured cases (constant ≈ 0.999, periodic ≈ 0.998)
-    under the implemented formula.
+    Under the standard normalisation C·log₂(n)/n, a random 256-symbol sequence
+    of length 1000 has C ≈ n/log₂(n), giving ρ ≈ 0.
     """
     rng = np.random.default_rng(404)
     random_seq = rng.integers(0, 256, 1000).astype(float)
     rho = _lz_rho(random_seq)
-    assert rho < 0.95, f"Random sequence ρ = {rho:.4f} ≥ 0.95"
+    assert rho < 0.15, f"Random sequence ρ = {rho:.4f} ≥ 0.15"
 
 
 @pytest.mark.acceptance
