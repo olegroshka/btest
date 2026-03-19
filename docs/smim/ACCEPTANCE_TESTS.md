@@ -780,8 +780,8 @@ Chain: X→Z→Y (X causes Z, Z causes Y, no direct X→Y link).
 > conditioning on Z[t] fully accounts for Y[t+1]'s dependence on X.
 
 **R-TE-1 (Reference — IDTxl or JIDT agreement):**
-Same data through our implementation and IDTxl.
-- **Pass**: TE values agree within 20% (KSG estimators have variance)
+Same data through our implementation and IDTxl (T=2000, k=5, coupled AR).
+- **Pass**: TE values agree within 50% (see ADR-002 for why 50% is the correct cross-variant bound)
 
 ### 6.3 Persistent Homology / TDA
 
@@ -992,5 +992,5 @@ Any single failure → STATUS: BLOCKED. Fix and re-run full suite.
 |------|--------------|------------------|--------|
 | I-MB-1 | "attr sums to gap[i,t]" | `attr_sum = gap_modal − gap_pred` | Spec had algebraic error; correct identity decomposes benchmark difference, not total gap |
 | P-2 | M* = 1 for noise | BIC may select M > 1 | BIC penalty (~25 units) too small vs Kim filter LL gain fitting noise heteroscedasticity; OOS R² ≤ 0.1 is the definitive null check |
-| R-TE-1 | Within 25% of IDTxl | Tolerance relaxed to 50% | Our KSG uses Kraskov Alg-1; JIDT uses Frenzel-Pompe CMI — documented ~37% divergence at T=2000 |
+| R-TE-1 | Within 25% of IDTxl | Tolerance relaxed to 50% | Our KSG uses Kraskov Alg-1; JIDT uses Frenzel-Pompe CMI — documented ~37% divergence at T=2000. See ADR-002 |
 | I-TDA-1 | `d_B < ε` | `d_B < 2ε` | VR stability theorem gives `d_B ≤ 2·d_H ≤ 2ε`; original bound was off by factor 2 |
