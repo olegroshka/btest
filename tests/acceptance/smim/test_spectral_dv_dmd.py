@@ -210,38 +210,38 @@ def test_R_DV_1_symmetric_agrees_with_laplacian():
 @pytest.mark.acceptance
 @pytest.mark.section("spectral_decomposition")
 def test_A_DMD_1_known_linear_system():
-    """A-DMD-1: Known 2D system — DMD eigenvalues ≈{0.9,0.8}, modes span correct subspace.
+    """A-DMD-1: Clean 2D system — eigenvalues within 2%, modes within 5°.
 
-    T=50 is used (not 500): both modes decay to near-noise after ~20 steps, so longer
-    trajectories degrade the estimate of the smaller eigenvalue.
-    Tolerance is 15%: the smaller eigenvalue (0.8) is harder to recover from noisy data.
+    Uses a well-conditioned system (high SNR, T=200) so DMD mathematical
+    correctness can be tested with a tight tolerance.
     """
-    A_true = np.array([[0.9, 0.1], [0.0, 0.8]])
-    T = 50
-    rng = np.random.default_rng(101)
+    eig1, eig2 = 0.95, 0.90
+    V = np.array([[1.0, 0.5], [0.3, 1.0]])   # well-conditioned change-of-basis
+    A_true = V @ np.diag([eig1, eig2]) @ np.linalg.inv(V)
+    T = 200
+    rng = np.random.default_rng(42)
 
     y = np.zeros((T, 2))
     y[0] = [1.0, 0.5]
     for t in range(T - 1):
-        y[t + 1] = A_true @ y[t] + rng.normal(0, 0.01, 2)
+        y[t + 1] = A_true @ y[t] + rng.normal(0, 0.001, 2)   # SNR ≈ 1000
 
     frame = _dmd(y.T, k=2)
     eigs = frame.eigenvalues
     modes = frame.basis  # (2, 2)
 
-    # Eigenvalue magnitudes within 15% of true values {0.9, 0.8}
-    # (noisy system; smaller eigenvalue decays to noise floor in ~20 steps)
-    computed_mags = np.sort(np.abs(eigs))[::-1]   # descending
-    true_mags     = np.array([0.9, 0.8])
+    # Eigenvalue magnitudes within 2% of true values {0.95, 0.90}
+    computed_mags = np.sort(np.abs(eigs))[::-1]
+    true_mags     = np.array([eig1, eig2])
     rel_err = np.abs(computed_mags - true_mags) / true_mags
-    assert np.all(rel_err < 0.15), (
-        f"DMD eigenvalue magnitudes {computed_mags} not within 15% of {true_mags}"
+    assert np.all(rel_err < 0.02), (
+        f"DMD eigenvalue magnitudes {computed_mags} not within 2% of {true_mags}; "
+        f"rel_err={rel_err}"
     )
 
-    # Modes span same subspace as eigenvectors of A_true (angle < 10°)
+    # Modes span same subspace as eigenvectors of A_true (angle < 5°)
     _, evecs_true = np.linalg.eig(A_true)
-    # Each DMD mode must align within 10° with at least one true eigenvector
-    thresh = math.radians(10)
+    thresh = math.radians(5)
     for j in range(2):
         mode_j = modes[:, j:j+1]
         min_angle = min(
@@ -250,7 +250,7 @@ def test_A_DMD_1_known_linear_system():
         )
         assert min_angle < thresh, (
             f"DMD mode {j} has min subspace angle {math.degrees(min_angle):.1f}° "
-            f"with true eigenvectors (threshold 10°)"
+            f"with true eigenvectors (threshold 5°)"
         )
 
 
@@ -493,4 +493,33 @@ def test_D_DMD_2_constant_signal():
     lam = frame.eigenvalues[0]
     assert abs(lam - 1.0) < 1e-6, (
         f"Constant-signal eigenvalue = {lam} is not close to 1.0"
+    )
+
+
+@pytest.mark.acceptance
+@pytest.mark.section("spectral_decomposition")
+def test_D_DMD_3_decaying_mode_below_noise():
+    """D-DMD-3: A = [[0.9,0.1],[0,0.8]], σ=0.01, T=50 — stress test for DMD robustness.
+
+    The 0.8 eigenvalue decays to 0.8^50 ≈ 1.4e-5, well below the noise floor.
+    Tests that DMD still recovers both eigenvalues within 15% when one mode has
+    effectively vanished — this is a robustness/stress test, not a precision test.
+    """
+    A_true = np.array([[0.9, 0.1], [0.0, 0.8]])
+    T = 50
+    rng = np.random.default_rng(101)
+
+    y = np.zeros((T, 2))
+    y[0] = [1.0, 0.5]
+    for t in range(T - 1):
+        y[t + 1] = A_true @ y[t] + rng.normal(0, 0.01, 2)
+
+    frame = _dmd(y.T, k=2)
+    eigs = frame.eigenvalues
+
+    computed_mags = np.sort(np.abs(eigs))[::-1]
+    true_mags     = np.array([0.9, 0.8])
+    rel_err = np.abs(computed_mags - true_mags) / true_mags
+    assert np.all(rel_err < 0.15), (
+        f"DMD eigenvalue magnitudes {computed_mags} not within 15% of {true_mags}"
     )
