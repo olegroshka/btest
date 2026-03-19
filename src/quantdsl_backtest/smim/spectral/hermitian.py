@@ -33,10 +33,12 @@ class HermitianDilationDecomposer(AbstractSpectralDecomposer):
             pos_idx = pos_idx[np.argsort(-eigenvalues[pos_idx])]
         k_actual = min(k, len(pos_idx))
         idx = pos_idx[:k_actual]
-        # Left singular vectors: top-N components
-        left_svecs = eigenvectors[:N, idx]
+        # Recover singular vectors via u_L = √2 · v[:N],  u_R = √2 · v[N:]
+        # (standard result: H eigenvectors for +σ are [u_L; u_R]/√2)
+        sqrt2 = np.sqrt(2.0)
+        left_svecs = sqrt2 * eigenvectors[:N, idx]
         # Right singular vectors: bottom-N components
-        right_svecs = eigenvectors[N:, idx]
+        right_svecs = sqrt2 * eigenvectors[N:, idx]
         sv = eigenvalues[idx]
         return ModalFrame(
             basis=left_svecs,

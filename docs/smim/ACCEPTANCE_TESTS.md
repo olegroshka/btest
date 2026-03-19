@@ -260,13 +260,11 @@ A = [[1, 0], [0, 0]] (rank deficient).
 A = [[3, 0], [0, 5]]. Known SVD: singular values {3, 5}.
 Hermitian dilation H = [[0, A], [A^T, 0]].
 - **Pass**: eigenvalues of H are {-5, -3, 3, 5} (the ±σ_k pairs)
-- **Pass**: left singular vectors recovered from H eigenvectors match U_L from SVD
-- **Pass**: right singular vectors recovered match U_R from SVD
-- *Implementation note*: Eigenvalue check uses TIGHT tolerance (1e-8). Reason: no
-  precision was specified in the original spec, and scipy.linalg.eigh on a 4×4
-  matrix introduces O(ε_mach) error (~1e-16), well within TIGHT. Singular vector
-  recovery checks (U_L, U_R) are omitted; eigenvalue ±pairing is the invariant
-  tested by I-HD-1/3.
+- **Pass**: U_L (basis) matches true left singular vectors to > 0.99 dot product
+- **Pass**: U_R (metadata["right_singular_vectors"]) matches true right singular vectors > 0.99
+- **Pass**: same check on a random 10×10 matrix, top-5 modes, threshold > 0.95
+
+*Formula*: u_L,k = √2 · v_k[:N] and u_R,k = √2 · v_k[N:] where v_k is the eigenvector of H for +σ_k.
 
 **A-HD-2 (Analytical — rank-1 matrix):**
 A = [[1], [2], [3]] @ [[4, 5]] = [[4,5],[8,10],[12,15]]. Single singular value σ = √(1²+2²+3²)×√(4²+5²).

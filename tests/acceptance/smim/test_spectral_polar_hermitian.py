@@ -224,7 +224,7 @@ def test_D_PL_1_singular_matrix():
 @pytest.mark.acceptance
 @pytest.mark.section("spectral_decomposition")
 def test_A_HD_1_diagonal_known_svs():
-    """A-HD-1: A = diag(3,5) → eigenvalues of H are {-5,-3,3,5}."""
+    """A-HD-1: A = diag(3,5) → eigenvalues of H are {-5,-3,3,5}; U_L/U_R recovered."""
     A = np.diag([3.0, 5.0])
     H, all_eigs = _hdilate_square(A)
 
@@ -233,6 +233,51 @@ def test_A_HD_1_diagonal_known_svs():
         sorted_eigs, [-5.0, -3.0, 3.0, 5.0], **TIGHT,
         err_msg="Eigenvalues of H(diag(3,5)) must be {-5,-3,3,5}",
     )
+
+    # --- Singular vector recovery ---
+    decomp = HermitianDilationDecomposer()
+    frame = decomp.decompose(csr_matrix(A), k=2)
+
+    U_L_true, _, Vt_true = np.linalg.svd(A)
+    U_R_true = Vt_true.T
+
+    # basis = left singular vectors (up to sign and ordering)
+    for k in range(2):
+        dots = np.abs(frame.basis[:, k] @ U_L_true)
+        best_match = float(np.max(dots))
+        assert best_match > 0.99, (
+            f"Mode {k}: best match to true U_L is {best_match:.4f}, expected > 0.99"
+        )
+
+    # right_singular_vectors stored in metadata
+    U_R = frame.metadata["right_singular_vectors"]
+    for k in range(2):
+        dots = np.abs(U_R[:, k] @ U_R_true)
+        best_match = float(np.max(dots))
+        assert best_match > 0.99, (
+            f"Mode {k}: best match to true U_R is {best_match:.4f}, expected > 0.99"
+        )
+
+    # --- Non-trivial 10×10 matrix ---
+    rng = np.random.default_rng(42)
+    A_big = rng.standard_normal((10, 10))
+    U_L_big, _, Vt_big = np.linalg.svd(A_big)
+    U_R_big = Vt_big.T
+
+    frame_big = decomp.decompose(csr_matrix(A_big), k=5)
+
+    for k in range(5):
+        dots_L = np.abs(frame_big.basis[:, k] @ U_L_big[:, :5])
+        assert np.max(dots_L) > 0.95, (
+            f"Mode {k}: U_L recovery failed (max dot = {np.max(dots_L):.4f})"
+        )
+
+    U_R_big_rec = frame_big.metadata["right_singular_vectors"]
+    for k in range(5):
+        dots_R = np.abs(U_R_big_rec[:, k] @ U_R_big[:, :5])
+        assert np.max(dots_R) > 0.95, (
+            f"Mode {k}: U_R recovery failed (max dot = {np.max(dots_R):.4f})"
+        )
 
 
 @pytest.mark.acceptance
