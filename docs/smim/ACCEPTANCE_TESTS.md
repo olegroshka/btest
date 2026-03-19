@@ -678,16 +678,12 @@ Compute C_t.
 > window_size=30 used for sensitivity to the abrupt change.
 
 **A-CI-2 (Analytical — stationary process):**
-Generate AR(1) with constant ρ = 0.5. T = 400.
-- **Pass**: C_t ≈ 1.0 throughout (variance ratio ≈ 1, ACF ratio ≈ 1)
-- **Pass**: std(C_t) < 0.3 (low variability when process is stationary)
+AR(1), ρ=0.7, T=2000, window_size=50.
+- **Pass**: median(C_t[2w:]) ∈ (0.5, 2.0)
 
-> *Implementation note (AT-8)*: with window_size=8 (spec default), ACF1 of AR(1)
-> ρ=0.5 has std ≈ 1/sqrt(8) ≈ 0.35, so the ratio of two noisy ACF1 estimates yields
-> mean(C_t) ≈ 9 (not near 1).  Test uses ρ=0.7, window_size=50, T=2000 so ACF1
-> estimates are stable (std ≈ 0.05).  Pass criterion: median(C[2w:]) ∈ (0.1, 20),
-> which confirms C_t is bounded and non-explosive for a stationary process without
-> requiring exact concentration at 1.
+*Calibration*: 100-seed Monte Carlo gives mean=0.997, 1st pct=0.913, 99th pct=1.073
+(all 100 seeds land in [0.90, 1.09]). Band (0.5, 2.0) provides generous margin while
+catching broken implementations. The old band (0.1, 20) was too wide to be meaningful.
 
 **I-CI-1 (Invariant — non-negativity):**
 - **Pass**: C_t ≥ 0 for all t (it's a product of variance and ACF ratios, both ≥ 0)

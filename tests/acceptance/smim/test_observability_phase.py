@@ -349,14 +349,16 @@ def test_A_CI_1_rising_variance_triggers_criticality():
 @pytest.mark.acceptance
 @pytest.mark.section("phase_transition")
 def test_A_CI_2_stationary_series_stays_near_one():
-    """A-CI-2: Stationary AR(1) with ρ=0.7 — C_t has no rising trend.
+    """A-CI-2: Stationary AR(1) with ρ=0.7 — median C_t ∈ (0.5, 2.0).
 
-    With window_size=50, ACF1 estimates are stable (~0.7 per window). The ratio
-    Var_curr/Var_prev ≈ 1 and ACF1_curr/ACF1_prev ≈ 1 throughout, so C_t is
-    bounded. The median C_t over [2w, T] must lie in (0.1, 20).
+    With window_size=50, ACF1 and variance estimates are stable window-to-window,
+    so C_t ≈ 1 throughout. Band calibrated from 100-seed Monte Carlo:
+      mean=0.997, 1st pct=0.913, 99th pct=1.073 (all seeds in [0.90, 1.09])
+    Acceptance band (0.5, 2.0) gives generous margin while catching broken
+    implementations — the old band (0.1, 20) was too wide to be meaningful.
 
     Implementation note: median is used instead of mean to avoid sensitivity to
-    rare large spikes when ACF1_prev happens to be close to zero.
+    rare large spikes when ACF1_prev is close to zero.
     """
     T = 2000
     w = 50
@@ -372,8 +374,9 @@ def test_A_CI_2_stationary_series_stays_near_one():
 
     burn = 2 * w
     median_C = float(np.median(C[burn:]))
-    assert 0.1 < median_C < 20.0, (
-        f"Stationary AR(1) ρ=0.7: median C_t = {median_C:.3f}; expected in (0.1, 20.0)"
+    assert 0.5 < median_C < 2.0, (
+        f"Stationary AR(1) ρ=0.7: median C_t = {median_C:.3f}; expected in (0.5, 2.0) "
+        f"[Monte Carlo 1st–99th pct: 0.913–1.073]"
     )
 
 
