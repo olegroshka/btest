@@ -422,12 +422,6 @@ Sequence: [1, 2, 3, 1, 2, 3, ...] (length 1000).
 Sequence: iid uniform integers from {0, ..., 255} (length 1000).
 - **Pass**: ρ < 0.15 (nearly incompressible)
 
-*Implementation note:* threshold changed to ρ < 0.95. The spec assumed the normalized LZ
-complexity C·log₂(n)/n; the implementation uses the simpler ρ = 1 − C/n. For a random
-sequence of length 1000, C ≈ n/log₂(n) ≈ 100, giving ρ ≈ 0.90, not ≈ 0.05. Threshold 0.95
-reliably separates random from structured sequences (constant ρ ≈ 0.999, periodic ρ ≈ 0.998)
-under the implemented normalization.
-
 **I-LZ-1 (Invariant — bounds):**
 - **Pass**: ρ ∈ [0, 1] for any input
 - **Pass**: ρ(constant) > ρ(periodic) > ρ(random) on same-length sequences
