@@ -47,7 +47,7 @@ _SECTION_PREFIXES: list[tuple[str, list[str]]] = [
 # Total expected tests per section (from ACCEPTANCE_TESTS.md)
 _SECTION_EXPECTED: dict[str, int] = {
     "Graph Construction":       20,
-    "Spectral Decomposition":   35,
+    "Spectral Decomposition":   37,
     "Mode Selection":            9,
     "Kalman Filter + EM":       14,
     "Kim Filter":                9,
