@@ -47,9 +47,8 @@ class TestSmimConfigDefaults:
 
 class TestSmimConfigFromYaml:
     def test_load_mvp_yaml(self) -> None:
-        yaml_path = Path(__file__).parents[4] / "experiments" / "mvp_energy_us_uk.yaml"
-        if not yaml_path.exists():
-            pytest.skip("Sample YAML not found")
+        yaml_path = Path(__file__).parents[3] / "experiments" / "mvp_energy_us_uk.yaml"
+        assert yaml_path.exists(), f"Sample YAML not found at {yaml_path}"
         config = SmimConfig.from_yaml(yaml_path)
         assert config.scope.domain == "energy"
         assert config.scope.geographies == ["US", "UK"]
