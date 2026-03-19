@@ -346,14 +346,14 @@ Known 5-mode system. Retain k = 1, 2, 3, 4, 5 modes.
 - **Pass**: at k=5, reconstruction error < 1% of signal energy
 
 **I-DMD-1 (Invariant — reconstruction fidelity):**
-Random 20-dimensional stable system, T=200.
+Random 20-dimensional non-symmetric stable system, T=200.
 - **Pass**: ||Y - Φ diag(λ^k) B||_F / ||Y||_F < 0.1 with all modes retained
-- *Implementation note*: A symmetric random matrix is used (A = A_raw + A_raw^T) instead
-  of a generic random matrix. Reason: `ModalFrame.basis` stores the real part of the DMD
-  modes. For a non-symmetric A, eigenvalues are complex and their imaginary parts are
-  discarded in `basis`, causing the reconstruction formula (which uses `basis` and complex
-  eigenvalues) to be inconsistent. A symmetric A has only real eigenvalues, so `.real`
-  modes are lossless and the reconstruction is valid.
+
+**I-DMD-2 (Invariant — real mode conversion):**
+4-dimensional block-diagonal system: 2 real eigenvalues + 1 conjugate pair.
+- **Pass**: DMD produces exactly 4 real modes: 2 singletons + 1 paired (2, 2)
+- **Pass**: `ModalFrame.basis.dtype` is real-valued (float64)
+- **Pass**: real-mode reconstruction error < 1%
 
 **R-DMD-1 (Reference — PyDMD agreement):**
 Same data through our implementation and PyDMD.
@@ -971,7 +971,7 @@ The acceptance report is generated automatically by the `conftest_report` plugin
 SMIM Acceptance Report — 2026-03-19
 ===========================================
 Graph Construction:     20/20 passed ✅
-Spectral Decomposition: 35/35 passed ✅
+Spectral Decomposition: 36/36 passed ✅
 Mode Selection:          9/9  passed ✅
 Kalman Filter + EM:     14/14 passed ✅
 Observability:           3/3  passed ✅
@@ -982,7 +982,7 @@ TDA:                     7/7  passed ✅
 Benchmarks/Gaps:         7/7  passed ✅
 Pipeline Sanity:         4/4  passed ✅
 -------------------------------------------
-TOTAL:                 119/119 passed ✅
+TOTAL:                 120/120 passed ✅
 STATUS: READY FOR EXPERIMENTS
 ```
 

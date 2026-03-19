@@ -10,6 +10,67 @@ from quantdsl_backtest.smim.interfaces import DecompositionMethod, ModalFrame
 from quantdsl_backtest.smim.spectral.base import AbstractSpectralDecomposer
 
 
+def _to_real_modes(
+    eigenvalues: np.ndarray,
+    modes: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, list[tuple[int, ...]]]:
+    """Convert complex DMD modes to a real-valued basis via conjugate-pair splitting.
+
+    For each complex conjugate pair (λ, λ̄) with modes (φ, φ̄):
+      - Store Re(φ) and Im(φ) as two consecutive real columns.
+      - Record the pair in mode_pairs as (j, j+1).
+    For real eigenvalues: store φ.real as a single column → singleton (j,).
+
+    Returns:
+        basis:      (N, k) real array of modes.
+        eigs:       (k,) complex array — conjugate pairs kept as [λ, λ̄].
+        mode_pairs: list of 1- or 2-tuples mapping output columns to mode type.
+    """
+    k = len(eigenvalues)
+    imag_tol = 1e-8 * (float(np.abs(eigenvalues).max()) + 1e-12)
+
+    real_cols: list[np.ndarray] = []
+    real_eigs: list[complex] = []
+    mode_pairs: list[tuple[int, ...]] = []
+    col_idx = 0
+    i = 0
+
+    while i < k:
+        lam = eigenvalues[i]
+        phi = modes[:, i]
+
+        # Try to identify a conjugate pair with the next eigenvalue
+        if i + 1 < k and abs(lam.imag) > imag_tol:
+            lam_next = eigenvalues[i + 1]
+            avg_mag = (abs(lam) + abs(lam_next)) / 2.0 + 1e-12
+            if abs(lam_next - np.conj(lam)) < 1e-4 * avg_mag:
+                # Conjugate pair: ensure positive-imaginary eigenvalue is first
+                if lam.imag < 0:
+                    lam, lam_next = lam_next, lam
+                    phi = modes[:, i + 1]
+                real_cols.append(phi.real)
+                real_cols.append(phi.imag)
+                real_eigs.extend([complex(lam), complex(np.conj(lam))])
+                mode_pairs.append((col_idx, col_idx + 1))
+                col_idx += 2
+                i += 2
+                continue
+
+        # Real eigenvalue or unpaired complex — keep real part only
+        real_cols.append(phi.real)
+        real_eigs.append(complex(lam))
+        mode_pairs.append((col_idx,))
+        col_idx += 1
+        i += 1
+
+    N = modes.shape[0]
+    if real_cols:
+        basis = np.column_stack(real_cols)
+    else:
+        basis = np.zeros((N, 0))
+    return basis, np.array(real_eigs), mode_pairs
+
+
 class ExactDMDDecomposer(AbstractSpectralDecomposer):
     """Exact DMD decomposer.
 
@@ -79,8 +140,7 @@ class ExactDMDDecomposer(AbstractSpectralDecomposer):
         k_actual = min(k, k_svd)
         idx = order[:k_actual]
 
-        basis = modes[:, idx].real
-        eigs = eigenvalues[idx]
+        basis, eigs, mode_pairs = _to_real_modes(eigenvalues[idx], modes[:, idx])
 
         return ModalFrame(
             basis=basis,
@@ -92,6 +152,7 @@ class ExactDMDDecomposer(AbstractSpectralDecomposer):
                 "S": S_r,
                 "Vh": Vh_r,
                 "full_eigenvalues": eigenvalues,
+                "mode_pairs": mode_pairs,
             },
         )
 

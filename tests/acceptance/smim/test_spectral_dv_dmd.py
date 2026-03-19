@@ -63,22 +63,59 @@ def _dmd_reconstruct(
     eigenvalues: np.ndarray,
     x0: np.ndarray,
     T: int,
+    mode_pairs: list[tuple[int, ...]] | None = None,
 ) -> np.ndarray:
-    """Reconstruct time series via DMD: x_t = modes @ (B * λ^t).real.
+    """Reconstruct time series from real DMD modes.
+
+    When mode_pairs is None (legacy path, all-real eigenvalues):
+        x_t = (modes @ (B * λ^t)).real
+
+    When mode_pairs is provided (general path with conjugate-pair real modes):
+        For singleton (j,):   contribution = basis[:,j] * |λ_j|^t * B[j]
+        For pair (j, j+1):    contribution = B[j]  * r^t * (u cos tθ − v sin tθ)
+                                           + B[j+1] * r^t * (v cos tθ + u sin tθ)
+        where u=modes[:,j], v=modes[:,j+1], r=|λ_j|, θ=angle(λ_j).
 
     Args:
-        modes:       (N, k) DMD modes
+        modes:       (N, k) real DMD mode matrix
         eigenvalues: (k,) complex DMD eigenvalues
-        x0:          (N,) initial state (= snapshots[:, 0])
-        T:           number of time steps to reconstruct
+        x0:          (N,) initial state
+        T:           number of time steps
+        mode_pairs:  pairing info from frame.metadata["mode_pairs"] (optional)
 
     Returns:
         (N, T) reconstructed snapshot matrix
     """
-    B = np.linalg.lstsq(modes, x0, rcond=None)[0]          # (k,) amplitudes
-    rec = np.zeros((modes.shape[0], T))
-    for t in range(T):
-        rec[:, t] = (modes @ (B * eigenvalues ** t)).real
+    B = np.linalg.lstsq(modes, x0, rcond=None)[0]   # (k,) real amplitudes
+    N = modes.shape[0]
+    rec = np.zeros((N, T))
+
+    if mode_pairs is None:
+        # Legacy: works for real eigenvalues; modes @ (B * λ^t) is real
+        for t in range(T):
+            rec[:, t] = (modes @ (B * eigenvalues ** t)).real
+        return rec
+
+    # General real-mode reconstruction
+    for pair in mode_pairs:
+        if len(pair) == 1:
+            # Real eigenvalue (possibly negative): use λ^t directly
+            j = pair[0]
+            lam_real = eigenvalues[j].real   # negligible imaginary part by construction
+            for t in range(T):
+                rec[:, t] += B[j] * (lam_real ** t) * modes[:, j]
+        else:
+            j, j1 = pair
+            lam = eigenvalues[j]   # positive-imaginary eigenvalue of the pair
+            r = abs(lam)
+            theta = np.angle(lam)
+            u = modes[:, j]        # Re(φ)
+            v = modes[:, j1]       # Im(φ)
+            for t in range(T):
+                ct = (r ** t) * np.cos(t * theta)
+                st = (r ** t) * np.sin(t * theta)
+                rec[:, t] += B[j] * (ct * u - st * v) + B[j1] * (ct * v + st * u)
+
     return rec
 
 
@@ -296,18 +333,17 @@ def test_A_DMD_3_reconstruction_convergence():
 @pytest.mark.acceptance
 @pytest.mark.section("spectral_decomposition")
 def test_I_DMD_1_reconstruction_fidelity():
-    """I-DMD-1: Random 20D symmetric stable system T=200 — ||Y_rec-Y||/||Y|| < 0.1.
+    """I-DMD-1: Random 20D non-symmetric stable system T=200 — ||Y_rec-Y||/||Y|| < 0.1.
 
-    A symmetric matrix is used so that all eigenvalues are real; this ensures the DMD
-    modes (stored as .real in ModalFrame.basis) contain no truncation error, making the
-    reconstruction formula valid.
+    A generic non-symmetric matrix is used, producing complex conjugate eigenvalue
+    pairs. The real-mode reconstruction (conjugate pairs split into Re/Im columns)
+    must still recover the trajectory to within 10% relative error.
     """
     N, T = 20, 200
     rng = np.random.default_rng(303)
 
-    # Build a stable symmetric random linear system (real eigenvalues)
-    A_raw = rng.standard_normal((N, N)) * 0.3 / N
-    A_rand = A_raw + A_raw.T   # symmetric -> all eigenvalues real
+    # Build a stable non-symmetric random linear system (complex eigenvalues)
+    A_rand = rng.standard_normal((N, N)) * 0.3 / N
     sr = max(abs(np.linalg.eigvals(A_rand)))
     A_rand = A_rand * 0.9 / sr   # spectral radius = 0.9
 
@@ -319,11 +355,62 @@ def test_I_DMD_1_reconstruction_fidelity():
     snapshots = y.T   # (20, 200)
     frame = _dmd(snapshots, k=N)   # all modes
 
-    rec = _dmd_reconstruct(frame.basis, frame.eigenvalues, snapshots[:, 0], T)
+    rec = _dmd_reconstruct(
+        frame.basis, frame.eigenvalues, snapshots[:, 0], T,
+        mode_pairs=frame.metadata.get("mode_pairs"),
+    )
     rel_err = np.linalg.norm(rec - snapshots, "fro") / np.linalg.norm(snapshots, "fro")
 
     assert rel_err < 0.10, (
         f"DMD reconstruction relative error = {rel_err:.4f} >= 0.10"
+    )
+
+
+@pytest.mark.acceptance
+@pytest.mark.section("spectral_decomposition")
+def test_I_DMD_2_real_mode_conversion():
+    """I-DMD-2: 4D system with 2 real + 1 conjugate pair → 4 real modes; reconstruction matches.
+
+    System: diagonal 2D real block + 2D rotation block.
+    Expected: DMD produces mode_pairs with 2 singletons + 1 pair-of-2.
+    Reconstruction from real modes must match complex-mode reconstruction to <1e-6 relative error.
+    """
+    r_osc, theta = 0.92, math.pi / 5
+    # Block-diagonal: [0.95, 0, 0, 0; 0, 0.80, 0, 0; 0, 0, r*cosθ, -r*sinθ; 0, 0, r*sinθ, r*cosθ]
+    A = np.block([
+        [np.diag([0.95, 0.80]),                np.zeros((2, 2))],
+        [np.zeros((2, 2)),                     r_osc * _rotation(theta)],
+    ])
+    N, T = 4, 300
+    rng = np.random.default_rng(999)
+    y = np.zeros((T, N))
+    y[0] = rng.standard_normal(N)
+    for t in range(T - 1):
+        y[t + 1] = A @ y[t]
+
+    snapshots = y.T   # (4, 300)
+    frame = _dmd(snapshots, k=N)
+
+    mode_pairs = frame.metadata.get("mode_pairs")
+    assert mode_pairs is not None, "mode_pairs must be stored in metadata"
+
+    # Should have 4 columns: 2 singletons (real eigs) + 1 pair (conjugate)
+    assert frame.basis.shape == (N, N), f"Expected ({N},{N}) basis, got {frame.basis.shape}"
+    assert frame.basis.dtype.kind == "f", "basis must be real-valued"
+
+    n_singletons = sum(1 for p in mode_pairs if len(p) == 1)
+    n_pairs = sum(1 for p in mode_pairs if len(p) == 2)
+    assert n_singletons == 2, f"Expected 2 singleton modes, got {n_singletons}"
+    assert n_pairs == 1, f"Expected 1 conjugate pair, got {n_pairs}"
+
+    # Real-mode reconstruction must match to tight tolerance
+    rec_real = _dmd_reconstruct(
+        frame.basis, frame.eigenvalues, snapshots[:, 0], T,
+        mode_pairs=mode_pairs,
+    )
+    rel_err = np.linalg.norm(rec_real - snapshots, "fro") / np.linalg.norm(snapshots, "fro")
+    assert rel_err < 0.01, (
+        f"Real-mode reconstruction error = {rel_err:.6f} >= 0.01"
     )
 
 
