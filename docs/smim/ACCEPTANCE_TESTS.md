@@ -888,8 +888,8 @@ Run the full pipeline. Verify:
 **P-2 (Null — pure noise DGP):**
 Generate 20 actors with iid Gaussian noise (no structure).
 - **Pass**: MDL selects K* = 1
-- **Pass**: `select_regime_count` completes without error
-- **Pass**: OOS R² ≤ 0.1
+- **Pass**: `select_regime_count` completes without error (BIC may return M*>1 — expected, see ADR-001)
+- **Pass**: OOS R² ≤ 0.1 ← primary null criterion (BIC M* is not asserted)
 
   *Implementation note*: The original spec required M* = 1 from BIC regime selection.
   This is not achievable: with K=1 and T=150, the BIC marginal penalty for an extra

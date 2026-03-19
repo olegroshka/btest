@@ -68,7 +68,7 @@ Do not revert them — the tests encode the **correct** behaviour.
 | Test | Original spec | Correct behaviour | Reason |
 |------|--------------|-------------------|--------|
 | I-MB-1 | "attr sums to gap[i,t]" | `attr_sum = gap_modal − gap_pred` | Spec had algebraic error |
-| P-2 | M* = 1 for pure noise | BIC may select M > 1 | BIC penalty too small vs Kim filter LL gain; OOS R² is the definitive check |
+| P-2 | M* = 1 for pure noise | BIC may select M > 1 | BIC penalty too small vs Kim filter LL gain; OOS R² is the definitive check. See ADR-001 in DECISIONS.md |
 | R-TE-1 | Within 25% of IDTxl | Tolerance 50% | Kraskov Alg-1 vs Frenzel-Pompe ~37% divergence at T=2000 |
 | I-TDA-1 | `d_B < ε` | `d_B < 2ε` | VR stability theorem: `d_B ≤ 2·d_H ≤ 2ε` |
 
