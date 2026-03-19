@@ -84,7 +84,9 @@ class AcceptanceReport:
         self._passed: dict[str, list[str]] = defaultdict(list)
         self._failed: dict[str, list[str]] = defaultdict(list)
 
-    def record(self, node_id: str, passed: bool) -> None:
+    def record(self, node_id: str, passed: bool, skipped: bool = False) -> None:
+        if skipped:
+            return  # skipped tests do not count against pass/fail
         section = _section_for_test(node_id)
         if passed:
             self._passed[section].append(node_id)
@@ -169,7 +171,7 @@ class _AcceptanceReportPlugin:
             rep.when == "call"
             and item.get_closest_marker("acceptance") is not None
         ):
-            self.report.record(item.nodeid, rep.passed)
+            self.report.record(item.nodeid, rep.passed, skipped=rep.skipped)
 
     def pytest_terminal_summary(
         self, terminalreporter, exitstatus: int, config: pytest.Config
