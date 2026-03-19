@@ -812,8 +812,14 @@ Same data through our implementation and IDTxl.
 
 **I-TDA-1 (Invariant — stability theorem):**
 Add small perturbation (ε=0.01) to point cloud from A-TDA-1. Recompute diagram.
-- **Pass**: bottleneck distance between original and perturbed diagrams < ε
-  (stability theorem guarantee)
+- **Pass**: bottleneck distance between original and perturbed diagrams < 2ε
+  (VR stability theorem guarantee: d_B ≤ 2·d_H ≤ 2ε)
+
+> *Implementation note (AT-11)*: The spec stated `< ε` but the correct Vietoris-Rips
+> stability theorem gives d_B(Dgm(X), Dgm(Y)) ≤ 2·d_Hausdorff(X, Y).  For a uniform
+> ±ε per-coordinate perturbation, d_H ≤ ε·√2 ≤ 2ε, so the correct bound is `< 2ε`.
+> Empirically d_B ≈ 0.006 ≪ 2ε = 0.02 for the unit circle (N=100, σ=0.05, ε=0.01).
+> ripser and persim added to `[project.optional-dependencies] dev`.
 
 **I-TDA-2 (Invariant — topological complexity non-negativity):**
 - **Pass**: T_t ≥ 0 for all windows

@@ -46,6 +46,8 @@ dev = [
   "pandas-stubs==2.3.3.251201",
   # SMIM acceptance test reference implementations
   "pydmd>=1.0",
+  "ripser>=0.6",
+  "persim>=0.3",
 ]
 
 platform = [
