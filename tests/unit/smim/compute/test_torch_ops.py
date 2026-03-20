@@ -53,7 +53,7 @@ class TestEnsureTensor:
         t = ensure_tensor(arr)
         assert isinstance(t, torch.Tensor)
         assert t.dtype == torch.float64
-        np.testing.assert_allclose(t.numpy(), arr, atol=ATOL)
+        np.testing.assert_allclose(t.cpu().numpy(), arr, atol=ATOL)
 
     def test_tensor_passthrough(self):
         t_in = torch.tensor([[1.0, 2.0]], dtype=torch.float64)
