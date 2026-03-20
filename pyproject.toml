@@ -62,6 +62,14 @@ platform = [
   "websockets>=15.0.1",
 ]
 
+gpu = [
+  "torch>=2.2",
+]
+
+benchmarks = [
+  "pytest-benchmark>=4.0",
+]
+
 # Browser-level UI E2E tests (executes JS)
 e2e = [
   "playwright>=1.57.0",
