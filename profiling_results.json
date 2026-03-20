@@ -7,19 +7,19 @@
       "M": 3,
       "components": {
         "edge_estimation_granger": {
-          "seconds": 9.15,
-          "pct": 25.13
+          "seconds": 11.1586,
+          "pct": 39.08
         },
         "edge_estimation_narrative": {
-          "seconds": 0.0412,
-          "pct": 0.11
+          "seconds": 0.0395,
+          "pct": 0.14
         },
         "sparsification": {
           "seconds": 0.0009,
           "pct": 0.0
         },
         "eigendecomposition_polar": {
-          "seconds": 0.0021,
+          "seconds": 0.002,
           "pct": 0.01
         },
         "eigendecomposition_schur": {
@@ -31,35 +31,35 @@
           "pct": 0.0
         },
         "kalman_filter": {
-          "seconds": 0.0081,
-          "pct": 0.02
-        },
-        "kim_filter_em": {
-          "seconds": 0.4467,
-          "pct": 1.23
-        },
-        "pid_synergy": {
-          "seconds": 0.0778,
-          "pct": 0.21
-        },
-        "pid_bootstrap": {
-          "seconds": 25.5973,
-          "pct": 70.29
-        },
-        "transfer_entropy": {
-          "seconds": 1.0782,
-          "pct": 2.96
-        },
-        "persistent_homology": {
-          "seconds": 0.0122,
+          "seconds": 0.0077,
           "pct": 0.03
         },
+        "kim_filter_em": {
+          "seconds": 0.4239,
+          "pct": 1.48
+        },
+        "pid_synergy": {
+          "seconds": 0.0757,
+          "pct": 0.27
+        },
+        "pid_bootstrap": {
+          "seconds": 16.3636,
+          "pct": 57.32
+        },
+        "transfer_entropy": {
+          "seconds": 0.4688,
+          "pct": 1.64
+        },
+        "persistent_homology": {
+          "seconds": 0.007,
+          "pct": 0.02
+        },
         "benchmark_computation": {
-          "seconds": 0.0002,
+          "seconds": 0.0001,
           "pct": 0.0
         },
         "total": {
-          "seconds": 36.4165
+          "seconds": 28.5498
         }
       },
       "memory_peak_mb": 43.3,
@@ -72,51 +72,51 @@
       "M": 3,
       "components": {
         "edge_estimation_granger": {
-          "seconds": 295.6589,
-          "pct": 29.59
+          "seconds": 170.3582,
+          "pct": 39.86
         },
         "edge_estimation_narrative": {
-          "seconds": 0.3152,
-          "pct": 0.03
+          "seconds": 0.2765,
+          "pct": 0.06
         },
         "sparsification": {
-          "seconds": 0.008,
+          "seconds": 0.0065,
           "pct": 0.0
         },
         "eigendecomposition_polar": {
-          "seconds": 0.4646,
-          "pct": 0.05
+          "seconds": 0.05,
+          "pct": 0.01
         },
         "eigendecomposition_schur": {
-          "seconds": 1.1731,
-          "pct": 0.12
+          "seconds": 0.0879,
+          "pct": 0.02
         },
         "mode_selection": {
-          "seconds": 0.0013,
+          "seconds": 0.0011,
           "pct": 0.0
         },
         "kalman_filter": {
-          "seconds": 252.9791,
-          "pct": 25.31
+          "seconds": 4.9614,
+          "pct": 1.16
         },
         "kim_filter_em": {
-          "seconds": 424.4472,
-          "pct": 42.47
+          "seconds": 235.1599,
+          "pct": 55.02
         },
         "pid_synergy": {
-          "seconds": 0.1356,
-          "pct": 0.01
+          "seconds": 0.0731,
+          "pct": 0.02
         },
         "pid_bootstrap": {
-          "seconds": 23.4838,
-          "pct": 2.35
+          "seconds": 15.9717,
+          "pct": 3.74
         },
         "transfer_entropy": {
-          "seconds": 0.6622,
-          "pct": 0.07
+          "seconds": 0.4579,
+          "pct": 0.11
         },
         "persistent_homology": {
-          "seconds": 0.004,
+          "seconds": 0.0038,
           "pct": 0.0
         },
         "benchmark_computation": {
@@ -124,22 +124,87 @@
           "pct": 0.0
         },
         "total": {
-          "seconds": 999.3333
+          "seconds": 427.4082
         }
       },
       "memory_peak_mb": 9.7,
-      "scaling_vs_n50": 27.44
+      "scaling_vs_n50": 14.97
+    },
+    {
+      "N": 500,
+      "T": 80,
+      "K": 15,
+      "M": 3,
+      "components": {
+        "edge_estimation_granger": {
+          "seconds": 1516.5735,
+          "pct": 86.06
+        },
+        "edge_estimation_narrative": {
+          "seconds": 0.4191,
+          "pct": 0.02
+        },
+        "sparsification": {
+          "seconds": 0.0441,
+          "pct": 0.0
+        },
+        "eigendecomposition_polar": {
+          "seconds": 0.2589,
+          "pct": 0.01
+        },
+        "eigendecomposition_schur": {
+          "seconds": 0.333,
+          "pct": 0.02
+        },
+        "mode_selection": {
+          "seconds": 0.0012,
+          "pct": 0.0
+        },
+        "kalman_filter": {
+          "seconds": 14.4284,
+          "pct": 0.82
+        },
+        "kim_filter_em": {
+          "seconds": 212.9982,
+          "pct": 12.09
+        },
+        "pid_synergy": {
+          "seconds": 0.0763,
+          "pct": 0.0
+        },
+        "pid_bootstrap": {
+          "seconds": 16.538,
+          "pct": 0.94
+        },
+        "transfer_entropy": {
+          "seconds": 0.4694,
+          "pct": 0.03
+        },
+        "persistent_homology": {
+          "seconds": 0.0041,
+          "pct": 0.0
+        },
+        "benchmark_computation": {
+          "seconds": 0.0005,
+          "pct": 0.0
+        },
+        "total": {
+          "seconds": 1762.1447
+        }
+      },
+      "memory_peak_mb": 42.8,
+      "scaling_vs_n50": 61.72
     }
   ],
   "falsification_profile": {
-    "one_null_instance_seconds": 5.7231,
+    "one_null_instance_seconds": 5.9675,
     "component_breakdown": {
-      "rewire": 0.2269,
-      "spectral": 0.0656,
-      "filter": 5.4302,
-      "benchmark": 0.0003
+      "rewire": 1.4542,
+      "spectral": 0.2834,
+      "filter": 4.2292,
+      "benchmark": 0.0007
     },
-    "projected_B100_seconds": 572.3,
-    "projected_B100_hours": 0.16
+    "projected_B100_seconds": 596.7,
+    "projected_B100_hours": 0.17
   }
 }
