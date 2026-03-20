@@ -22,6 +22,10 @@ from quantdsl_backtest.smim.emergence.pid import (
     compute_synergy_matrix,
     gaussian_mmi_pid,
 )
+from quantdsl_backtest.smim.compute.batch_pid import (
+    batch_pid_synergy,
+    _pid_bootstrap_sequential,
+)
 
 from tests.acceptance.smim.conftest import make_pid_sources
 
@@ -258,3 +262,92 @@ def test_I_PID_3_synergy_matrix_symmetry():
                 f"S[{j},{k}]={S_mat[j,k]:.6e} ≠ S[{k},{j}]={S_mat[k,j]:.6e} "
                 f"(diff={diff:.2e})"
             )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GPU-1.3: Batch PID bootstrap tests
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.acceptance
+@pytest.mark.section("pid")
+def test_batch_pid_point_estimates_match_cpu():
+    """Batch PID point estimates match compute_synergy_matrix within atol=1e-4.
+
+    batch_pid_synergy uses batched PyTorch covariance + slogdet.
+    compute_synergy_matrix uses the original NumPy path per-pair.
+    Both must agree on the full (non-bootstrapped) data to within 1e-4.
+    """
+    K = 5
+    T = 200
+    N = 8
+    rng = np.random.default_rng(7001)
+
+    alpha = rng.standard_normal((T, K))
+    gaps  = rng.standard_normal((N, T))
+    target = gaps.mean(axis=0)
+
+    S_cpu = compute_synergy_matrix(alpha, gaps, K=K)
+    S_gpu, _, _ = batch_pid_synergy(alpha, target, n_bootstrap=50, block_size=5)
+
+    assert S_gpu.shape == (K, K), f"Expected ({K},{K}), got {S_gpu.shape}"
+    max_diff = np.max(np.abs(S_gpu - S_cpu))
+    assert max_diff < 1e-4, (
+        f"Max abs diff between batch and CPU synergy = {max_diff:.2e} ≥ 1e-4"
+    )
+
+
+@pytest.mark.acceptance
+@pytest.mark.section("pid")
+def test_batch_pid_symmetry():
+    """Batch PID synergy matrix is symmetric."""
+    K = 4
+    T = 100
+    rng = np.random.default_rng(7002)
+
+    alpha  = rng.standard_normal((T, K))
+    target = rng.standard_normal(T)
+
+    S, ci_lo, ci_hi = batch_pid_synergy(alpha, target, n_bootstrap=50, block_size=5)
+
+    for j in range(K):
+        for k in range(j + 1, K):
+            assert abs(S[j, k] - S[k, j]) < 1e-12, (
+                f"S[{j},{k}]={S[j,k]:.6e} ≠ S[{k},{j}]={S[k,j]:.6e}"
+            )
+
+
+@pytest.mark.acceptance
+@pytest.mark.section("pid")
+def test_batch_pid_ci_width_consistent_with_sequential():
+    """Bootstrap CI widths from batch implementation match sequential within 30%.
+
+    Both use the same block bootstrap parameters and seed=42 RNG, so they sample
+    the same distribution.  CI width ratio must be within [0.7, 1.3].
+    """
+    T = 200
+    rng = np.random.default_rng(7003)
+    alpha_j = rng.standard_normal(T)
+    alpha_k = rng.standard_normal(T)
+    target  = alpha_j + alpha_k + rng.standard_normal(T)
+
+    # Sequential (per-pair)
+    _, lo_seq, hi_seq = _pid_bootstrap_sequential(
+        alpha_j, alpha_k, target, n_bootstrap=200, ci_level=0.95, block_size=5
+    )
+    width_seq = hi_seq - lo_seq
+
+    # Batch (build (T,2) modal_states from the two sources)
+    modal = np.column_stack([alpha_j, alpha_k])  # (T, 2)
+    S_batch, ci_lo_batch, ci_hi_batch = batch_pid_synergy(
+        modal, target, n_bootstrap=200, ci_level=0.95, block_size=5
+    )
+    # pair (0,1) is the only pair for K=2
+    width_batch = ci_hi_batch[0, 1] - ci_lo_batch[0, 1]
+
+    if width_seq > 1e-6:
+        ratio = width_batch / width_seq
+        assert 0.7 <= ratio <= 1.3, (
+            f"CI width ratio = {ratio:.3f}, expected in [0.7, 1.3]. "
+            f"width_seq={width_seq:.4f}, width_batch={width_batch:.4f}"
+        )
