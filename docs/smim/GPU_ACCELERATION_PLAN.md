@@ -1,908 +1,798 @@
-# SMIM GPU Acceleration Phase — Master Prompt
+# SMIM GPU Acceleration Phase — Master Plan
 
 ## Context
 
-Read this entire prompt before writing any code. This is a multi-session project
-that adds GPU-accelerated implementations alongside the existing CPU code. The
-existing CPU implementations are correct (121 acceptance tests pass). The GPU
-implementations must produce identical results while being significantly faster.
+Read this entire document before writing any code. This is a multi-session project
+that accelerates the SMIM pipeline using PyTorch for unified CPU/CUDA execution and
+a Woodbury algorithmic fix for the Kalman/Kim filter bottleneck.
+
+The existing CPU implementations are correct (121 acceptance tests pass). All
+accelerated code must produce outputs matching the acceptance test criteria.
 
 Reference documents:
-- `docs/smim/ACCEPTANCE_TESTS.md` — the 121 correctness tests that both backends must pass
-- `docs/smim/EXPERIMENT_PLAN.md` — the experiment programme (~680 pipeline runs) driving the speed requirement
+- `docs/smim/ACCEPTANCE_TESTS.md` — 121 correctness tests
+- `docs/smim/EXPERIMENT_PLAN.md` — ~680 pipeline runs driving the speed requirement
+- `docs/smim/GPU_ACCELERATION_TARGETS.md` — actual profiling data from Task 1.1–1.2
 - `src/quantdsl_backtest/smim/interfaces.py` — existing Protocol definitions
 
-## Goal
+## Profiling Results (Measured)
 
-The experiment programme requires ~680 full pipeline runs. At current CPU speeds
-(estimated 5–15 min per run at N=200), this is 57–170 hours. Ablation experiments
-(Phase B) alone involve ~600 runs. We need a 5–20× speedup on the bottleneck
-operations to make the programme practical within 1–2 weeks of wall-clock time.
+**Hardware:** NVIDIA GeForce RTX 4070 Ti, CUDA 12.6, PyTorch 2.10.0+cu126
 
-The constraint: **GPU code must produce outputs matching CPU reference outputs
-to within documented tolerance.** Mathematical correctness is non-negotiable.
-A fast wrong answer is worse than a slow right one.
+Two profiling snapshots:
 
----
+### Pre-Woodbury baseline (from GPU_ACCELERATION_TARGETS.md)
 
-## Part 1: Profiling (Do This First)
+| Component | N=50 | N=200 | N=500 | Scaling | Priority |
+|-----------|------|-------|-------|---------|----------|
+| Granger edges | 39% (11s) | 40% (170s) | 86% (1517s) | O(N²) | **#1 — GPU batch** |
+| Kim filter EM | 2% (0.4s) | 55% (235s) | 12% (213s) | O(N³)/BLAS plateau | **#2 — Woodbury CPU** |
+| PID bootstrap | 57% (16s) | 4% (16s) | 1% (17s) | O(1) in N | **#3 — GPU batch** |
+| Kalman filter | 0% (0.008s) | 1% (5s) | 0.8% (14s) | O(N³)/BLAS plateau | Fixed by #2 |
+| Transfer entropy | 2% (0.5s) | 0.1% (0.5s) | <0.1% | O(1) in N | Leave on CPU |
+| **TOTAL** | **28s** | **427s** | **1762s** | | |
 
-Before writing any GPU code, profile the existing CPU pipeline to identify the
-actual bottlenecks. Don't guess — measure.
+### Post-Woodbury, pre-GPU-Granger (current state — `profiling_results.json`)
 
-### Task 1.1: Create the profiling harness
+| Component | N=50 | N=200 | N=500 | Scaling | Status |
+|-----------|------|-------|-------|---------|--------|
+| Granger edges | 34% (8.8s) | **89% (148.6s)** | **98% (881.7s)** | O(N²) | Batch impl done, not yet wired |
+| Kim filter EM | 2% (0.57s) | 0.4% (0.73s) ✅ | 0.1% (0.92s) ✅ | Woodbury fixed | **321× speedup at N=200** |
+| PID bootstrap | 62% (16.1s) | 10% (16.9s) | 2% (16s) | O(1) in N | Next GPU target |
+| Kalman filter | 0.05% (0.01s) | 0.02% (0.03s) ✅ | 0.02% (0.14s) ✅ | Woodbury fixed | **167× speedup at N=200** |
+| Transfer entropy | 1.8% (0.47s) | 0.3% (0.46s) | 0.05% (0.46s) | O(1) in N | Leave on CPU |
+| **TOTAL** | **26.1s** | **167s** | **900s** | | **2.6× vs baseline at N=200** |
 
-Create `src/quantdsl_backtest/smim/profiling.py`:
+**Key insight**: Woodbury fix (GPU-0.1) eliminated the Kim/Kalman bottleneck entirely.
+Granger is now 89–98% of all pipeline time. GPU-1.2 batch implementation exists;
+wiring it in (GPU-2.1) is the next highest-impact step.
 
+## Why PyTorch, Not CuPy
+
+PyTorch provides a **single code path** for CPU and CUDA:
 ```python
-"""Pipeline profiling harness.
-
-Usage:
-    python -m quantdsl_backtest.smim.profiling \
-        --config experiments/mvp_energy_us_uk.yaml \
-        --n-actors 50 100 200 500 \
-        --output profiling_results.json
-"""
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+A = torch.as_tensor(A_numpy, device=device, dtype=torch.float64)
+U, S, Vh = torch.linalg.svd(A)
 ```
 
-The harness must:
-1. Run the full pipeline (graph → spectral → filter → gaps → emergence) on
-   synthetic data at multiple actor counts (N = 50, 100, 200, 500)
-2. Time each component separately using `time.perf_counter_ns()` (wall-clock, not CPU)
-3. Record peak memory via `tracemalloc`
-4. Output a structured JSON with per-component timings and percentages:
-   ```json
-   {
-     "N": 200, "T": 80, "K": 15, "M": 3,
-     "components": {
-       "edge_estimation_granger": {"seconds": 45.2, "pct": 38.1},
-       "edge_estimation_narrative": {"seconds": 12.1, "pct": 10.2},
-       "sparsification": {"seconds": 0.3, "pct": 0.3},
-       "eigendecomposition_polar": {"seconds": 18.7, "pct": 15.8},
-       "eigendecomposition_schur": {"seconds": 16.2, "pct": 13.7},
-       "mode_selection": {"seconds": 1.1, "pct": 0.9},
-       "kalman_filter": {"seconds": 2.3, "pct": 1.9},
-       "kim_filter_em": {"seconds": 8.5, "pct": 7.2},
-       "pid_synergy": {"seconds": 5.2, "pct": 4.4},
-       "pid_bootstrap": {"seconds": 22.1, "pct": 18.6},
-       "transfer_entropy": {"seconds": 6.8, "pct": 5.7},
-       "persistent_homology": {"seconds": 3.2, "pct": 2.7},
-       "benchmark_computation": {"seconds": 0.5, "pct": 0.4},
-       "total": {"seconds": 118.6}
-     },
-     "memory_peak_mb": 412,
-     "scaling_vs_n50": 4.2
-   }
-   ```
-5. Print a sorted summary: component, seconds, percentage, cumulative percentage
-6. Identify the top-3 bottlenecks that account for >70% of total time
+Benefits over the original CuPy plan:
+- No separate CpuBackend/GpuBackend classes — one implementation, device-parametrised
+- No parity test suite needed — same code path, same floating-point operations
+- Batched operations native: `torch.linalg.solve` handles (B, N, N) batch dimensions
+- Future-proof: if we add learned components (differentiable filtering, neural
+  network narrative embeddings), autograd is already available
 
-Also profile the falsification suite separately (since it multiplies everything by B=100):
-- Time for one null-model instance (rewire + re-run pipeline)
-- Projected time for B=100
-
-Use `make_modal_system` and `make_switching_system` from the acceptance test
-fixtures to generate realistic synthetic data at each N.
-
-Run: `uv run python -m quantdsl_backtest.smim.profiling --n-actors 50 200 500`
-
-Save the output — it determines which components get GPU implementations.
-
-Git add and commit:
-[SMIM GPU-1.1] Create pipeline profiling harness
-
-### Task 1.2: Profile and identify acceleration targets
-
-Run the profiler at N=200 (the MVP experiment size) and N=500 (the scaling target).
-From the results, identify the acceleration targets using this decision rule:
-
-```
-IF component takes >10% of total time AND scales as O(N²) or worse:
-    → GPU acceleration candidate (high priority)
-IF component takes >10% of total time AND is embarrassingly parallel:
-    → GPU batch parallelisation candidate (medium priority)  
-IF component takes <5% of total time:
-    → Leave on CPU (not worth the complexity)
-```
-
-Expected acceleration targets (verify with profiling data):
-
-| Component | Expected Bottleneck? | GPU Strategy |
-|-----------|---------------------|--------------|
-| Granger edge estimation | Yes — O(N² × T) pairwise VARs | Batch parallel: run N² independent VAR fits on GPU |
-| Eigendecomposition | Yes — O(N³) dense, O(N²K) sparse | cuSOLVER via CuPy: `cupyx.scipy.linalg.schur`, SVD |
-| PID bootstrap | Yes — 200× base PID cost | Batch parallel: 200 independent covariance computations |
-| Falsification (B=100) | Yes — 100× full pipeline | Batch parallel across null instances |
-| Kim filter | Probably not — O(M²K²T), K and M small | Leave on CPU unless profiling shows otherwise |
-| Transfer entropy (KSG) | Maybe — O(T² per pair) neighbour search | cuML KNN or FAISS for nearest-neighbour queries |
-| Persistent homology | Probably not — ripser is already C++ optimised | Leave on CPU |
-| Kalman filter | No — O(K³T), K small | Leave on CPU |
-| Mode selection | No — lightweight | Leave on CPU |
-| Benchmark computation | No — matrix multiply | Leave on CPU |
-
-Document the profiling results and acceleration targets in
-`docs/smim/GPU_ACCELERATION_PLAN.md`.
-
-Git add and commit:
-[SMIM GPU-1.2] Profile pipeline and document GPU acceleration targets
+Limitation: `torch.linalg.schur` does not exist. Schur decomposition stays on
+scipy (CPU). This is acceptable — Schur takes <0.1% of total time.
 
 ---
 
-## Part 2: Compute Backend Abstraction Layer
+## Part 0: Woodbury Fix for Kim/Kalman (CPU, No GPU Needed) ✅ DONE
 
-This is the architectural core. The abstraction must be clean enough that:
-- All existing code continues to work unchanged on CPU
-- GPU implementations slot in without modifying calling code
-- Backend selection is automatic (GPU if available) with manual override
-- Testing can force either backend
+**Completed.** Commit `8db184a`. Actual results at N=200: Kim 235s → 0.73s (321×),
+Kalman 5s → 0.03s (167×). Both now <0.5% of pipeline time.
 
-### Task 2.1: Backend abstraction
+### Task 0.1: Woodbury Kalman filter ✅ DONE
+
+```
+The Kalman filter currently inverts the N×N innovation covariance:
+  S = U P U^T + R    (N×N)
+  K = P U^T S^{-1}   (requires O(N³) inversion)
+
+where U is N×K (modal frame), P is K×K (state covariance), R is N×N (obs noise).
+
+Apply the Woodbury identity to compute S^{-1} via a K×K inversion instead:
+  S^{-1} = R^{-1} - R^{-1} U (P^{-1} + U^T R^{-1} U)^{-1} U^T R^{-1}
+
+The inner matrix (P^{-1} + U^T R^{-1} U) is K×K (typically 15×15).
+This reduces the per-step cost from O(N³) to O(NK² + K³).
+
+If R is diagonal (common case), R^{-1} is trivial — just 1/diag(R).
+
+Implementation in src/quantdsl_backtest/smim/dynamics/kalman.py:
+
+1. Add a method _woodbury_gain(U, P_pred, R) that computes the Kalman gain
+   via Woodbury. Return both K and S^{-1} (needed for log-likelihood).
+
+2. Add numerical safety: if cond(P^{-1} + U^T R^{-1} U) > 1e8, fall back
+   to direct N×N inversion with a warning.
+
+3. Replace the existing gain computation in the filter loop.
+
+4. Do the same in the Kim filter (kim_filter.py) — each of the M² branch
+   filters uses the same innovation covariance structure.
+
+Run: uv run pytest tests/acceptance/smim/ -v --tb=short
+ALL 121 tests must still pass. The outputs must be numerically identical
+(within 1e-10) to the pre-Woodbury implementation.
+
+Then re-run the profiler to measure the improvement:
+uv run python -m quantdsl_backtest.smim.profiling --n-actors 50 200 500
+
+Git add and commit:
+[SMIM GPU-0.1] Apply Woodbury identity to Kalman and Kim filter gain computation
+```
+
+---
+
+## Part 1: PyTorch Compute Layer
+
+### Task 1.1: Create the compute module with device management ✅ DONE
 
 Create `src/quantdsl_backtest/smim/compute/__init__.py` and
-`src/quantdsl_backtest/smim/compute/backend.py`:
+`src/quantdsl_backtest/smim/compute/torch_ops.py`:
 
 ```python
-"""Compute backend abstraction for CPU/GPU dispatch.
+"""PyTorch-based compute operations with automatic CPU/CUDA dispatch.
 
 Usage:
-    from quantdsl_backtest.smim.compute import get_backend, ComputeBackend
+    from quantdsl_backtest.smim.compute import get_device, ensure_tensor, to_numpy
 
-    backend = get_backend()  # auto-detects GPU
-    backend = get_backend(force="cpu")  # explicit CPU
-    backend = get_backend(force="gpu")  # explicit GPU (raises if unavailable)
+    device = get_device()  # auto-detect CUDA, or force via SMIM_DEVICE env var
+    A_t = ensure_tensor(A_numpy, device=device)
+    result_numpy = to_numpy(some_tensor)
 
-    # All numerical operations go through the backend
-    result = backend.eigendecompose(operator, k=10, method="schur")
-    edges = backend.granger_edges(signals, max_lag=4, p_threshold=0.05)
-    synergy = backend.pid_synergy(alpha_j, alpha_k, target, n_bootstrap=200)
+All functions accept numpy arrays and return numpy arrays at the boundary.
+PyTorch tensors are used internally for computation only.
 """
+import os
+import logging
+from functools import lru_cache
 
-from __future__ import annotations
-import enum
-from typing import Protocol, runtime_checkable
 import numpy as np
+import torch
 from numpy.typing import NDArray
-import scipy.sparse as sparse
+
+logger = logging.getLogger(__name__)
 
 
-class BackendType(enum.Enum):
-    CPU = "cpu"
-    GPU = "gpu"
+@lru_cache(maxsize=1)
+def get_device(force: str | None = None) -> torch.device:
+    """Get the compute device.
 
-
-@runtime_checkable
-class ComputeBackend(Protocol):
-    """Interface that both CPU and GPU backends implement.
-
-    Every method has identical signature and semantics. The ONLY
-    difference is execution speed and hardware utilisation.
-    """
-
-    @property
-    def backend_type(self) -> BackendType: ...
-
-    @property
-    def device_name(self) -> str: ...
-
-    # ── Eigendecomposition ─────────────────────────────────
-    def schur_decompose(
-        self, A: NDArray, k: int | None = None
-    ) -> tuple[NDArray, NDArray]:
-        """Returns (Q, T) from Schur decomposition A = QTQ^H.
-        If k is specified, return only top-k."""
-        ...
-
-    def polar_decompose(
-        self, A: NDArray
-    ) -> tuple[NDArray, NDArray]:
-        """Returns (U, P) from polar decomposition A = UP."""
-        ...
-
-    def hermitian_dilation_decompose(
-        self, A: NDArray, k: int
-    ) -> tuple[NDArray, NDArray, NDArray]:
-        """Returns (eigenvalues, U_L, U_R) from Hermitian dilation."""
-        ...
-
-    def svd(
-        self, A: NDArray, k: int | None = None
-    ) -> tuple[NDArray, NDArray, NDArray]:
-        """Returns (U, S, Vt). Truncated if k specified."""
-        ...
-
-    def eigh(
-        self, H: NDArray, k: int | None = None
-    ) -> tuple[NDArray, NDArray]:
-        """Symmetric eigendecomposition. Returns (eigenvalues, eigenvectors)."""
-        ...
-
-    # ── Edge Estimation ────────────────────────────────────
-    def batch_granger_test(
-        self,
-        signals: NDArray,      # (N, T)
-        max_lag: int,
-        p_threshold: float,
-    ) -> sparse.csr_matrix:
-        """Compute all N² pairwise Granger tests, return adjacency."""
-        ...
-
-    # ── PID / Information Theory ───────────────────────────
-    def batch_pid_synergy(
-        self,
-        modal_states: NDArray,  # (T, K)
-        target: NDArray,        # (T,)
-        n_bootstrap: int,
-    ) -> tuple[NDArray, NDArray, NDArray]:
-        """Compute K*(K-1)/2 pairwise PID synergies with bootstrap CIs.
-        Returns (synergy_matrix, ci_lower, ci_upper)."""
-        ...
-
-    def batch_covariance(
-        self, X: NDArray  # (T, N)
-    ) -> NDArray:
-        """Batch covariance matrix computation. Shape (N, N)."""
-        ...
-
-    # ── Nearest Neighbour (for KSG TE) ────────────────────
-    def knn_query(
-        self,
-        points: NDArray,   # (T, d)
-        k: int,
-    ) -> tuple[NDArray, NDArray]:
-        """k-nearest-neighbour distances and indices.
-        Returns (distances (T, k), indices (T, k))."""
-        ...
-
-    # ── Batch Utilities ────────────────────────────────────
-    def to_device(self, arr: NDArray) -> NDArray:
-        """Transfer array to compute device (no-op for CPU)."""
-        ...
-
-    def to_host(self, arr: NDArray) -> NDArray:
-        """Transfer array back to CPU numpy (no-op for CPU)."""
-        ...
-
-
-def get_backend(force: str | None = None) -> ComputeBackend:
-    """Get the active compute backend.
+    Priority: force arg > SMIM_DEVICE env var > auto-detect.
 
     Args:
-        force: "cpu", "gpu", or None (auto-detect).
-            If "gpu" and no GPU available, raises RuntimeError.
-            If None, uses GPU if available, else CPU.
+        force: "cpu", "cuda", "cuda:0", "cuda:1", or None (auto-detect).
 
-    Environment variable override: SMIM_BACKEND=cpu|gpu
+    Returns:
+        torch.device
     """
-    ...
-```
+    if force is not None:
+        device_str = force
+    else:
+        device_str = os.environ.get("SMIM_DEVICE", "auto")
 
-Key design principles:
-- `ComputeBackend` is a Protocol — both backends implement it structurally
-- Methods operate on numpy arrays (input/output always numpy on host)
-- GPU backend handles device transfer internally (to_device/to_host are for
-  advanced use where the caller wants to keep data on GPU across calls)
-- Backend selection is: explicit arg > env var > auto-detect
-- Auto-detect: try `import cupy; cupy.cuda.Device(0)` — if succeeds, use GPU
-
-### Task 2.2: CPU backend (wraps existing implementations)
-
-Create `src/quantdsl_backtest/smim/compute/cpu_backend.py`:
-
-This wraps the EXISTING implementations from `smim/spectral/`, `smim/graph/`,
-`smim/emergence/` etc. into the ComputeBackend interface. It should be a thin
-delegation layer, NOT a reimplementation.
-
-```python
-class CpuBackend:
-    """CPU compute backend — delegates to existing implementations."""
-
-    @property
-    def backend_type(self) -> BackendType:
-        return BackendType.CPU
-
-    @property
-    def device_name(self) -> str:
-        return "cpu"
-
-    def schur_decompose(self, A, k=None):
-        # Delegate to scipy.linalg.schur (same as existing SchurDecomposer)
-        from scipy.linalg import schur
-        T, Q = schur(A, output='complex')
-        if k is not None:
-            # truncate to top-k by eigenvalue magnitude
-            ...
-        return Q, T
-
-    def polar_decompose(self, A):
-        from scipy.linalg import polar
-        return polar(A)
-
-    # ... etc for all methods
-```
-
-Tests: verify CpuBackend passes all 121 acceptance tests when used as the backend.
-This is a rewiring test, not a new correctness test — the underlying implementations
-are already validated.
-
-### Task 2.3: GPU backend
-
-Create `src/quantdsl_backtest/smim/compute/gpu_backend.py`:
-
-```python
-class GpuBackend:
-    """GPU compute backend using CuPy and CUDA.
-
-    Requirements:
-        - NVIDIA GPU with CUDA support
-        - CuPy installed: pip install cupy-cuda12x (match your CUDA version)
-        - cuSOLVER for eigendecomposition
-        - (optional) cuML for KNN, FAISS for nearest-neighbour
-    """
-
-    def __init__(self):
-        import cupy as cp
-        self._cp = cp
-        self._device = cp.cuda.Device(0)
-        # Verify CUDA is functional
-        _ = cp.array([1.0])
-
-    @property
-    def backend_type(self) -> BackendType:
-        return BackendType.GPU
-
-    @property
-    def device_name(self) -> str:
-        return f"gpu:{self._device.id} ({self._device.attributes['DeviceName']})"
-
-    def schur_decompose(self, A, k=None):
-        cp = self._cp
-        A_gpu = cp.asarray(A)
-        # CuPy wraps cuSOLVER: cupyx.scipy.linalg.schur
-        from cupyx.scipy.linalg import schur as cu_schur
-        T_gpu, Q_gpu = cu_schur(A_gpu, output='complex')
-        if k is not None:
-            ...
-        return cp.asnumpy(Q_gpu), cp.asnumpy(T_gpu)
-
-    def polar_decompose(self, A):
-        cp = self._cp
-        A_gpu = cp.asarray(A)
-        # Polar via SVD: A = U S V^H, then orthogonal = U V^H, PSD = V S V^H
-        U, S, Vh = cp.linalg.svd(A_gpu, full_matrices=False)
-        orth = U @ Vh
-        psd = (Vh.conj().T * S) @ Vh
-        return cp.asnumpy(orth), cp.asnumpy(psd)
-
-    def svd(self, A, k=None):
-        cp = self._cp
-        A_gpu = cp.asarray(A)
-        U, S, Vh = cp.linalg.svd(A_gpu, full_matrices=False)
-        if k is not None:
-            U, S, Vh = U[:, :k], S[:k], Vh[:k, :]
-        return cp.asnumpy(U), cp.asnumpy(S), cp.asnumpy(Vh)
-
-    def eigh(self, H, k=None):
-        cp = self._cp
-        H_gpu = cp.asarray(H)
-        if k is not None and k < H.shape[0] // 2:
-            # Use iterative solver for partial eigendecomposition
-            from cupyx.scipy.sparse.linalg import eigsh
-            H_sparse = cupyx.scipy.sparse.csr_matrix(H_gpu)
-            vals, vecs = eigsh(H_sparse, k=k, which='LM')
+    if device_str == "auto":
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+            name = torch.cuda.get_device_name(0)
+            logger.info(f"SMIM compute: using CUDA device {name}")
         else:
-            vals, vecs = cp.linalg.eigh(H_gpu)
-        return cp.asnumpy(vals), cp.asnumpy(vecs)
+            device = torch.device("cpu")
+            logger.info("SMIM compute: using CPU (no CUDA available)")
+    elif device_str == "cpu":
+        device = torch.device("cpu")
+        logger.info("SMIM compute: using CPU (forced)")
+    else:
+        device = torch.device(device_str)
+        if device.type == "cuda":
+            name = torch.cuda.get_device_name(device.index or 0)
+            logger.info(f"SMIM compute: using CUDA device {name}")
+    return device
 
-    def batch_granger_test(self, signals, max_lag, p_threshold):
-        # Strategy: formulate all N² VAR regressions as a batched least-squares
-        # problem and solve on GPU using cuBLAS batched GEMM
-        cp = self._cp
-        N, T = signals.shape
-        # ... construct batched regression matrices ...
-        # ... solve via batched lstsq or QR ...
-        # ... compute F-statistics from residuals ...
-        # ... threshold and return sparse adjacency ...
-        ...
 
-    def batch_pid_synergy(self, modal_states, target, n_bootstrap):
-        cp = self._cp
-        T, K = modal_states.shape
-        n_pairs = K * (K - 1) // 2
-        # For Gaussian MMI: synergy depends only on covariance matrices
-        # Compute all pairwise covariances on GPU
-        # Bootstrap: generate n_bootstrap block-bootstrap index arrays on GPU
-        # Compute covariance for each bootstrap sample in parallel
-        # ... batched covariance computation ...
-        ...
+def ensure_tensor(
+    arr: NDArray | torch.Tensor,
+    device: torch.device | None = None,
+    dtype: torch.dtype = torch.float64,
+) -> torch.Tensor:
+    """Convert numpy array to torch tensor on the target device.
 
-    def batch_covariance(self, X):
-        cp = self._cp
-        X_gpu = cp.asarray(X)
-        mean = X_gpu.mean(axis=0, keepdims=True)
-        centered = X_gpu - mean
-        cov = (centered.T @ centered) / (X_gpu.shape[0] - 1)
-        return cp.asnumpy(cov)
+    Always uses float64 for numerical precision matching scipy.
+    """
+    if device is None:
+        device = get_device()
+    if isinstance(arr, torch.Tensor):
+        return arr.to(device=device, dtype=dtype)
+    return torch.as_tensor(np.asarray(arr), device=device, dtype=dtype)
 
-    def knn_query(self, points, k):
-        cp = self._cp
-        # Option 1: brute-force pairwise distances on GPU (fast for T < 50000)
-        points_gpu = cp.asarray(points)
-        # Pairwise L2 distances via the expansion trick:
-        # ||a-b||² = ||a||² + ||b||² - 2 a·b
-        sq_norms = cp.sum(points_gpu ** 2, axis=1, keepdims=True)
-        dists = sq_norms + sq_norms.T - 2 * points_gpu @ points_gpu.T
-        cp.fill_diagonal(dists, cp.inf)
-        # Top-k smallest
-        idx = cp.argpartition(dists, k, axis=1)[:, :k]
-        # Gather distances
-        d = cp.take_along_axis(dists, idx, axis=1)
-        return cp.asnumpy(cp.sqrt(cp.maximum(d, 0))), cp.asnumpy(idx)
 
-    def to_device(self, arr):
-        return self._cp.asarray(arr)
-
-    def to_host(self, arr):
-        if hasattr(arr, 'get'):
-            return arr.get()
-        return np.asarray(arr)
+def to_numpy(t: torch.Tensor) -> NDArray:
+    """Convert torch tensor back to numpy (on CPU)."""
+    return t.detach().cpu().numpy()
 ```
 
-IMPORTANT implementation notes:
-- All methods accept numpy arrays and return numpy arrays (device transfer
-  is internal). This is critical — calling code never touches CuPy arrays.
-- For operations CuPy doesn't support directly (e.g., Schur decomposition
-  may not be in all CuPy versions), fall back to CPU with a warning:
-  ```python
-  import warnings
-  warnings.warn("Schur not available in CuPy, falling back to CPU", RuntimeWarning)
-  return CpuBackend().schur_decompose(A, k)
-  ```
-- Memory management: use `cp.get_default_memory_pool().free_all_blocks()`
-  after large operations to prevent GPU OOM.
+Also create `src/quantdsl_backtest/smim/compute/linalg.py`:
 
-### Task 2.4: Wire backend into existing pipeline
-
-Modify the existing pipeline components to use the backend abstraction:
-
-1. In `smim/spectral/schur.py`, `polar.py`, `hermitian.py`:
-   Replace direct scipy calls with `backend.schur_decompose()` etc.
-
-2. In `smim/graph/edges/granger.py`:
-   Replace the pairwise VAR loop with `backend.batch_granger_test()`
-
-3. In `smim/emergence/pid.py`:
-   Replace the bootstrap loop with `backend.batch_pid_synergy()`
-
-4. In `smim/emergence/transfer_entropy.py`:
-   Replace scipy KDTree with `backend.knn_query()`
-
-The pattern is:
 ```python
-# Before:
-from scipy.linalg import schur
-T, Q = schur(A)
+"""Linear algebra operations — single implementation for CPU and CUDA.
 
-# After:
-from quantdsl_backtest.smim.compute import get_backend
-backend = get_backend()
-Q, T = backend.schur_decompose(A)
+Every function: numpy in → numpy out. PyTorch used internally.
+Schur decomposition falls back to scipy (not available in torch).
+"""
+import numpy as np
+import torch
+import scipy.linalg
+from numpy.typing import NDArray
+from .torch_ops import ensure_tensor, to_numpy, get_device
+
+
+def svd(A: NDArray, k: int | None = None) -> tuple[NDArray, NDArray, NDArray]:
+    """SVD with optional truncation. Works on CPU or CUDA."""
+    A_t = ensure_tensor(A)
+    U, S, Vh = torch.linalg.svd(A_t, full_matrices=False)
+    if k is not None:
+        U, S, Vh = U[:, :k], S[:k], Vh[:k, :]
+    return to_numpy(U), to_numpy(S), to_numpy(Vh)
+
+
+def eigh(H: NDArray, k: int | None = None) -> tuple[NDArray, NDArray]:
+    """Symmetric eigendecomposition. Works on CPU or CUDA."""
+    H_t = ensure_tensor(H)
+    vals, vecs = torch.linalg.eigh(H_t)
+    if k is not None:
+        # Return top-k by magnitude
+        idx = torch.argsort(vals.abs(), descending=True)[:k]
+        vals, vecs = vals[idx], vecs[:, idx]
+    return to_numpy(vals), to_numpy(vecs)
+
+
+def polar_decompose(A: NDArray) -> tuple[NDArray, NDArray]:
+    """Polar decomposition A = UP via SVD. Works on CPU or CUDA."""
+    A_t = ensure_tensor(A)
+    U, S, Vh = torch.linalg.svd(A_t, full_matrices=False)
+    orth = U @ Vh
+    psd = (Vh.conj().mT * S.unsqueeze(-2)) @ Vh
+    return to_numpy(orth), to_numpy(psd)
+
+
+def schur_decompose(A: NDArray, k: int | None = None) -> tuple[NDArray, NDArray]:
+    """Schur decomposition A = QTQ^H. Always runs on CPU (scipy).
+
+    torch.linalg.schur does not exist. This is the one operation that
+    cannot be GPU-accelerated. It takes <0.1% of pipeline time, so
+    the impact is negligible.
+    """
+    T, Q = scipy.linalg.schur(np.asarray(A), output='complex')
+    if k is not None:
+        eig_magnitudes = np.abs(np.diag(T))
+        idx = np.argsort(eig_magnitudes)[::-1][:k]
+        Q, T = Q[:, idx], T[np.ix_(idx, idx)]
+    return Q, T
+
+
+def hermitian_dilation_decompose(
+    A: NDArray, k: int
+) -> tuple[NDArray, NDArray, NDArray]:
+    """Hermitian dilation: eigendecompose H = [[0,A],[A^T,0]].
+    Returns (eigenvalues, U_L, U_R). Works on CPU or CUDA.
+    """
+    N = A.shape[0]
+    A_t = ensure_tensor(A)
+    zeros = torch.zeros((N, N), device=A_t.device, dtype=A_t.dtype)
+    H = torch.cat([
+        torch.cat([zeros, A_t], dim=1),
+        torch.cat([A_t.T, zeros], dim=1),
+    ], dim=0)
+    vals, vecs = torch.linalg.eigh(H)
+    # Select top-k positive eigenvalues
+    pos_mask = vals > 1e-10
+    pos_vals = vals[pos_mask]
+    pos_vecs = vecs[:, pos_mask]
+    # Sort descending
+    idx = torch.argsort(pos_vals, descending=True)[:k]
+    sigma = pos_vals[idx]
+    # Extract U_L (first N rows) and U_R (last N rows)
+    U_L = pos_vecs[:N, idx] * (2 ** 0.5)
+    U_R = pos_vecs[N:, idx] * (2 ** 0.5)
+    return to_numpy(sigma), to_numpy(U_L), to_numpy(U_R)
+
+
+def batch_covariance(X: NDArray) -> NDArray:
+    """Covariance matrix. Works on CPU or CUDA."""
+    X_t = ensure_tensor(X)
+    mean = X_t.mean(dim=0, keepdim=True)
+    centered = X_t - mean
+    cov = (centered.T @ centered) / (X_t.shape[0] - 1)
+    return to_numpy(cov)
+
+
+def batch_solve(A: NDArray, B: NDArray) -> NDArray:
+    """Batched linear solve A @ X = B. Shape (batch, N, N) and (batch, N, M).
+    Works on CPU or CUDA — this is the key primitive for batch Granger.
+    """
+    A_t = ensure_tensor(A)
+    B_t = ensure_tensor(B)
+    X_t = torch.linalg.solve(A_t, B_t)
+    return to_numpy(X_t)
 ```
 
-DO NOT change any mathematical logic. Only change the compute dispatch.
+Tests:
+- Verify all functions work on CPU
+- If CUDA available, verify they also work on CUDA and produce same results
+- Schur always returns CPU result regardless of SMIM_DEVICE
 
-### Task 2.5: Fallback and environment configuration
+**Implemented.** Commits `d93cd74`, `8431c9c`. Actual files created:
+- `compute/__init__.py`, `compute/torch_ops.py`, `compute/linalg.py`
+- 54 unit tests in `tests/unit/smim/compute/` — 54/54 pass on both CPU and CUDA
+- `hermitian_dilation_decompose` fixed for non-square A (M×M and N×N zero blocks)
+- 121/121 acceptance tests pass with `SMIM_DEVICE=cuda`
 
-Create `src/quantdsl_backtest/smim/compute/config.py`:
+Git add and commit:
+[SMIM GPU-1.1] Create PyTorch compute layer with CPU/CUDA auto-dispatch
+
+### Task 1.2: Batch Granger on PyTorch ✅ DONE
+
+**Completed.** Commit `43d9455`. `compute/batch_granger.py` contains
+`batch_granger_test` (GPU batch, fixed lag) and `_granger_sequential`
+(numpy OLS reference). Constant term included (L+1 / 2L+1 params).
+Chunked at 10,000 pairs/batch. 23 unit tests + 5 acceptance parity tests pass.
+**Parity verified:** identical edge set to statsmodels on A-GR-1 data (CUDA + CPU).
+**Not yet wired** into `GrangerEdgeEstimator` — that is Task 2.1.
+
+This is the highest-impact GPU acceleration. Replace 250,000 sequential
+statsmodels VAR fits with a single batched least-squares solve on GPU.
+
+Create `src/quantdsl_backtest/smim/compute/batch_granger.py`:
 
 ```python
-"""Compute backend configuration.
+"""Batch Granger causality via PyTorch batched least-squares.
 
-Environment variables:
-    SMIM_BACKEND=cpu|gpu|auto   (default: auto)
-    SMIM_GPU_DEVICE=0           (default: 0)
-    SMIM_GPU_MEMORY_LIMIT=8GB   (default: no limit)
+For N actors and max_lag L, the Granger test for i→j is:
+  Restricted model:  y_j[t] = Σ_l a_l y_j[t-l] + ε        (L params)
+  Unrestricted model: y_j[t] = Σ_l a_l y_j[t-l] + Σ_l b_l y_i[t-l] + ε  (2L params)
+  F = ((RSS_r - RSS_u) / L) / (RSS_u / (T - 2L))
+
+Strategy: construct ALL N² regression matrices in a single batch tensor
+and solve via torch.linalg.lstsq. This replaces the Python loop over N²
+pairs with a single GPU kernel launch.
 """
 ```
 
-Fallback chain:
-1. If SMIM_BACKEND=gpu and GPU unavailable → raise RuntimeError (explicit failure)
-2. If SMIM_BACKEND=auto and GPU unavailable → use CPU silently
-3. If SMIM_BACKEND=cpu → always CPU regardless of GPU availability
-4. Log the selected backend at pipeline startup: "Using compute backend: gpu:0 (NVIDIA RTX ...)"
+The implementation must:
+1. For each directed pair (i, j), construct the (T-L) × 2L design matrix
+   [y_j lagged, y_i lagged] and the (T-L) response vector y_j[L:]
+2. Stack ALL N² design matrices into a (N², T-L, 2L) batch tensor
+3. Solve via torch.linalg.lstsq in one call
+4. Compute RSS_restricted (first L columns only) and RSS_unrestricted (all 2L)
+   — this can also be batched
+5. Compute F-statistics and p-values from scipy.stats.f.sf (on CPU after transfer)
+6. Threshold and return sparse adjacency
+
+For memory management at N=500 (250K pairs × 80 × 8 = ~150MB for design matrices):
+- If GPU memory < needed, process in chunks of 10,000 pairs
+- Always use float64 for numerical precision matching statsmodels
+
+Tests:
+- On the SAME synthetic VAR(1) data from acceptance test A-GR-1, verify the
+  batch implementation detects the same edges as the original statsmodels version
+- F-statistics agree within 1e-4 (different solver paths)
+- Edge structure (which pairs are significant) is IDENTICAL
+
+Git add and commit:
+[SMIM GPU-1.2] Implement batched Granger causality via PyTorch lstsq
+
+### Task 1.3: Batch PID Bootstrap on PyTorch
+
+Replace 200 sequential covariance computations with batched GPU covariance.
+
+Create `src/quantdsl_backtest/smim/compute/batch_pid.py`:
+
+```python
+"""Batch PID bootstrap via PyTorch.
+
+For Gaussian MMI PID, synergy depends only on covariance matrices.
+The bootstrap generates B resampled covariance matrices — each is a
+matrix multiply, trivially parallelisable.
+
+Strategy:
+1. Generate B block-bootstrap index arrays on device
+2. For each bootstrap sample, compute the covariance submatrices
+   for (alpha_j, alpha_k, target) — batched as (B, 3, 3) covariances
+3. Compute MI terms from covariance determinants (batched torch.linalg.det)
+4. Derive R, U_j, U_k, S for all B samples in parallel
+5. Return point estimate (mean) and CIs (percentiles)
+"""
+```
+
+The implementation must:
+1. Accept modal_states (T, K) and target (T,) as numpy
+2. Generate B bootstrap index arrays of length T (block bootstrap with block
+   size ~sqrt(T) for temporal dependence)
+3. For each pair (j, k): stack the (alpha_j, alpha_k, target) submatrix
+   across B samples → shape (B, T, 3)
+4. Compute covariance: (B, 3, 3) — batched matrix multiply
+5. Compute all MI terms via log-det: I(X;Y) = 0.5 * (log|Σ_X| + log|Σ_Y| - log|Σ_{XY}|)
+   — batched via torch.linalg.slogdet
+6. Return synergy matrix and CIs as numpy
+
+Tests:
+- Synergy point estimates match the existing CPU implementation within 1e-4
+- Bootstrap CIs have same width (within 30% — different RNG but same distribution)
+
+Git add and commit:
+[SMIM GPU-1.3] Implement batched PID bootstrap via PyTorch
+
+### Task 1.4: GPU-accelerated KNN for transfer entropy
+
+Create `src/quantdsl_backtest/smim/compute/gpu_knn.py`:
+
+```python
+"""Brute-force k-nearest-neighbours via PyTorch.
+
+For KSG transfer entropy, we need KNN on (T, d) point clouds where
+T ≤ 10,000 and d ≤ 6. Brute-force pairwise distances on GPU is faster
+than CPU KD-trees for this regime.
+
+Strategy: compute full pairwise distance matrix on GPU via the expansion trick:
+  ||a-b||² = ||a||² + ||b||² - 2 a·b
+Then torch.topk for k smallest per row.
+"""
+```
+
+Handle memory for large T: if T² × 8 bytes > 2GB, compute distances in row chunks.
+
+Tests:
+- KNN results match scipy.spatial.KDTree exactly (same neighbours, same distances)
+- Faster than scipy KDTree for T > 2000
+
+Git add and commit:
+[SMIM GPU-1.4] Implement GPU brute-force KNN for transfer entropy
 
 ---
 
-## Part 3: Correctness Parity Test Suite
+## Part 2: Wire Into Pipeline
 
-This is the quality gate. GPU outputs must match CPU outputs.
+### Task 2.1: Replace scipy/numpy calls with compute layer
 
-### Task 3.1: Create parity test infrastructure
-
-Create `tests/acceptance/smim/test_gpu_parity.py`:
-
-```python
-"""GPU ↔ CPU correctness parity tests.
-
-For every operation in the ComputeBackend protocol, verify that
-GPU output matches CPU output to within documented tolerance.
-
-These tests require a GPU. Skip gracefully if unavailable:
-    @pytest.mark.gpu
-    @pytest.mark.skipif(not gpu_available(), reason="No CUDA GPU")
-"""
-import pytest
-import numpy as np
-from quantdsl_backtest.smim.compute import get_backend, BackendType
-
-def gpu_available() -> bool:
-    try:
-        import cupy
-        cupy.cuda.Device(0).compute_capability
-        return True
-    except Exception:
-        return False
-
-@pytest.fixture
-def cpu():
-    return get_backend(force="cpu")
-
-@pytest.fixture
-def gpu():
-    return get_backend(force="gpu")
-
-PARITY_ATOL = 1e-8   # absolute tolerance for CPU-GPU agreement
-PARITY_RTOL = 1e-6   # relative tolerance for CPU-GPU agreement
-```
-
-### Task 3.2: Eigendecomposition parity tests
+Modify existing pipeline components to use the new compute functions.
+The pattern is simple — import from compute instead of scipy:
 
 ```python
-@pytest.mark.gpu
-class TestEigendecompositionParity:
-    """GPU eigendecomposition must match CPU to PARITY tolerance."""
+# BEFORE (in smim/spectral/polar.py):
+from scipy.linalg import polar
+U, P = polar(A)
 
-    @pytest.mark.parametrize("N", [10, 50, 100, 200, 500])
-    def test_schur_parity(self, cpu, gpu, N):
-        rng = np.random.default_rng(42)
-        A = rng.standard_normal((N, N))
-        Q_cpu, T_cpu = cpu.schur_decompose(A)
-        Q_gpu, T_gpu = gpu.schur_decompose(A)
-        # Eigenvalues must match (Q and T may differ by unitary transform)
-        eig_cpu = sorted(np.diag(T_cpu), key=lambda x: (abs(x), np.angle(x)))
-        eig_gpu = sorted(np.diag(T_gpu), key=lambda x: (abs(x), np.angle(x)))
-        np.testing.assert_allclose(eig_cpu, eig_gpu, atol=PARITY_ATOL, rtol=PARITY_RTOL)
-
-    @pytest.mark.parametrize("N", [10, 50, 100, 200, 500])
-    def test_polar_parity(self, cpu, gpu, N):
-        rng = np.random.default_rng(42)
-        A = rng.standard_normal((N, N))
-        U_cpu, P_cpu = cpu.polar_decompose(A)
-        U_gpu, P_gpu = gpu.polar_decompose(A)
-        np.testing.assert_allclose(U_cpu, U_gpu, atol=PARITY_ATOL, rtol=PARITY_RTOL)
-        np.testing.assert_allclose(P_cpu, P_gpu, atol=PARITY_ATOL, rtol=PARITY_RTOL)
-
-    @pytest.mark.parametrize("N", [10, 50, 100, 200])
-    def test_hermitian_dilation_parity(self, cpu, gpu, N):
-        rng = np.random.default_rng(42)
-        A = rng.standard_normal((N, N))
-        vals_cpu, UL_cpu, UR_cpu = cpu.hermitian_dilation_decompose(A, k=min(N, 20))
-        vals_gpu, UL_gpu, UR_gpu = gpu.hermitian_dilation_decompose(A, k=min(N, 20))
-        np.testing.assert_allclose(sorted(vals_cpu), sorted(vals_gpu),
-                                   atol=PARITY_ATOL, rtol=PARITY_RTOL)
-
-    @pytest.mark.parametrize("N", [10, 50, 100, 200, 500])
-    def test_svd_parity(self, cpu, gpu, N):
-        rng = np.random.default_rng(42)
-        A = rng.standard_normal((N, N))
-        U_cpu, S_cpu, Vt_cpu = cpu.svd(A, k=min(N, 20))
-        U_gpu, S_gpu, Vt_gpu = gpu.svd(A, k=min(N, 20))
-        # Singular values must match. Vectors may differ by sign.
-        np.testing.assert_allclose(S_cpu, S_gpu, atol=PARITY_ATOL, rtol=PARITY_RTOL)
-
-    @pytest.mark.parametrize("N", [10, 50, 100, 200, 500])
-    def test_eigh_parity(self, cpu, gpu, N):
-        rng = np.random.default_rng(42)
-        A = rng.standard_normal((N, N))
-        H = A + A.T  # symmetric
-        vals_cpu, vecs_cpu = cpu.eigh(H)
-        vals_gpu, vecs_gpu = gpu.eigh(H)
-        np.testing.assert_allclose(vals_cpu, vals_gpu, atol=PARITY_ATOL, rtol=PARITY_RTOL)
+# AFTER:
+from quantdsl_backtest.smim.compute.linalg import polar_decompose
+U, P = polar_decompose(A)
 ```
 
-### Task 3.3: Edge estimation parity tests
+Files to modify:
+1. `smim/spectral/schur.py` → use `compute.linalg.schur_decompose` (stays on CPU)
+2. `smim/spectral/polar.py` → use `compute.linalg.polar_decompose`
+3. `smim/spectral/hermitian.py` → use `compute.linalg.hermitian_dilation_decompose`
+4. `smim/spectral/dmd.py` → use `compute.linalg.svd`
+5. `smim/graph/edges/granger.py` → use `compute.batch_granger.batch_granger_test`
+6. `smim/emergence/pid.py` → use `compute.batch_pid.batch_pid_synergy`
+7. `smim/emergence/transfer_entropy.py` → use `compute.gpu_knn.knn_query`
 
-```python
-@pytest.mark.gpu
-class TestEdgeParity:
+DO NOT change any mathematical logic. Only change where the computation runs.
 
-    @pytest.mark.parametrize("N,T", [(10, 200), (50, 200), (100, 200)])
-    def test_granger_parity(self, cpu, gpu, N, T):
-        rng = np.random.default_rng(42)
-        signals = rng.standard_normal((N, T))
-        adj_cpu = cpu.batch_granger_test(signals, max_lag=4, p_threshold=0.05)
-        adj_gpu = gpu.batch_granger_test(signals, max_lag=4, p_threshold=0.05)
-        # Adjacency structure must match (same edges detected)
-        np.testing.assert_array_equal(adj_cpu.toarray() > 0, adj_gpu.toarray() > 0)
-        # Edge weights (F-statistics) match to loose tolerance
-        # (different linear algebra paths may give slightly different F-stats)
-        mask = adj_cpu.toarray() > 0
-        if mask.any():
-            np.testing.assert_allclose(
-                adj_cpu.toarray()[mask], adj_gpu.toarray()[mask],
-                atol=1e-4, rtol=1e-3
-            )
-```
-
-### Task 3.4: PID and information-theoretic parity tests
-
-```python
-@pytest.mark.gpu
-class TestPIDParity:
-
-    def test_synergy_matrix_parity(self, cpu, gpu):
-        rng = np.random.default_rng(42)
-        T, K = 2000, 5
-        modal_states = rng.standard_normal((T, K))
-        target = rng.standard_normal(T)
-        S_cpu, lo_cpu, hi_cpu = cpu.batch_pid_synergy(modal_states, target, n_bootstrap=50)
-        S_gpu, lo_gpu, hi_gpu = gpu.batch_pid_synergy(modal_states, target, n_bootstrap=50)
-        # Synergy point estimates must match closely
-        np.testing.assert_allclose(S_cpu, S_gpu, atol=1e-4, rtol=1e-3)
-        # Bootstrap CIs: same distributional properties (not exact — different RNG paths)
-        # Verify: CI widths agree within 50%
-        width_cpu = hi_cpu - lo_cpu
-        width_gpu = hi_gpu - lo_gpu
-        np.testing.assert_allclose(width_cpu, width_gpu, atol=0, rtol=0.5)
-
-    def test_covariance_parity(self, cpu, gpu):
-        rng = np.random.default_rng(42)
-        X = rng.standard_normal((1000, 50))
-        cov_cpu = cpu.batch_covariance(X)
-        cov_gpu = gpu.batch_covariance(X)
-        np.testing.assert_allclose(cov_cpu, cov_gpu, atol=1e-10, rtol=1e-8)
-
-    @pytest.mark.parametrize("T", [1000, 5000])
-    def test_knn_parity(self, cpu, gpu, T):
-        rng = np.random.default_rng(42)
-        points = rng.standard_normal((T, 3))
-        dist_cpu, idx_cpu = cpu.knn_query(points, k=5)
-        dist_gpu, idx_gpu = gpu.knn_query(points, k=5)
-        # Same neighbours found
-        for i in range(min(T, 100)):  # check 100 random points
-            assert set(idx_cpu[i]) == set(idx_gpu[i]), f"KNN mismatch at point {i}"
-        # Distances match
-        np.testing.assert_allclose(
-            np.sort(dist_cpu[:100], axis=1),
-            np.sort(dist_gpu[:100], axis=1),
-            atol=1e-8, rtol=1e-6
-        )
-```
-
-### Task 3.5: Full acceptance suite on GPU backend
-
-The ultimate parity test: run ALL 121 existing acceptance tests using the GPU
-backend and verify they pass.
-
-```python
-# In conftest.py for acceptance tests, add:
-@pytest.fixture(autouse=True)
-def set_backend_from_env():
-    """Allow running acceptance suite on GPU via env var."""
-    import os
-    backend = os.environ.get("SMIM_TEST_BACKEND")
-    if backend:
-        os.environ["SMIM_BACKEND"] = backend
-    yield
-    if backend:
-        os.environ.pop("SMIM_BACKEND", None)
-```
-
-Run acceptance suite on GPU:
+After wiring, run the full acceptance suite:
 ```bash
-SMIM_TEST_BACKEND=gpu uv run pytest tests/acceptance/smim/ -v --tb=short
+uv run pytest tests/acceptance/smim/ -v --tb=short
 ```
 
-All 121 tests must pass on GPU backend. Any failure means the GPU implementation
-has a correctness bug — fix the GPU code, not the test.
+All 121 tests must pass. Any failure means the wiring introduced a bug.
+
+Then test with CUDA (if available):
+```bash
+SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
+```
+
+All 121 tests must also pass on CUDA. Same tests, same thresholds — because
+it's the same code path, just on a different device.
+
+Git add and commit:
+[SMIM GPU-2.1] Wire compute layer into pipeline components
+
+### Task 2.2: Add device selection to pipeline config
+
+Extend `SmimConfig` in `smim/config.py`:
+
+```python
+class ComputeConfig(BaseModel):
+    """Compute device configuration."""
+    device: str = Field(
+        default="auto",
+        description="'auto', 'cpu', 'cuda', 'cuda:0', 'cuda:1'"
+    )
+    granger_chunk_size: int = Field(
+        default=10000,
+        description="Max pairs per GPU batch for Granger (memory control)"
+    )
+    pid_bootstrap_on_gpu: bool = Field(
+        default=True,
+        description="Run PID bootstrap on GPU if available"
+    )
+    knn_on_gpu: bool = Field(
+        default=True,
+        description="Run KNN for TE on GPU if available"
+    )
+    float_dtype: str = Field(
+        default="float64",
+        description="'float64' (precise) or 'float32' (faster, less precise)"
+    )
+```
+
+Add `compute: ComputeConfig` to the top-level `SmimConfig`.
+
+Update `experiments/mvp_energy_us_uk.yaml` with the compute section.
+
+Git add and commit:
+[SMIM GPU-2.2] Add compute device configuration to SmimConfig
 
 ---
 
-## Part 4: Performance Benchmark Suite
+## Part 3: Verification
 
-### Task 4.1: Create performance benchmark infrastructure
+### Task 3.1: Device-parametrised acceptance tests
 
-Create `tests/benchmarks/smim/conftest.py` and individual benchmark files.
+Instead of a separate parity suite, run the EXISTING 121 acceptance tests
+on both CPU and CUDA. This is the PyTorch advantage — same code, both devices.
 
-Use `pytest-benchmark` (add to dev dependencies) for rigorous timing with
-statistical confidence (multiple rounds, warmup, outlier detection).
+Add to `tests/acceptance/smim/conftest.py`:
 
 ```python
-"""Performance benchmarks for CPU vs GPU backends.
+import os
 
-Run: uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds
-Compare: uv run pytest tests/benchmarks/smim/ -v --benchmark-compare
-"""
+def pytest_configure(config):
+    """Register gpu marker."""
+    config.addinivalue_line("markers", "gpu: requires CUDA GPU")
+
+@pytest.fixture(autouse=True)
+def configure_device_from_env():
+    """Allow SMIM_DEVICE=cuda to run acceptance suite on GPU."""
+    device = os.environ.get("SMIM_DEVICE")
+    if device:
+        from quantdsl_backtest.smim.compute.torch_ops import get_device
+        get_device.cache_clear()  # reset cached device
+    yield
+    if device:
+        get_device.cache_clear()
+```
+
+Running on CPU (default — nothing changes):
+```bash
+uv run pytest tests/acceptance/smim/ -v --tb=short
+```
+
+Running on CUDA:
+```bash
+SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
+```
+
+Both must show: `121/121 passed ✅`
+
+### Task 3.2: Granger parity spot-check
+
+Even with the same code path, the batched Granger implementation is a
+DIFFERENT algorithm (batched lstsq vs sequential statsmodels VAR). Add
+a dedicated cross-check:
+
+Create `tests/acceptance/smim/test_granger_batch_parity.py`:
+
+```python
+"""Verify batched Granger produces same edges as original statsmodels."""
+
+def test_batch_granger_matches_original():
+    """On the same VAR(1) data from A-GR-1, the batch implementation
+    must detect the same edges as the original statsmodels implementation."""
+    # Generate known VAR(1) data (same as acceptance test A-GR-1)
+    # Run BOTH: original statsmodels loop AND batch PyTorch implementation
+    # Compare:
+    #   - Same edges detected (identical adjacency structure)
+    #   - F-statistics within 1e-3 relative tolerance
+    #   - p-values agree to 2 decimal places
+```
+
+This test imports and runs both implementations side-by-side. It's the
+one place where we explicitly compare old vs new, because the algorithm
+changed (not just the device).
+
+Git add and commit:
+[SMIM GPU-3.1] Add device-parametrised acceptance and Granger parity tests
+
+### Task 3.3: Determinism test
+
+```python
+def test_gpu_determinism():
+    """Run pipeline 5× on CUDA with same seed. All outputs must be identical."""
+    if not torch.cuda.is_available():
+        pytest.skip("No CUDA")
+    # Set deterministic mode
+    torch.use_deterministic_algorithms(True)
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
+    results = []
+    for _ in range(5):
+        result = run_pipeline_once(seed=42, device="cuda")
+        results.append(result)
+
+    for i in range(1, 5):
+        np.testing.assert_array_equal(results[0].gaps, results[i].gaps)
+        np.testing.assert_array_equal(results[0].regimes, results[i].regimes)
+```
+
+If this fails with `torch.use_deterministic_algorithms(True)`, there's a
+non-deterministic operation that needs fixing (usually a scatter/gather or
+atomicAdd in a custom kernel). Document which operations require deterministic
+mode and the performance cost.
+
+Git add and commit:
+[SMIM GPU-3.2] Add GPU determinism test
+
+---
+
+## Part 4: Performance Benchmarks
+
+### Task 4.1: Benchmark infrastructure
+
+Add `pytest-benchmark` to dev dependencies. Create `tests/benchmarks/smim/`:
+
+```python
+# conftest.py
 import pytest
-import numpy as np
-from quantdsl_backtest.smim.compute import get_backend
+import torch
 
-
-@pytest.fixture(params=["cpu", "gpu"], ids=["CPU", "GPU"])
-def backend(request):
-    try:
-        return get_backend(force=request.param)
-    except RuntimeError:
-        pytest.skip(f"{request.param} backend not available")
+@pytest.fixture(params=["cpu", "cuda"], ids=["CPU", "CUDA"])
+def device(request):
+    if request.param == "cuda" and not torch.cuda.is_available():
+        pytest.skip("No CUDA")
+    return torch.device(request.param)
 ```
 
-### Task 4.2: Component-level benchmarks
+### Task 4.2: Component benchmarks
 
-Create `tests/benchmarks/smim/test_bench_eigendecomp.py`:
-
-```python
-@pytest.mark.parametrize("N", [50, 100, 200, 500, 1000])
-def test_bench_schur(benchmark, backend, N):
-    rng = np.random.default_rng(42)
-    A = rng.standard_normal((N, N))
-    benchmark(backend.schur_decompose, A, k=20)
-
-@pytest.mark.parametrize("N", [50, 100, 200, 500, 1000])
-def test_bench_svd(benchmark, backend, N):
-    rng = np.random.default_rng(42)
-    A = rng.standard_normal((N, N))
-    benchmark(backend.svd, A, k=20)
-
-@pytest.mark.parametrize("N", [50, 100, 200, 500, 1000])
-def test_bench_eigh(benchmark, backend, N):
-    rng = np.random.default_rng(42)
-    A = rng.standard_normal((N, N))
-    H = A + A.T
-    benchmark(backend.eigh, H, k=20)
-```
-
-Create `tests/benchmarks/smim/test_bench_edges.py`:
+Create benchmark files that parametrise over device AND problem size:
 
 ```python
-@pytest.mark.parametrize("N,T", [(20, 200), (50, 200), (100, 200), (200, 200)])
-def test_bench_granger(benchmark, backend, N, T):
-    rng = np.random.default_rng(42)
-    signals = rng.standard_normal((N, T))
-    benchmark(backend.batch_granger_test, signals, max_lag=4, p_threshold=0.05)
-```
-
-Create `tests/benchmarks/smim/test_bench_pid.py`:
-
-```python
-@pytest.mark.parametrize("K,T", [(5, 1000), (10, 1000), (15, 2000), (20, 2000)])
-def test_bench_pid_synergy(benchmark, backend, K, T):
-    rng = np.random.default_rng(42)
-    modal_states = rng.standard_normal((T, K))
-    target = rng.standard_normal(T)
-    benchmark(backend.batch_pid_synergy, modal_states, target, n_bootstrap=50)
-
-@pytest.mark.parametrize("T", [1000, 5000, 10000])
-def test_bench_knn(benchmark, backend, T):
-    rng = np.random.default_rng(42)
-    points = rng.standard_normal((T, 3))
-    benchmark(backend.knn_query, points, k=10)
-```
-
-### Task 4.3: Pipeline-level benchmark
-
-Create `tests/benchmarks/smim/test_bench_pipeline.py`:
-
-```python
+# test_bench_granger.py
 @pytest.mark.parametrize("N", [50, 100, 200, 500])
-def test_bench_full_pipeline(benchmark, backend, N):
-    """Benchmark the complete pipeline at different actor counts."""
-    # Generate synthetic data matching the experiment profile
-    from tests.acceptance.smim.conftest import make_modal_system
-    obs, _, _ = make_modal_system(N=N, K=5, T=80, seed=42)
-    # ... run full pipeline ...
-    benchmark(run_pipeline_once, obs, backend=backend)
+def test_bench_granger(benchmark, device, N):
+    """Benchmark Granger edge estimation."""
+    import os
+    os.environ["SMIM_DEVICE"] = str(device)
+    rng = np.random.default_rng(42)
+    signals = rng.standard_normal((N, 80))
+    from quantdsl_backtest.smim.compute.batch_granger import batch_granger_test
+    benchmark(batch_granger_test, signals, max_lag=4, p_threshold=0.05)
+
+# test_bench_linalg.py
+@pytest.mark.parametrize("N", [50, 100, 200, 500])
+def test_bench_svd(benchmark, device, N):
+    rng = np.random.default_rng(42)
+    A = rng.standard_normal((N, N))
+    os.environ["SMIM_DEVICE"] = str(device)
+    from quantdsl_backtest.smim.compute.linalg import svd
+    benchmark(svd, A, k=20)
+
+# test_bench_pid.py
+@pytest.mark.parametrize("K", [5, 10, 15, 20])
+def test_bench_pid_bootstrap(benchmark, device, K):
+    rng = np.random.default_rng(42)
+    os.environ["SMIM_DEVICE"] = str(device)
+    modal = rng.standard_normal((2000, K))
+    target = rng.standard_normal(2000)
+    from quantdsl_backtest.smim.compute.batch_pid import batch_pid_synergy
+    benchmark(batch_pid_synergy, modal, target, n_bootstrap=200)
+
+# test_bench_pipeline.py
+@pytest.mark.parametrize("N", [50, 100, 200, 500])
+def test_bench_full_pipeline(benchmark, device, N):
+    os.environ["SMIM_DEVICE"] = str(device)
+    # ... generate synthetic data, run full pipeline ...
+    benchmark(run_pipeline_once, ...)
 ```
 
-### Task 4.4: Speedup report generator
-
-Create `scripts/gpu_speedup_report.py`:
-
-```python
-"""Generate GPU speedup report from benchmark results.
-
-Usage: uv run python scripts/gpu_speedup_report.py
-
-Output: docs/smim/reports/gpu_speedup.md
-"""
+Run:
+```bash
+uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds
 ```
 
-The report should show:
+### Task 4.3: Speedup report
+
+Create `scripts/gpu_speedup_report.py` that reads benchmark results and generates:
 
 ```
 SMIM GPU Speedup Report
 ========================
-Hardware: NVIDIA RTX [model], CUDA [version], CuPy [version]
+Hardware: NVIDIA RTX [model], CUDA [version], PyTorch [version]
 Date: [date]
 
-Component Speedup Table:
-| Component            | N=100 CPU | N=100 GPU | Speedup | N=500 CPU | N=500 GPU | Speedup |
-|----------------------|-----------|-----------|---------|-----------|-----------|---------|
-| Schur decomposition  | 0.12s     | 0.03s     | 4.0×    | 8.2s      | 0.4s      | 20.5×   |
-| SVD (truncated k=20) | 0.08s     | 0.02s     | 4.0×    | 5.1s      | 0.2s      | 25.5×   |
-| Polar decomposition  | 0.15s     | 0.04s     | 3.8×    | 9.8s      | 0.5s      | 19.6×   |
-| Granger edges (N²)   | 2.1s      | 0.3s      | 7.0×    | 52s       | 3.1s      | 16.8×   |
-| PID bootstrap (×200) | 1.5s      | 0.2s      | 7.5×    | 1.5s      | 0.2s      | 7.5×    |
-| KNN (T=5000)         | 3.2s      | 0.1s      | 32.0×   | 3.2s      | 0.1s      | 32.0×   |
+Component Speedup Table (including Woodbury fix):
+| Component            | CPU Before | CPU After Woodbury | CUDA     | Total Speedup |
+|----------------------|-----------|-------------------|----------|---------------|
+| Granger edges (N=200) | 143s      | 143s (no change)  | ~14s     | 10.2×         |
+| Kim filter EM (N=200) | 35s       | ~0.2s             | (on CPU) | 175×          |
+| PID bootstrap         | 17s       | 17s (no change)   | ~2s      | 8.5×          |
+| Full pipeline (N=200) | 197s      | ~163s             | ~17s     | 11.6×         |
 
-Projected Experiment Programme Time:
-| Scenario            | CPU estimate | GPU estimate | Saving |
-|---------------------|-------------|-------------|--------|
-| Phase A (anchor)    | 12 hours    | 1.5 hours   | 87%    |
-| Phase B (ablation)  | 85 hours    | 8 hours     | 91%    |
-| Phase C (transfer)  | 15 hours    | 2 hours     | 87%    |
-| Phase D (economic)  | 8 hours     | 3 hours     | 63%    |
-| TOTAL               | 120 hours   | 14.5 hours  | 88%    |
+Projected Experiment Programme:
+| Scenario            | Before   | After    | Saving |
+|---------------------|----------|----------|--------|
+| 680 runs at N=200   | 37 hours | 3.2 hours| 91%    |
+| 680 runs at N=500   | 333 hours| ~30 hours| 91%    |
 
-Correctness Verification:
-- Parity tests: XX/XX passed ✅
-- Acceptance suite on GPU: 121/121 passed ✅
+Acceptance Verification:
+- CPU: 121/121 passed ✅
+- CUDA: 121/121 passed ✅
+- Determinism: 5/5 identical runs ✅
+- Granger parity: edges match ✅
 ```
+
+Git add and commit:
+[SMIM GPU-4.3] Generate speedup report
 
 ---
 
 ## Part 5: Execution Order
 
-1. **GPU-1.1**: Profiling harness (1 session)
-2. **GPU-1.2**: Profile and document targets (run profiler, write doc)
-3. **GPU-2.1**: Backend abstraction Protocol (1 session)
-4. **GPU-2.2**: CPU backend wrapper (1 session)
-5. **GPU-2.3**: GPU backend implementation (2–3 sessions — eigendecomp first, then edges, then PID/KNN)
-6. **GPU-2.4**: Wire backend into pipeline (1 session)
-7. **GPU-2.5**: Fallback and config (1 session)
-8. **GPU-3.1–3.4**: Parity tests (1–2 sessions)
-9. **GPU-3.5**: Full acceptance suite on GPU backend (run + fix)
-10. **GPU-4.1–4.3**: Performance benchmarks (1 session)
-11. **GPU-4.4**: Speedup report (1 session)
+Priority-ordered (highest impact first):
 
-Total: ~10–12 Claude Code sessions.
+1. ✅ **GPU-0.1**: Woodbury fix for Kalman/Kim — **DONE** (commit `8db184a`). Kim 235s→0.73s at N=200 (321×).
+2. ✅ **GPU-1.1**: PyTorch compute layer + linalg — **DONE** (commits `d93cd74`, `8431c9c`). 54/54 unit tests, 121/121 acceptance tests on CUDA.
+3. ✅ **GPU-1.2**: Batch Granger on PyTorch — **DONE** (commit `43d9455`). `batch_granger_test` implemented and parity-verified. Not yet wired into pipeline.
+4. ⏳ **GPU-2.1**: Wire batch Granger into `GrangerEdgeEstimator` — **NEXT**. This delivers the end-to-end speedup.
+5. ⏳ **GPU-1.3**: Batch PID bootstrap (1 session) — eliminates #3 bottleneck (~16s constant cost)
+6. ⏳ **GPU-1.4**: GPU KNN for TE (1 session) — minor but easy win
+7. ⏳ **GPU-2.2**: Config + device selection (0.5 session)
+8. ⏳ **GPU-3.1–3.3**: Full verification — run acceptance suite on CUDA end-to-end
+9. ⏳ **GPU-4.1–4.3**: Benchmarks + speedup report
+
+**Remaining: ~5 Claude Code sessions.**
+
+After GPU-2.1 wiring: re-profile — Granger should drop from 89% to ~10% at N=200.
+After GPU-1.3: pipeline should hit ≥5× overall (Gate GPU-C).
+
+### Hardware confirmed
+NVIDIA GeForce RTX 4070 Ti, CUDA 12.6, PyTorch 2.10.0+cu126, 12 GB VRAM.
 
 ## Quality Gates
 
-**Gate GPU-A (Correctness):** All 121 acceptance tests pass on GPU backend.
-Not 120 — all 121. Any failure blocks the experiment programme on GPU.
+**Gate GPU-A (Correctness):** `uv run pytest tests/acceptance/smim/` passes
+on both CPU and CUDA. All 121 tests, both devices.
+→ **✅ PASSED** — 121/121 on CPU; 121/121 with `SMIM_DEVICE=cuda`.
 
-**Gate GPU-B (Parity):** All parity tests pass. CPU and GPU produce the same
-results to documented tolerance.
+**Gate GPU-B (Granger Parity):** Batched Granger detects identical edges to
+original statsmodels implementation on acceptance test A-GR-1 data.
+→ **✅ PASSED** — `test_batch_granger_matches_statsmodels_edges` and
+  `test_batch_granger_cuda_matches_cpu_edges` in `test_granger_batch_parity.py`.
 
-**Gate GPU-C (Performance):** GPU achieves ≥5× speedup on the top-3 bottleneck
-components at N=200. If speedup is <2× on a component, that component is not
-worth the GPU complexity — revert it to CPU-only.
+**Gate GPU-C (Performance):** Pipeline achieves ≥5× end-to-end speedup at N=200.
+→ **⏳ PENDING** — requires GPU-2.1 (wiring batch Granger into the pipeline).
+  Projected: Granger 148.6s → ~5–15s, total ~23–31s vs 167s baseline = 5–7×.
 
-**Gate GPU-D (Stability):** Run the full pipeline 10 times on GPU with same
-input and seed. All 10 runs produce bitwise identical output.
-(GPU floating-point non-determinism is a real risk — cuBLAS can reorder
-operations across runs. If this fails, set CUBLAS_WORKSPACE_CONFIG and
-CUDA_LAUNCH_BLOCKING appropriately.)
+**Gate GPU-D (Determinism):** 5 identical CUDA runs produce bitwise identical output
+with `torch.use_deterministic_algorithms(True)`.
+→ **⏳ PENDING** — scheduled for GPU-3.3.
 
 ---
 
-## Dependencies to Add
+## Dependencies
 
 ```toml
 # In pyproject.toml [project.optional-dependencies]
 gpu = [
-    "cupy-cuda12x>=13.0",   # Match your CUDA version
+    "torch>=2.2",  # includes CUDA support if installed via pip with --index-url
 ]
 benchmarks = [
     "pytest-benchmark>=4.0",
 ]
 ```
 
-Install:
+Install PyTorch with CUDA:
 ```bash
-uv sync --extra gpu --extra benchmarks --extra dev
+# For CUDA 12.x:
+pip install torch --index-url https://download.pytorch.org/whl/cu121
+# Or for CUDA 11.8:
+pip install torch --index-url https://download.pytorch.org/whl/cu118
 ```
 
-Verify CuPy:
+Verify:
 ```bash
-uv run python -c "import cupy; print(cupy.cuda.runtime.getDeviceProperties(0)['name'])"
+python -c "import torch; print(f'CUDA: {torch.cuda.is_available()}, Device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 ```
