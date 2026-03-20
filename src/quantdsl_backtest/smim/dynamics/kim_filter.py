@@ -86,6 +86,24 @@ class KimFilter:
         if P_trans is None:
             P_trans = np.full((M, M), 1.0 / M)
 
+        # Precompute Woodbury components — amortises O(N^3) R^{-1} over T × M^2 steps,
+        # reducing per-step cost from O(N^3) to O(N K^2 + K^3).
+        _use_woodbury = False
+        _R_inv: np.ndarray | None = None
+        _R_inv_U: np.ndarray | None = None
+        _Ut_Rinv_U: np.ndarray | None = None
+        _logdet_R = 0.0
+        try:
+            _R_inv = np.linalg.solve(R, np.eye(N))
+            # Fall back to direct for near-singular R to avoid catastrophic cancellation.
+            if np.max(np.abs(_R_inv)) <= 1e8:
+                _R_inv_U = _R_inv @ U          # (N, K)
+                _Ut_Rinv_U = U.T @ _R_inv_U   # (K, K)
+                _, _logdet_R = np.linalg.slogdet(R)
+                _use_woodbury = True
+        except np.linalg.LinAlgError:
+            pass
+
         # Per-regime filtered state
         alpha = [np.zeros(K) for _ in range(M)]
         P_cov = [np.eye(K) for _ in range(M)]
@@ -112,17 +130,38 @@ class KimFilter:
                     P_ij[i, j] = P_p
 
                     v = observations[t] - U @ a_p
-                    S = U @ P_p @ U.T + R
                     try:
+                        if _use_woodbury:
+                            # Woodbury: replace O(N^3) inversion with O(K^3 + N K^2).
+                            P_inv = np.linalg.solve(P_p, np.eye(K))
+                            inner = P_inv + _Ut_Rinv_U  # (K, K)
+                            cond = np.linalg.cond(inner)
+                            sign_inner, logdet_inner = np.linalg.slogdet(inner)
+                            sign_P, logdet_P = np.linalg.slogdet(P_p)
+
+                            if cond <= 1e8 and sign_inner > 0 and sign_P > 0:
+                                logdet_S = _logdet_R + logdet_P + logdet_inner
+                                # Quadratic form without forming S^{-1}:
+                                # v^T S^{-1} v = v^T R^{-1} v
+                                #              - (U^T R^{-1} v)^T inner^{-1} (U^T R^{-1} v)
+                                Ut_Rinv_v = _R_inv_U.T @ v  # type: ignore[union-attr]  # (K,)
+                                R_inv_v = _R_inv @ v         # type: ignore[union-attr]  # (N,)
+                                quad = float(v @ R_inv_v) - float(
+                                    Ut_Rinv_v @ np.linalg.solve(inner, Ut_Rinv_v)
+                                )
+                                exponent = -0.5 * (logdet_S + quad)
+                                lik_ij[i, j] = np.exp(np.clip(exponent, -700, 700))
+                                continue  # skip direct fallback below
+
+                        # Direct O(N^3) path (original, or Woodbury fallback).
+                        S = U @ P_p @ U.T + R
                         sign, logdet = np.linalg.slogdet(S)
                         if sign <= 0:
                             lik_ij[i, j] = 1e-300
                         else:
                             S_inv = np.linalg.solve(S, np.eye(N))
                             exponent = -0.5 * (logdet + v @ S_inv @ v)
-                            lik_ij[i, j] = np.exp(
-                                np.clip(exponent, -700, 700)
-                            )
+                            lik_ij[i, j] = np.exp(np.clip(exponent, -700, 700))
                     except np.linalg.LinAlgError:
                         lik_ij[i, j] = 1e-300
 
