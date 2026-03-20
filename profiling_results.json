@@ -1,0 +1,145 @@
+{
+  "pipeline_profiles": [
+    {
+      "N": 50,
+      "T": 80,
+      "K": 15,
+      "M": 3,
+      "components": {
+        "edge_estimation_granger": {
+          "seconds": 9.15,
+          "pct": 25.13
+        },
+        "edge_estimation_narrative": {
+          "seconds": 0.0412,
+          "pct": 0.11
+        },
+        "sparsification": {
+          "seconds": 0.0009,
+          "pct": 0.0
+        },
+        "eigendecomposition_polar": {
+          "seconds": 0.0021,
+          "pct": 0.01
+        },
+        "eigendecomposition_schur": {
+          "seconds": 0.0014,
+          "pct": 0.0
+        },
+        "mode_selection": {
+          "seconds": 0.0005,
+          "pct": 0.0
+        },
+        "kalman_filter": {
+          "seconds": 0.0081,
+          "pct": 0.02
+        },
+        "kim_filter_em": {
+          "seconds": 0.4467,
+          "pct": 1.23
+        },
+        "pid_synergy": {
+          "seconds": 0.0778,
+          "pct": 0.21
+        },
+        "pid_bootstrap": {
+          "seconds": 25.5973,
+          "pct": 70.29
+        },
+        "transfer_entropy": {
+          "seconds": 1.0782,
+          "pct": 2.96
+        },
+        "persistent_homology": {
+          "seconds": 0.0122,
+          "pct": 0.03
+        },
+        "benchmark_computation": {
+          "seconds": 0.0002,
+          "pct": 0.0
+        },
+        "total": {
+          "seconds": 36.4165
+        }
+      },
+      "memory_peak_mb": 43.3,
+      "scaling_vs_n50": 1.0
+    },
+    {
+      "N": 200,
+      "T": 80,
+      "K": 15,
+      "M": 3,
+      "components": {
+        "edge_estimation_granger": {
+          "seconds": 295.6589,
+          "pct": 29.59
+        },
+        "edge_estimation_narrative": {
+          "seconds": 0.3152,
+          "pct": 0.03
+        },
+        "sparsification": {
+          "seconds": 0.008,
+          "pct": 0.0
+        },
+        "eigendecomposition_polar": {
+          "seconds": 0.4646,
+          "pct": 0.05
+        },
+        "eigendecomposition_schur": {
+          "seconds": 1.1731,
+          "pct": 0.12
+        },
+        "mode_selection": {
+          "seconds": 0.0013,
+          "pct": 0.0
+        },
+        "kalman_filter": {
+          "seconds": 252.9791,
+          "pct": 25.31
+        },
+        "kim_filter_em": {
+          "seconds": 424.4472,
+          "pct": 42.47
+        },
+        "pid_synergy": {
+          "seconds": 0.1356,
+          "pct": 0.01
+        },
+        "pid_bootstrap": {
+          "seconds": 23.4838,
+          "pct": 2.35
+        },
+        "transfer_entropy": {
+          "seconds": 0.6622,
+          "pct": 0.07
+        },
+        "persistent_homology": {
+          "seconds": 0.004,
+          "pct": 0.0
+        },
+        "benchmark_computation": {
+          "seconds": 0.0003,
+          "pct": 0.0
+        },
+        "total": {
+          "seconds": 999.3333
+        }
+      },
+      "memory_peak_mb": 9.7,
+      "scaling_vs_n50": 27.44
+    }
+  ],
+  "falsification_profile": {
+    "one_null_instance_seconds": 5.7231,
+    "component_breakdown": {
+      "rewire": 0.2269,
+      "spectral": 0.0656,
+      "filter": 5.4302,
+      "benchmark": 0.0003
+    },
+    "projected_B100_seconds": 572.3,
+    "projected_B100_hours": 0.16
+  }
+}
