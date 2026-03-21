@@ -1,0 +1,201 @@
+ticker,name,sector,gics_code
+MMM,3M,Industrials,20
+AOS,A. O. Smith,Industrials,20
+ABT,Abbott Laboratories,Health Care,35
+ABBV,AbbVie,Health Care,35
+ACN,Accenture,Information Technology,45
+ADBE,Adobe Inc.,Information Technology,45
+AMD,Advanced Micro Devices,Information Technology,45
+AES,AES Corporation,Utilities,55
+AFL,Aflac,Financials,40
+A,Agilent Technologies,Health Care,35
+APD,Air Products,Materials,15
+ABNB,Airbnb,Consumer Discretionary,25
+AKAM,Akamai Technologies,Information Technology,45
+ALB,Albemarle Corporation,Materials,15
+ARE,Alexandria Real Estate Equities,Real Estate,60
+ALGN,Align Technology,Health Care,35
+ALLE,Allegion,Industrials,20
+LNT,Alliant Energy,Utilities,55
+ALL,Allstate,Financials,40
+GOOGL,Alphabet Inc. (Class A),Communication Services,50
+GOOG,Alphabet Inc. (Class C),Communication Services,50
+MO,Altria,Consumer Staples,30
+AMZN,Amazon,Consumer Discretionary,25
+AMCR,Amcor,Materials,15
+AEE,Ameren,Utilities,55
+AEP,American Electric Power,Utilities,55
+AXP,American Express,Financials,40
+AIG,American International Group,Financials,40
+AMT,American Tower,Real Estate,60
+AWK,American Water Works,Utilities,55
+AMP,Ameriprise Financial,Financials,40
+AME,Ametek,Industrials,20
+AMGN,Amgen,Health Care,35
+APH,Amphenol,Information Technology,45
+ADI,Analog Devices,Information Technology,45
+AON,Aon plc,Financials,40
+APA,APA Corporation,Energy,10
+APO,Apollo Global Management,Financials,40
+AAPL,Apple Inc.,Information Technology,45
+AMAT,Applied Materials,Information Technology,45
+APTV,Aptiv,Consumer Discretionary,25
+ACGL,Arch Capital Group,Financials,40
+ADM,Archer Daniels Midland,Consumer Staples,30
+ANET,Arista Networks,Information Technology,45
+AJG,Arthur J. Gallagher & Co.,Financials,40
+AIZ,Assurant,Financials,40
+T,AT&T,Communication Services,50
+ATO,Atmos Energy,Utilities,55
+ADSK,Autodesk,Information Technology,45
+ADP,Automatic Data Processing,Industrials,20
+AZO,AutoZone,Consumer Discretionary,25
+AVB,AvalonBay Communities,Real Estate,60
+AVY,Avery Dennison,Materials,15
+AXON,Axon Enterprise,Industrials,20
+BKR,Baker Hughes,Energy,10
+BALL,Ball Corporation,Materials,15
+BAC,Bank of America,Financials,40
+BAX,Baxter International,Health Care,35
+BDX,Becton Dickinson,Health Care,35
+BRK-B,Berkshire Hathaway,Financials,40
+BBY,Best Buy,Consumer Discretionary,25
+TECH,Bio-Techne,Health Care,35
+BIIB,Biogen,Health Care,35
+BLK,BlackRock,Financials,40
+BX,Blackstone Inc.,Financials,40
+XYZ,"Block, Inc.",Financials,40
+BK,BNY Mellon,Financials,40
+BA,Boeing,Industrials,20
+BKNG,Booking Holdings,Consumer Discretionary,25
+BSX,Boston Scientific,Health Care,35
+BMY,Bristol Myers Squibb,Health Care,35
+AVGO,Broadcom,Information Technology,45
+BR,Broadridge Financial Solutions,Industrials,20
+BRO,Brown & Brown,Financials,40
+BF-B,Brown–Forman,Consumer Staples,30
+BLDR,Builders FirstSource,Industrials,20
+BG,Bunge Global,Consumer Staples,30
+BXP,"BXP, Inc.",Real Estate,60
+CHRW,C.H. Robinson,Industrials,20
+CDNS,Cadence Design Systems,Information Technology,45
+CZR,Caesars Entertainment,Consumer Discretionary,25
+CPT,Camden Property Trust,Real Estate,60
+CPB,Campbell's Company (The),Consumer Staples,30
+COF,Capital One,Financials,40
+CAH,Cardinal Health,Health Care,35
+KMX,CarMax,Consumer Discretionary,25
+CCL,Carnival,Consumer Discretionary,25
+CARR,Carrier Global,Industrials,20
+CAT,Caterpillar Inc.,Industrials,20
+CBOE,Cboe Global Markets,Financials,40
+CBRE,CBRE Group,Real Estate,60
+CDW,CDW Corporation,Information Technology,45
+COR,Cencora,Health Care,35
+CNC,Centene Corporation,Health Care,35
+CNP,CenterPoint Energy,Utilities,55
+CF,CF Industries,Materials,15
+CRL,Charles River Laboratories,Health Care,35
+SCHW,Charles Schwab Corporation,Financials,40
+CHTR,Charter Communications,Communication Services,50
+CVX,Chevron Corporation,Energy,10
+CMG,Chipotle Mexican Grill,Consumer Discretionary,25
+CB,Chubb Limited,Financials,40
+CHD,Church & Dwight,Consumer Staples,30
+CI,Cigna,Health Care,35
+CINF,Cincinnati Financial,Financials,40
+CTAS,Cintas,Industrials,20
+CSCO,Cisco,Information Technology,45
+C,Citigroup,Financials,40
+CFG,Citizens Financial Group,Financials,40
+CLX,Clorox,Consumer Staples,30
+CME,CME Group,Financials,40
+CMS,CMS Energy,Utilities,55
+KO,Coca-Cola Company (The),Consumer Staples,30
+CTSH,Cognizant,Information Technology,45
+COIN,Coinbase,Financials,40
+CL,Colgate-Palmolive,Consumer Staples,30
+CMCSA,Comcast,Communication Services,50
+CAG,Conagra Brands,Consumer Staples,30
+COP,ConocoPhillips,Energy,10
+ED,Consolidated Edison,Utilities,55
+STZ,Constellation Brands,Consumer Staples,30
+CEG,Constellation Energy,Utilities,55
+COO,Cooper Companies (The),Health Care,35
+CPRT,Copart,Industrials,20
+GLW,Corning Inc.,Information Technology,45
+CPAY,Corpay,Financials,40
+CTVA,Corteva,Materials,15
+CSGP,CoStar Group,Real Estate,60
+COST,Costco,Consumer Staples,30
+CTRA,Coterra,Energy,10
+CRWD,CrowdStrike,Information Technology,45
+CCI,Crown Castle,Real Estate,60
+CSX,CSX Corporation,Industrials,20
+CMI,Cummins,Industrials,20
+CVS,CVS Health,Health Care,35
+DHR,Danaher Corporation,Health Care,35
+DRI,Darden Restaurants,Consumer Discretionary,25
+DDOG,Datadog,Information Technology,45
+DVA,DaVita,Health Care,35
+DAY,Dayforce,Industrials,20
+DECK,Deckers Brands,Consumer Discretionary,25
+DE,Deere & Company,Industrials,20
+DELL,Dell Technologies,Information Technology,45
+DAL,Delta Air Lines,Industrials,20
+DVN,Devon Energy,Energy,10
+DXCM,Dexcom,Health Care,35
+FANG,Diamondback Energy,Energy,10
+DLR,Digital Realty,Real Estate,60
+DG,Dollar General,Consumer Staples,30
+DLTR,Dollar Tree,Consumer Staples,30
+D,Dominion Energy,Utilities,55
+DPZ,Domino's,Consumer Discretionary,25
+DASH,DoorDash,Consumer Discretionary,25
+DOV,Dover Corporation,Industrials,20
+DOW,Dow Inc.,Materials,15
+DHI,D. R. Horton,Consumer Discretionary,25
+DTE,DTE Energy,Utilities,55
+DUK,Duke Energy,Utilities,55
+DD,DuPont,Materials,15
+EMN,Eastman Chemical Company,Materials,15
+ETN,Eaton Corporation,Industrials,20
+EBAY,eBay Inc.,Consumer Discretionary,25
+ECL,Ecolab,Materials,15
+EIX,Edison International,Utilities,55
+EW,Edwards Lifesciences,Health Care,35
+EA,Electronic Arts,Communication Services,50
+ELV,Elevance Health,Health Care,35
+EMR,Emerson Electric,Industrials,20
+ENPH,Enphase Energy,Information Technology,45
+ETR,Entergy,Utilities,55
+EOG,EOG Resources,Energy,10
+EPAM,EPAM Systems,Information Technology,45
+EQT,EQT Corporation,Energy,10
+EFX,Equifax,Industrials,20
+EQIX,Equinix,Real Estate,60
+EQR,Equity Residential,Real Estate,60
+ERIE,Erie Indemnity,Financials,40
+ESS,Essex Property Trust,Real Estate,60
+EL,Estée Lauder Companies (The),Consumer Staples,30
+EG,Everest Group,Financials,40
+EVRG,Evergy,Utilities,55
+ES,Eversource Energy,Utilities,55
+EXC,Exelon,Utilities,55
+EXE,Expand Energy,Energy,10
+EXPE,Expedia Group,Consumer Discretionary,25
+EXPD,Expeditors International,Industrials,20
+EXR,Extra Space Storage,Real Estate,60
+XOM,ExxonMobil,Energy,10
+FFIV,"F5, Inc.",Information Technology,45
+FDS,FactSet,Financials,40
+FICO,Fair Isaac,Information Technology,45
+FAST,Fastenal,Industrials,20
+FRT,Federal Realty Investment Trust,Real Estate,60
+FDX,FedEx,Industrials,20
+FIS,Fidelity National Information Services,Financials,40
+FITB,Fifth Third Bancorp,Financials,40
+FSLR,First Solar,Information Technology,45
+FE,FirstEnergy,Utilities,55
+FI,Fiserv,Financials,40
+F,Ford Motor Company,Consumer Discretionary,25

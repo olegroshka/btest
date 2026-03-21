@@ -1,0 +1,79 @@
+ticker,name,sector,gics_code
+MMM,3M,Industrials,20
+AOS,A. O. Smith,Industrials,20
+ALLE,Allegion,Industrials,20
+AME,Ametek,Industrials,20
+ADP,Automatic Data Processing,Industrials,20
+AXON,Axon Enterprise,Industrials,20
+BA,Boeing,Industrials,20
+BR,Broadridge Financial Solutions,Industrials,20
+BLDR,Builders FirstSource,Industrials,20
+CHRW,C.H. Robinson,Industrials,20
+CARR,Carrier Global,Industrials,20
+CAT,Caterpillar Inc.,Industrials,20
+CTAS,Cintas,Industrials,20
+CPRT,Copart,Industrials,20
+CSX,CSX Corporation,Industrials,20
+CMI,Cummins,Industrials,20
+DAY,Dayforce,Industrials,20
+DE,Deere & Company,Industrials,20
+DAL,Delta Air Lines,Industrials,20
+DOV,Dover Corporation,Industrials,20
+ETN,Eaton Corporation,Industrials,20
+EMR,Emerson Electric,Industrials,20
+EFX,Equifax,Industrials,20
+EXPD,Expeditors International,Industrials,20
+FAST,Fastenal,Industrials,20
+FDX,FedEx,Industrials,20
+FTV,Fortive,Industrials,20
+GE,GE Aerospace,Industrials,20
+GEV,GE Vernova,Industrials,20
+GNRC,Generac,Industrials,20
+GD,General Dynamics,Industrials,20
+HON,Honeywell,Industrials,20
+HWM,Howmet Aerospace,Industrials,20
+HUBB,Hubbell Incorporated,Industrials,20
+HII,Huntington Ingalls Industries,Industrials,20
+IEX,IDEX Corporation,Industrials,20
+ITW,Illinois Tool Works,Industrials,20
+IR,Ingersoll Rand,Industrials,20
+JBHT,J.B. Hunt,Industrials,20
+J,Jacobs Solutions,Industrials,20
+JCI,Johnson Controls,Industrials,20
+LHX,L3Harris,Industrials,20
+LDOS,Leidos,Industrials,20
+LII,Lennox International,Industrials,20
+LMT,Lockheed Martin,Industrials,20
+MAS,Masco,Industrials,20
+NDSN,Nordson Corporation,Industrials,20
+NSC,Norfolk Southern,Industrials,20
+NOC,Northrop Grumman,Industrials,20
+ODFL,Old Dominion,Industrials,20
+OTIS,Otis Worldwide,Industrials,20
+PCAR,Paccar,Industrials,20
+PH,Parker Hannifin,Industrials,20
+PAYX,Paychex,Industrials,20
+PAYC,Paycom,Industrials,20
+PNR,Pentair,Industrials,20
+PWR,Quanta Services,Industrials,20
+RTX,RTX Corporation,Industrials,20
+RSG,Republic Services,Industrials,20
+ROK,Rockwell Automation,Industrials,20
+ROL,"Rollins, Inc.",Industrials,20
+SNA,Snap-on,Industrials,20
+LUV,Southwest Airlines,Industrials,20
+SWK,Stanley Black & Decker,Industrials,20
+TXT,Textron,Industrials,20
+TT,Trane Technologies,Industrials,20
+TDG,TransDigm Group,Industrials,20
+UBER,Uber,Industrials,20
+UNP,Union Pacific Corporation,Industrials,20
+UAL,United Airlines Holdings,Industrials,20
+UPS,United Parcel Service,Industrials,20
+URI,United Rentals,Industrials,20
+VLTO,Veralto,Industrials,20
+VRSK,Verisk Analytics,Industrials,20
+GWW,W. W. Grainger,Industrials,20
+WAB,Wabtec,Industrials,20
+WM,Waste Management,Industrials,20
+XYL,Xylem Inc.,Industrials,20

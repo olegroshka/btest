@@ -1,0 +1,61 @@
+ticker,name,sector,gics_code
+ABT,Abbott Laboratories,Health Care,35
+ABBV,AbbVie,Health Care,35
+A,Agilent Technologies,Health Care,35
+ALGN,Align Technology,Health Care,35
+AMGN,Amgen,Health Care,35
+BAX,Baxter International,Health Care,35
+BDX,Becton Dickinson,Health Care,35
+TECH,Bio-Techne,Health Care,35
+BIIB,Biogen,Health Care,35
+BSX,Boston Scientific,Health Care,35
+BMY,Bristol Myers Squibb,Health Care,35
+CAH,Cardinal Health,Health Care,35
+COR,Cencora,Health Care,35
+CNC,Centene Corporation,Health Care,35
+CRL,Charles River Laboratories,Health Care,35
+CI,Cigna,Health Care,35
+COO,Cooper Companies (The),Health Care,35
+CVS,CVS Health,Health Care,35
+DHR,Danaher Corporation,Health Care,35
+DVA,DaVita,Health Care,35
+DXCM,Dexcom,Health Care,35
+EW,Edwards Lifesciences,Health Care,35
+ELV,Elevance Health,Health Care,35
+GEHC,GE HealthCare,Health Care,35
+GILD,Gilead Sciences,Health Care,35
+HCA,HCA Healthcare,Health Care,35
+HSIC,Henry Schein,Health Care,35
+HOLX,Hologic,Health Care,35
+HUM,Humana,Health Care,35
+IDXX,Idexx Laboratories,Health Care,35
+INCY,Incyte,Health Care,35
+PODD,Insulet Corporation,Health Care,35
+ISRG,Intuitive Surgical,Health Care,35
+IQV,IQVIA,Health Care,35
+JNJ,Johnson & Johnson,Health Care,35
+LH,Labcorp,Health Care,35
+LLY,Lilly (Eli),Health Care,35
+MCK,McKesson Corporation,Health Care,35
+MDT,Medtronic,Health Care,35
+MRK,Merck & Co.,Health Care,35
+MTD,Mettler Toledo,Health Care,35
+MRNA,Moderna,Health Care,35
+MOH,Molina Healthcare,Health Care,35
+PFE,Pfizer,Health Care,35
+DGX,Quest Diagnostics,Health Care,35
+REGN,Regeneron Pharmaceuticals,Health Care,35
+RMD,ResMed,Health Care,35
+RVTY,Revvity,Health Care,35
+SOLV,Solventum,Health Care,35
+STE,Steris,Health Care,35
+SYK,Stryker Corporation,Health Care,35
+TMO,Thermo Fisher Scientific,Health Care,35
+UNH,UnitedHealth Group,Health Care,35
+UHS,Universal Health Services,Health Care,35
+VRTX,Vertex Pharmaceuticals,Health Care,35
+VTRS,Viatris,Health Care,35
+WAT,Waters Corporation,Health Care,35
+WST,West Pharmaceutical Services,Health Care,35
+ZBH,Zimmer Biomet,Health Care,35
+ZTS,Zoetis,Health Care,35

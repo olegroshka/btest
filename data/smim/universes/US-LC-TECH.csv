@@ -1,0 +1,69 @@
+ticker,name,sector,gics_code
+ACN,Accenture,Information Technology,45
+ADBE,Adobe Inc.,Information Technology,45
+AMD,Advanced Micro Devices,Information Technology,45
+AKAM,Akamai Technologies,Information Technology,45
+APH,Amphenol,Information Technology,45
+ADI,Analog Devices,Information Technology,45
+AAPL,Apple Inc.,Information Technology,45
+AMAT,Applied Materials,Information Technology,45
+ANET,Arista Networks,Information Technology,45
+ADSK,Autodesk,Information Technology,45
+AVGO,Broadcom,Information Technology,45
+CDNS,Cadence Design Systems,Information Technology,45
+CDW,CDW Corporation,Information Technology,45
+CSCO,Cisco,Information Technology,45
+CTSH,Cognizant,Information Technology,45
+GLW,Corning Inc.,Information Technology,45
+CRWD,CrowdStrike,Information Technology,45
+DDOG,Datadog,Information Technology,45
+DELL,Dell Technologies,Information Technology,45
+ENPH,Enphase Energy,Information Technology,45
+EPAM,EPAM Systems,Information Technology,45
+FFIV,"F5, Inc.",Information Technology,45
+FICO,Fair Isaac,Information Technology,45
+FSLR,First Solar,Information Technology,45
+FTNT,Fortinet,Information Technology,45
+IT,Gartner,Information Technology,45
+GEN,Gen Digital,Information Technology,45
+GDDY,GoDaddy,Information Technology,45
+HPE,Hewlett Packard Enterprise,Information Technology,45
+HPQ,HP Inc.,Information Technology,45
+IBM,IBM,Information Technology,45
+INTC,Intel,Information Technology,45
+INTU,Intuit,Information Technology,45
+JBL,Jabil,Information Technology,45
+KEYS,Keysight Technologies,Information Technology,45
+KLAC,KLA Corporation,Information Technology,45
+LRCX,Lam Research,Information Technology,45
+MCHP,Microchip Technology,Information Technology,45
+MU,Micron Technology,Information Technology,45
+MSFT,Microsoft,Information Technology,45
+MPWR,Monolithic Power Systems,Information Technology,45
+MSI,Motorola Solutions,Information Technology,45
+NTAP,NetApp,Information Technology,45
+NVDA,Nvidia,Information Technology,45
+NXPI,NXP Semiconductors,Information Technology,45
+ON,ON Semiconductor,Information Technology,45
+ORCL,Oracle Corporation,Information Technology,45
+PLTR,Palantir Technologies,Information Technology,45
+PANW,Palo Alto Networks,Information Technology,45
+PTC,PTC Inc.,Information Technology,45
+QCOM,Qualcomm,Information Technology,45
+ROP,Roper Technologies,Information Technology,45
+CRM,Salesforce,Information Technology,45
+STX,Seagate Technology,Information Technology,45
+NOW,ServiceNow,Information Technology,45
+SWKS,Skyworks Solutions,Information Technology,45
+SMCI,Supermicro,Information Technology,45
+SNPS,Synopsys,Information Technology,45
+TEL,TE Connectivity,Information Technology,45
+TDY,Teledyne Technologies,Information Technology,45
+TER,Teradyne,Information Technology,45
+TXN,Texas Instruments,Information Technology,45
+TRMB,Trimble Inc.,Information Technology,45
+TYL,Tyler Technologies,Information Technology,45
+VRSN,Verisign,Information Technology,45
+WDC,Western Digital,Information Technology,45
+WDAY,"Workday, Inc.",Information Technology,45
+ZBRA,Zebra Technologies,Information Technology,45

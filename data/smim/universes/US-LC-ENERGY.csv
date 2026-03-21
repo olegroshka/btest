@@ -1,0 +1,23 @@
+ticker,name,sector,gics_code
+APA,APA Corporation,Energy,10
+BKR,Baker Hughes,Energy,10
+CVX,Chevron Corporation,Energy,10
+COP,ConocoPhillips,Energy,10
+CTRA,Coterra,Energy,10
+DVN,Devon Energy,Energy,10
+FANG,Diamondback Energy,Energy,10
+EOG,EOG Resources,Energy,10
+EQT,EQT Corporation,Energy,10
+EXE,Expand Energy,Energy,10
+XOM,ExxonMobil,Energy,10
+HAL,Halliburton,Energy,10
+KMI,Kinder Morgan,Energy,10
+MPC,Marathon Petroleum,Energy,10
+OXY,Occidental Petroleum,Energy,10
+OKE,Oneok,Energy,10
+PSX,Phillips 66,Energy,10
+SLB,Schlumberger,Energy,10
+TRGP,Targa Resources,Energy,10
+TPL,Texas Pacific Land Corporation,Energy,10
+VLO,Valero Energy,Energy,10
+WMB,Williams Companies,Energy,10

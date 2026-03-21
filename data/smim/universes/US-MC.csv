@@ -1,0 +1,201 @@
+ticker,name,sector,gics_code
+AA,Alcoa,Materials,15
+AAL,American Airlines Group,Industrials,20
+AAON,AAON,Industrials,20
+ACI,Albertsons,Consumer Staples,30
+ACM,AECOM,Industrials,20
+ADC,Agree Realty,Real Estate,60
+AEIS,Advanced Energy,Information Technology,45
+AFG,American Financial Group,Financials,40
+AGCO,AGCO,Industrials,20
+AHR,American Healthcare REIT,Real Estate,60
+AIT,Applied Industrial Technologies,Industrials,20
+ALGM,Allegro MicroSystems,Information Technology,45
+ALK,Alaska Air Group,Industrials,20
+ALLY,Ally Financial,Financials,40
+ALV,Autoliv,Consumer Discretionary,25
+AM,Antero Midstream,Energy,10
+AMG,Affiliated Managers Group,Financials,40
+AMH,American Homes 4 Rent,Real Estate,60
+AMKR,Amkor Technology,Information Technology,45
+AN,AutoNation,Consumer Discretionary,25
+ANF,Abercrombie & Fitch,Consumer Discretionary,25
+APG,APi Group,Industrials,20
+APPF,AppFolio,Information Technology,45
+AR,Antero Resources,Energy,10
+ARMK,Aramark,Consumer Discretionary,25
+ARW,Arrow Electronics,Information Technology,45
+ARWR,Arrowhead Pharmaceuticals,Health Care,35
+ASB,Associated Bank,Financials,40
+ASGN,ASGN Inc.,Information Technology,45
+ASH,Ashland Global,Materials,15
+ATI,ATI Inc.,Industrials,20
+ATR,AptarGroup,Materials,15
+AVAV,AeroVironment,Industrials,20
+AVNT,Avient,Materials,15
+AVT,Avnet,Information Technology,45
+AVTR,Avantor,Health Care,35
+AXTA,Axalta,Materials,15
+AYI,Acuity Brands,Industrials,20
+BAH,Booz Allen Hamilton,Industrials,20
+BBWI,"Bath & Body Works, Inc.",Consumer Discretionary,25
+BC,Brunswick,Consumer Discretionary,25
+BCO,Brink's,Industrials,20
+BDC,Belden Inc.,Information Technology,45
+BHF,Brighthouse Financial,Financials,40
+BILL,Bill Holdings,Information Technology,45
+BIO,Bio-Rad Laboratories,Health Care,35
+BJ,BJ's Wholesale Club,Consumer Staples,30
+BKH,Black Hills Corporation,Utilities,55
+BLD,TopBuild Corp.,Consumer Discretionary,25
+BLKB,Blackbaud,Information Technology,45
+BMRN,BioMarin Pharmaceutical,Health Care,35
+BRBR,BellRing Brands,Consumer Staples,30
+BRKR,Bruker,Health Care,35
+BROS,Dutch Bros Inc.,Consumer Discretionary,25
+BRX,Brixmor Property Group,Real Estate,60
+BSY,Bentley Systems,Information Technology,45
+BURL,Burlington Stores,Consumer Discretionary,25
+BWA,BorgWarner,Consumer Discretionary,25
+BWXT,BWX Technologies,Industrials,20
+BYD,Boyd Gaming,Consumer Discretionary,25
+CACI,CACI International,Industrials,20
+CAR,Avis Budget Group,Industrials,20
+CART,Maplebear Inc.,Consumer Staples,30
+CASY,Casey's General Stores,Consumer Staples,30
+CAVA,Cava Group,Consumer Discretionary,25
+CBSH,Commerce Bancshares,Financials,40
+CBT,Cabot Corp,Materials,15
+CCK,Crown Holdings,Materials,15
+CDP,COPT Defense Properties,Real Estate,60
+CELH,Celsius Holdings,Consumer Staples,30
+CFR,Frost Bank,Financials,40
+CG,Carlyle Group,Financials,40
+CGNX,Cognex,Information Technology,45
+CHDN,Churchill Downs Inc.,Consumer Discretionary,25
+CHE,Chemed Corp.,Health Care,35
+CHH,Choice Hotels,Consumer Discretionary,25
+CHRD,Chord Energy,Energy,10
+CHWY,Chewy,Consumer Discretionary,25
+CLF,Cleveland-Cliffs,Materials,15
+CLH,Clean Harbors,Industrials,20
+CMC,Commercial Metals,Materials,15
+CNH,CNH Industrial,Industrials,20
+CNM,Core & Main,Industrials,20
+CNO,CNO Financial Group,Financials,40
+CNX,CNX Resources,Energy,10
+CNXC,Concentrix,Industrials,20
+COHR,Coherent Corp.,Information Technology,45
+COKE,Coca-Cola Consolidated,Consumer Staples,30
+COLB,Columbia Banking System,Financials,40
+COLM,Columbia Sportswear,Consumer Discretionary,25
+COTY,Coty,Consumer Staples,30
+CPRI,Capri Holdings,Consumer Discretionary,25
+CR,Crane,Industrials,20
+CRBG,Corebridge Financial,Financials,40
+CROX,Crocs,Consumer Discretionary,25
+CRS,Carpenter Technology,Industrials,20
+CRUS,Cirrus Logic,Information Technology,45
+CSL,Carlisle Companies,Industrials,20
+CUBE,CubeSmart,Real Estate,60
+CUZ,Cousins Properties,Real Estate,60
+CVLT,CommVault Systems,Information Technology,45
+CW,Curtiss-Wright,Industrials,20
+CXT,Crane NXT,Information Technology,45
+CYTK,Cytokinetics,Health Care,35
+DAR,Darling Ingredients,Consumer Staples,30
+DBX,Dropbox,Information Technology,45
+DCI,Donaldson Company,Industrials,20
+DINO,HF Sinclair,Energy,10
+DKS,Dick's Sporting Goods,Consumer Discretionary,25
+DLB,Dolby,Information Technology,45
+DOCS,Doximity,Health Care,35
+DOCU,Docusign,Information Technology,45
+DT,Dynatrace,Information Technology,45
+DTM,DT Midstream,Energy,10
+DUOL,Duolingo,Consumer Discretionary,25
+DY,Dycom Industries,Industrials,20
+EEFT,Euronet Worldwide,Financials,40
+EGP,EastGroup Properties,Real Estate,60
+EHC,Encompass Health,Health Care,35
+ELAN,Elanco,Health Care,35
+ELF,e.l.f. Beauty,Consumer Staples,30
+ELS,Equity Lifestyle Properties,Real Estate,60
+ENS,EnerSys,Industrials,20
+ENSG,Ensign Group,Health Care,35
+ENTG,Entegris,Information Technology,45
+EPR,EPR Properties,Real Estate,60
+EQH,Equitable Holdings,Financials,40
+ESAB,ESAB,Industrials,20
+ESNT,Essent Group Ltd.,Financials,40
+EVR,Evercore,Financials,40
+EWBC,East West Bancorp,Financials,40
+EXEL,Exelixis,Health Care,35
+EXLS,EXL Service,Industrials,20
+EXP,Eagle Materials,Materials,15
+EXPO,"Exponent, Inc.",Industrials,20
+FAF,First American Financial Corporation,Financials,40
+FBIN,Fortune Brands Innovations,Industrials,20
+FCFS,FirstCash,Financials,40
+FCN,FTI Consulting,Industrials,20
+FFIN,First Financial Bankshares,Financials,40
+FHI,Federated Hermes,Financials,40
+FHN,First Horizon,Financials,40
+FIVE,Five Below,Consumer Discretionary,25
+FLEX,Flex Ltd.,Information Technology,45
+FLG,Flagstar Bank,Financials,40
+FLO,Flowers Foods,Consumer Staples,30
+FLR,Fluor,Industrials,20
+FLS,Flowserve,Industrials,20
+FN,Fabrinet,Information Technology,45
+FNB,FNB Corporation,Financials,40
+FND,Floor & Decor,Consumer Discretionary,25
+FNF,Fidelity National Financial,Financials,40
+FOUR,Shift4,Financials,40
+FR,First Industrial Realty Trust,Real Estate,60
+FTI,TechnipFMC,Energy,10
+G,Genpact,Industrials,20
+GAP,Gap Inc.,Consumer Discretionary,25
+GATX,GATX,Industrials,20
+GBCI,Glacier Bancorp,Financials,40
+GEF,"Greif, Inc.",Materials,15
+GGG,Graco Inc.,Industrials,20
+GHC,Graham Holdings,Consumer Discretionary,25
+GLPI,Gaming and Leisure Properties,Real Estate,60
+GME,GameStop,Consumer Discretionary,25
+GMED,Globus Medical,Health Care,35
+GNTX,Gentex,Consumer Discretionary,25
+GPK,Graphic Packaging,Materials,15
+GT,Goodyear Tire & Rubber,Consumer Discretionary,25
+GTLS,Chart Industries,Industrials,20
+GTM,ZoomInfo,Communication Services,50
+GWRE,Guidewire Software,Information Technology,45
+GXO,GXO Logistics,Industrials,20
+H,Hyatt,Consumer Discretionary,25
+HAE,Haemonetics,Health Care,35
+HALO,Halozyme,Health Care,35
+HGV,Hilton Grand Vacations,Consumer Discretionary,25
+HIMS,Hims & Hers Health,Health Care,35
+HL,Hecla Mining,Materials,15
+HLI,Houlihan Lokey,Financials,40
+HLNE,Hamilton Lane,Financials,40
+HOG,Harley-Davidson,Consumer Discretionary,25
+HOMB,Home BancShares,Financials,40
+HQY,HealthEquity,Health Care,35
+HR,Healthcare Realty Trust,Real Estate,60
+HRB,H&R Block,Consumer Discretionary,25
+HWC,Hancock Whitney,Financials,40
+HXL,Hexcel,Industrials,20
+IBOC,Intl Bancshares Corp,Financials,40
+IDA,Idacorp,Utilities,55
+ILMN,"Illumina, Inc.",Health Care,35
+INGR,Ingredion,Consumer Staples,30
+IPGP,IPG Photonics,Information Technology,45
+IRT,IRT Living,Real Estate,60
+ITT,ITT Inc.,Industrials,20
+JAZZ,Jazz Pharmaceuticals,Health Care,35
+JEF,Jefferies,Financials,40
+JHG,Janus Henderson,Financials,40
+JLL,Jones Lang LaSalle,Real Estate,60
+KBH,KB Home,Consumer Discretionary,25
+KBR,"KBR, Inc.",Industrials,20

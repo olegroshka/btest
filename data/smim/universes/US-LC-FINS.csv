@@ -1,0 +1,75 @@
+ticker,name,sector,gics_code
+AFL,Aflac,Financials,40
+ALL,Allstate,Financials,40
+AXP,American Express,Financials,40
+AIG,American International Group,Financials,40
+AMP,Ameriprise Financial,Financials,40
+AON,Aon plc,Financials,40
+APO,Apollo Global Management,Financials,40
+ACGL,Arch Capital Group,Financials,40
+AJG,Arthur J. Gallagher & Co.,Financials,40
+AIZ,Assurant,Financials,40
+BAC,Bank of America,Financials,40
+BRK-B,Berkshire Hathaway,Financials,40
+BLK,BlackRock,Financials,40
+BX,Blackstone Inc.,Financials,40
+XYZ,"Block, Inc.",Financials,40
+BK,BNY Mellon,Financials,40
+BRO,Brown & Brown,Financials,40
+COF,Capital One,Financials,40
+CBOE,Cboe Global Markets,Financials,40
+SCHW,Charles Schwab Corporation,Financials,40
+CB,Chubb Limited,Financials,40
+CINF,Cincinnati Financial,Financials,40
+C,Citigroup,Financials,40
+CFG,Citizens Financial Group,Financials,40
+CME,CME Group,Financials,40
+COIN,Coinbase,Financials,40
+CPAY,Corpay,Financials,40
+ERIE,Erie Indemnity,Financials,40
+EG,Everest Group,Financials,40
+FDS,FactSet,Financials,40
+FIS,Fidelity National Information Services,Financials,40
+FITB,Fifth Third Bancorp,Financials,40
+FI,Fiserv,Financials,40
+BEN,Franklin Resources,Financials,40
+GPN,Global Payments,Financials,40
+GL,Globe Life,Financials,40
+GS,Goldman Sachs,Financials,40
+HIG,Hartford (The),Financials,40
+HBAN,Huntington Bancshares,Financials,40
+ICE,Intercontinental Exchange,Financials,40
+IVZ,Invesco,Financials,40
+JKHY,Jack Henry & Associates,Financials,40
+JPM,JPMorgan Chase,Financials,40
+KEY,KeyCorp,Financials,40
+KKR,KKR & Co.,Financials,40
+L,Loews Corporation,Financials,40
+MTB,M&T Bank,Financials,40
+MKTX,MarketAxess,Financials,40
+MMC,Marsh McLennan,Financials,40
+MA,Mastercard,Financials,40
+MET,MetLife,Financials,40
+MCO,Moody's Corporation,Financials,40
+MS,Morgan Stanley,Financials,40
+MSCI,MSCI Inc.,Financials,40
+NDAQ,"Nasdaq, Inc.",Financials,40
+NTRS,Northern Trust,Financials,40
+PYPL,PayPal,Financials,40
+PNC,PNC Financial Services,Financials,40
+PFG,Principal Financial Group,Financials,40
+PGR,Progressive Corporation,Financials,40
+PRU,Prudential Financial,Financials,40
+RJF,Raymond James Financial,Financials,40
+RF,Regions Financial Corporation,Financials,40
+SPGI,S&P Global,Financials,40
+STT,State Street Corporation,Financials,40
+SYF,Synchrony Financial,Financials,40
+TROW,T. Rowe Price,Financials,40
+TRV,Travelers Companies (The),Financials,40
+TFC,Truist Financial,Financials,40
+USB,U.S. Bancorp,Financials,40
+V,Visa Inc.,Financials,40
+WRB,W. R. Berkley Corporation,Financials,40
+WFC,Wells Fargo,Financials,40
+WTW,Willis Towers Watson,Financials,40
