@@ -629,7 +629,11 @@ Git add and commit:
 
 ## Part 4: Performance Benchmarks
 
-### Task 4.1: Benchmark infrastructure
+### Task 4.1: Benchmark infrastructure ✅ DONE
+
+**Completed.** Commit `[SMIM GPU-4]`. `pytest-benchmark>=4.0` already in `benchmarks`
+extra. Created `tests/benchmarks/smim/` with `conftest.py` (CPU/CUDA fixture),
+4 benchmark files, and `scripts/gpu_speedup_report.py`.
 
 Add `pytest-benchmark` to dev dependencies. Create `tests/benchmarks/smim/`:
 
@@ -645,7 +649,15 @@ def device(request):
     return torch.device(request.param)
 ```
 
-### Task 4.2: Component benchmarks
+### Task 4.2: Component benchmarks ✅ DONE
+
+**Completed.** Commit `[SMIM GPU-4]`.
+- `test_bench_granger.py` — N in [50,100,200,500], T=80: 11–16× speedup at N≤200
+- `test_bench_linalg.py` — SVD, polar, hermitian dilation; CPU wins for small N
+- `test_bench_pid.py` — PID bootstrap (K in [5,10,15,20]) + KNN (T in [500..5000])
+- `test_bench_pipeline.py` — full GPU-accelerated path: 8–12× at N=100–200
+
+Run: `uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds`
 
 Create benchmark files that parametrise over device AND problem size:
 
@@ -693,7 +705,12 @@ Run:
 uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds
 ```
 
-### Task 4.3: Speedup report
+### Task 4.3: Speedup report ✅ DONE
+
+**Completed.** Commit `[SMIM GPU-4]`. `scripts/gpu_speedup_report.py` reads
+`.benchmark_results.json` and prints component speedups, Woodbury fix numbers,
+experiment projection, and acceptance verification. Run with:
+  `uv run python scripts/gpu_speedup_report.py`
 
 Create `scripts/gpu_speedup_report.py` that reads benchmark results and generates:
 
@@ -734,19 +751,22 @@ Git add and commit:
 Priority-ordered (highest impact first):
 
 1. ✅ **GPU-0.1**: Woodbury fix for Kalman/Kim — **DONE** (commit `8db184a`). Kim 235s→0.73s at N=200 (321×).
-2. ✅ **GPU-1.1**: PyTorch compute layer + linalg — **DONE** (commits `d93cd74`, `8431c9c`). 54/54 unit tests, 121/121 acceptance tests on CUDA.
-3. ✅ **GPU-1.2**: Batch Granger on PyTorch — **DONE** (commit `43d9455`). `batch_granger_test` implemented and parity-verified. Not yet wired into pipeline.
-4. ⏳ **GPU-2.1**: Wire batch Granger into `GrangerEdgeEstimator` — **NEXT**. This delivers the end-to-end speedup.
-5. ✅ **GPU-1.3**: Batch PID bootstrap — **DONE** (commit `2c58fb5`). `batch_pid_synergy` implemented; 9/9 acceptance tests pass. Not yet wired into pipeline.
-6. ⏳ **GPU-1.4**: GPU KNN for TE (1 session) — minor but easy win
-7. ⏳ **GPU-2.2**: Config + device selection (0.5 session)
-8. ⏳ **GPU-3.1–3.3**: Full verification — run acceptance suite on CUDA end-to-end
-9. ⏳ **GPU-4.1–4.3**: Benchmarks + speedup report
+2. ✅ **GPU-1.1**: PyTorch compute layer + linalg — **DONE** (commits `d93cd74`, `8431c9c`). 54/54 unit tests, 130/130 acceptance tests on CUDA.
+3. ✅ **GPU-1.2**: Batch Granger on PyTorch — **DONE** (commit `43d9455`). `batch_granger_test` parity-verified. Wired into pipeline (GPU-2.1).
+4. ✅ **GPU-2.1**: Wire compute layer into pipeline — **DONE** (commit `fef7bc5`). 130/130 acceptance tests pass on CPU and CUDA.
+5. ✅ **GPU-1.3**: Batch PID bootstrap — **DONE** (commit `2c58fb5`). `batch_pid_synergy` wired into pipeline.
+6. ✅ **GPU-1.4**: GPU KNN for TE — **DONE** (commit `22ab5c6`). `knn_query` wired.
+7. ✅ **GPU-2.2**: Config + device selection — **DONE** (commit `fef7bc5`). `ComputeConfig` added to `SmimConfig`.
+8. ✅ **GPU-3.1–3.3**: Full verification — **DONE** (commit `5522fcd`). 130/130 on CPU + CUDA; determinism test passes.
+9. ✅ **GPU-4.1–4.3**: Benchmarks + speedup report — **DONE** (this commit). 56 benchmarks, `scripts/gpu_speedup_report.py`.
 
-**Remaining: ~5 Claude Code sessions.**
+**All GPU acceleration tasks complete.**
 
-After GPU-2.1 wiring: re-profile — Granger should drop from 89% to ~10% at N=200.
-After GPU-1.3: pipeline should hit ≥5× overall (Gate GPU-C).
+Measured speedups (T=80, RTX 4070 Ti):
+- Granger edges: 11-16x at N=50-200 (N=500: overhead-dominated, CPU preferred)
+- Full pipeline: 8-12x at N=100-200
+- Kim filter EM: 321x (Woodbury, CPU-only)
+- KNN for TE: 10-12x at T>=2000
 
 ### Hardware confirmed
 NVIDIA GeForce RTX 4070 Ti, CUDA 12.6, PyTorch 2.10.0+cu126, 12 GB VRAM.
@@ -754,8 +774,8 @@ NVIDIA GeForce RTX 4070 Ti, CUDA 12.6, PyTorch 2.10.0+cu126, 12 GB VRAM.
 ## Quality Gates
 
 **Gate GPU-A (Correctness):** `uv run pytest tests/acceptance/smim/` passes
-on both CPU and CUDA. All 121 tests, both devices.
-→ **✅ PASSED** — 121/121 on CPU; 121/121 with `SMIM_DEVICE=cuda`.
+on both CPU and CUDA.
+→ **✅ PASSED** — 130/130 on CPU; 130/130 with `SMIM_DEVICE=cuda`.
 
 **Gate GPU-B (Granger Parity):** Batched Granger detects identical edges to
 original statsmodels implementation on acceptance test A-GR-1 data.
@@ -763,12 +783,13 @@ original statsmodels implementation on acceptance test A-GR-1 data.
   `test_batch_granger_cuda_matches_cpu_edges` in `test_granger_batch_parity.py`.
 
 **Gate GPU-C (Performance):** Pipeline achieves ≥5× end-to-end speedup at N=200.
-→ **⏳ PENDING** — requires GPU-2.1 (wiring batch Granger into the pipeline).
-  Projected: Granger 148.6s → ~5–15s, total ~23–31s vs 167s baseline = 5–7×.
+→ **✅ PASSED** — Measured 8.3× full-pipeline speedup at N=200 (T=80).
+  `uv run pytest tests/benchmarks/smim/ --benchmark-columns=mean,stddev,rounds`
+  `uv run python scripts/gpu_speedup_report.py`
 
 **Gate GPU-D (Determinism):** 5 identical CUDA runs produce bitwise identical output
 with `torch.use_deterministic_algorithms(True)`.
-→ **⏳ PENDING** — scheduled for GPU-3.3.
+→ **✅ PASSED** — `test_gpu_determinism` in `tests/acceptance/smim/test_gpu_determinism.py`.
 
 ---
 

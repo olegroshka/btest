@@ -155,8 +155,27 @@ Built artifacts are committed at `src/quantdsl_backtest/platform_ui/assets_dist/
 - `tests_slow/integration/` — full strategy runs, data source integration
 - `tests_slow/platform/` — FastAPI endpoint tests + Playwright browser E2E
 - `tests_slow/smoke/` — live-server smoke tests (marked `manual`, require running server)
+- `tests/acceptance/smim/` — 130 SMIM correctness tests (run on both CPU and CUDA)
+- `tests/benchmarks/smim/` — GPU vs CPU performance benchmarks (pytest-benchmark)
 
 Playwright tests require a running platform server and are marked `manual`. The `.platform_ui/server.port` file stores the active port.
+
+### SMIM acceptance and benchmark commands
+
+```bash
+# SMIM acceptance suite (CPU, ~65 s)
+uv run python scripts/run_smim_acceptance.py
+
+# SMIM acceptance suite on CUDA
+SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
+
+# Performance benchmarks (requires --extra benchmarks + --extra gpu)
+uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds \
+    --benchmark-json=.benchmark_results.json
+
+# Speedup report (reads .benchmark_results.json)
+uv run python scripts/gpu_speedup_report.py
+```
 
 ## Code Style
 
@@ -200,6 +219,7 @@ milestone status, and implementation patterns specific to the SMIM framework.
 - `docs/smim/scope_selection.md` — justification for energy US+UK MVP scope (G0 artefact)
 - `docs/smim/DECISIONS.md` — architectural decision log (created at Gate G0; append after each gate)
 - `docs/smim/ADAPTER_GUIDE.md` — how to write a new data adapter (created in M1.2-T1)
+- `docs/smim/GPU_ACCELERATION_PLAN.md` — GPU acceleration design, measured speedups, quality gates
 - `smim/interfaces.py` — all Protocol definitions (read this before implementing anything)
 - `smim/config.py` — Pydantic config models (all tuneable parameters)
 - `experiments/mvp_energy_us_uk.yaml` — sample experiment config for the first build

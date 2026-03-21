@@ -84,10 +84,12 @@ Do not revert them — the tests encode the **correct** behaviour.
 
 ## Acceptance Test Infrastructure
 
-- `tests/acceptance/smim/conftest.py` — synthetic data generators (fixed seeds)
+- `tests/acceptance/smim/conftest.py` — synthetic data generators (fixed seeds) + SMIM_DEVICE fixture
 - `tests/acceptance/smim/conftest_report.py` — pytest plugin: auto-prints gate report
+- `tests/acceptance/smim/test_granger_batch_parity.py` — batch vs statsmodels parity
+- `tests/acceptance/smim/test_gpu_determinism.py` — 5× CUDA runs must be bitwise identical
 - `scripts/run_smim_acceptance.py` — standalone runner with `--section` support
-- **119/119 tests pass** (as of 2026-03-19); skipped tests do not block the gate
+- **130/130 tests pass** (as of 2026-03-21); includes GPU verification tests
 
 ### Running tests
 
@@ -95,11 +97,21 @@ Do not revert them — the tests encode the **correct** behaviour.
 # Unit tests (~4 s)
 uv run pytest tests/unit/smim/ -q
 
-# Acceptance suite with gate report (~60 s)
+# Acceptance suite with gate report (~65 s)
 uv run python scripts/run_smim_acceptance.py
+
+# Acceptance suite on CUDA (~65 s)
+SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
 
 # Single section
 uv run python scripts/run_smim_acceptance.py --section pipeline
+
+# Performance benchmarks (CPU + CUDA, ~92 s)
+uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds \
+    --benchmark-json=.benchmark_results.json
+
+# Speedup report (reads .benchmark_results.json)
+uv run python scripts/gpu_speedup_report.py
 ```
 
 ### IDTxl dependency (R-TE-1)
@@ -113,7 +125,7 @@ uv pip install "idtxl @ git+https://github.com/pwollstadt/IDTxl.git"
 
 ## Current Status
 
-Last updated: 2026-03-19
+Last updated: 2026-03-21
 
 | WP | Gate | Status |
 |----|------|--------|
@@ -124,6 +136,7 @@ Last updated: 2026-03-19
 | WP4 | G4 | ✅ Complete |
 | WP5 | G5 | ✅ Complete |
 | WP6 | G6 | ✅ Complete |
-| AT  | —  | ✅ 119/119 acceptance tests pass |
+| AT  | —  | ✅ 130/130 acceptance tests pass |
+| GPU | —  | ✅ All GPU acceleration tasks complete (GPU-0 through GPU-4) |
 
 See `docs/smim/TASK_REGISTRY.md` for detailed per-task status.
