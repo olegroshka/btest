@@ -8,6 +8,7 @@ from sklearn.preprocessing import PolynomialFeatures
 
 from quantdsl_backtest.smim.interfaces import DecompositionMethod, ModalFrame
 from quantdsl_backtest.smim.spectral.base import AbstractSpectralDecomposer
+from quantdsl_backtest.smim.compute.linalg import svd as _compute_svd
 
 
 def _to_real_modes(
@@ -115,8 +116,8 @@ class ExactDMDDecomposer(AbstractSpectralDecomposer):
         X = snapshots[:, :-1]   # (N, T-1)
         Y = snapshots[:, 1:]    # (N, T-1)
 
-        # SVD of X
-        U, S, Vh = np.linalg.svd(X, full_matrices=False)
+        # SVD of X — dispatched to compute layer (CPU or CUDA via PyTorch)
+        U, S, Vh = _compute_svd(X)
         # Truncate to k_svd modes
         k_svd = min(k, len(S))
         U_r = U[:, :k_svd]
@@ -221,8 +222,8 @@ class ExtendedDMDDecomposer(AbstractSpectralDecomposer):
         except np.linalg.LinAlgError:
             K = np.linalg.lstsq(G, A_koopman, rcond=None)[0]
 
-        # SVD of K for modes
-        U, S, Vh = np.linalg.svd(K, full_matrices=False)
+        # SVD of K for modes — dispatched to compute layer
+        U, S, Vh = _compute_svd(K)
         eigenvalues_complex = S.astype(complex)
 
         k_actual = min(k, P)

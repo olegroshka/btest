@@ -11,6 +11,7 @@ data MUST pass a fixed seed so results are reproducible.
 from __future__ import annotations
 
 import math
+import os
 from typing import NamedTuple
 
 # Load the acceptance report plugin — registered via pytest_plugins so that
@@ -24,6 +25,28 @@ from numpy.typing import NDArray
 
 from quantdsl_backtest.smim.data.actor_registry import ActorRegistry
 from quantdsl_backtest.smim.interfaces import Actor, ActorType, Layer
+
+
+# ═══════════════════════════════════════════════════════════
+# Device fixture — allows SMIM_DEVICE=cuda to run suite on GPU
+# ═══════════════════════════════════════════════════════════
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Register gpu marker."""
+    config.addinivalue_line("markers", "gpu: requires CUDA GPU")
+
+
+@pytest.fixture(autouse=True)
+def configure_device_from_env() -> None:
+    """Allow SMIM_DEVICE=cuda to run acceptance suite on GPU."""
+    device = os.environ.get("SMIM_DEVICE")
+    if device:
+        from quantdsl_backtest.smim.compute.torch_ops import get_device
+        get_device.cache_clear()
+    yield  # type: ignore[misc]
+    if device:
+        from quantdsl_backtest.smim.compute.torch_ops import get_device
+        get_device.cache_clear()
 
 
 # ═══════════════════════════════════════════════════════════

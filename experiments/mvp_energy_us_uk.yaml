@@ -77,6 +77,13 @@ emergence:
     max_homology_dim: 2
     n_windows_min: 50
 
+compute:
+  device: auto
+  granger_chunk_size: 10000
+  pid_bootstrap_on_gpu: true
+  knn_on_gpu: true
+  float_dtype: float64
+
 validation:
   holdout_strategy: rolling_5yr
   falsification_null_instances: 100

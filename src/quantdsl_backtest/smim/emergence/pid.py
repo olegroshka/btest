@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from quantdsl_backtest.smim.compute.batch_pid import batch_pid_synergy
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +103,8 @@ def compute_synergy_matrix(
 ) -> np.ndarray:
     """Build a symmetric pairwise synergy matrix across modal states.
 
+    Uses batched PyTorch implementation for all K*(K-1)/2 pairs simultaneously.
+
     Args:
         alpha_filtered: (T, K) filtered modal states.
         gaps:           (N, T) gap matrix, collapsed to scalar target via mean.
@@ -112,6 +115,27 @@ def compute_synergy_matrix(
     """
     K = min(K, alpha_filtered.shape[1])
     target = gaps.mean(axis=0)  # (T,) aggregate gap signal
+    synergy, _, _ = batch_pid_synergy(alpha_filtered[:, :K], target, n_bootstrap=1)
+    return synergy
+
+
+def _compute_synergy_matrix_sequential(
+    alpha_filtered: np.ndarray,
+    gaps: np.ndarray,
+    K: int,
+) -> np.ndarray:
+    """Fallback: original sequential numpy implementation.
+
+    Args:
+        alpha_filtered: (T, K) filtered modal states.
+        gaps:           (N, T) gap matrix, collapsed to scalar target via mean.
+        K:              Number of modes (clipped to available columns).
+
+    Returns:
+        (K, K) symmetric matrix S[j, k] = synergy(mode_j, mode_k → aggregate_gap).
+    """
+    K = min(K, alpha_filtered.shape[1])
+    target = gaps.mean(axis=0)
     S = np.zeros((K, K))
 
     for j in range(K):
@@ -137,7 +161,42 @@ def bootstrap_synergy(
 ) -> tuple[float, float, float]:
     """Estimate bootstrap confidence interval for PID synergy.
 
-    Uses block bootstrap to preserve autocorrelation structure.
+    Uses batched PyTorch implementation for all bootstrap samples at once.
+
+    Args:
+        alpha_j:    (T,) source time series j.
+        alpha_k:    (T,) source time series k.
+        target:     (T,) target time series.
+        n_bootstrap: Number of bootstrap samples.
+        ci_level:   Coverage level (e.g., 0.95).
+        block_size: Block length for block bootstrap.
+
+    Returns:
+        (observed_synergy, ci_lower, ci_upper)
+    """
+    modal_states = np.column_stack([alpha_j, alpha_k])  # (T, 2)
+    synergy, ci_lower, ci_upper = batch_pid_synergy(
+        modal_states, target,
+        n_bootstrap=n_bootstrap,
+        ci_level=ci_level,
+        block_size=block_size,
+    )
+    # synergy[0, 1] = synergy between modes 0 and 1
+    observed = float(synergy[0, 1])
+    lower = float(ci_lower[0, 1])
+    upper = float(ci_upper[0, 1])
+    return observed, lower, upper
+
+
+def _bootstrap_synergy_sequential(
+    alpha_j: np.ndarray,
+    alpha_k: np.ndarray,
+    target: np.ndarray,
+    n_bootstrap: int = 200,
+    ci_level: float = 0.95,
+    block_size: int = 5,
+) -> tuple[float, float, float]:
+    """Fallback: original sequential block-bootstrap implementation.
 
     Args:
         alpha_j:    (T,) source time series j.

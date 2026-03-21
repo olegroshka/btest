@@ -20,6 +20,7 @@ from statsmodels.tsa.vector_ar.var_model import VAR
 from quantdsl_backtest.smim.config import GrangerEdgeConfig
 from quantdsl_backtest.smim.graph.edges.base import AbstractEdgeEstimator
 from quantdsl_backtest.smim.interfaces import ActorRegistry, DateRange, RelationChannel
+from quantdsl_backtest.smim.compute.batch_granger import batch_granger_test
 
 
 class GrangerEdgeEstimator(AbstractEdgeEstimator):
@@ -27,6 +28,11 @@ class GrangerEdgeEstimator(AbstractEdgeEstimator):
 
     A[j_idx, i_idx] = F-statistic if p < p_threshold, else 0.
     BIC is used to select the optimal lag (if config.bic_selection=True).
+
+    When bic_selection=False the batched PyTorch implementation is used for
+    all N*(N-1) pairs in a single GPU kernel pass.  When bic_selection=True
+    the sequential statsmodels path (_estimate_sequential) is used to preserve
+    per-pair BIC lag selection.
     """
 
     channel = RelationChannel.FINANCIAL
@@ -42,6 +48,9 @@ class GrangerEdgeEstimator(AbstractEdgeEstimator):
     ) -> csr_matrix:
         """Estimate directed Granger-causal adjacency matrix.
 
+        Routes to batched GPU implementation when bic_selection=False,
+        or to the sequential statsmodels path when bic_selection=True.
+
         Args:
             signals: DataFrame with index=dates, columns=actor_ids.
             actors: ActorRegistry matching signal columns.
@@ -50,10 +59,35 @@ class GrangerEdgeEstimator(AbstractEdgeEstimator):
         Returns:
             csr_matrix of shape (N, N) where A[j, i] > 0 if i Granger-causes j.
         """
+        if self.config.bic_selection:
+            return self._estimate_sequential(signals, actors, date_range)
+
         self._validate_inputs(signals, actors, date_range)
         signals_filtered = self._apply_pit_filter(signals, date_range)
 
-        # Align columns to actor ordering
+        actor_ids = [a.actor_id for a in actors.actors]
+        signals_filtered = signals_filtered[actor_ids]
+
+        # Drop rows with any NaN and convert to (T, N) array
+        signals_array = signals_filtered.dropna().values.astype(np.float64)
+
+        dense = batch_granger_test(
+            signals_array,
+            max_lag=self.config.max_lag,
+            p_threshold=self.config.p_threshold,
+        )
+        return self._to_sparse(dense, threshold=0.0)
+
+    def _estimate_sequential(
+        self,
+        signals: pd.DataFrame,
+        actors: ActorRegistry,
+        date_range: DateRange,
+    ) -> csr_matrix:
+        """Fallback: original statsmodels sequential implementation with BIC selection."""
+        self._validate_inputs(signals, actors, date_range)
+        signals_filtered = self._apply_pit_filter(signals, date_range)
+
         actor_ids = [a.actor_id for a in actors.actors]
         signals_filtered = signals_filtered[actor_ids]
 
@@ -68,7 +102,6 @@ class GrangerEdgeEstimator(AbstractEdgeEstimator):
                 series_i = signals_filtered[i_id].dropna()
                 series_j = signals_filtered[j_id].dropna()
 
-                # Align on common index
                 common_idx = series_i.index.intersection(series_j.index)
                 if len(common_idx) < 10:
                     continue
@@ -76,12 +109,10 @@ class GrangerEdgeEstimator(AbstractEdgeEstimator):
                 x = series_i.loc[common_idx].values
                 y = series_j.loc[common_idx].values
 
-                # BIC lag selection
                 lag = self._select_lag(np.column_stack([y, x]))
                 if lag < 1:
                     lag = 1
 
-                # grangercausalitytests: data is [effect, cause] (2 columns)
                 data_2col = np.column_stack([y, x])
                 try:
                     with warnings.catch_warnings():

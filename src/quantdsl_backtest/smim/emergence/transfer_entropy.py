@@ -7,8 +7,10 @@ M4.6-T4: Conditional transfer entropy TE_{X→Y|Z} for mediation analysis.
 from __future__ import annotations
 
 import numpy as np
-from scipy.spatial import cKDTree
+from scipy.spatial import cKDTree as _cKDTree
 from scipy.special import digamma
+
+from quantdsl_backtest.smim.compute.gpu_knn import knn_query, knn_count_within_radius
 
 
 # ---------------------------------------------------------------------------
@@ -16,7 +18,7 @@ from scipy.special import digamma
 # ---------------------------------------------------------------------------
 
 def _knn_count(data: np.ndarray, queries: np.ndarray, r_max: np.ndarray) -> np.ndarray:
-    """Count neighbours within radius r_max[i] for each query point i.
+    """Count neighbours within radius r_max[i] for each query point i (GPU-backed).
 
     Uses the L∞ (Chebyshev) norm consistent with KSG estimator.
 
@@ -28,7 +30,12 @@ def _knn_count(data: np.ndarray, queries: np.ndarray, r_max: np.ndarray) -> np.n
     Returns:
         (n,) integer counts (excluding the point itself).
     """
-    tree = cKDTree(data)
+    return knn_count_within_radius(data, queries, r_max, p=float("inf"))
+
+
+def _knn_count_scipy(data: np.ndarray, queries: np.ndarray, r_max: np.ndarray) -> np.ndarray:
+    """Fallback: original scipy cKDTree implementation."""
+    tree = _cKDTree(data)
     counts = np.array(
         [
             len(tree.query_ball_point(queries[i], r_max[i], p=np.inf)) - 1
@@ -47,6 +54,7 @@ def ksg_transfer_entropy(
     """Estimate transfer entropy TE_{X→Y} = I(Y_{t+1}; X_t | Y_t) via KSG.
 
     Uses the KSG conditional mutual information estimator (Kraskov et al. 2004).
+    KNN queries dispatched to PyTorch compute layer (CPU or CUDA).
 
     Args:
         source:       (T,) source time series X.
@@ -70,14 +78,49 @@ def ksg_transfer_entropy(
     yz = np.column_stack([Y_fut, Y_past])               # (n, 2)
     z = Y_past.reshape(-1, 1)                           # (n, 1)
 
-    # Radius from k-NN in joint space
-    tree_joint = cKDTree(joint)
-    dists, _ = tree_joint.query(joint, k=k_neighbours + 1, p=np.inf)
+    # Radius from k-NN in joint space (via GPU compute layer)
+    dists, _ = knn_query(joint, k=k_neighbours + 1, p=float("inf"))
     r = dists[:, -1]
 
     n_xz = _knn_count(xz, xz, r)
     n_yz = _knn_count(yz, yz, r)
     n_z = _knn_count(z, z, r)
+
+    te = (
+        digamma(k_neighbours)
+        + np.mean(digamma(n_z + 1))
+        - np.mean(digamma(n_xz + 1))
+        - np.mean(digamma(n_yz + 1))
+    )
+    return max(float(te), 0.0)
+
+
+def _ksg_transfer_entropy_scipy(
+    source: np.ndarray,
+    target: np.ndarray,
+    lag: int = 1,
+    k_neighbours: int = 5,
+) -> float:
+    """Fallback: original scipy cKDTree implementation of KSG TE."""
+    T = len(source)
+    n = T - lag
+
+    Y_fut = target[lag:]
+    X_past = source[:-lag]
+    Y_past = target[:-lag]
+
+    joint = np.column_stack([Y_fut, X_past, Y_past])
+    xz = np.column_stack([X_past, Y_past])
+    yz = np.column_stack([Y_fut, Y_past])
+    z = Y_past.reshape(-1, 1)
+
+    tree_joint = _cKDTree(joint)
+    dists, _ = tree_joint.query(joint, k=k_neighbours + 1, p=np.inf)
+    r = dists[:, -1]
+
+    n_xz = _knn_count_scipy(xz, xz, r)
+    n_yz = _knn_count_scipy(yz, yz, r)
+    n_z = _knn_count_scipy(z, z, r)
 
     te = (
         digamma(k_neighbours)
@@ -168,8 +211,7 @@ def conditional_transfer_entropy(
     yz = np.column_stack([Y_fut, Y_past, Z_past])               # (n, 3)
     z = np.column_stack([Y_past, Z_past])                       # (n, 2)
 
-    tree_joint = cKDTree(joint)
-    dists, _ = tree_joint.query(joint, k=k + 1, p=np.inf)
+    dists, _ = knn_query(joint, k=k + 1, p=float("inf"))
     r = dists[:, -1]
 
     n_xz = _knn_count(xz, xz, r)

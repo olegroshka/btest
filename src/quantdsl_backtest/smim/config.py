@@ -232,6 +232,35 @@ class EmergenceConfig(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════
+# Compute Device
+# ═══════════════════════════════════════════════════════════
+
+class ComputeConfig(BaseModel):
+    """Compute device configuration."""
+
+    device: str = Field(
+        default="auto",
+        description="'auto', 'cpu', 'cuda', 'cuda:0', 'cuda:1'",
+    )
+    granger_chunk_size: int = Field(
+        default=10000,
+        description="Max pairs per GPU batch for Granger (memory control)",
+    )
+    pid_bootstrap_on_gpu: bool = Field(
+        default=True,
+        description="Run PID bootstrap on GPU if available",
+    )
+    knn_on_gpu: bool = Field(
+        default=True,
+        description="Run KNN for TE on GPU if available",
+    )
+    float_dtype: str = Field(
+        default="float64",
+        description="'float64' (precise) or 'float32' (faster, less precise)",
+    )
+
+
+# ═══════════════════════════════════════════════════════════
 # Validation / Backtesting
 # ═══════════════════════════════════════════════════════════
 
@@ -277,6 +306,7 @@ class SmimConfig(BaseModel):
     dynamics: DynamicsConfig = Field(default_factory=DynamicsConfig)
     emergence: EmergenceConfig = Field(default_factory=EmergenceConfig)
     validation: ValidationConfig = Field(default_factory=ValidationConfig)
+    compute: ComputeConfig = Field(default_factory=ComputeConfig)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> SmimConfig:

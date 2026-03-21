@@ -6,6 +6,7 @@ import numpy as np
 
 from quantdsl_backtest.smim.interfaces import DecompositionMethod, ModalFrame
 from quantdsl_backtest.smim.spectral.base import AbstractSpectralDecomposer
+from quantdsl_backtest.smim.compute.linalg import hermitian_dilation_decompose
 
 
 class HermitianDilationDecomposer(AbstractSpectralDecomposer):
@@ -18,26 +19,38 @@ class HermitianDilationDecomposer(AbstractSpectralDecomposer):
     def decompose(self, operator, k: int) -> ModalFrame:
         A = self._validate_operator(operator)
         N = A.shape[0]
-        # Construct 2N x 2N Hermitian dilation
+        k_actual = min(k, N)
+        sigma, U_L, U_R = hermitian_dilation_decompose(A, k_actual)
+        # Reconstruct H and all_eigenvalues for metadata (tests access these)
         H = np.block([[np.zeros((N, N)), A], [A.T, np.zeros((N, N))]])
-        # Eigendecompose symmetric matrix -> real eigenvalues
+        all_eigenvalues = np.linalg.eigvalsh(H)  # ascending
+        return ModalFrame(
+            basis=U_L,
+            eigenvalues=sigma.astype(complex),
+            method=self.method,
+            metadata={
+                "right_singular_vectors": U_R,
+                "H": H,
+                "all_eigenvalues": all_eigenvalues,
+            },
+        )
+
+    def _decompose_scipy(self, operator, k: int) -> ModalFrame:
+        """Fallback: original numpy eigh implementation."""
+        A = self._validate_operator(operator)
+        N = A.shape[0]
+        H = np.block([[np.zeros((N, N)), A], [A.T, np.zeros((N, N))]])
         eigenvalues, eigenvectors = np.linalg.eigh(H)
-        # Positive eigenvalues correspond to singular values
         pos_idx = np.where(eigenvalues > 0)[0]
         if len(pos_idx) == 0:
-            # Fallback: take top-k by magnitude
             order = np.argsort(-np.abs(eigenvalues))
             pos_idx = order
         else:
-            # Sort positive eigenvalues descending
             pos_idx = pos_idx[np.argsort(-eigenvalues[pos_idx])]
         k_actual = min(k, len(pos_idx))
         idx = pos_idx[:k_actual]
-        # Recover singular vectors via u_L = √2 · v[:N],  u_R = √2 · v[N:]
-        # (standard result: H eigenvectors for +σ are [u_L; u_R]/√2)
         sqrt2 = np.sqrt(2.0)
         left_svecs = sqrt2 * eigenvectors[:N, idx]
-        # Right singular vectors: bottom-N components
         right_svecs = sqrt2 * eigenvectors[N:, idx]
         sv = eigenvalues[idx]
         return ModalFrame(

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.linalg import polar
+from scipy.linalg import polar as _polar_scipy
 
 from quantdsl_backtest.smim.interfaces import DecompositionMethod, ModalFrame
 from quantdsl_backtest.smim.spectral.base import AbstractSpectralDecomposer
+from quantdsl_backtest.smim.compute.linalg import polar_decompose
 
 
 class PolarDecomposer(AbstractSpectralDecomposer):
@@ -19,7 +20,7 @@ class PolarDecomposer(AbstractSpectralDecomposer):
     def decompose(self, operator, k: int) -> ModalFrame:
         A = self._validate_operator(operator)
         # A = U @ P, U orthogonal/unitary, P symmetric PSD
-        U, P = polar(A)
+        U, P = polar_decompose(A)
         # Eigendecompose P (symmetric -> real eigenvalues, ascending order)
         p_vals, p_vecs = np.linalg.eigh(P)
         # Sort descending by eigenvalue
@@ -29,6 +30,24 @@ class PolarDecomposer(AbstractSpectralDecomposer):
         basis = p_vecs[:, idx]
         eigenvalues = p_vals[idx].astype(complex)
         # Also eigendecompose U for metadata
+        u_vals, u_vecs = np.linalg.eig(U)
+        return ModalFrame(
+            basis=basis,
+            eigenvalues=eigenvalues,
+            method=self.method,
+            metadata={"U": U, "P": P, "u_eigenvalues": u_vals, "u_eigenvectors": u_vecs},
+        )
+
+    def _decompose_scipy(self, operator, k: int) -> ModalFrame:
+        """Fallback: original scipy polar implementation."""
+        A = self._validate_operator(operator)
+        U, P = _polar_scipy(A)
+        p_vals, p_vecs = np.linalg.eigh(P)
+        order = np.argsort(-p_vals)
+        k_actual = min(k, len(p_vals))
+        idx = order[:k_actual]
+        basis = p_vecs[:, idx]
+        eigenvalues = p_vals[idx].astype(complex)
         u_vals, u_vecs = np.linalg.eig(U)
         return ModalFrame(
             basis=basis,
