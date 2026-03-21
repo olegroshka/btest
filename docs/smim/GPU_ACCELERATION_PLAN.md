@@ -38,7 +38,7 @@ Two profiling snapshots:
 |-----------|------|-------|-------|---------|--------|
 | Granger edges | 34% (8.8s) | **89% (148.6s)** | **98% (881.7s)** | O(N²) | Batch impl done, not yet wired |
 | Kim filter EM | 2% (0.57s) | 0.4% (0.73s) ✅ | 0.1% (0.92s) ✅ | Woodbury fixed | **321× speedup at N=200** |
-| PID bootstrap | 62% (16.1s) | 10% (16.9s) | 2% (16s) | O(1) in N | Next GPU target |
+| PID bootstrap | 62% (16.1s) | 10% (16.9s) | 2% (16s) | O(1) in N | Batch impl done, not yet wired |
 | Kalman filter | 0.05% (0.01s) | 0.02% (0.03s) ✅ | 0.02% (0.14s) ✅ | Woodbury fixed | **167× speedup at N=200** |
 | Transfer entropy | 1.8% (0.47s) | 0.3% (0.46s) | 0.05% (0.46s) | O(1) in N | Leave on CPU |
 | **TOTAL** | **26.1s** | **167s** | **900s** | | **2.6× vs baseline at N=200** |
@@ -737,7 +737,7 @@ Priority-ordered (highest impact first):
 2. ✅ **GPU-1.1**: PyTorch compute layer + linalg — **DONE** (commits `d93cd74`, `8431c9c`). 54/54 unit tests, 121/121 acceptance tests on CUDA.
 3. ✅ **GPU-1.2**: Batch Granger on PyTorch — **DONE** (commit `43d9455`). `batch_granger_test` implemented and parity-verified. Not yet wired into pipeline.
 4. ⏳ **GPU-2.1**: Wire batch Granger into `GrangerEdgeEstimator` — **NEXT**. This delivers the end-to-end speedup.
-5. ⏳ **GPU-1.3**: Batch PID bootstrap (1 session) — eliminates #3 bottleneck (~16s constant cost)
+5. ✅ **GPU-1.3**: Batch PID bootstrap — **DONE** (commit `2c58fb5`). `batch_pid_synergy` implemented; 9/9 acceptance tests pass. Not yet wired into pipeline.
 6. ⏳ **GPU-1.4**: GPU KNN for TE (1 session) — minor but easy win
 7. ⏳ **GPU-2.2**: Config + device selection (0.5 session)
 8. ⏳ **GPU-3.1–3.3**: Full verification — run acceptance suite on CUDA end-to-end
