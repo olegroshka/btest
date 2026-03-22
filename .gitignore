@@ -50,6 +50,12 @@ Thumbs.db
 # SMIM OHLCV data (large binary, not committed)
 equities/smim/
 
+# SMIM acquired data (large binaries — gitignored, not committed)
+# The universe CSVs under data/smim/universes/ ARE committed (small, version-controlled)
+data/smim/raw/
+data/smim/processed/
+data/smim/pit_store/
+
 # SMIM temporary / scratch files
 tmp_*.txt
 tmp_*.py
