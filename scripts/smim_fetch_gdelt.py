@@ -10,41 +10,56 @@ WHY RAW GKG CSV INSTEAD OF DOC API
       1. Rate-limited to ~1 req/5s per IP; consecutive year-by-year absolute-date
          queries for common theme codes trigger 429s lasting hours.
       2. Several theme codes (ECON_ENERGY, ENV_ENERGY, etc.) return empty timelines
-         via the DOC API even when present in the raw GKG data. This is a DOC API
-         limitation, not a data gap.
-    Direct GKG CSV downloads have neither limitation: they are static files served
-    by a standard HTTP server with no rate limits and complete raw theme data.
+         via the DOC API even when present in the raw GKG data.
+    Direct GKG CSV downloads have neither limitation.
 
 SAMPLING STRATEGY
-    For weekly SMIM signals we need one representative GKG snapshot per week.
-    We download the GKG file closest to Monday 12:00 UTC for each ISO week.
-    GKG files are produced every 15 minutes; we try slots at 120000, 121500,
-    123000, 090000, 150000 and take the first that exists (HTTP 200).
+    For each UTC calendar day, one representative GKG snapshot is selected.
+    We choose the file with a timestamp closest to 12:00 UTC for that date,
+    trying slots in order of proximity to noon (12:00, 12:15, 11:45, 12:30,
+    11:30, ...) and taking the first HTTP 200 response.
 
-    Each GKG file contains ~200-1000 articles processed in that 15-min window.
-    A single file is a statistical sample (~0.15%) of the full week, but it is
-    sufficient for a stable normalised intensity signal at weekly frequency.
-    All signal values are divided by the total document count in that file,
-    so they represent fractional shares — not absolute counts.
+    MAX_SLOT_TRIES (default 20) bounds the probe count. If no file is found
+    within that window (~±2.5 hours from noon), the day is recorded as missing.
+
+    Selection types logged per run:
+      exact_noon     : 12:00:00 UTC file found on first try
+      fallback_nearest : a different slot found within the probe window
+      missing        : no GKG file found for that UTC day
+
+WEEKLY AGGREGATION (mathematically correct)
+    The canonical weekly panel is derived from daily data:
+
+      weekly_article_count = sum(daily_article_count)
+      weekly_avg_tone      = sum(daily_avg_tone * daily_article_count)
+                             / sum(daily_article_count)          [weighted mean]
+      weekly_intensity     = sum(daily_article_count)
+                             / sum(daily_total_docs)
+
+    Note: weekly_avg_tone uses article-count weighting; days with zero matched
+    articles are excluded from the weighted mean denominator.
+    Note: weekly_intensity is NOT a simple mean of daily intensities.
 
 COVERAGE
-    GDELT GKG 2.0 began 2015-02-19.  Files exist from that date forward.
-    This script fetches 2015-02-23 (first Monday) through 2025-12-29.
+    GDELT GKG 2.0 began 2015-02-19. Default range: 2015-02-19 – 2025-12-31.
 
-METHODOLOGY
-    For each weekly GKG snapshot file:
-      1. Parse V2Themes column: split by ";", take part before "," (= code),
-         deduplicate per document. Match against basket sets.
-      2. Parse V2Organizations column: split by ";", take part before ",",
-         normalise (lowercase, collapse whitespace), match alias lists.
-      3. Parse V2Tone column: first comma-delimited field = primary tone.
-      4. Count distinct DocumentIdentifiers per signal.
-      5. article_count = matched docs in file.
-      6. total_docs   = total distinct docs in file.
-      7. intensity    = article_count / total_docs  (0.0–1.0 fractional share).
-      8. avg_tone     = mean tone across matched docs.
+OUTPUTS
+    data/smim/processed/gdelt_narrative_daily.parquet  — daily panel
+    data/smim/processed/gdelt_narrative.parquet         — weekly panel (daily-derived)
+    data/smim/pit_store/gdelt.parquet                   — PIT store (weekly)
+    data/smim/cache/gdelt/daily_aggregates/             — per-day stat cache
+    data/smim/cache/gdelt/daily_file_index.parquet      — file selection log
 
-    Results cached per week as data/smim/raw/gdelt/gkg_weekly/{YYYY-Www}.parquet.
+    Before overwriting the canonical weekly outputs, the previous files are moved
+    to timestamped archive paths under:
+      data/smim/processed/old/
+      data/smim/pit_store/old/
+
+RESUMABILITY
+    Per-day aggregate parquets in daily_aggregates/ act as the cache.
+    Reruns skip days whose cache file already exists (unless --force-refetch).
+    Use --weekly-only to rebuild weekly from cache without any new downloads.
+    Use --rebuild to reprocess all outputs from cache without re-downloading.
 
 GKG FIELD REFERENCE (column indices, 0-based, TSV file):
     4  DocumentIdentifier  — article URL
@@ -56,6 +71,9 @@ Usage:
     uv run python scripts/smim_fetch_gdelt.py
     uv run python scripts/smim_fetch_gdelt.py --start-date 2023-01-01 --end-date 2023-12-31
     uv run python scripts/smim_fetch_gdelt.py --force-refetch
+    uv run python scripts/smim_fetch_gdelt.py --rebuild
+    uv run python scripts/smim_fetch_gdelt.py --daily-only
+    uv run python scripts/smim_fetch_gdelt.py --weekly-only
     uv run python scripts/smim_fetch_gdelt.py --workers 8
     uv run python scripts/smim_fetch_gdelt.py --validate-only
 
@@ -68,9 +86,11 @@ from __future__ import annotations
 import argparse
 import io
 import logging
+import shutil
 import sys
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -88,15 +108,13 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ── Date range ─────────────────────────────────────────────────────────────────
-# GDELT GKG 2.0 began 2015-02-19; first Monday is 2015-02-23.
-GKG_V2_START  = pd.Timestamp("2015-02-23")   # first Monday with GKG 2.0
-DEFAULT_START = pd.Timestamp("2015-02-23")
-DEFAULT_END   = pd.Timestamp("2025-12-29")   # last Monday of 2025
+GKG_V2_START  = pd.Timestamp("2015-02-19")   # GKG 2.0 true start
+DEFAULT_START = pd.Timestamp("2015-02-19")
+DEFAULT_END   = pd.Timestamp("2025-12-31")
 
 # ── GKG file settings ──────────────────────────────────────────────────────────
-GKG_BASE_URL = "http://data.gdeltproject.org/gdeltv2"
-# 15-minute slots to try for each Monday, in preference order
-MONDAY_SLOTS = ["120000", "121500", "123000", "090000", "150000", "180000"]
+GKG_BASE_URL   = "http://data.gdeltproject.org/gdeltv2"
+MAX_SLOT_TRIES = 20  # max 15-min slots to probe per day before declaring missing
 
 # GKG TSV column indices (0-based)
 COL_DOCID  = 4
@@ -110,7 +128,7 @@ COL_TONE   = 15
 # IMPORTANT: The old simple codes (OIL, GAS, TECH, HEALTH, ECON_BANKING, etc.)
 # do NOT appear in GKG 2.0 files — the GDELT taxonomy was replaced by a
 # hierarchical WB_/ENV_/EPU_/TAX_ scheme starting in Feb 2015.
-# The correct codes are those verified from actual GKG 2.0 file inspection.
+# The correct codes below were verified from actual GKG 2.0 file inspection.
 #
 # Codes verified present in GKG 2.0 files (count per ~1300-doc snapshot):
 #   ENV_OIL (540), ECON_OILPRICE (120), FUELPRICES (79), ENV_NATURALGAS (54)
@@ -160,6 +178,7 @@ SECTOR_CODES: dict[str, set[str]] = {
 # ── Actor alias lists ──────────────────────────────────────────────────────────
 # Matched case-insensitively as substrings in normalised V2Organizations entries.
 # "central bank" excluded from actor_FED — too ambiguous.
+# actor_SEC: GKG NLP drops "and", producing "securities exchange commission".
 ACTOR_ALIASES: dict[str, list[str]] = {
     "actor_FED": [
         "federal reserve",
@@ -182,10 +201,14 @@ ACTOR_ALIASES: dict[str, list[str]] = {
 
 ALL_SIGNALS = list(SECTOR_CODES.keys()) + list(ACTOR_ALIASES.keys())
 
-# ── Output paths ───────────────────────────────────────────────────────────────
-RAW_WEEKLY_DIR  = _ROOT / "data" / "smim" / "raw" / "gdelt" / "gkg_weekly"
-PROCESSED_PATH  = _ROOT / "data" / "smim" / "processed" / "gdelt_narrative.parquet"
-PIT_DIR         = _ROOT / "data" / "smim" / "pit_store"
+# ── Paths ──────────────────────────────────────────────────────────────────────
+DAILY_CACHE_DIR  = _ROOT / "data" / "smim" / "cache" / "gdelt" / "daily_aggregates"
+FILE_INDEX_PATH  = _ROOT / "data" / "smim" / "cache" / "gdelt" / "daily_file_index.parquet"
+DAILY_PROCESSED  = _ROOT / "data" / "smim" / "processed" / "gdelt_narrative_daily.parquet"
+WEEKLY_PROCESSED = _ROOT / "data" / "smim" / "processed" / "gdelt_narrative.parquet"
+PIT_DIR          = _ROOT / "data" / "smim" / "pit_store"
+ARCHIVE_PROC_DIR = _ROOT / "data" / "smim" / "processed" / "old"
+ARCHIVE_PIT_DIR  = _ROOT / "data" / "smim" / "pit_store" / "old"
 
 
 # ── HTTP helpers ───────────────────────────────────────────────────────────────
@@ -198,21 +221,43 @@ def _get_client():
     return httpx.Client(timeout=60.0, follow_redirects=True)
 
 
-def _download_gkg_file(client, monday: pd.Timestamp) -> bytes | None:
-    """Download the GKG zip file for the given Monday, trying multiple time slots.
+def _noon_ordered_slots() -> list[str]:
+    """Return all 96 daily 15-min HHMMSS slots sorted by proximity to 12:00 UTC."""
+    noon = 720  # minutes from midnight
+    pairs: list[tuple[int, str]] = []
+    for i in range(96):
+        m = i * 15
+        slot = f"{m // 60:02d}{m % 60:02d}00"
+        pairs.append((abs(m - noon), slot))
+    return [s for _, s in sorted(pairs)]
 
-    Returns the raw zip bytes, or None if no slot has a file.
+
+# Pre-compute once at module load — used in every download call.
+_NOON_SLOTS: list[str] = _noon_ordered_slots()
+
+
+def _download_gkg_file_for_day(
+    client: object,
+    date: pd.Timestamp,
+    max_tries: int = MAX_SLOT_TRIES,
+) -> tuple[bytes | None, str | None, str]:
+    """Download the GKG zip for a UTC date, choosing the slot nearest to noon.
+
+    Returns:
+        (zip_bytes, slot_hhmmss, selection_type)
+        selection_type: "exact_noon" | "fallback_nearest" | "missing"
     """
-    date_str = monday.strftime("%Y%m%d")
-    for slot in MONDAY_SLOTS:
+    date_str = date.strftime("%Y%m%d")
+    for slot in _NOON_SLOTS[:max_tries]:
         url = f"{GKG_BASE_URL}/{date_str}{slot}.gkg.csv.zip"
         try:
-            resp = client.get(url, timeout=60.0)
+            resp = client.get(url, timeout=60.0)  # type: ignore[attr-defined]
             if resp.status_code == 200 and len(resp.content) > 1000:
-                return resp.content
+                sel_type = "exact_noon" if slot == "120000" else "fallback_nearest"
+                return resp.content, slot, sel_type
         except Exception:
             continue
-    return None
+    return None, None, "missing"
 
 
 # ── Parse one GKG file ─────────────────────────────────────────────────────────
@@ -221,7 +266,7 @@ def _extract_theme_codes(v2themes: str) -> set[str]:
     """Extract distinct theme codes from V2Themes field.
 
     V2Themes format: "CODE1,offset1;CODE2,offset2;..."
-    Returns set of CODE strings (before the comma).
+    Returns set of CODE strings (part before the comma).
     """
     if not v2themes or pd.isna(v2themes):
         return set()
@@ -250,7 +295,6 @@ def _extract_org_names(v2orgs: str) -> list[str]:
         if not entry:
             continue
         name = entry.split(",")[0].strip().lower()
-        # Collapse internal whitespace
         name = " ".join(name.split())
         if name:
             names.append(name)
@@ -270,8 +314,8 @@ def _extract_tone(v2tone: str) -> float | None:
 def _parse_gkg_bytes(data: bytes) -> pd.DataFrame | None:
     """Unzip and parse a GKG CSV zip file.
 
-    Returns a DataFrame with columns: doc_id, themes_set, org_names, tone.
-    Returns None if the file cannot be parsed.
+    Returns a DataFrame with columns: doc_id, themes (set), orgs (list), tone.
+    Returns None if the file cannot be parsed or is empty.
     """
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
@@ -308,18 +352,18 @@ def _parse_gkg_bytes(data: bytes) -> pd.DataFrame | None:
     return pd.DataFrame(records)
 
 
-# ── Compute weekly signal statistics from parsed GKG ──────────────────────────
+# ── Per-snapshot signal statistics ────────────────────────────────────────────
 
-def _compute_week_stats(
+def _compute_snapshot_stats(
     docs: pd.DataFrame,
     sector_codes: dict[str, set[str]],
     actor_aliases: dict[str, list[str]],
 ) -> dict[str, dict]:
-    """Compute per-signal article_count, avg_tone, total_docs for one week's snapshot.
+    """Compute per-signal stats from one GKG snapshot (any frequency).
 
     Returns: {signal_id: {"article_count": int, "avg_tone": float|nan, "total_docs": int}}
+    total_docs is the distinct document count in the snapshot (denominator for intensity).
     """
-    # Deduplicate on doc_id (same URL may appear in the file twice)
     docs = docs.drop_duplicates(subset=["doc_id"])
     total_docs = len(docs)
     if total_docs == 0:
@@ -327,7 +371,6 @@ def _compute_week_stats(
 
     result: dict[str, dict] = {}
 
-    # Sector signals
     for sig, basket in sector_codes.items():
         mask  = docs["themes"].apply(lambda t: bool(t & basket))
         sub   = docs[mask]
@@ -339,11 +382,11 @@ def _compute_week_stats(
             "total_docs":    total_docs,
         }
 
-    # Actor signals
     for sig, aliases in actor_aliases.items():
-        def _matches(org_list: list[str]) -> bool:
+        # Capture aliases via default argument to avoid closure-over-loop-variable.
+        def _matches(org_list: list[str], _a: list[str] = aliases) -> bool:
             for org in org_list:
-                for alias in aliases:
+                for alias in _a:
                     if alias in org:
                         return True
             return False
@@ -361,88 +404,105 @@ def _compute_week_stats(
     return result
 
 
-# ── Per-week fetch + cache ────────────────────────────────────────────────────
+# ── Daily cache helpers ────────────────────────────────────────────────────────
 
-def _week_cache_path(monday: pd.Timestamp) -> Path:
-    return RAW_WEEKLY_DIR / f"{monday.strftime('%Y-W%V')}.parquet"
+def _daily_cache_path(date: pd.Timestamp) -> Path:
+    return DAILY_CACHE_DIR / f"{date.strftime('%Y-%m-%d')}.parquet"
 
 
-def _load_week_cache(monday: pd.Timestamp) -> pd.DataFrame | None:
-    p = _week_cache_path(monday)
+def _load_daily_cache(date: pd.Timestamp) -> dict[str, dict] | None:
+    p = _daily_cache_path(date)
     if not p.exists():
         return None
     try:
-        return pd.read_parquet(p)
+        df = pd.read_parquet(p)
+        return {
+            row["signal"]: {
+                "article_count": row["article_count"],
+                "avg_tone":      row["avg_tone"],
+                "total_docs":    row["total_docs"],
+            }
+            for _, row in df.iterrows()
+        }
     except Exception:
         return None
 
 
-def _save_week_cache(monday: pd.Timestamp, stats: dict[str, dict]) -> None:
+def _save_daily_cache(date: pd.Timestamp, stats: dict[str, dict]) -> None:
     if not stats:
         return
-    rows = [
-        {"signal": sig, **vals}
-        for sig, vals in stats.items()
-    ]
-    RAW_WEEKLY_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(rows).to_parquet(_week_cache_path(monday), index=False)
+    rows = [{"signal": sig, **vals} for sig, vals in stats.items()]
+    DAILY_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_parquet(_daily_cache_path(date), index=False)
 
 
-def fetch_week(
-    monday: pd.Timestamp,
+# ── File index helpers ─────────────────────────────────────────────────────────
+
+def _load_file_index() -> pd.DataFrame:
+    if FILE_INDEX_PATH.exists():
+        try:
+            return pd.read_parquet(FILE_INDEX_PATH)
+        except Exception:
+            pass
+    return pd.DataFrame(columns=["date", "slot_time", "selection_type", "url"])
+
+
+def _save_file_index(index_df: pd.DataFrame) -> None:
+    FILE_INDEX_PATH.parent.mkdir(parents=True, exist_ok=True)
+    index_df.to_parquet(FILE_INDEX_PATH, index=False)
+
+
+# ── Fetch one day ──────────────────────────────────────────────────────────────
+
+def fetch_day(
+    date: pd.Timestamp,
     force: bool = False,
-) -> dict[str, dict] | None:
-    """Fetch and process one Monday's GKG file. Returns per-signal stats dict.
+) -> tuple[dict[str, dict] | None, str]:
+    """Fetch and process one day's GKG file. Returns (stats, selection_type).
 
-    Uses on-disk cache to skip already-processed weeks.
-    Returns None if the GKG file cannot be downloaded or parsed.
+    selection_type: "exact_noon" | "fallback_nearest" | "missing" | "cached"
+
+    Uses on-disk daily cache; returns (cached_stats, "cached") if already
+    processed (unless force=True).
     """
     if not force:
-        cached = _load_week_cache(monday)
-        if cached is not None and not cached.empty:
-            return {
-                row["signal"]: {
-                    "article_count": row["article_count"],
-                    "avg_tone":      row["avg_tone"],
-                    "total_docs":    row["total_docs"],
-                }
-                for _, row in cached.iterrows()
-            }
+        cached = _load_daily_cache(date)
+        if cached is not None:
+            return cached, "cached"
 
     client = _get_client()
-    data   = _download_gkg_file(client, monday)
+    data, slot, sel_type = _download_gkg_file_for_day(client, date)
     if data is None:
-        log.warning("  %s — no GKG file found for any Monday slot", monday.date())
-        return None
+        return None, "missing"
 
     docs = _parse_gkg_bytes(data)
     if docs is None or docs.empty:
-        log.warning("  %s — GKG file parsed to 0 rows", monday.date())
-        return None
+        log.warning("  %s — GKG file parsed to 0 rows (slot %s)", date.date(), slot)
+        return None, "missing"
 
-    stats = _compute_week_stats(docs, SECTOR_CODES, ACTOR_ALIASES)
-    _save_week_cache(monday, stats)
-    return stats
+    stats = _compute_snapshot_stats(docs, SECTOR_CODES, ACTOR_ALIASES)
+    _save_daily_cache(date, stats)
+    return stats, sel_type
 
 
-# ── Build processed DataFrame ─────────────────────────────────────────────────
+# ── Build processed DataFrames ────────────────────────────────────────────────
 
-def build_processed(
-    weekly_stats: dict[pd.Timestamp, dict[str, dict]],
-    signals: list[str],
+def build_daily_processed(
+    daily_results: dict[pd.Timestamp, dict[str, dict]],
 ) -> pd.DataFrame:
-    """Convert {monday: {signal: stats}} → processed long DataFrame.
+    """Convert {date: {signal: stats}} → daily long DataFrame.
 
     Schema:
         theme_or_actor : str
-        week_start     : datetime64[ns]
-        article_count  : float64  — docs matching signal in that week's GKG snapshot
+        event_date     : datetime64[ns]
+        article_count  : float64  — distinct matching docs in that daily snapshot
         avg_tone       : float64  — mean V2Tone[0] of matching docs
-        intensity      : float64  — article_count / total_docs (fractional share)
+        intensity      : float64  — article_count / total_docs_day
+        total_docs_day : float64  — total distinct docs in that daily snapshot
     """
     rows: list[dict] = []
-    for monday, sig_stats in weekly_stats.items():
-        for sig in signals:
+    for date, sig_stats in daily_results.items():
+        for sig in ALL_SIGNALS:
             s = sig_stats.get(sig)
             if s is None:
                 continue
@@ -450,32 +510,121 @@ def build_processed(
             ac    = s["article_count"]
             rows.append({
                 "theme_or_actor": sig,
-                "week_start":     monday,
+                "event_date":     date,
                 "article_count":  float(ac),
                 "avg_tone":       s["avg_tone"],
                 "intensity":      float(ac) / total if total > 0 else float("nan"),
+                "total_docs_day": float(total),
             })
 
     if not rows:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-    df["week_start"] = pd.to_datetime(df["week_start"])
-    for col in ("article_count", "avg_tone", "intensity"):
+    df["event_date"] = pd.to_datetime(df["event_date"])
+    for col in ("article_count", "avg_tone", "intensity", "total_docs_day"):
         df[col] = df[col].astype("float64")
     return (
-        df[["theme_or_actor", "week_start", "article_count", "avg_tone", "intensity"]]
+        df[["theme_or_actor", "event_date", "article_count", "avg_tone",
+            "intensity", "total_docs_day"]]
+        .sort_values(["theme_or_actor", "event_date"])
+        .reset_index(drop=True)
+    )
+
+
+def aggregate_daily_to_weekly(daily_df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate daily panel to weekly using mathematically correct formulas.
+
+    week_start is the Monday of each ISO week (dayofweek == 0).
+
+    Aggregation rules (NOT simple means):
+      weekly_article_count = sum(daily_article_count)
+      weekly_avg_tone      = weighted mean using daily_article_count as weights
+                             (NaN days and zero-article days excluded from mean)
+      weekly_intensity     = sum(daily_article_count) / sum(daily_total_docs)
+    """
+    df = daily_df.copy()
+    # Subtract dayofweek days to get Monday of the ISO week for each date.
+    df["week_start"] = df["event_date"] - pd.to_timedelta(
+        df["event_date"].dt.dayofweek, unit="D"
+    )
+
+    rows: list[dict] = []
+    for (signal, week_start), grp in df.groupby(["theme_or_actor", "week_start"]):
+        weekly_ac    = grp["article_count"].sum()
+        weekly_total = grp["total_docs_day"].sum()
+
+        # Weighted mean tone: only include days with valid tone AND matched articles.
+        tone_mask = grp["avg_tone"].notna() & (grp["article_count"] > 0)
+        tone_weight_sum = grp.loc[tone_mask, "article_count"].sum()
+        if tone_weight_sum > 0:
+            weekly_tone = float(
+                (grp.loc[tone_mask, "avg_tone"] * grp.loc[tone_mask, "article_count"]).sum()
+                / tone_weight_sum
+            )
+        else:
+            weekly_tone = float("nan")
+
+        rows.append({
+            "theme_or_actor": signal,
+            "week_start":     week_start,
+            "article_count":  float(weekly_ac),
+            "avg_tone":       weekly_tone,
+            "intensity":      float(weekly_ac) / weekly_total if weekly_total > 0 else float("nan"),
+        })
+
+    if not rows:
+        return pd.DataFrame()
+
+    out = pd.DataFrame(rows)
+    out["week_start"] = pd.to_datetime(out["week_start"])
+    for col in ("article_count", "avg_tone", "intensity"):
+        out[col] = out[col].astype("float64")
+    return (
+        out[["theme_or_actor", "week_start", "article_count", "avg_tone", "intensity"]]
         .sort_values(["theme_or_actor", "week_start"])
         .reset_index(drop=True)
     )
 
 
+# ── Archive old outputs ────────────────────────────────────────────────────────
+
+def archive_old_outputs() -> None:
+    """Move existing canonical output files to timestamped archive paths."""
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    pairs = [
+        (
+            WEEKLY_PROCESSED,
+            ARCHIVE_PROC_DIR / f"gdelt_narrative_weekly_snapshot_{ts}.parquet",
+        ),
+        (
+            PIT_DIR / "gdelt.parquet",
+            ARCHIVE_PIT_DIR / f"gdelt_weekly_snapshot_{ts}.parquet",
+        ),
+    ]
+    for src, dst in pairs:
+        if src.exists():
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(src), str(dst))
+            log.info("Archived  %s  →  %s", src.name, dst.name)
+
+
 # ── PIT ingest ─────────────────────────────────────────────────────────────────
 
-def ingest_to_pit(processed: pd.DataFrame) -> None:
+def ingest_to_pit(weekly_df: pd.DataFrame) -> None:
+    """Ingest the weekly processed panel into the PIT store.
+
+    PIT semantics:
+      actor_id   = theme_or_actor
+      signal_id  = gdelt_article_count | gdelt_avg_tone | gdelt_intensity
+      event_date = week_start
+      pub_date   = week_start + 7 days  (GDELT data complete at end of week)
+      source     = "gdelt"
+      vintage_id = None  (GDELT is append-only, no revisions)
+    """
     pit_rows: list[pd.DataFrame] = []
     for metric in ("article_count", "avg_tone", "intensity"):
-        chunk = processed[["theme_or_actor", "week_start", metric]].dropna(
+        chunk = weekly_df[["theme_or_actor", "week_start", metric]].dropna(
             subset=[metric]
         ).copy()
         chunk = chunk.rename(
@@ -487,27 +636,25 @@ def ingest_to_pit(processed: pd.DataFrame) -> None:
         chunk["source"]     = "gdelt"
         chunk["vintage_id"] = None
         pit_rows.append(chunk)
+
     pit_df = pd.concat(pit_rows, ignore_index=True)
     store  = PointInTimeStore(root_dir=PIT_DIR)
     store.bulk_ingest([pit_df])
     log.info("PIT store: %d rows → %s", len(pit_df), PIT_DIR)
 
 
-# ── Validate with a quick single-file test ────────────────────────────────────
+# ── Validate ───────────────────────────────────────────────────────────────────
 
 def run_validation() -> None:
-    """Download one recent GKG file and show sample signal values."""
-    log.info("Validation: downloading last Monday's GKG file …")
-    # Find last Monday
-    today  = pd.Timestamp.now().normalize()
-    monday = today - pd.Timedelta(days=today.dayofweek)
-    if monday == today:
-        monday -= pd.Timedelta(weeks=1)
+    """Download yesterday's GKG file and show sample signal values."""
+    log.info("Validation: downloading recent GKG file …")
+    today     = pd.Timestamp.utcnow().normalize().tz_localize(None)
+    test_date = today - pd.Timedelta(days=1)
 
     client = _get_client()
-    data   = _download_gkg_file(client, monday)
+    data, slot, sel_type = _download_gkg_file_for_day(client, test_date)
     if data is None:
-        log.warning("Could not download validation file for %s", monday.date())
+        log.warning("Could not download validation file for %s", test_date.date())
         return
 
     docs = _parse_gkg_bytes(data)
@@ -515,44 +662,127 @@ def run_validation() -> None:
         log.warning("Could not parse validation file")
         return
 
-    stats = _compute_week_stats(docs, SECTOR_CODES, ACTOR_ALIASES)
+    stats = _compute_snapshot_stats(docs, SECTOR_CODES, ACTOR_ALIASES)
     total = next(iter(stats.values()), {}).get("total_docs", 0) if stats else 0
-    log.info("Validation file: %d docs (Monday %s)", total, monday.date())
+    log.info(
+        "Validation file: %d docs  (date=%s  slot=%s  selection=%s)",
+        total, test_date.date(), slot, sel_type,
+    )
     for sig, s in stats.items():
         log.info(
             "  %-28s  %3d docs  intensity=%.4f  tone=%.2f",
             sig, s["article_count"], s["article_count"] / max(total, 1),
-            s["avg_tone"] if not pd.isna(s["avg_tone"]) else 0,
+            s["avg_tone"] if not pd.isna(s["avg_tone"]) else 0.0,
         )
 
 
 # ── Summary ────────────────────────────────────────────────────────────────────
 
-def print_summary(processed: pd.DataFrame, n_files: int, n_skipped: int) -> None:
-    if processed.empty:
+def print_summary(
+    daily_df: pd.DataFrame,
+    weekly_df: pd.DataFrame,
+    n_exact_noon: int,
+    n_fallback: int,
+    n_missing: int,
+) -> None:
+    if weekly_df.empty:
         print("\nNo data.\n")
         return
-    fetched = set(processed["theme_or_actor"].unique())
-    missing = [s for s in ALL_SIGNALS if s not in fetched]
-    print("\n" + "=" * 68)
+
+    fetched      = set(weekly_df["theme_or_actor"].unique())
+    missing_sigs = [s for s in ALL_SIGNALS if s not in fetched]
+    n_days       = daily_df["event_date"].nunique() if not daily_df.empty else 0
+
+    print("\n" + "=" * 70)
     print("GDELT GKG 2.0 raw-file narrative signals — summary")
-    print("=" * 68)
-    print(f"  Source        : {GKG_BASE_URL}")
-    print(f"  Method        : 1 GKG file per week (Monday ~noon UTC sample)")
-    print(f"  Files fetched : {n_files}  ({n_skipped} weeks skipped / no file)")
-    print(f"  Signals       : {len(fetched)} / {len(ALL_SIGNALS)}")
-    print(f"  Weekly rows   : {len(processed):,}")
-    print(f"  Date range    : {processed['week_start'].min().date()} "
-          f"-> {processed['week_start'].max().date()}")
-    print(f"  article_count : docs matching signal in that week's snapshot")
-    print(f"  intensity     : article_count / total_docs_in_snapshot")
-    print(f"  avg_tone      : mean V2Tone[0] of matching docs")
-    print(f"  Cache         : {RAW_WEEKLY_DIR}")
-    print(f"  Processed     : {PROCESSED_PATH}")
-    print(f"  PIT store     : {PIT_DIR}")
-    if missing:
-        print(f"  WARN missing  : {missing}")
-    print("=" * 68 + "\n")
+    print("=" * 70)
+    print(f"  Source          : {GKG_BASE_URL}")
+    print(f"  Method          : 1 GKG file per UTC day (slot nearest 12:00 UTC)")
+    print(f"                    daily -> weekly via weighted aggregation")
+    print(f"  Days processed  : {n_days:,}")
+    print(f"  Exact noon      : {n_exact_noon:,}  (12:00:00 UTC file found)")
+    print(f"  Fallback nearest: {n_fallback:,}  (nearest slot within probe window)")
+    print(f"  Missing days    : {n_missing:,}  (no GKG file found)")
+    print(f"  Signals         : {len(fetched)} / {len(ALL_SIGNALS)}")
+    print(f"  Daily rows      : {len(daily_df):,}")
+    print(f"  Weekly rows     : {len(weekly_df):,}")
+    if not weekly_df.empty:
+        print(f"  Week range      : {weekly_df['week_start'].min().date()} "
+              f"→ {weekly_df['week_start'].max().date()}")
+    print(f"  article_count   : sum of daily matched docs across the week")
+    print(f"  avg_tone        : article-count-weighted mean daily tone per week")
+    print(f"  intensity       : sum(daily_matched) / sum(daily_total_docs)")
+    print(f"  Daily artifact  : {DAILY_PROCESSED}")
+    print(f"  Weekly artifact : {WEEKLY_PROCESSED}  [DAILY-DERIVED — canonical]")
+    print(f"  PIT store       : {PIT_DIR}")
+    if missing_sigs:
+        print(f"  WARN missing    : {missing_sigs}")
+    print("=" * 70 + "\n")
+
+
+# ── Write outputs helper ───────────────────────────────────────────────────────
+
+def _write_outputs(
+    daily_results: dict[pd.Timestamp, dict[str, dict]],
+    args: argparse.Namespace,
+    n_exact: int = 0,
+    n_fallback: int = 0,
+    n_missing: int = 0,
+) -> None:
+    """Build processed artifacts from daily_results and write to disk."""
+    log.info("Building daily processed artifact (%d days) …", len(daily_results))
+    daily_df = build_daily_processed(daily_results)
+
+    if daily_df.empty:
+        log.error("No daily data — aborting.")
+        sys.exit(1)
+
+    # Log per-signal daily coverage
+    for sig in sorted(daily_df["theme_or_actor"].unique()):
+        sub = daily_df[daily_df["theme_or_actor"] == sig]
+        tone_vals = sub["avg_tone"].dropna()
+        log.info(
+            "  %-28s  %4d days  intensity [%.4f–%.4f]  tone [%.1f–%.1f]",
+            sig, len(sub),
+            sub["intensity"].min(), sub["intensity"].max(),
+            float(tone_vals.min()) if len(tone_vals) else 0.0,
+            float(tone_vals.max()) if len(tone_vals) else 0.0,
+        )
+
+    # Write daily artifact (skip only in --weekly-only mode)
+    if not getattr(args, "weekly_only", False):
+        DAILY_PROCESSED.parent.mkdir(parents=True, exist_ok=True)
+        daily_df.to_parquet(DAILY_PROCESSED, index=False)
+        log.info("Saved daily: %d rows → %s", len(daily_df), DAILY_PROCESSED)
+
+    if getattr(args, "daily_only", False):
+        log.info("--daily-only: skipping weekly aggregation and PIT.")
+        return
+
+    # Aggregate daily → weekly
+    log.info("Aggregating daily → weekly …")
+    weekly_df = aggregate_daily_to_weekly(daily_df)
+
+    if weekly_df.empty:
+        log.error("Weekly aggregation produced no data — aborting.")
+        sys.exit(1)
+
+    # Archive old canonical outputs before overwriting
+    if not getattr(args, "no_archive", False):
+        archive_old_outputs()
+
+    # Write canonical weekly artifact
+    WEEKLY_PROCESSED.parent.mkdir(parents=True, exist_ok=True)
+    weekly_df.to_parquet(WEEKLY_PROCESSED, index=False)
+    log.info("Saved weekly: %d rows → %s", len(weekly_df), WEEKLY_PROCESSED)
+
+    if getattr(args, "skip_pit", False):
+        log.info("--skip-pit: skipping PIT ingest.")
+    else:
+        log.info("Ingesting into PIT store …")
+        ingest_to_pit(weekly_df)
+
+    print_summary(daily_df, weekly_df, n_exact, n_fallback, n_missing)
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -561,7 +791,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Fetch GDELT GKG 2.0 narrative signals for SMIM "
-            "from raw CSV files (free, no rate limits)."
+            "(one representative file per UTC day, aggregated to weekly)."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -571,7 +801,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--end-date", default=DEFAULT_END.strftime("%Y-%m-%d"),
-        help=f"End date. Default: {DEFAULT_END.date()}.",
+        help=f"End date (YYYY-MM-DD). Default: {DEFAULT_END.date()}.",
     )
     parser.add_argument(
         "--workers", type=int, default=5,
@@ -579,11 +809,45 @@ def main() -> None:
     )
     parser.add_argument(
         "--force-refetch", action="store_true",
-        help="Ignore per-week cache and re-download everything.",
+        help="Ignore daily cache and re-download all GKG files.",
+    )
+    parser.add_argument(
+        "--rebuild", action="store_true",
+        help=(
+            "Recompute processed outputs from existing daily cache. "
+            "No new downloads. Respects --daily-only / --weekly-only."
+        ),
+    )
+    parser.add_argument(
+        "--skip-pit", action="store_true",
+        help="Skip PIT store ingestion.",
+    )
+    parser.add_argument(
+        "--sectors-only", action="store_true",
+        help="Only compute sector signals (skip actor signals).",
+    )
+    parser.add_argument(
+        "--actors-only", action="store_true",
+        help="Only compute actor signals (skip sector signals).",
+    )
+    parser.add_argument(
+        "--daily-only", action="store_true",
+        help="Build/refresh only the daily artifact; skip weekly aggregation and PIT.",
+    )
+    parser.add_argument(
+        "--weekly-only", action="store_true",
+        help=(
+            "Rebuild weekly from existing daily cache. "
+            "No new downloads. Skips writing the daily artifact."
+        ),
+    )
+    parser.add_argument(
+        "--no-archive", action="store_true",
+        help="Skip archiving old canonical outputs (overwrite in place).",
     )
     parser.add_argument(
         "--validate-only", action="store_true",
-        help="Download last Monday's GKG file and show signal stats. No full fetch.",
+        help="Download yesterday's GKG file and show signal stats. No full fetch.",
     )
     args = parser.parse_args()
 
@@ -594,74 +858,105 @@ def main() -> None:
     start = max(pd.Timestamp(args.start_date), GKG_V2_START)
     end   = pd.Timestamp(args.end_date)
 
-    # Generate all Mondays in range
-    mondays = pd.date_range(start=start, end=end, freq="W-MON")
-    log.info(
-        "Fetching %d weekly GKG snapshots (%s → %s) with %d workers …",
-        len(mondays), mondays[0].date(), mondays[-1].date(), args.workers,
-    )
+    # Apply --sectors-only / --actors-only filters by restricting the module-level
+    # signal sets. This is done by narrowing SECTOR_CODES and ACTOR_ALIASES
+    # temporarily in the per-signal loop inside build_daily_processed (ALL_SIGNALS
+    # is module-level; we override it locally here).
+    global SECTOR_CODES, ACTOR_ALIASES, ALL_SIGNALS
+    if args.sectors_only:
+        ACTOR_ALIASES = {}
+        ALL_SIGNALS = list(SECTOR_CODES.keys())
+    elif args.actors_only:
+        SECTOR_CODES = {}
+        ALL_SIGNALS = list(ACTOR_ALIASES.keys())
 
-    # Count cache hits
-    n_cached = sum(
-        1 for m in mondays
-        if not args.force_refetch and _week_cache_path(m).exists()
-    )
-    log.info("Cache hits: %d / %d  (downloading %d files)", n_cached, len(mondays),
-             len(mondays) - n_cached)
-
-    # Fetch all weeks (parallelised)
-    weekly_stats: dict[pd.Timestamp, dict[str, dict]] = {}
-    n_skipped = 0
-    completed = 0
-
-    def _do_week(m: pd.Timestamp) -> tuple[pd.Timestamp, dict | None]:
-        return m, fetch_week(m, force=args.force_refetch)
-
-    with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        futures = {pool.submit(_do_week, m): m for m in mondays}
-        for fut in as_completed(futures):
-            monday, stats = fut.result()
-            completed += 1
-            if stats is None:
-                n_skipped += 1
-            else:
-                weekly_stats[monday] = stats
-            if completed % 50 == 0 or completed == len(mondays):
-                log.info(
-                    "  Progress: %d / %d weeks  (%d skipped)",
-                    completed, len(mondays), n_skipped,
-                )
-
-    log.info(
-        "Downloaded %d weeks (%d skipped). Building processed signals …",
-        len(weekly_stats), n_skipped,
-    )
-
-    processed = build_processed(weekly_stats, ALL_SIGNALS)
-
-    if processed.empty:
-        log.error("No data — aborting.")
-        sys.exit(1)
-
-    # Log coverage
-    for sig in sorted(processed["theme_or_actor"].unique()):
-        sub = processed[processed["theme_or_actor"] == sig]
-        n   = sub["article_count"].notna().sum()
+    # ── Weekly-only mode: rebuild from cached daily data, no new downloads ────
+    if args.weekly_only:
+        log.info("--weekly-only: loading daily cache and rebuilding weekly artifact …")
+        dates = pd.date_range(start=start, end=end, freq="D")
+        daily_results: dict[pd.Timestamp, dict[str, dict]] = {}
+        for d in dates:
+            cached = _load_daily_cache(d)
+            if cached is not None:
+                daily_results[d] = cached
         log.info(
-            "  %-28s  %3d weeks  intensity [%.4f–%.4f]  tone [%.1f–%.1f]",
-            sig, n,
-            sub["intensity"].min(), sub["intensity"].max(),
-            sub["avg_tone"].min(),  sub["avg_tone"].max(),
+            "Loaded %d / %d days from daily cache.", len(daily_results), len(dates)
+        )
+        if not daily_results:
+            log.error("No daily cache found in range. Run without --weekly-only first.")
+            sys.exit(1)
+        _write_outputs(daily_results, args)
+        return
+
+    # ── Normal fetch loop (or --rebuild) ──────────────────────────────────────
+    dates = pd.date_range(start=start, end=end, freq="D")
+    log.info(
+        "Processing %d UTC days (%s → %s) with %d workers …",
+        len(dates), dates[0].date(), dates[-1].date(), args.workers,
+    )
+
+    if args.rebuild:
+        log.info("--rebuild: loading all stats from daily cache (no downloads).")
+    elif not args.force_refetch:
+        n_cached = sum(1 for d in dates if _daily_cache_path(d).exists())
+        log.info(
+            "Cache hits: %d / %d  (downloading %d files)",
+            n_cached, len(dates), len(dates) - n_cached,
         )
 
-    PROCESSED_PATH.parent.mkdir(parents=True, exist_ok=True)
-    processed.to_parquet(PROCESSED_PATH, index=False)
-    log.info("Saved %d rows → %s", len(processed), PROCESSED_PATH)
+    daily_results: dict[pd.Timestamp, dict[str, dict]] = {}
+    sel_counts: dict[str, int] = {
+        "exact_noon": 0, "fallback_nearest": 0, "missing": 0, "cached": 0
+    }
+    # Per-date selection records for the file index (only non-cached results).
+    new_index_rows: list[dict] = []
+    completed = 0
 
-    log.info("Ingesting into PIT store …")
-    ingest_to_pit(processed)
+    def _do_day(d: pd.Timestamp) -> tuple[pd.Timestamp, dict | None, str]:
+        if args.rebuild:
+            cached = _load_daily_cache(d)
+            return (d, cached, "cached") if cached is not None else (d, None, "missing")
+        stats, sel_type = fetch_day(d, force=args.force_refetch)
+        return d, stats, sel_type
 
-    print_summary(processed, len(weekly_stats), n_skipped)
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        futures = {pool.submit(_do_day, d): d for d in dates}
+        for fut in as_completed(futures):
+            date, stats, sel_type = fut.result()
+            completed += 1
+            sel_counts[sel_type] = sel_counts.get(sel_type, 0) + 1
+            if stats is not None:
+                daily_results[date] = stats
+            if sel_type != "cached":
+                new_index_rows.append({
+                    "date":           date.strftime("%Y-%m-%d"),
+                    "slot_time":      "",
+                    "selection_type": sel_type,
+                    "url":            "",
+                })
+            if completed % 100 == 0 or completed == len(dates):
+                log.info(
+                    "  Progress: %d / %d  (missing: %d)",
+                    completed, len(dates), sel_counts.get("missing", 0),
+                )
+
+    n_exact    = sel_counts.get("exact_noon", 0)
+    n_fallback = sel_counts.get("fallback_nearest", 0)
+    n_missing  = sel_counts.get("missing", 0)
+    log.info(
+        "Selection summary: exact_noon=%d  fallback=%d  missing=%d  cached=%d",
+        n_exact, n_fallback, n_missing, sel_counts.get("cached", 0),
+    )
+
+    # Persist file index: merge new rows with existing, dedup on date.
+    if new_index_rows:
+        existing_index = _load_file_index()
+        merged = pd.concat(
+            [existing_index, pd.DataFrame(new_index_rows)], ignore_index=True
+        ).drop_duplicates(subset=["date"], keep="last")
+        _save_file_index(merged)
+
+    _write_outputs(daily_results, args, n_exact, n_fallback, n_missing)
 
 
 if __name__ == "__main__":

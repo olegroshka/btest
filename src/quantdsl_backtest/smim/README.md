@@ -414,36 +414,48 @@ modern 10-K/10-Q filers use `PaymentsToAcquirePropertyPlantAndEquipment` instead
 
 ```bash
 # No auth required — direct GKG 2.0 CSV downloads, free
-uv run python scripts/smim_fetch_gdelt.py                 # incremental (uses weekly cache)
-uv run python scripts/smim_fetch_gdelt.py --force-refetch # re-download all 567 weeks
-uv run python scripts/smim_fetch_gdelt.py --validate-only # spot-check theme basket hits
-uv run python scripts/smim_fetch_gdelt.py --workers 8     # increase parallelism
+uv run python scripts/smim_fetch_gdelt.py                  # full fetch (incremental, uses daily cache)
+uv run python scripts/smim_fetch_gdelt.py --weekly-only    # rebuild weekly from existing daily cache
+uv run python scripts/smim_fetch_gdelt.py --rebuild        # reprocess outputs from cache, no downloads
+uv run python scripts/smim_fetch_gdelt.py --force-refetch  # re-download all ~3,970 daily files
+uv run python scripts/smim_fetch_gdelt.py --validate-only  # spot-check yesterday's file
+uv run python scripts/smim_fetch_gdelt.py --workers 8      # increase parallelism
+uv run python scripts/smim_fetch_gdelt.py --daily-only     # build daily artifact only, skip weekly/PIT
 ```
 
-Fetches one GKG 2.0 file per ISO week (Monday ~noon UTC), parses V2EnhancedThemes and
-V2Organizations, and computes weekly narrative intensity (matched docs / total docs) and
-average tone for 5 sector signals and 4 institutional actor signals.
+Fetches one representative GKG 2.0 file per **UTC calendar day** (slot nearest 12:00 UTC),
+parses V2EnhancedThemes and V2Organizations, and computes per-day narrative intensity and
+tone for 5 sector signals and 4 institutional actor signals. The canonical weekly panel is
+then **derived from daily data** using mathematically correct aggregation:
 
-**Coverage (from 2026-03-22 run):** 518 / 567 weeks fetched (49 weeks had no file),
-4,662 processed rows, date range 2015-02-23 to 2025-12-29.
+- `weekly_article_count = sum(daily_article_count)` — sums matched docs across the week
+- `weekly_avg_tone = weighted mean` using `daily_article_count` as weights — not a simple mean
+- `weekly_intensity = sum(daily_matched) / sum(daily_total_docs)` — not a mean of daily ratios
+
+This replaces the old approach (one file per ISO week), which used a single 15-minute snapshot
+as a proxy for a full week. The new method aggregates ~7 samples per week, giving ~20× more
+matched documents per weekly signal value.
+
+**Coverage (from 2026-03-22 run):** 3,138 exact noon + 25 fallback + 360 missing days,
+32,481 daily rows, 5,094 weekly rows, date range 2015-02-19 to 2025-12-31.
 
 **Signals:**
 
-| Signal | Type | Intensity range |
-|--------|------|----------------|
-| `sector_energy` | Sector | 0–16% |
-| `sector_technology` | Sector | 4–40% |
-| `sector_financials` | Sector | 0–20% |
-| `sector_healthcare` | Sector | 0–57% |
-| `sector_macro` | Sector | 0–9% |
-| `actor_FED` | Institution | 0–2.9% |
-| `actor_IMF` | Institution | 0–3.8% |
-| `actor_SEC` | Institution | 0–3.6% |
+| Signal | Type | Weekly intensity range |
+|--------|------|----------------------|
+| `sector_energy` | Sector | 0–28.6% |
+| `sector_technology` | Sector | 0–66.7% |
+| `sector_financials` | Sector | 0–23.0% |
+| `sector_healthcare` | Sector | 0–66.7% |
+| `sector_macro` | Sector | 0–20.0% |
+| `actor_FED` | Institution | 0–4.0% |
+| `actor_IMF` | Institution | 0–4.5% |
+| `actor_SEC` | Institution | 0–6.2% |
 | `actor_BOE` | Institution | 0–0.09% |
 
 **Theme baskets** use actual GKG 2.0 V2EnhancedThemes codes (WB\_/ENV\_/EPU\_ hierarchy).
 Old simple codes (OIL, GAS, TECH, etc.) do not exist in GKG 2.0 — see
-`docs/smim/DATA_ACQUISITION.md` for the full basket definitions.
+`docs/smim/DATA_ACQUISITION.md` for full basket definitions and aggregation formulas.
 
 **Actor matching** is case-insensitive substring match in the V2Organizations NLP field.
 Note: GKG NLP drops "and" from org names (`"securities exchange commission"`, not
@@ -453,9 +465,11 @@ Note: GKG NLP drops "and" from org names (`"securities exchange commission"`, no
 
 | Path | Contents |
 |------|----------|
-| `data/smim/raw/gdelt/gkg_weekly/{YYYY-Www}.parquet` | Per-week parsed stats cache (re-download is idempotent) |
-| `data/smim/processed/gdelt_narrative.parquet` | Tidy table: theme_or_actor, week_start, article_count, avg_tone, intensity |
-| `data/smim/pit_store/gdelt.parquet` | PIT store shard: 14,720 rows, 3 signal_ids × 9 actors × 518 weeks |
+| `data/smim/cache/gdelt/daily_aggregates/YYYY-MM-DD.parquet` | Per-day stats cache (resumability) |
+| `data/smim/cache/gdelt/daily_file_index.parquet` | Selection log: date, slot, exact\_noon/fallback/missing |
+| `data/smim/processed/gdelt_narrative_daily.parquet` | Daily panel: theme\_or\_actor, event\_date, article\_count, avg\_tone, intensity, total\_docs\_day |
+| `data/smim/processed/gdelt_narrative.parquet` | **Canonical weekly panel** (daily-derived): theme\_or\_actor, week\_start, article\_count, avg\_tone, intensity |
+| `data/smim/pit_store/gdelt.parquet` | PIT store shard: 14,638 rows, 3 signal\_ids × 9 actors × 566 weeks |
 
 ---
 

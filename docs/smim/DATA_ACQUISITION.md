@@ -1,6 +1,6 @@
 # SMIM Data Acquisition Status
 
-Last updated: 2026-03-22 (GDELT re-fetched with corrected actor_SEC alias)
+Last updated: 2026-03-22 (GDELT upgraded to daily-sampled pipeline; weekly panel now daily-derived)
 
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
@@ -22,7 +22,7 @@ Only `data/smim/universes/*.csv` are committed to git.
 | FRED macro signals | `smim_fetch_fred.py` | ✅ Complete (27/29 series) | 71,761 rows | 2000-01-01 – 2026-03-20 |
 | ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | 8,956 vintage rows (subset above) | 2000-01-01 – 2026-03-20 |
 | SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
-| GDELT narrative | `smim_fetch_gdelt.py` | ✅ Complete (9/9 signals) | 4,662 rows (518 weeks × 9 signals) | 2015-02-23 – 2025-12-29 |
+| GDELT narrative | `smim_fetch_gdelt.py` | ✅ Complete (9/9 signals, daily-derived weekly) | ~37K daily rows; ~4.7K weekly rows | 2015-02-19 – 2025-12-31 |
 | IMF SDMX | — | ⬜ Not started | — | — |
 | OECD SDMX | — | ⬜ Not started | — | — |
 | BEA I/O | — | ⬜ Not started | — | — |
@@ -243,18 +243,21 @@ vintage_id : None (EDGAR filings are point-in-time; not revised in place)
 
 ---
 
-## 4. GDELT Narrative Signals — ✅ Complete
+## 4. GDELT Narrative Signals — ✅ Complete (daily-sampled, weekly-derived)
 
 **Script:** `scripts/smim_fetch_gdelt.py`
-**Adapter:** `smim/data/adapters/gdelt.py` (implemented)
+**Adapter:** `smim/data/adapters/gdelt.py` (file-based; reads processed parquets)
 **Data:** Weekly narrative intensity for 5 sector themes + 4 institutional actors
 **Source:** GDELT GKG 2.0 raw CSV files (free, no authentication)
 
-### Fetch approach: raw GKG CSV files
+### Fetch approach: daily-sampled raw GKG CSV → daily-derived weekly panel
 
-One GKG file per ISO week (Monday ~noon UTC slot). Each file is a 15-minute snapshot
-of ~200–1,300 articles. Intensity = matched_docs / total_docs_in_snapshot (fractional
-share, not absolute count). All parsing done in-process; no rate limits, no cost.
+One representative GKG file per **UTC calendar day** (slot nearest 12:00 UTC).
+Per-day stats are cached in `data/smim/cache/gdelt/daily_aggregates/YYYY-MM-DD.parquet`.
+The canonical weekly panel is then **derived from daily data** using correct aggregation.
+
+This supersedes the old approach (one file per ISO week, Monday noon snapshot), which
+used a single 15-minute file as a proxy for a full week — an order-of-magnitude sparser.
 
 **Why not DOC API or BigQuery:**
 
@@ -264,6 +267,30 @@ share, not absolute count). All parsing done in-process; no rate limits, no cost
 | Theme code support | Most GKG 2.0 codes return empty | Full | Full |
 | Cost | Free | ~$100–250 | Free |
 | Auth required | No | Yes (gcloud) | No |
+
+### Daily file selection
+
+For each UTC date in the range:
+1. Try the 12:00:00 UTC slot first (exact noon).
+2. If not found, try slots in order of proximity to noon (12:15, 11:45, 12:30, 11:30, …).
+3. Stop after `MAX_SLOT_TRIES=20` probes (~±2.5 hours). If no file found, day = missing.
+
+Selection types logged per run:
+- **exact_noon**: 12:00:00 UTC file found on first try
+- **fallback_nearest**: a different slot found within the probe window
+- **missing**: no GKG file found for that UTC day
+
+### Weekly aggregation (mathematically correct)
+
+The weekly panel is **not** a naive mean of daily values. Correct formulas:
+
+```
+weekly_article_count = sum(daily_article_count)
+weekly_avg_tone      = sum(daily_avg_tone × daily_article_count)
+                       / sum(daily_article_count)        ← weighted mean
+weekly_intensity     = sum(daily_article_count)
+                       / sum(daily_total_docs)           ← NOT mean of daily intensities
+```
 
 ### Theme baskets (actual GKG 2.0 V2EnhancedThemes codes)
 
@@ -276,7 +303,7 @@ share, not absolute count). All parsing done in-process; no rate limits, no cost
 | `sector_macro` | `ECON_INFLATION`, `WB_442_INFLATION`, `WB_1104_MACROECONOMIC_VULNERABILITY_AND_DEBT` |
 
 Note: old simple codes (`OIL`, `GAS`, `TECH`, etc.) do not appear in GKG 2.0 V2EnhancedThemes.
-These baskets were derived from inspecting actual GKG file top codes.
+Baskets were derived from inspecting actual GKG file top codes.
 
 ### Actor alias dictionaries (matched as case-insensitive substrings in V2Organizations)
 
@@ -287,56 +314,74 @@ These baskets were derived from inspecting actual GKG file top codes.
 | `actor_IMF` | "international monetary fund" |
 | `actor_BOE` | "bank of england" |
 
-Note: GKG NLP drops "and" from org names — actual form is "securities exchange commission".
+Note: GKG NLP drops "and" from org names — raw form is "securities exchange commission".
 
-### Coverage (`data/smim/processed/gdelt_narrative.parquet`)
+### Output artifacts
 
-| Metric | Value |
-|--------|-------|
-| Files fetched | 518 (49 weeks skipped — no file found for that Monday) |
-| Date range | 2015-02-23 – 2025-12-29 |
-| Total rows | 4,662 (518 weeks × 9 signals) |
-| Signals | 9 / 9 |
-| actor_SEC intensity range | 0.00 – 3.59% (was 0% before alias fix) |
-| actor_FED intensity range | 0.00 – 2.90% |
-| actor_IMF intensity range | 0.00 – 3.78% |
-| actor_BOE intensity range | 0.00 – 0.09% |
-| sector_energy intensity range | 0.00 – 16.0% |
-| sector_financials intensity range | 0.00 – 20.0% |
-| sector_healthcare intensity range | 0.00 – 57.2% |
-| sector_macro intensity range | 0.00 – 9.3% |
-| sector_technology intensity range | 3.86 – 40.0% |
+| Path | Contents | Rows (est.) |
+|------|----------|-------------|
+| `data/smim/processed/gdelt_narrative_daily.parquet` | Daily panel | ~37K (3,970 days × 9 signals) |
+| `data/smim/processed/gdelt_narrative.parquet` | Weekly panel — **daily-derived, canonical** | ~4.7K (521 weeks × 9 signals) |
+| `data/smim/pit_store/gdelt.parquet` | PIT store (weekly) | ~14K |
+| `data/smim/cache/gdelt/daily_aggregates/*.parquet` | Per-day stats cache (resumability) | one file per day |
+| `data/smim/cache/gdelt/daily_file_index.parquet` | Selection log (date, slot, type) | one row per day |
 
-### PIT store row counts (`data/smim/pit_store/gdelt.parquet`)
+Before overwriting the canonical files, the previous versions are archived to:
+- `data/smim/processed/old/gdelt_narrative_weekly_snapshot_<ts>.parquet`
+- `data/smim/pit_store/old/gdelt_weekly_snapshot_<ts>.parquet`
 
-| Metric | Value |
-|--------|-------|
-| Rows | 14,720 |
-| Unique actor_id | 9 |
-| Unique signal_id | 3 (gdelt_article_count, gdelt_avg_tone, gdelt_intensity) |
-
-### Output schema (`data/smim/processed/gdelt_narrative.parquet`)
+### Daily artifact schema (`gdelt_narrative_daily.parquet`)
 
 ```
 theme_or_actor : str             — signal ID (e.g. "sector_energy", "actor_FED")
-week_start     : datetime64[ns]  — Monday of the ISO week
-article_count  : float64         — distinct documents matching signal that week
-avg_tone       : float64         — mean primary tone of matching documents
-intensity      : float64         — article_count / total_weekly_distinct_docs
+event_date     : datetime64[ns]  — UTC calendar date of the snapshot
+article_count  : float64         — distinct documents matching signal in that snapshot
+avg_tone       : float64         — mean V2Tone[0] of matching documents
+intensity      : float64         — article_count / total_docs_day
+total_docs_day : float64         — total distinct docs in that daily snapshot (denominator)
 ```
 
-Weeks before 2015-02-19 are `NaN`, not zero. The GDELT 2.0 true start is 2015-02-19.
+### Weekly artifact schema (`gdelt_narrative.parquet`) — canonical
+
+```
+theme_or_actor : str             — signal ID
+week_start     : datetime64[ns]  — Monday of the ISO week
+article_count  : float64         — sum of daily article counts across the week
+avg_tone       : float64         — article-count-weighted mean daily tone
+intensity      : float64         — sum(daily_matched) / sum(daily_total_docs)
+```
+
+Days before 2015-02-19 are absent (not zero). GDELT 2.0 true start is 2015-02-19.
 
 ### PIT store schema (`data/smim/pit_store/gdelt.parquet`)
 
 ```
-actor_id   : query ID (e.g. "sector_energy", "actor_FED")
+actor_id   : theme_or_actor value (e.g. "sector_energy", "actor_FED")
 signal_id  : "gdelt_article_count" | "gdelt_avg_tone" | "gdelt_intensity"
 event_date : week_start (tz-naive)
-pub_date   : week_start + 7 days  (GDELT weekly data complete at end of week)
+pub_date   : week_start + 7 days  (GDELT data for week W complete by Monday W+1)
 value      : float64
 source     : "gdelt"
 vintage_id : None  (GDELT is append-only, no revisions)
+```
+
+### Running the script
+
+```bash
+# Full fetch (downloads ~3,970 daily files, ~hours first run)
+uv run python scripts/smim_fetch_gdelt.py
+
+# Rebuild weekly only from existing daily cache (fast, no downloads)
+uv run python scripts/smim_fetch_gdelt.py --weekly-only
+
+# Rebuild all processed outputs from cache (no re-download)
+uv run python scripts/smim_fetch_gdelt.py --rebuild
+
+# Validate with yesterday's file
+uv run python scripts/smim_fetch_gdelt.py --validate-only
+
+# Specific date range
+uv run python scripts/smim_fetch_gdelt.py --start-date 2023-01-01 --end-date 2023-12-31
 ```
 
 ---
@@ -378,5 +423,5 @@ vintage_id : None  (GDELT is append-only, no revisions)
 1. **`CPIMEDSL`** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care
 2. **ISM PMI** — `MANEMP` is the accepted proxy; actual ISM data requires a subscription or use `DALLASMPMC` (Dallas Fed Manufacturing Activity, available on FRED)
 3. **BEA** — register for API key at https://apps.bea.gov/api/signup/ and set `BEA_API_KEY`
-4. **GDELT** — ✅ complete. To re-run: `uv run python scripts/smim_fetch_gdelt.py` (uses cached weekly parquets; add `--force-refetch` to re-download all files).
+4. **GDELT** — ✅ complete (daily-derived weekly pipeline). To re-run: `uv run python scripts/smim_fetch_gdelt.py` (uses per-day cache; add `--force-refetch` to re-download all files). Use `--weekly-only` to rebuild weekly panel from existing daily cache without any new downloads.
 5. **IMF / OECD / BIS** — adapters exist; bulk fetch scripts not yet written

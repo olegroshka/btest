@@ -1,46 +1,71 @@
 """GDELT 2.0 narrative intensity adapter for SMIM.
 
-Uses the GDELT DOC API v2 Timeline endpoint to retrieve article-count and
-tone time series for configured CAMEO themes. Aggregates to daily frequency.
+Loads pre-processed narrative signals from the canonical parquet files produced
+by scripts/smim_fetch_gdelt.py.
 
-GDELT data is append-only — no revisions — so pub_date equals event_date
-for the purpose of PIT compliance. The 15-minute publication lag is
-negligible at daily aggregation.
+Data pipeline:
+    1. smim_fetch_gdelt.py downloads one representative GKG 2.0 CSV file per UTC
+       day (slot nearest 12:00 UTC), parses it, and caches daily per-signal stats.
+    2. It aggregates daily stats to a weekly panel using correct weighted formulas
+       (see script docstring), writing:
+         data/smim/processed/gdelt_narrative_daily.parquet  — daily panel
+         data/smim/processed/gdelt_narrative.parquet         — weekly panel (canonical)
+    3. This adapter reads those parquet files — it does NOT call the GDELT DOC API.
 
-Endpoint:
-    https://api.gdeltproject.org/api/v2/doc/doc
+Why not DOC API:
+    - Rate-limited to ~1 req/5s; common theme codes trigger 429s lasting hours.
+    - Most GKG 2.0 V2EnhancedThemes codes return empty via DOC API even though
+      they are present in the raw GKG files.
+
+Available signals (theme_or_actor values):
+    sector_energy, sector_technology, sector_financials, sector_healthcare,
+    sector_macro, actor_FED, actor_SEC, actor_IMF, actor_BOE
+
+GDELT data is append-only (no revisions).
+pub_date = week_start + 7 days (conservative: data for week W complete by W+1 Mon).
 """
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
-from urllib.parse import urlencode
+from pathlib import Path
 
 import pandas as pd
 
 from quantdsl_backtest.smim.config import GdeltConfig
 from quantdsl_backtest.smim.interfaces import DateRange
 
-_BASE_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
-_DT_FMT = "%Y%m%d%H%M%S"
-
-
-def _ts_to_gdelt(ts: pd.Timestamp) -> str:
-    return ts.strftime(_DT_FMT)
+# Resolve canonical data paths relative to the repo root.
+# gdelt.py is at: src/quantdsl_backtest/smim/data/adapters/gdelt.py
+# parents[5] = repo root
+_REPO_ROOT = Path(__file__).parents[5]
+_WEEKLY_PARQUET = _REPO_ROOT / "data" / "smim" / "processed" / "gdelt_narrative.parquet"
+_DAILY_PARQUET  = _REPO_ROOT / "data" / "smim" / "processed" / "gdelt_narrative_daily.parquet"
 
 
 @dataclass
 class GdeltAdapter:
-    """GDELT DOC API v2 adapter for narrative theme intensity.
+    """File-based GDELT adapter that reads from pre-processed narrative parquets.
+
+    Reads the canonical weekly parquet produced by scripts/smim_fetch_gdelt.py.
+    The weekly dataset is daily-derived and uses mathematically correct aggregation:
+      - article_count = sum of daily matched article counts across the week
+      - avg_tone      = article-count-weighted mean of daily tone values
+      - intensity     = sum(daily_matched) / sum(daily_total_docs)
+
+    ``series_ids`` in ``fetch()`` are SMIM signal IDs (e.g. ``"sector_energy"``,
+    ``"actor_FED"``), matching the ``theme_or_actor`` column in the parquet.
 
     Args:
-        config: ``GdeltConfig`` from ``SmimConfig.data.gdelt``.
-        http_client: Optional injectable HTTP client (for testing).
+        config:       GdeltConfig from SmimConfig.data.gdelt (unused at fetch time;
+                      kept for interface compatibility).
+        parquet_path: Override path for the canonical weekly parquet (for testing).
+        use_daily:    If True, read the daily parquet instead of the weekly one.
     """
 
     config: GdeltConfig = field(default_factory=GdeltConfig)
-    http_client: object | None = None
+    parquet_path: Path | None = None
+    use_daily: bool = False
 
     @property
     def source_name(self) -> str:
@@ -52,113 +77,57 @@ class GdeltAdapter:
         date_range: DateRange,
         as_of: pd.Timestamp | None = None,
     ) -> pd.DataFrame:
-        """Fetch daily narrative intensity for given GDELT themes.
+        """Fetch narrative intensity for the requested signals.
 
-        ``series_ids`` are GDELT theme codes (e.g. ``["ECON_ENERGY"]``).
-        If empty, uses ``config.themes``.
-
-        Returns a wide DataFrame indexed by ``event_date`` with columns
-        ``{theme}_count`` and ``{theme}_tone`` for each theme.
+        Returns a wide DataFrame indexed by ``event_date`` (= ``week_start`` for
+        weekly data, or ``event_date`` for daily data) with columns:
+            ``{signal_id}_count``, ``{signal_id}_tone``, ``{signal_id}_intensity``
 
         Args:
-            series_ids: GDELT theme codes, or empty list to use config themes.
-            date_range: Observation window.
-            as_of: Applied only as an upper-bound filter on ``event_date``
-                since GDELT data is never revised (pub_date ≈ event_date).
+            series_ids: SMIM signal IDs, or empty list to return all signals.
+            date_range: Observation window (inclusive on both ends).
+            as_of:      Upper bound on event_date for PIT compliance.
         """
-        themes = series_ids if series_ids else self.config.themes
+        if self.use_daily:
+            path       = self.parquet_path or _DAILY_PARQUET
+            date_col   = "event_date"
+        else:
+            path       = self.parquet_path or _WEEKLY_PARQUET
+            date_col   = "week_start"
+
+        if not path.exists():
+            raise FileNotFoundError(
+                f"GDELT processed parquet not found: {path}\n"
+                f"Run: uv run python scripts/smim_fetch_gdelt.py"
+            )
+
+        df = pd.read_parquet(path)
+
         effective_end = date_range.end
         if as_of is not None and as_of < effective_end:
             effective_end = as_of
 
-        client = self._get_client()
-        frames: list[pd.DataFrame] = []
+        mask = (df[date_col] >= date_range.start) & (df[date_col] <= effective_end)
+        df = df[mask].copy()
 
-        for theme in themes:
-            vol_df = self._fetch_timeline(
-                client, theme, date_range.start, effective_end, mode="timelinevol"
-            )
-            tone_df = self._fetch_timeline(
-                client, theme, date_range.start, effective_end, mode="timelinecovtone"
-            )
-            if vol_df is not None:
-                vol_df = vol_df.rename(columns={"value": f"{theme}_count"})
-            if tone_df is not None:
-                tone_df = tone_df.rename(columns={"value": f"{theme}_tone"})
-            parts = [df for df in [vol_df, tone_df] if df is not None]
-            if not parts:
-                continue
-            merged = pd.concat(parts, axis=1)
-            if not merged.empty:
-                frames.append(merged)
+        if series_ids:
+            df = df[df["theme_or_actor"].isin(series_ids)]
 
-        if not frames:
+        if df.empty:
             return pd.DataFrame()
 
-        result = pd.concat(frames, axis=1)
+        # Pivot to wide format.
+        wide: dict[pd.Timestamp, dict] = {}
+        for _, row in df.iterrows():
+            dt  = row[date_col]
+            sig = row["theme_or_actor"]
+            if dt not in wide:
+                wide[dt] = {}
+            wide[dt][f"{sig}_count"]     = row["article_count"]
+            wide[dt][f"{sig}_tone"]      = row["avg_tone"]
+            wide[dt][f"{sig}_intensity"] = row["intensity"]
+
+        result = pd.DataFrame.from_dict(wide, orient="index")
         result.index.name = "event_date"
+        result.sort_index(inplace=True)
         return result.astype("float64")
-
-    def _fetch_timeline(
-        self,
-        client: object,
-        theme: str,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-        mode: str,
-    ) -> pd.DataFrame | None:
-        params = {
-            "query": f"theme:{theme}",
-            "mode": mode,
-            "format": "json",
-            "startdatetime": _ts_to_gdelt(start),
-            "enddatetime": _ts_to_gdelt(end),
-            "timelinesmooth": "5",
-        }
-        url = f"{_BASE_URL}?{urlencode(params)}"
-        resp = client.get(url)  # type: ignore[attr-defined]
-        if resp.status_code != 200:
-            return None
-        data = resp.json()
-        timeline = data.get("timeline") or []
-        if not timeline:
-            return None
-
-        # The timeline list may be a list of dicts or a list of series
-        # GDELT returns: [{"series": [{"date": "...", "value": ...}]}]
-        # or directly: [{"date": "...", "value": ...}]
-        if isinstance(timeline[0], dict) and "series" in timeline[0]:
-            rows = timeline[0]["series"]
-        else:
-            rows = timeline
-
-        records = []
-        for row in rows:
-            dt_str = row.get("date", "")
-            val = row.get("value")
-            if dt_str and val is not None:
-                # GDELT dates: YYYYMMDDHHMMSS
-                try:
-                    dt = pd.to_datetime(dt_str, format=_DT_FMT)
-                except ValueError:
-                    dt = pd.to_datetime(dt_str)
-                records.append({"event_date": dt.normalize(), "value": float(val)})
-
-        if not records:
-            return None
-
-        df = pd.DataFrame(records).set_index("event_date")
-        # Aggregate to daily (sum for volume, mean for tone)
-        agg = "sum" if mode == "timelinevol" else "mean"
-        return df.resample("D").agg(agg)  # type: ignore[return-value]
-
-    def _get_client(self) -> object:
-        if self.http_client is not None:
-            return self.http_client
-        try:
-            import httpx  # type: ignore[import-untyped]
-        except ImportError as exc:
-            raise RuntimeError(
-                "httpx is required for GdeltAdapter. Install with: pip install httpx"
-            ) from exc
-        return httpx.Client(timeout=60.0)
