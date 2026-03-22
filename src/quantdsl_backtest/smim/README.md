@@ -269,6 +269,81 @@ uv run python -c "import torch; print(torch.__version__, torch.cuda.is_available
 
 ---
 
+## Data Acquisition
+
+SMIM experiments require equity OHLCV data and macro/alternative data.
+The equity universe construction and download is handled by a single script.
+
+### Equity universes + OHLCV
+
+```bash
+# Build all universe CSVs and download OHLCV (full run, ~20 min)
+uv run python scripts/smim_build_universes.py
+
+# Individual steps
+uv run python scripts/smim_build_universes.py --step 1          # universe CSVs only
+uv run python scripts/smim_build_universes.py --step 2          # OHLCV download only
+uv run python scripts/smim_build_universes.py --step 3          # quality verification only
+
+# Retry specific universes (useful after partial failures)
+uv run python scripts/smim_build_universes.py --step 2 3 --only US-LC MIXED-200
+
+# Skip live market-cap fetch for US-LC (uses CSV order instead)
+uv run python scripts/smim_build_universes.py --skip-market-cap
+```
+
+**Outputs:**
+
+| Path | Contents |
+|------|----------|
+| `data/smim/universes/*.csv` | Ticker lists (columns: `ticker, name, sector, gics_code`) — committed to git |
+| `equities/smim/{universe_id}/ohlcv.parquet` | Daily OHLCV, long-form — gitignored (large binary) |
+
+**Universes built:**
+
+| ID | Description | ~Size |
+|----|-------------|-------|
+| `US-LC` | Top-200 S&P 500 by market cap | 200 tickers |
+| `US-LC-ENERGY` | S&P 500 GICS sector 10 (Energy) | ~22 tickers |
+| `US-LC-TECH` | S&P 500 GICS sector 45 (IT) | ~68 tickers |
+| `US-LC-FINS` | S&P 500 GICS sector 40 (Financials) | ~74 tickers |
+| `US-LC-HEALTH` | S&P 500 GICS sector 35 (Health Care) | ~60 tickers |
+| `US-LC-INDUS` | S&P 500 GICS sector 20 (Industrials) | ~78 tickers |
+| `US-MC` | 200 S&P 400 mid-cap names | 200 tickers |
+| `US-SC` | 200 Russell 2000 small-cap (stratified, seed=42) | 200 tickers |
+| `UK-LC` | FTSE 100 (Yahoo Finance `.L` suffix) | ~99 tickers |
+| `UK-MC` | FTSE 250 ex-100 | ~100 tickers |
+| `MIXED-200` | US energy (S&P 500) + UK energy (FTSE 100) — MVP Layer-2 universe | ~27 tickers |
+
+**OHLCV parquet schema** (long-form):
+
+```
+date       datetime64[ns]
+ticker     str
+open       float64
+high       float64
+low        float64
+close      float64
+volume     float64
+sector     str  (from universe CSV, may be NaN for UK tickers)
+```
+
+**Date range:** 2005-01-03 to 2025-12-30 for all universes.
+Each ticker starts from its IPO date — tickers listed after 2005 will have
+fewer rows than the full 20-year range. This is expected and correct.
+
+**Sparse ticker flags** in the step-3 quality report flag tickers with
+<50% of the max trading-day count. For post-IPO companies (e.g. `ABNB`,
+`COIN`, `CRWD`, `MRNA`) this is expected — their history is simply shorter.
+
+**Download implementation note:** the script uses `yf.download()` with a
+per-chunk outer-join strategy so each ticker retains its own date range.
+The earlier vectorbt batch approach caused inner-join truncation (one
+recent-IPO ticker in a chunk would silently truncate all others to its
+listing date); that approach has been replaced.
+
+---
+
 ## Running Tests
 
 ### Unit tests (~15 s)
