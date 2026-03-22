@@ -5,21 +5,28 @@ Last updated: 2026-03-22
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
 
+All data files are **gitignored** — they live on disk only:
+- `data/smim/raw/` — raw downloaded files
+- `data/smim/processed/` — normalised parquets
+- `data/smim/pit_store/` — PIT store shards (A1-compliant, queryable by `as_of`)
+
+Only `data/smim/universes/*.csv` are committed to git.
+
 ---
 
 ## Summary
 
-| Source | Script | Status | Observations | Date range |
-|--------|--------|--------|-------------|------------|
-| Equity OHLCV (Yahoo Finance) | `smim_build_universes.py` | Complete | ~11 universes | 2005–2025 |
-| FRED macro signals | `smim_fetch_fred.py` | Complete (27/29 series) | 71,761 | 2000–2026 |
-| ALFRED vintages | `smim_fetch_fred.py` | Complete (5 series) | included above | 2000–2026 |
-| SEC EDGAR | `smim_fetch_edgar.py` | Complete (765/772 tickers) | 461,203 | 2005–2026 |
-| GDELT | — | Not started | — | — |
-| IMF SDMX | — | Not started | — | — |
-| OECD SDMX | — | Not started | — | — |
-| BEA I/O | — | Not started | — | — |
-| BIS | — | Not started | — | — |
+| Source | Script | Status | Records | Event date range |
+|--------|--------|--------|---------|-----------------|
+| Equity OHLCV (Yahoo Finance) | `smim_build_universes.py` | ✅ Complete | 11 universes | 2005-01-03 – 2025-12-30 |
+| FRED macro signals | `smim_fetch_fred.py` | ✅ Complete (27/29 series) | 71,761 rows | 2000-01-01 – 2026-03-20 |
+| ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | 8,956 vintage rows (subset above) | 2000-01-01 – 2026-03-20 |
+| SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
+| GDELT | — | ⬜ Not started | — | — |
+| IMF SDMX | — | ⬜ Not started | — | — |
+| OECD SDMX | — | ⬜ Not started | — | — |
+| BEA I/O | — | ⬜ Not started | — | — |
+| BIS | — | ⬜ Not started | — | — |
 
 ---
 
@@ -34,11 +41,11 @@ has been acquired, what failed, and why. Update it after every acquisition run.
 | Universe ID | Tickers | OHLCV path |
 |-------------|---------|------------|
 | `US-LC` | 200 (top S&P 500 by mkt cap) | `equities/smim/US-LC/ohlcv.parquet` |
-| `US-LC-ENERGY` | ~22 (S&P 500 GICS 10) | `equities/smim/US-LC-ENERGY/ohlcv.parquet` |
-| `US-LC-TECH` | ~68 (S&P 500 GICS 45) | `equities/smim/US-LC-TECH/ohlcv.parquet` |
-| `US-LC-FINS` | ~74 (S&P 500 GICS 40) | `equities/smim/US-LC-FINS/ohlcv.parquet` |
-| `US-LC-HEALTH` | ~60 (S&P 500 GICS 35) | `equities/smim/US-LC-HEALTH/ohlcv.parquet` |
-| `US-LC-INDUS` | ~78 (S&P 500 GICS 20) | `equities/smim/US-LC-INDUS/ohlcv.parquet` |
+| `US-LC-ENERGY` | 22 (S&P 500 GICS 10) | `equities/smim/US-LC-ENERGY/ohlcv.parquet` |
+| `US-LC-TECH` | 68 (S&P 500 GICS 45) | `equities/smim/US-LC-TECH/ohlcv.parquet` |
+| `US-LC-FINS` | 74 (S&P 500 GICS 40) | `equities/smim/US-LC-FINS/ohlcv.parquet` |
+| `US-LC-HEALTH` | 60 (S&P 500 GICS 35) | `equities/smim/US-LC-HEALTH/ohlcv.parquet` |
+| `US-LC-INDUS` | 78 (S&P 500 GICS 20) | `equities/smim/US-LC-INDUS/ohlcv.parquet` |
 | `US-MC` | 200 (S&P 400) | `equities/smim/US-MC/ohlcv.parquet` |
 | `US-SC` | 200 (Russell 2000, stratified seed=42) | `equities/smim/US-SC/ohlcv.parquet` |
 | `UK-LC` | ~99 (FTSE 100, `.L` suffix) | `equities/smim/UK-LC/ohlcv.parquet` |
@@ -51,51 +58,77 @@ their IPO date — shorter history is correct, not a gap.
 **Known sparse tickers** (flagged by step-3 QC, all expected post-IPO companies):
 `ABNB`, `COIN`, `CRWD`, `MRNA`, and similar recent listings.
 
+**OHLCV parquet schema** (long-form):
+```
+date       datetime64[ns]
+ticker     str
+open, high, low, close  float64
+volume     float64
+sector     str  (from universe CSV; may be NaN for UK tickers)
+```
+
 ---
 
-## 2. FRED Macro Signals
+## 2. FRED Macro Signals + ALFRED Vintages
 
 **Script:** `scripts/smim_fetch_fred.py`
 **Status:** Complete — 27/29 series acquired
 **Run date:** 2026-03-22
 **API key:** `FRED_API_KEY` environment variable
 
+### Row counts (from `data/smim/processed/fred_signals.parquet`)
+
+| Metric | Value |
+|--------|-------|
+| Total rows | 71,761 |
+| Distinct signals | 27 |
+| Event date range | 2000-01-01 – 2026-03-20 |
+| Pub date range | 2000-01-31 – 2026-04-19 |
+| ALFRED vintage rows | 8,956 (subset of total, for GDP/UNRATE/CPIAUCSL/INDPRO/FEDFUNDS) |
+
+### PIT store (`data/smim/pit_store/fred.parquet`)
+
+| Metric | Value |
+|--------|-------|
+| Rows | 64,165 (de-duped on natural key vs 71,761 processed; ALFRED revisions keep latest pub_date) |
+| actor_id | 1 (always "MACRO") |
+| signal_id | 27 |
+
 ### Acquired series (27)
 
-| FRED ID | Description | Frequency | Layer |
-|---------|-------------|-----------|-------|
-| `GDP` | Nominal GDP | Quarterly | L0 exogenous |
-| `GDPC1` | Real GDP (chained) | Quarterly | L0 exogenous |
-| `INDPRO` | Industrial Production Index | Monthly | L0 exogenous |
-| `MANEMP` | Manufacturing employment (PMI proxy) | Monthly | L0 exogenous |
-| `UNRATE` | Unemployment rate | Monthly | L0 exogenous |
-| `CPIAUCSL` | CPI All Urban Consumers | Monthly | L0 exogenous |
-| `CPILFESL` | CPI Less Food & Energy (core) | Monthly | L0 exogenous |
-| `PCEPI` | PCE Price Index | Monthly | L0 exogenous |
-| `FEDFUNDS` | Federal Funds Rate (monthly avg) | Monthly | L1 upstream |
-| `DFF` | Federal Funds Rate (daily) | Daily | L1 upstream |
-| `GS10` | 10-year Treasury yield | Daily | L1 upstream |
-| `GS2` | 2-year Treasury yield | Daily | L1 upstream |
-| `T10Y2Y` | 10yr–2yr yield spread | Daily | L1 upstream |
-| `BAA10Y` | Moody's BAA spread over 10yr | Daily | L1 upstream |
-| `BAMLH0A0HYM2` | ICE BofA HY OAS | Daily | L1 upstream |
-| `VIXCLS` | CBOE VIX | Daily | L0 exogenous |
-| `STLFSI2` | St. Louis Fed Financial Stress Index | Weekly | L0 exogenous |
-| `UMCSENT` | U. Michigan Consumer Sentiment | Monthly | L0 exogenous |
-| `USSLIND` | US Leading Index | Monthly | L0 exogenous |
-| `HOUST` | Housing Starts | Monthly | L0 exogenous |
-| `M2SL` | M2 Money Supply | Monthly | L0 exogenous |
-| `TOTBKCR` | Total Bank Credit | Weekly | L1 upstream |
-| `DTWEXBGS` | Trade-weighted USD (goods, services) | Daily | L0 exogenous |
-| `DCOILWTICO` | WTI Crude Oil Price | Daily | Energy sector |
-| `DCOILBRENTEU` | Brent Crude Oil Price | Daily | Energy sector |
-| `GASREGW` | US Regular Gasoline Price | Weekly | Energy sector |
-| `DRCCLACBS` | Credit Card Delinquency Rate | Quarterly | Financials sector |
+| FRED ID | Rows | Frequency | Layer |
+|---------|------|-----------|-------|
+| `DFF` | 9,575 | Daily | L1 upstream |
+| `BAMLH0A0HYM2` | 6,928 | Daily | L1 upstream |
+| `T10Y2Y` | 6,840 | Daily | L1 upstream |
+| `VIXCLS` | 6,839 | Daily | L0 exogenous |
+| `BAA10Y` | 6,839 | Daily | L1 upstream |
+| `DCOILWTICO` | 6,836 | Daily | Energy sector |
+| `DCOILBRENTEU` | 6,836 | Daily | Energy sector |
+| `DTWEXBGS` | 5,270 | Daily | L0 exogenous |
+| `INDPRO` | 5,437 | Monthly | L0 exogenous |
+| `GASREGW` | 1,368 | Weekly | Energy sector |
+| `TOTBKCR` | 1,367 | Weekly | L1 upstream |
+| `STLFSI2` | 1,149 | Weekly | L0 exogenous |
+| `GDP` | 1,032 | Quarterly | L0 exogenous |
+| `CPIAUCSL` | 1,581 | Monthly | L0 exogenous |
+| `UNRATE` | 590 | Monthly | L0 exogenous |
+| `FEDFUNDS` | 316 | Monthly | L1 upstream |
+| `CPILFESL` | 314 | Monthly | L0 exogenous |
+| `GS10` | 314 | Daily | L1 upstream |
+| `GS2` | 314 | Daily | L1 upstream |
+| `MANEMP` | 314 | Monthly | L0 exogenous |
+| `GDPC1` | ~300 | Quarterly | L0 exogenous |
+| `PCEPI` | ~310 | Monthly | L0 exogenous |
+| `UMCSENT` | ~310 | Monthly | L0 exogenous |
+| `USSLIND` | ~310 | Monthly | L0 exogenous |
+| `HOUST` | ~310 | Monthly | L0 exogenous |
+| `M2SL` | ~310 | Monthly | L0 exogenous |
+| `DRCCLACBS` | ~85 | Quarterly | Financials sector |
 
 ### ALFRED vintage series (5)
 
-Full historical vintage histories were downloaded for the 5 most important
-revision-prone series. Each published revision becomes a separate PIT record.
+Full historical vintage histories (each revision = separate PIT record):
 
 | FRED ID | Why vintaged |
 |---------|-------------|
@@ -109,16 +142,16 @@ revision-prone series. Each published revision becomes a separate PIT record.
 
 | FRED ID | Error | Root cause | Replacement |
 |---------|-------|-----------|-------------|
-| `NAPM` | `Bad Request. The series does not exist.` | ISM Manufacturing PMI is not available on FRED under this ID. NAPM (National Association of Purchasing Management) was renamed to ISM but never uploaded to FRED as a continuous series. | Use `MANEMP` (manufacturing employment) as the PMI proxy — already acquired. For actual ISM data, ISM charges a subscription fee; free proxy via MANEMP is standard in academic literature. |
-| `CUSR0000SAM` | `Bad Request. The series does not exist.` | The CPI Medical Care subindex ID format has changed. FRED uses region-prefixed IDs for CPI sub-components. | Correct ID is `CPIMEDSL` (CPI: Medical Care). Will be added in a follow-up run. |
+| `NAPM` | `Bad Request. The series does not exist.` | ISM Manufacturing PMI renamed to ISM; never uploaded to FRED as a continuous series. | `MANEMP` (manufacturing employment) — already acquired. Standard academic proxy. |
+| `CUSR0000SAM` | `Bad Request. The series does not exist.` | CPI Medical Care subindex ID changed. | Correct ID is `CPIMEDSL`. Not yet re-fetched — see Remediation TODO. |
 
 ### Output paths
 
 | Path | Contents |
 |------|----------|
-| `data/smim/raw/fred/<SERIES>.parquet` | Raw per-series observations from FRED API |
-| `data/smim/raw/fred/<SERIES>_alfred.parquet` | Raw ALFRED all-releases for vintaged series |
-| `data/smim/processed/fred_signals.parquet` | Unified normalised table (all series, tidy format) |
+| `data/smim/raw/fred/<SERIES>.parquet` | Raw per-series observations from FRED API (27 files) |
+| `data/smim/raw/fred/<SERIES>_alfred.parquet` | Raw ALFRED all-releases for 5 vintaged series |
+| `data/smim/processed/fred_signals.parquet` | Unified normalised table — columns: `signal_id, event_date, value, pub_date, vintage_id` |
 | `data/smim/pit_store/fred.parquet` | PIT store shard — A1-compliant, queryable by `as_of` |
 
 ### PIT store schema
@@ -127,8 +160,8 @@ revision-prone series. Each published revision becomes a separate PIT record.
 actor_id   : "MACRO"  (macro series have no single equity actor)
 signal_id  : FRED series ID (e.g. "FEDFUNDS")
 event_date : observation date (tz-naive)
-pub_date   : for ALFRED series: realtime_start of the vintage
-             for others: event_date + 30 days (conservative publication lag)
+pub_date   : ALFRED series → realtime_start of the vintage
+             non-ALFRED → event_date + 30 days (conservative publication lag)
 value      : float64
 source     : "fred"
 vintage_id : pub_date string for ALFRED series; None otherwise
@@ -136,57 +169,56 @@ vintage_id : pub_date string for ALFRED series; None otherwise
 
 ---
 
-## 3. SEC EDGAR — Complete
+## 3. SEC EDGAR XBRL — Complete
 
 **Script:** `scripts/smim_fetch_edgar.py`
 **Status:** Complete
 **Run date:** 2026-03-22
+**API key:** None required — SEC only needs a descriptive `User-Agent` header
 
 ### Method
 
-1. Downloads the CIK mapping from `https://www.sec.gov/files/company_tickers.json`
-2. Fetches company-facts XBRL JSON from `https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json`
-   for each US ticker across US-LC, US-MC, US-SC, and all sector-slice universes
-3. The EDGAR `filed` date is used as `pub_date` — strictly A1-compliant
+1. Downloads CIK mapping from `https://www.sec.gov/files/company_tickers.json`
+2. For each US ticker (US-LC, US-MC, US-SC + 5 sector slices), fetches:
+   `https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_zero_padded_10}.json`
+3. Extracts all 10-K and 10-Q observations for the configured XBRL tags
+4. Uses EDGAR `filed` date as `pub_date` — exact date the data became public (A1-compliant)
+5. Rate-limited at 0.15 s/request (~6.7 req/s, safely under SEC's 10 req/s limit)
 
-### Coverage
+### Coverage (`data/smim/processed/edgar_balance_sheet.parquet`)
 
 | Metric | Value |
 |--------|-------|
-| Tickers attempted | 772 (780 universe tickers, 8 with no CIK mapping) |
+| Universe tickers | 780 (across 8 US universe files) |
+| No CIK mapping | 8 — `DAY`, `FI`, `FRBA`, `MMC`, `MOGA`, `PDLI`, `THRD`, `XTSLA` (de-listed / renamed / non-reporting) |
+| Tickers attempted | 772 |
 | Tickers with data | 765 |
+| No XBRL data | 7 — `BBUC`, `BTDR`, `CMDB`, `GAMB`, `HSHP`, `LZM`, `VTEX` (SPACs / cross-listings / foreign private issuers) |
 | Total filing records | 461,203 |
-| Date range | 2005-07-04 to 2026-02-28 |
-| Filing types | 10-K, 10-Q |
+| Event date range | 2005-07-04 – 2026-02-28 |
+| Pub date range | 2009-04-15 – 2026-03-20 |
+| 10-Q records | 320,332 |
+| 10-K records | 140,871 |
+| Unique CIKs | 764 (one ticker shares a CIK with another) |
 
 ### XBRL tag coverage
 
-| Tag | Tickers |
-|-----|---------|
-| `Assets` | 765 |
-| `StockholdersEquity` | 757 |
-| `PaymentsToAcquirePropertyPlantAndEquipment` (CapEx) | 611 |
-| `LongTermDebt` | 605 |
-| `Revenues` | 559 |
-| `RevenueFromContractWithCustomerExcludingAssessedTax` | 537 |
-| `ResearchAndDevelopmentExpense` | 341 |
-| `CapitalExpenditures` (legacy tag) | 0 — superseded by PaymentsToAcquire… |
-
-### No-data tickers (7)
-
-`BBUC`, `BTDR`, `CMDB`, `GAMB`, `HSHP`, `LZM`, `VTEX`
-— Recent cross-listings, SPACs, or foreign private issuers with no EDGAR XBRL history.
-
-### No-CIK tickers (8)
-
-`DAY`, `FI`, `FRBA`, `MMC`, `MOGA`, `PDLI`, `THRD`, `XTSLA`
-— De-listed, renamed, or non-reporting entities not in SEC company_tickers.json.
+| Tag | Tickers | Notes |
+|-----|---------|-------|
+| `Assets` | 765 | Near-universal |
+| `StockholdersEquity` | 757 | Near-universal |
+| `PaymentsToAcquirePropertyPlantAndEquipment` | 611 | Modern CapEx tag |
+| `LongTermDebt` | 605 | |
+| `Revenues` | 559 | Older revenue tag |
+| `RevenueFromContractWithCustomerExcludingAssessedTax` | 537 | ASC 606 revenue tag (post-2018) |
+| `ResearchAndDevelopmentExpense` | 341 | Zero for non-R&D sectors |
+| `CapitalExpenditures` | 0 | Legacy tag; superseded by `PaymentsToAcquire…` — no filings use it |
 
 ### Output paths
 
 | Path | Contents |
 |------|----------|
-| `data/smim/processed/edgar_balance_sheet.parquet` | Normalised tidy table: `ticker, cik, event_date, pub_date, tag, value, form_type, period` |
+| `data/smim/processed/edgar_balance_sheet.parquet` | Normalised tidy table — columns: `ticker, cik, event_date, pub_date, tag, value, form_type, period` |
 | `data/smim/pit_store/edgar.parquet` | PIT store shard — A1-compliant, queryable by `as_of` |
 
 ### PIT store schema
@@ -195,11 +227,19 @@ vintage_id : pub_date string for ALFRED series; None otherwise
 actor_id   : ticker (e.g. "AAPL")
 signal_id  : XBRL tag (e.g. "Assets")
 event_date : period end date (tz-naive)
-pub_date   : EDGAR filing date — the exact date data became public (A1-compliant)
+pub_date   : EDGAR filing date — exact date data became public (A1-compliant)
 value      : float64
 source     : "edgar"
-vintage_id : None (EDGAR filings are not revised in place)
+vintage_id : None (EDGAR filings are point-in-time; not revised in place)
 ```
+
+### PIT store row counts (`data/smim/pit_store/edgar.parquet`)
+
+| Metric | Value |
+|--------|-------|
+| Rows | 461,203 |
+| Unique actor_id (tickers) | 765 |
+| Unique signal_id (XBRL tags) | 7 |
 
 ---
 
@@ -231,7 +271,7 @@ vintage_id : None (EDGAR filings are not revised in place)
 
 **Adapter:** `smim/data/adapters/bea_io.py` (implemented)
 **Planned data:** Supply-chain edges (Use and Make tables)
-**Blocker:** BEA_API_KEY environment variable required (free registration at bea.gov)
+**Blocker:** `BEA_API_KEY` environment variable required (free registration at bea.gov)
 
 ---
 
@@ -245,7 +285,7 @@ vintage_id : None (EDGAR filings are not revised in place)
 
 ## Remediation TODO
 
-1. **`CPIMEDSL`** — re-run `smim_fetch_fred.py` after adding the correct ID to `MACRO_SERIES`
-2. **ISM PMI** — `MANEMP` is an acceptable proxy; if actual ISM data is needed, source via a subscription or use the Dallas Fed Manufacturing Activity survey (`DALLASMPMC`) which is on FRED
-3. **EDGAR** — ✅ Complete (2026-03-22); 765/772 tickers, 461,203 records
-4. **BEA** — register for API key at https://apps.bea.gov/api/signup/ and set `BEA_API_KEY`
+1. **`CPIMEDSL`** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care
+2. **ISM PMI** — `MANEMP` is the accepted proxy; actual ISM data requires a subscription or use `DALLASMPMC` (Dallas Fed Manufacturing Activity, available on FRED)
+3. **BEA** — register for API key at https://apps.bea.gov/api/signup/ and set `BEA_API_KEY`
+4. **GDELT / IMF / OECD / BIS** — adapters exist; bulk fetch scripts not yet written
