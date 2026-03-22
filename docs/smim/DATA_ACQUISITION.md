@@ -22,7 +22,7 @@ Only `data/smim/universes/*.csv` are committed to git.
 | FRED macro signals | `smim_fetch_fred.py` | ✅ Complete (27/29 series) | 71,761 rows | 2000-01-01 – 2026-03-20 |
 | ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | 8,956 vintage rows (subset above) | 2000-01-01 – 2026-03-20 |
 | SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
-| GDELT | — | ⬜ Not started | — | — |
+| GDELT narrative | `smim_fetch_gdelt.py` | ⬜ Not run yet | — | 2015-01-01 – 2025-12-31 (planned) |
 | IMF SDMX | — | ⬜ Not started | — | — |
 | OECD SDMX | — | ⬜ Not started | — | — |
 | BEA I/O | — | ⬜ Not started | — | — |
@@ -243,11 +243,48 @@ vintage_id : None (EDGAR filings are point-in-time; not revised in place)
 
 ---
 
-## 4. GDELT — Not Started
+## 4. GDELT Narrative Signals — Script ready, not yet run
 
-**Adapter:** `smim/data/adapters/gdelt.py` (implemented, untested at scale)
-**Planned data:** Narrative co-occurrence signals for edge estimation
-**Blocker:** None — no API key required
+**Script:** `scripts/smim_fetch_gdelt.py`
+**Adapter:** `smim/data/adapters/gdelt.py` (implemented)
+**Planned data:** Weekly narrative intensity for 5 sector themes + 4 institutional actors
+**Blocker:** None — no API key required (GDELT is public)
+
+### Queries planned
+
+| Query ID | Type | GDELT query |
+|----------|------|-------------|
+| `sector_energy` | Theme | `theme:ECON_ENERGY OR theme:ENV_ENERGY OR theme:FUEL OR theme:OIL OR theme:GAS` |
+| `sector_technology` | Theme | `theme:TECH OR theme:CYBER OR theme:AI OR theme:DIGITAL` |
+| `sector_financials` | Theme | `theme:ECON_BANKING OR theme:ECON_INTEREST_RATE OR theme:FINANCIAL` |
+| `sector_healthcare` | Theme | `theme:HEALTH OR theme:PHARMA OR theme:MEDICAL` |
+| `sector_macro` | Theme | `theme:ECON_INFLATION OR theme:ECON_UNEMPLOYMENT OR theme:ECON_GDP` |
+| `actor_FED` | Actor | `"federal reserve" OR "central bank"` |
+| `actor_SEC` | Actor | `"securities and exchange"` |
+| `actor_IMF` | Actor | `"international monetary fund"` |
+| `actor_BOE` | Actor | `"bank of england"` |
+
+### Output schema (`data/smim/processed/gdelt_narrative.parquet`)
+
+```
+theme_or_actor : str   — query ID (e.g. "sector_energy", "actor_FED")
+week_start     : datetime64[ns]
+article_count  : float64  — normalised GDELT volume (% of all articles that week)
+avg_tone       : float64  — mean coverage tone (negative = pessimistic)
+intensity      : float64  — same as article_count (timelinevol already normalised)
+```
+
+### PIT store schema (`data/smim/pit_store/gdelt.parquet`)
+
+```
+actor_id   : query ID (e.g. "sector_energy", "actor_FED")
+signal_id  : "gdelt_article_count" | "gdelt_avg_tone" | "gdelt_intensity"
+event_date : week_start (tz-naive)
+pub_date   : week_start + 7 days  (GDELT weekly data complete by end of week)
+value      : float64
+source     : "gdelt"
+vintage_id : None
+```
 
 ---
 
@@ -288,4 +325,5 @@ vintage_id : None (EDGAR filings are point-in-time; not revised in place)
 1. **`CPIMEDSL`** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care
 2. **ISM PMI** — `MANEMP` is the accepted proxy; actual ISM data requires a subscription or use `DALLASMPMC` (Dallas Fed Manufacturing Activity, available on FRED)
 3. **BEA** — register for API key at https://apps.bea.gov/api/signup/ and set `BEA_API_KEY`
-4. **GDELT / IMF / OECD / BIS** — adapters exist; bulk fetch scripts not yet written
+4. **GDELT** — script written (`smim_fetch_gdelt.py`); run when ready: `uv run python scripts/smim_fetch_gdelt.py`
+5. **IMF / OECD / BIS** — adapters exist; bulk fetch scripts not yet written
