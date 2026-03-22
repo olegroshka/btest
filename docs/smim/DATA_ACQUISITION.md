@@ -1,6 +1,6 @@
 # SMIM Data Acquisition Status
 
-Last updated: 2026-03-22 (GDELT upgraded to daily-sampled pipeline; weekly panel now daily-derived)
+Last updated: 2026-03-22 (IMF DataMapper + OECD SDMX 3.0 + BEA I/O tables fetched and ingested)
 
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
@@ -23,9 +23,9 @@ Only `data/smim/universes/*.csv` are committed to git.
 | ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | 8,956 vintage rows (subset above) | 2000-01-01 – 2026-03-20 |
 | SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
 | GDELT narrative | `smim_fetch_gdelt.py` | ✅ Complete (9/9 signals, daily-derived weekly) | ~37K daily rows; ~4.7K weekly rows | 2015-02-19 – 2025-12-31 |
-| IMF SDMX | — | ⬜ Not started | — | — |
-| OECD SDMX | — | ⬜ Not started | — | — |
-| BEA I/O | — | ⬜ Not started | — | — |
+| IMF WEO (DataMapper) | `smim_fetch_imf.py` | ✅ Complete (7/7 series) | 618 rows | 2000-12-31 – 2030-12-31 |
+| OECD SDMX 3.0 | `smim_fetch_oecd.py` | ✅ Complete (4 signals) | 244 rows | 2000-01-01 – 2025-10-01 |
+| BEA I/O | `smim_fetch_bea.py` | ✅ Complete (2010–2024, API) | 26,852 sector rows / 315 PIT pairs | 2010 – 2024 |
 | BIS | — | ⬜ Not started | — | — |
 
 ---
@@ -386,27 +386,220 @@ uv run python scripts/smim_fetch_gdelt.py --start-date 2023-01-01 --end-date 202
 
 ---
 
-## 5. IMF SDMX — Not Started
+## 5. IMF WEO — ✅ Complete (DataMapper API)
 
-**Adapter:** `smim/data/adapters/imf_sdmx.py` (implemented)
-**Planned data:** International macro indicators for `INST-INTL` actor set
-**Blocker:** None
+**Script:** `scripts/smim_fetch_imf.py`
+**Adapter:** `smim/data/adapters/imf_sdmx.py`
+**Status:** Complete — 7 WEO indicators, 4 countries
+**Run date:** 2026-03-22
+**API key:** None required
+
+### Method
+
+Uses the IMF DataMapper API (`https://www.imf.org/external/datamapper/api/v1/`),
+which exposes WEO projections + history without authentication.
+
+The IFS SDMX quarterly endpoint (`dataservices.imf.org`) is also attempted at runtime
+but currently times out in this environment; the DataMapper fallback is authoritative.
+
+### Coverage
+
+| Indicator | Label | Countries | Rows |
+|-----------|-------|-----------|------|
+| `NGDP_RPCH` | Real GDP growth (%) | US, GB, DE, JP | 124 |
+| `PCPIPCH` | CPI inflation (%) | US, GB, DE, JP | 124 |
+| `BCA` | Current account (USD bn) | US, GB | 62 |
+| `GGXCNL_NGDP` | Govt net lending (% GDP) | US, GB | 61 |
+| `GGXWDG_NGDP` | Govt gross debt (% GDP) | US, GB | 61 |
+| `LUR` | Unemployment rate (%) | US, GB | 62 |
+| `PPPGDP` | GDP PPP (int'l $bn) | US, GB, DE, JP | 124 |
+
+**Total:** 618 rows, annual frequency, 2000–2030 (includes WEO projections to 2030).
+
+### Output paths
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/imf/<INDICATOR>.parquet` | Per-indicator raw DataMapper response |
+| `data/smim/processed/imf_macro.parquet` | Unified tidy table — `actor_id, signal_id, event_date, pub_date, value` |
+| `data/smim/pit_store/imf.parquet` | PIT store shard (A1-compliant, pub_date = event_date + 365 days) |
+
+### PIT store schema
+
+```
+actor_id   : country alpha-2 code (US, GB, DE, JP)
+signal_id  : IMF WEO indicator code (e.g. "NGDP_RPCH")
+event_date : December 31 of reference year (tz-naive)
+pub_date   : event_date + 365 days (conservative annual WEO lag)
+value      : float64
+source     : "imf"
+vintage_id : None (DataMapper provides single-vintage current estimates)
+```
+
+### Not available / partial
+
+| Indicator | Reason |
+|-----------|--------|
+| `BCA_NGDPDP` (CA % GDP) | Not in DataMapper catalogue; `BCA` (USD bn) used instead |
+| `NID_NGDP` (investment % GDP) | Not in DataMapper; use FRED `A006RE1Q156NBEA` as proxy |
+| `NGAP_NPGDP` (output gap) | Not in DataMapper catalogue |
+| IFS quarterly (NGDP_R_XDC, PCPI_IX, FPOLM_PA) | `dataservices.imf.org` times out in this network environment |
+
+### Running the script
+
+```bash
+uv run python scripts/smim_fetch_imf.py
+```
 
 ---
 
-## 6. OECD SDMX — Not Started
+## 6. OECD SDMX 3.0 — ✅ Complete
 
-**Adapter:** `smim/data/adapters/oecd_sdmx.py` (implemented)
-**Planned data:** Structural indicators for international actors
-**Blocker:** None
+**Script:** `scripts/smim_fetch_oecd.py`
+**Adapter:** `smim/data/adapters/oecd_sdmx.py`
+**Status:** Complete — 4 signals (CLI + QNA), US + UK
+**Run date:** 2026-03-22
+**API key:** None required
+
+### Method
+
+Uses OECD SDMX 3.0 REST API (`https://sdmx.oecd.org/public/rest/data/`) with the
+`all` key approach: fetch the full dataflow (filtered by `startPeriod`/`endPeriod`)
+and filter to the desired countries and measures in-memory.
+
+This approach avoids the 14-dimension key format problem of SDMX 3.0 (direct
+dimension keys with partial wildcards return 422 errors).
+
+### Coverage
+
+| Dataflow | Signals fetched | Countries | Rows |
+|----------|----------------|-----------|------|
+| `DSD_STES@DF_CLI,4.0` | LI (Composite Leading Indicator), BCICP (Business Confidence), CCICP (Consumer Confidence) | US, GB | 180 |
+| `DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA,1.1` | B1GQ_POP (GDP per capita, USD PPP, level) | US, GB | 64 |
+
+**Total:** 244 rows. LI/BCICP/CCICP are monthly; B1GQ_POP is quarterly.
+
+**Date range:** CLI from 2000-01-01; QNA from earliest available through 2025-Q4.
+
+### OECD country codes
+
+The OECD SDMX 3.0 API uses ISO 3166-1 alpha-3 codes (USA, GBR). The script
+normalises these to alpha-2 (US, GB) for consistency with the rest of the PIT store.
+
+### Output paths
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/oecd/DSD_STES_DF_CLI_4.0.parquet` | Raw CLI response (all countries) |
+| `data/smim/raw/oecd/DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA_1.1.parquet` | Raw QNA response |
+| `data/smim/processed/oecd_macro.parquet` | Unified tidy table |
+| `data/smim/pit_store/oecd.parquet` | PIT store shard |
+
+### PIT store schema
+
+```
+actor_id   : country alpha-2 code (US, GB)
+signal_id  : OECD measure code (e.g. "LI", "BCICP", "B1GQ_POP")
+event_date : first day of period (tz-naive)
+pub_date   : event_date + 45 days (CLI) or + 75 days (QNA)
+value      : float64
+source     : "oecd"
+vintage_id : None
+```
+
+### Running the script
+
+```bash
+uv run python scripts/smim_fetch_oecd.py
+```
 
 ---
 
-## 7. BEA Input-Output — Not Started
+## 7. BEA Input-Output — ✅ Complete
 
-**Adapter:** `smim/data/adapters/bea_io.py` (implemented)
-**Planned data:** Supply-chain edges (Use and Make tables)
-**Blocker:** `BEA_API_KEY` environment variable required (free registration at bea.gov)
+**Script:** `scripts/smim_fetch_bea.py`
+**Adapter:** `smim/data/adapters/bea_io.py`
+**Status:** Complete — Use Table (TableID=259), 2010–2024, all 5 sectors
+**Run date:** 2026-03-22
+**API key:** `BEA_API_KEY` (free at https://apps.bea.gov/API/signup/ — used if set, else direct Excel download)
+
+### Method
+
+**With API key (primary):** Calls BEA JSON API (`https://apps.bea.gov/api/data`)
+with `DataSetName=InputOutput`, `TableID=259` (Use of Commodities by Industries,
+Before Redefinitions, Producers' Prices) for years 2010–2024.
+
+**Without API key (fallback):** Downloads published Excel files from
+`https://apps.bea.gov/industry/xls/io-annual/` and parses the flow matrix.
+
+Direct-requirements coefficients are computed as:
+```
+coeff[source→target] = flow[source, target] / total_output[target]
+```
+
+### Sector mapping (NAICS prefix → SMIM sector)
+
+| BEA NAICS prefix | SMIM sector |
+|-----------------|-------------|
+| 211, 213, 324 | Energy |
+| 334, 511, 518, 519 | Technology |
+| 521–525 | Financials |
+| 621–624 | Healthcare |
+| 331, 332, 333, 336, 337 | Industrials |
+
+### Coverage
+
+| Metric | Value |
+|--------|-------|
+| Raw rows (all sector-involved pairs) | 26,852 |
+| Year range | 2010 – 2024 |
+| Sectors covered | Energy, Financials, Healthcare, Industrials, Technology |
+| PIT sector-pair observations | 315 (21 unique source→target pairs × 15 years) |
+
+### Output paths
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/bea/use_table_<year>.parquet` | Raw per-year API response |
+| `data/smim/processed/bea_io_tables.parquet` | Sector-mapped coefficient table |
+| `data/smim/pit_store/bea.parquet` | PIT store shard |
+
+### Processed table schema (`bea_io_tables.parquet`)
+
+```
+source_industry : BEA RowCode (NAICS-based, e.g. "211000")
+source_sector   : SMIM sector label (e.g. "Energy") or None
+source_desc     : BEA row description
+target_industry : BEA ColCode
+target_sector   : SMIM sector label or None
+target_desc     : BEA column description
+coefficient     : direct requirements coefficient (float64)
+year            : reference year
+pub_date        : year-end + 548 days (A1 conservative lag, ~18 months)
+table_id        : "259"
+```
+
+### PIT store schema (`bea.parquet`)
+
+```
+actor_id   : "SourceSector→TargetSector" (e.g. "Energy→Industrials")
+signal_id  : "io_coefficient"
+event_date : December 31 of reference year (tz-naive)
+pub_date   : event_date + 548 days
+value      : mean coefficient for that sector pair (float64)
+source     : "bea"
+vintage_id : None
+```
+
+### Running the script
+
+```bash
+# With API key (more complete industry detail):
+BEA_API_KEY=<your_key> uv run python scripts/smim_fetch_bea.py
+
+# Without API key (downloads Excel from BEA website):
+uv run python scripts/smim_fetch_bea.py
+```
 
 ---
 
@@ -422,6 +615,8 @@ uv run python scripts/smim_fetch_gdelt.py --start-date 2023-01-01 --end-date 202
 
 1. **`CPIMEDSL`** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care
 2. **ISM PMI** — `MANEMP` is the accepted proxy; actual ISM data requires a subscription or use `DALLASMPMC` (Dallas Fed Manufacturing Activity, available on FRED)
-3. **BEA** — register for API key at https://apps.bea.gov/api/signup/ and set `BEA_API_KEY`
+3. **BEA** — ✅ complete (`smim_fetch_bea.py`). API key gives full industry detail; no-key fallback uses published Excel. Re-run anytime to pick up the latest BEA release.
 4. **GDELT** — ✅ complete (daily-derived weekly pipeline). To re-run: `uv run python scripts/smim_fetch_gdelt.py` (uses per-day cache; add `--force-refetch` to re-download all files). Use `--weekly-only` to rebuild weekly panel from existing daily cache without any new downloads.
-5. **IMF / OECD / BIS** — adapters exist; bulk fetch scripts not yet written
+5. **IMF** — ✅ complete (DataMapper API, 7 WEO indicators). IFS SDMX quarterly data (`dataservices.imf.org`) still times out; add a proxy or VPN to unblock. Missing WEO codes: `BCA_NGDPDP`, `NID_NGDP`, `NGAP_NPGDP` — not in DataMapper.
+6. **OECD** — ✅ complete (SDMX 3.0, CLI + QNA). Only US + GB currently; add more OECD countries by modifying `filters["REF_AREA"]` in `smim_fetch_oecd.py`.
+7. **BIS** — adapters not yet built; bulk fetch script not written
