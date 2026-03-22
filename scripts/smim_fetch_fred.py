@@ -291,7 +291,7 @@ def print_summary(current_df: pd.DataFrame, alfred_df: pd.DataFrame, unified: pd
     print("=" * 60)
     print(f"  Total series fetched     : {total_series} / {len(MACRO_SERIES)}")
     print(f"  Total observations       : {total_obs:,}")
-    print(f"  Date range               : {earliest} → {latest}")
+    print(f"  Date range               : {earliest} to {latest}")
     print(f"  ALFRED vintage series    : {alfred_series}")
     print(f"  Processed parquet        : {PROCESSED_PATH}")
     print(f"  PIT store                : {PIT_DIR}")

@@ -342,6 +342,32 @@ The earlier vectorbt batch approach caused inner-join truncation (one
 recent-IPO ticker in a chunk would silently truncate all others to its
 listing date); that approach has been replaced.
 
+### FRED macro signals + ALFRED vintages
+
+```bash
+# Requires: FRED_API_KEY environment variable
+uv run python scripts/smim_fetch_fred.py
+```
+
+Fetches 29 macro series from FRED and full ALFRED vintage histories for the 5
+most revision-prone series (GDP, UNRATE, CPIAUCSL, INDPRO, FEDFUNDS). Results
+are stored in the PIT store for A1-compliant backtesting.
+
+**Outputs:**
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/fred/<SERIES>.parquet` | Raw per-series observations |
+| `data/smim/raw/fred/<SERIES>_alfred.parquet` | All ALFRED releases for vintaged series |
+| `data/smim/processed/fred_signals.parquet` | Unified tidy table (all series) |
+| `data/smim/pit_store/fred.parquet` | PIT store shard, queryable via `PointInTimeStore` |
+
+Series coverage: Layer 0 exogenous (GDP, CPI, VIX, housing, …), Layer 1 upstream
+(Fed funds, yield curve, credit spreads), energy sector (WTI, Brent, gasoline),
+and sector proxies for financials and industrials.
+
+Acquisition status and known failures: `docs/smim/DATA_ACQUISITION.md`.
+
 ---
 
 ## Running Tests
@@ -503,6 +529,7 @@ Every SMIM component follows this pattern:
 | `docs/smim/notation.md` | Every mathematical symbol with Python mapping |
 | `docs/smim/benchmark_specs.md` | Formal definitions for all 5 benchmark families |
 | `docs/smim/ADAPTER_GUIDE.md` | How to write a new data adapter |
+| `docs/smim/DATA_ACQUISITION.md` | Data acquisition status: what's downloaded, what failed, why |
 | `smim/interfaces.py` | All Protocol definitions — read before implementing |
 | `smim/config.py` | All tuneable parameters (Pydantic) |
 | `experiments/mvp_energy_us_uk.yaml` | Sample experiment config |
