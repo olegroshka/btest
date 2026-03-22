@@ -410,6 +410,53 @@ modern 10-K/10-Q filers use `PaymentsToAcquirePropertyPlantAndEquipment` instead
 | `data/smim/processed/edgar_balance_sheet.parquet` | Normalised tidy table (ticker, cik, event_date, pub_date, tag, value, form_type, period) |
 | `data/smim/pit_store/edgar.parquet` | PIT store shard, queryable via `PointInTimeStore` |
 
+### GDELT narrative signals
+
+```bash
+# No auth required — direct GKG 2.0 CSV downloads, free
+uv run python scripts/smim_fetch_gdelt.py                 # incremental (uses weekly cache)
+uv run python scripts/smim_fetch_gdelt.py --force-refetch # re-download all 567 weeks
+uv run python scripts/smim_fetch_gdelt.py --validate-only # spot-check theme basket hits
+uv run python scripts/smim_fetch_gdelt.py --workers 8     # increase parallelism
+```
+
+Fetches one GKG 2.0 file per ISO week (Monday ~noon UTC), parses V2EnhancedThemes and
+V2Organizations, and computes weekly narrative intensity (matched docs / total docs) and
+average tone for 5 sector signals and 4 institutional actor signals.
+
+**Coverage (from 2026-03-22 run):** 518 / 567 weeks fetched (49 weeks had no file),
+4,662 processed rows, date range 2015-02-23 to 2025-12-29.
+
+**Signals:**
+
+| Signal | Type | Intensity range |
+|--------|------|----------------|
+| `sector_energy` | Sector | 0–16% |
+| `sector_technology` | Sector | 4–40% |
+| `sector_financials` | Sector | 0–20% |
+| `sector_healthcare` | Sector | 0–57% |
+| `sector_macro` | Sector | 0–9% |
+| `actor_FED` | Institution | 0–2.9% |
+| `actor_IMF` | Institution | 0–3.8% |
+| `actor_SEC` | Institution | 0–3.6% |
+| `actor_BOE` | Institution | 0–0.09% |
+
+**Theme baskets** use actual GKG 2.0 V2EnhancedThemes codes (WB\_/ENV\_/EPU\_ hierarchy).
+Old simple codes (OIL, GAS, TECH, etc.) do not exist in GKG 2.0 — see
+`docs/smim/DATA_ACQUISITION.md` for the full basket definitions.
+
+**Actor matching** is case-insensitive substring match in the V2Organizations NLP field.
+Note: GKG NLP drops "and" from org names (`"securities exchange commission"`, not
+`"securities and exchange commission"`).
+
+**Outputs:**
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/gdelt/gkg_weekly/{YYYY-Www}.parquet` | Per-week parsed stats cache (re-download is idempotent) |
+| `data/smim/processed/gdelt_narrative.parquet` | Tidy table: theme_or_actor, week_start, article_count, avg_tone, intensity |
+| `data/smim/pit_store/gdelt.parquet` | PIT store shard: 14,720 rows, 3 signal_ids × 9 actors × 518 weeks |
+
 ---
 
 ## Running Tests
