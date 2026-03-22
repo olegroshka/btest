@@ -368,6 +368,48 @@ and sector proxies for financials and industrials.
 
 Acquisition status and known failures: `docs/smim/DATA_ACQUISITION.md`.
 
+### SEC EDGAR — XBRL balance sheet data
+
+```bash
+# No API key required — SEC only needs a User-Agent header
+uv run python scripts/smim_fetch_edgar.py
+```
+
+Fetches company-level XBRL facts for all US equity universes (US-LC, US-MC,
+US-SC, and all five sector slices) from the SEC EDGAR JSON API. The filing
+date (`filed`) is used as `pub_date`, making this strictly A1-compliant.
+
+**Coverage (from 2026-03-22 run):** 765 / 772 tickers, 461,203 filing records,
+date range 2005-07-04 to 2026-02-28.
+
+**XBRL tags fetched:**
+
+| Tag | Coverage |
+|-----|----------|
+| `PaymentsToAcquirePropertyPlantAndEquipment` (CapEx) | 611 tickers |
+| `Assets` | 765 tickers |
+| `StockholdersEquity` | 757 tickers |
+| `LongTermDebt` | 605 tickers |
+| `Revenues` | 559 tickers |
+| `RevenueFromContractWithCustomerExcludingAssessedTax` | 537 tickers |
+| `ResearchAndDevelopmentExpense` | 341 tickers |
+
+Note: `CapitalExpenditures` (the older tag) has near-zero coverage because most
+modern 10-K/10-Q filers use `PaymentsToAcquirePropertyPlantAndEquipment` instead.
+
+**Tickers with no filings (7):** `BBUC`, `BTDR`, `CMDB`, `GAMB`, `HSHP`, `LZM`, `VTEX`
+(recent cross-listings or SPACs with no EDGAR XBRL history).
+
+**Tickers with no CIK mapping (8):** `DAY`, `FI`, `FRBA`, `MMC`, `MOGA`, `PDLI`,
+`THRD`, `XTSLA` (de-listed, renamed, or non-reporting entities).
+
+**Outputs:**
+
+| Path | Contents |
+|------|----------|
+| `data/smim/processed/edgar_balance_sheet.parquet` | Normalised tidy table (ticker, cik, event_date, pub_date, tag, value, form_type, period) |
+| `data/smim/pit_store/edgar.parquet` | PIT store shard, queryable via `PointInTimeStore` |
+
 ---
 
 ## Running Tests

@@ -14,7 +14,7 @@ has been acquired, what failed, and why. Update it after every acquisition run.
 | Equity OHLCV (Yahoo Finance) | `smim_build_universes.py` | Complete | ~11 universes | 2005–2025 |
 | FRED macro signals | `smim_fetch_fred.py` | Complete (27/29 series) | 71,761 | 2000–2026 |
 | ALFRED vintages | `smim_fetch_fred.py` | Complete (5 series) | included above | 2000–2026 |
-| SEC EDGAR | — | Not started | — | — |
+| SEC EDGAR | `smim_fetch_edgar.py` | Complete (765/772 tickers) | 461,203 | 2005–2026 |
 | GDELT | — | Not started | — | — |
 | IMF SDMX | — | Not started | — | — |
 | OECD SDMX | — | Not started | — | — |
@@ -136,13 +136,70 @@ vintage_id : pub_date string for ALFRED series; None otherwise
 
 ---
 
-## 3. SEC EDGAR — Not Started
+## 3. SEC EDGAR — Complete
 
-**Adapter:** `smim/data/adapters/edgar.py` (implemented, untested at scale)
-**Planned data:** Balance sheet XBRL tags for all US equities
-  (`CapitalExpenditures`, `ResearchAndDevelopmentExpense`, `Assets`, …)
-**Prerequisite:** US equity universe tickers + CIK mapping
-**Blocker:** None — no API key required (User-Agent header only)
+**Script:** `scripts/smim_fetch_edgar.py`
+**Status:** Complete
+**Run date:** 2026-03-22
+
+### Method
+
+1. Downloads the CIK mapping from `https://www.sec.gov/files/company_tickers.json`
+2. Fetches company-facts XBRL JSON from `https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json`
+   for each US ticker across US-LC, US-MC, US-SC, and all sector-slice universes
+3. The EDGAR `filed` date is used as `pub_date` — strictly A1-compliant
+
+### Coverage
+
+| Metric | Value |
+|--------|-------|
+| Tickers attempted | 772 (780 universe tickers, 8 with no CIK mapping) |
+| Tickers with data | 765 |
+| Total filing records | 461,203 |
+| Date range | 2005-07-04 to 2026-02-28 |
+| Filing types | 10-K, 10-Q |
+
+### XBRL tag coverage
+
+| Tag | Tickers |
+|-----|---------|
+| `Assets` | 765 |
+| `StockholdersEquity` | 757 |
+| `PaymentsToAcquirePropertyPlantAndEquipment` (CapEx) | 611 |
+| `LongTermDebt` | 605 |
+| `Revenues` | 559 |
+| `RevenueFromContractWithCustomerExcludingAssessedTax` | 537 |
+| `ResearchAndDevelopmentExpense` | 341 |
+| `CapitalExpenditures` (legacy tag) | 0 — superseded by PaymentsToAcquire… |
+
+### No-data tickers (7)
+
+`BBUC`, `BTDR`, `CMDB`, `GAMB`, `HSHP`, `LZM`, `VTEX`
+— Recent cross-listings, SPACs, or foreign private issuers with no EDGAR XBRL history.
+
+### No-CIK tickers (8)
+
+`DAY`, `FI`, `FRBA`, `MMC`, `MOGA`, `PDLI`, `THRD`, `XTSLA`
+— De-listed, renamed, or non-reporting entities not in SEC company_tickers.json.
+
+### Output paths
+
+| Path | Contents |
+|------|----------|
+| `data/smim/processed/edgar_balance_sheet.parquet` | Normalised tidy table: `ticker, cik, event_date, pub_date, tag, value, form_type, period` |
+| `data/smim/pit_store/edgar.parquet` | PIT store shard — A1-compliant, queryable by `as_of` |
+
+### PIT store schema
+
+```
+actor_id   : ticker (e.g. "AAPL")
+signal_id  : XBRL tag (e.g. "Assets")
+event_date : period end date (tz-naive)
+pub_date   : EDGAR filing date — the exact date data became public (A1-compliant)
+value      : float64
+source     : "edgar"
+vintage_id : None (EDGAR filings are not revised in place)
+```
 
 ---
 
@@ -190,5 +247,5 @@ vintage_id : pub_date string for ALFRED series; None otherwise
 
 1. **`CPIMEDSL`** — re-run `smim_fetch_fred.py` after adding the correct ID to `MACRO_SERIES`
 2. **ISM PMI** — `MANEMP` is an acceptable proxy; if actual ISM data is needed, source via a subscription or use the Dallas Fed Manufacturing Activity survey (`DALLASMPMC`) which is on FRED
-3. **EDGAR** — run bulk CIK mapping then batch XBRL download for US equity universes
+3. **EDGAR** — ✅ Complete (2026-03-22); 765/772 tickers, 461,203 records
 4. **BEA** — register for API key at https://apps.bea.gov/api/signup/ and set `BEA_API_KEY`
