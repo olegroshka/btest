@@ -576,6 +576,58 @@ python .\scripts\reset_arctic_cache.py --force
 - Local parquet sources (`parquet://...`) do not use ArcticDB caching by default.
 
 
+SMIM Research Framework
+-----------------------
+This repository also includes **SMIM** (Spectral Multi-layer Investment Misallocation), a research framework that estimates actor-specific investment gaps from a directed multilayer graph → spectral decomposition → state-space filtering → emergence diagnostics pipeline.
+
+SMIM is implemented under `src/quantdsl_backtest/smim/` and connects to the backtesting DSL via bridge signals in `smim/signals/`.
+
+### Data acquired (as of 2026-03-22)
+
+| Source | Script | Records | Date range |
+|--------|--------|---------|------------|
+| Equity OHLCV (Yahoo Finance) | `smim_build_universes.py` | 11 universes | 2005-01-03 – 2025-12-30 |
+| FRED macro signals (27 series) | `smim_fetch_fred.py` | 71,761 rows | 2000-01-01 – 2026-03-20 |
+| ALFRED real-time vintages (5 series) | `smim_fetch_fred.py` | 8,956 vintage rows | 2000-01-01 – 2026-03-20 |
+| SEC EDGAR XBRL (765/772 tickers) | `smim_fetch_edgar.py` | 461,203 rows | 2005-07-04 – 2026-02-28 |
+| GDELT narrative signals (9 signals) | `smim_fetch_gdelt.py` | 4,662 rows (518 weeks) | 2015-02-23 – 2025-12-29 |
+
+All data lives in `data/smim/` (gitignored) and is queryable via a point-in-time store (`data/smim/pit_store/`, 540,088 total rows across all sources).
+
+### Re-acquiring data
+
+```bash
+# Equity universes
+uv run python scripts/smim_build_universes.py
+
+# FRED macro + ALFRED vintages (requires FRED_API_KEY env var)
+uv run python scripts/smim_fetch_fred.py
+
+# SEC EDGAR XBRL (no auth required)
+uv run python scripts/smim_fetch_edgar.py
+
+# GDELT narrative signals (free, no auth)
+uv run python scripts/smim_fetch_gdelt.py                 # incremental (uses cache)
+uv run python scripts/smim_fetch_gdelt.py --force-refetch # re-download all
+```
+
+### SMIM tests
+
+```bash
+# Unit tests
+uv run pytest tests/unit/smim/ -q
+
+# Acceptance suite (130/130) with gate report (~65 s)
+uv run python scripts/run_smim_acceptance.py
+
+# GPU benchmarks (requires --extra benchmarks + --extra gpu)
+uv run pytest tests/benchmarks/smim/ -v --benchmark-json=.benchmark_results.json
+uv run python scripts/gpu_speedup_report.py
+```
+
+See `docs/smim/DATA_ACQUISITION.md` for per-source details and `docs/smim/CLAUDE.md` for the full SMIM architecture.
+
+
 License
 -------
 This project is licensed under the terms of the MIT License (see `LICENSE`).
