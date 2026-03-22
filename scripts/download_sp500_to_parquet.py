@@ -257,7 +257,7 @@ def download_ohlcv(
                 if hasattr(close_df, "columns"):
                     total_kept.extend([c for c in close_df.columns if c not in total_kept])
                 success = True
-                print(f"  ✓ Downloaded via vectorbt for chunk with {len(ch)} symbols; kept {len(close_df.columns) if hasattr(close_df,'columns') else 1}")
+                print(f"  OK Downloaded via vectorbt for chunk with {len(ch)} symbols; kept {len(close_df.columns) if hasattr(close_df,'columns') else 1}")
                 break
             except Exception as e:
                 last_err = e
@@ -279,7 +279,7 @@ def download_ohlcv(
             fail_syms = fb.get("__failed__", [])  # type: ignore
             total_kept.extend([s for s in kept_syms if s not in total_kept])
             total_failed.extend(fail_syms)
-            print(f"  ✓ Fallback kept {len(kept_syms)}; dropped {len(fail_syms)}")
+            print(f"  OK Fallback kept {len(kept_syms)}; dropped {len(fail_syms)}")
 
     # If nothing kept, raise
     if close_all is None or close_all.empty or (hasattr(close_all, "columns") and len(close_all.columns) == 0):

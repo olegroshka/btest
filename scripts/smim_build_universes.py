@@ -546,6 +546,95 @@ def step1_build_universes(skip_market_cap: bool = False) -> Dict[str, pd.DataFra
 # STEP 2 — download OHLCV for each universe
 # ---------------------------------------------------------------------------
 
+def _download_yf_outer(
+    tickers: List[str],
+    start: str,
+    end: str,
+    chunk_size: int = 50,
+    delay: float = 0.5,
+) -> pd.DataFrame:
+    """
+    Download OHLCV for *tickers* using yfinance with an outer-join on dates.
+
+    Each ticker retains its own date range — no inner-join truncation.
+    Returns a long-form DataFrame with columns:
+        date, ticker, open, high, low, close, volume
+    Missing values appear as NaN (not dropped rows).
+    """
+    chunks = _chunk_list(tickers, chunk_size)
+    long_parts: List[pd.DataFrame] = []
+
+    for i, chunk in enumerate(chunks, start=1):
+        log.info(f"  Chunk {i}/{len(chunks)}: {len(chunk)} tickers")
+        for attempt in range(1, 4):
+            try:
+                raw = yf.download(
+                    tickers=chunk,
+                    start=start,
+                    end=end,
+                    auto_adjust=True,
+                    progress=False,
+                    threads=True,
+                )
+                if raw.empty:
+                    log.warning(f"    chunk {i} attempt {attempt}: empty result")
+                    if attempt < 3:
+                        time.sleep(2 ** attempt)
+                    continue
+
+                # yf.download with multiple tickers returns MultiIndex columns:
+                # (field, ticker). With a single ticker it returns flat columns.
+                if isinstance(raw.columns, pd.MultiIndex):
+                    # Stack ticker level → long form
+                    raw.index.name = "date"
+                    raw.columns.names = ["field", "ticker"]
+                    long_chunk = (
+                        raw.stack(level="ticker", future_stack=True)
+                        .reset_index()
+                    )
+                    # Rename yfinance columns to our schema
+                    col_map = {
+                        "Open": "open", "High": "high", "Low": "low",
+                        "Close": "close", "Volume": "volume",
+                    }
+                    long_chunk = long_chunk.rename(columns=col_map)
+                else:
+                    # Single ticker — flat columns
+                    assert len(chunk) == 1
+                    long_chunk = raw.reset_index().rename(columns={"Date": "date", "index": "date"})
+                    long_chunk["ticker"] = chunk[0]
+                    col_map = {
+                        "Open": "open", "High": "high", "Low": "low",
+                        "Close": "close", "Volume": "volume",
+                    }
+                    long_chunk = long_chunk.rename(columns=col_map)
+
+                # Keep only rows where close is not NaN (ticker had no data that day)
+                keep_cols = [c for c in ("date", "ticker", "open", "high", "low", "close", "volume") if c in long_chunk.columns]
+                long_chunk = long_chunk[keep_cols].dropna(subset=["close"])
+                long_chunk["date"] = pd.to_datetime(long_chunk["date"])
+
+                if not long_chunk.empty:
+                    long_parts.append(long_chunk)
+                    log.info(f"    chunk {i}: {long_chunk['ticker'].nunique()} tickers, {len(long_chunk)} rows")
+                break
+
+            except Exception as e:
+                log.warning(f"    chunk {i} attempt {attempt} failed: {e}")
+                if attempt < 3:
+                    time.sleep(2 ** attempt)
+
+        if i < len(chunks):
+            time.sleep(delay)
+
+    if not long_parts:
+        raise RuntimeError("All chunks returned no data.")
+
+    result = pd.concat(long_parts, ignore_index=True)
+    result["date"] = pd.to_datetime(result["date"])
+    return result
+
+
 def step2_download_ohlcv(
     universes: Dict[str, pd.DataFrame],
     start: str = START_DATE,
@@ -565,18 +654,15 @@ def step2_download_ohlcv(
             continue
 
         tickers = df["ticker"].dropna().unique().tolist()
-        log.info(f"\n{'─'*60}")
-        log.info(f"  Downloading OHLCV for {uid} ({len(tickers)} tickers, {start} → {end})")
+        log.info(f"\n{'-'*60}")
+        log.info(f"  Downloading OHLCV for {uid} ({len(tickers)} tickers, {start} to {end})")
 
         out_path = OHLCV_DIR / uid
         out_path.mkdir(parents=True, exist_ok=True)
         parquet_path = out_path / "ohlcv.parquet"
 
         try:
-            open_df, high_df, low_df, close_df, vol_df = download_ohlcv(
-                tickers, start, end, chunk_size=chunk_size, retries=retries
-            )
-            long = build_long_table(open_df, high_df, low_df, close_df, vol_df)
+            long = _download_yf_outer(tickers, start, end, chunk_size=chunk_size)
 
             if long.empty:
                 log.warning(f"  {uid}: no usable rows returned")
@@ -589,9 +675,9 @@ def step2_download_ohlcv(
             long.to_parquet(parquet_path, index=False)
 
             n_tickers = long["ticker"].nunique()
-            dt_min = pd.to_datetime(long["date"]).min().date()
-            dt_max = pd.to_datetime(long["date"]).max().date()
-            log.info(f"  {uid}: {n_tickers}/{len(tickers)} tickers, {dt_min} → {dt_max}, saved to {parquet_path}")
+            dt_min = long["date"].min().date()
+            dt_max = long["date"].max().date()
+            log.info(f"  {uid}: {n_tickers}/{len(tickers)} tickers, {dt_min} to {dt_max}, saved to {parquet_path}")
 
             results[uid] = {
                 "downloaded": n_tickers,
@@ -614,7 +700,7 @@ def step2_download_ohlcv(
     for uid, r in results.items():
         status = "OK" if not r.get("failed") else "FAIL"
         pct = f"{100*r['downloaded']/r['attempted']:.0f}%" if r["attempted"] else "n/a"
-        date_rng = f"{r.get('date_min','')} → {r.get('date_max','')}" if not r.get("failed") else r.get("error", "")
+        date_rng = f"{r.get('date_min','')} to {r.get('date_max','')}" if not r.get("failed") else r.get("error", "")
         print(f"  {uid:15s}  {status:4s}  {r['downloaded']:4d}/{r['attempted']:4d} ({pct})  {date_rng}")
     print()
 
@@ -672,7 +758,7 @@ def step3_verify(universes: Optional[Dict[str, pd.DataFrame]] = None) -> None:
 
         print(f"\n  {uid}")
         print(f"    Tickers downloaded : {downloaded}/{attempted}")
-        print(f"    Date range         : {dt_min} → {dt_max}")
+        print(f"    Date range         : {dt_min} to {dt_max}")
         print(f"    Trading days       : {n_trading_days}")
         print(f"    Avg coverage/ticker: {avg_coverage:.1f}%")
         if sparse_tickers:
@@ -743,6 +829,12 @@ def main() -> None:
         default=50,
         help="Tickers per download chunk (default: 50)",
     )
+    parser.add_argument(
+        "--only",
+        nargs="+",
+        metavar="UNIVERSE_ID",
+        help="Restrict step 2 to these universe IDs only (e.g. --only US-LC US-SC)",
+    )
     args = parser.parse_args()
 
     steps = set(args.step)
@@ -757,6 +849,9 @@ def main() -> None:
             universes = {}
             for csv_path in sorted(UNIVERSES_DIR.glob("*.csv")):
                 universes[csv_path.stem] = pd.read_csv(csv_path)
+        if args.only:
+            universes = {k: v for k, v in universes.items() if k in args.only}
+            log.info(f"--only filter: downloading {list(universes.keys())}")
         _ensure_gitignore_excludes_parquet()
         step2_download_ohlcv(
             universes,
