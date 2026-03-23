@@ -16,6 +16,7 @@ Usage::
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -135,3 +136,60 @@ class ActorRegistry:
             for a in data["actors"]
         ]
         return cls(actors=actors)
+
+    @classmethod
+    def from_json(cls, path: str | Path) -> ActorRegistry:
+        """Load a registry from a JSON file produced by ``to_json``.
+
+        Args:
+            path: Path to a JSON file with a top-level ``actors`` key.
+
+        Returns:
+            ActorRegistry populated from the JSON actor list.
+
+        Raises:
+            FileNotFoundError: If the file does not exist.
+            ValueError: If the JSON has no ``actors`` key.
+        """
+        path = Path(path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if "actors" not in data:
+            raise ValueError(f"JSON file {path} must have a top-level 'actors' key.")
+        actors = [
+            Actor(
+                actor_id=a["actor_id"],
+                name=a["name"],
+                actor_type=ActorType(a["actor_type"]),
+                layer=Layer(int(a["layer"])),
+                geography=a["geography"],
+                sector=a["sector"],
+                external_ids=a.get("external_ids", {}),
+            )
+            for a in data["actors"]
+        ]
+        return cls(actors=actors)
+
+    def to_json(self, path: str | Path, **metadata: object) -> None:
+        """Serialise registry to a JSON file.
+
+        Args:
+            path: Destination file path.
+            **metadata: Extra top-level keys stored alongside ``actors``
+                (e.g. ``universe_id="US-LC"``, ``description="..."``)
+        """
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload: dict = dict(metadata)
+        payload["actors"] = [
+            {
+                "actor_id": a.actor_id,
+                "name": a.name,
+                "actor_type": a.actor_type.value,
+                "layer": a.layer.value,
+                "geography": a.geography,
+                "sector": a.sector,
+                "external_ids": a.external_ids,
+            }
+            for a in self.actors
+        ]
+        path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")

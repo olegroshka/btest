@@ -1,0 +1,792 @@
+{
+  "universe_id": "US-LC-FINS",
+  "description": "Equity-only registry for US-LC-FINS",
+  "data_regime": "Gold",
+  "date_range": [
+    "2005-01-03",
+    "2025-12-30"
+  ],
+  "actors": [
+    {
+      "actor_id": "AFL",
+      "name": "Aflac",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000004977"
+      }
+    },
+    {
+      "actor_id": "ALL",
+      "name": "Allstate",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000899051"
+      }
+    },
+    {
+      "actor_id": "AXP",
+      "name": "American Express",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000004962"
+      }
+    },
+    {
+      "actor_id": "AIG",
+      "name": "American International Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000005272"
+      }
+    },
+    {
+      "actor_id": "AMP",
+      "name": "Ameriprise Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000820027"
+      }
+    },
+    {
+      "actor_id": "AON",
+      "name": "Aon plc",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000315293"
+      }
+    },
+    {
+      "actor_id": "APO",
+      "name": "Apollo Global Management",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001858681"
+      }
+    },
+    {
+      "actor_id": "ACGL",
+      "name": "Arch Capital Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000947484"
+      }
+    },
+    {
+      "actor_id": "AJG",
+      "name": "Arthur J. Gallagher & Co.",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000354190"
+      }
+    },
+    {
+      "actor_id": "AIZ",
+      "name": "Assurant",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001267238"
+      }
+    },
+    {
+      "actor_id": "BAC",
+      "name": "Bank of America",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000070858"
+      }
+    },
+    {
+      "actor_id": "BRK-B",
+      "name": "Berkshire Hathaway",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001067983"
+      }
+    },
+    {
+      "actor_id": "BLK",
+      "name": "BlackRock",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0002012383"
+      }
+    },
+    {
+      "actor_id": "BX",
+      "name": "Blackstone Inc.",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001393818"
+      }
+    },
+    {
+      "actor_id": "XYZ",
+      "name": "Block, Inc.",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001512673"
+      }
+    },
+    {
+      "actor_id": "BK",
+      "name": "BNY Mellon",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001390777"
+      }
+    },
+    {
+      "actor_id": "BRO",
+      "name": "Brown & Brown",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000079282"
+      }
+    },
+    {
+      "actor_id": "COF",
+      "name": "Capital One",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000927628"
+      }
+    },
+    {
+      "actor_id": "CBOE",
+      "name": "Cboe Global Markets",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001374310"
+      }
+    },
+    {
+      "actor_id": "SCHW",
+      "name": "Charles Schwab Corporation",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000316709"
+      }
+    },
+    {
+      "actor_id": "CB",
+      "name": "Chubb Limited",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000896159"
+      }
+    },
+    {
+      "actor_id": "CINF",
+      "name": "Cincinnati Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000020286"
+      }
+    },
+    {
+      "actor_id": "C",
+      "name": "Citigroup",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000831001"
+      }
+    },
+    {
+      "actor_id": "CFG",
+      "name": "Citizens Financial Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000759944"
+      }
+    },
+    {
+      "actor_id": "CME",
+      "name": "CME Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001156375"
+      }
+    },
+    {
+      "actor_id": "CPAY",
+      "name": "Corpay",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001175454"
+      }
+    },
+    {
+      "actor_id": "ERIE",
+      "name": "Erie Indemnity",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000922621"
+      }
+    },
+    {
+      "actor_id": "EG",
+      "name": "Everest Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001095073"
+      }
+    },
+    {
+      "actor_id": "FDS",
+      "name": "FactSet",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001013237"
+      }
+    },
+    {
+      "actor_id": "FIS",
+      "name": "Fidelity National Information Services",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001136893"
+      }
+    },
+    {
+      "actor_id": "FITB",
+      "name": "Fifth Third Bancorp",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000035527"
+      }
+    },
+    {
+      "actor_id": "BEN",
+      "name": "Franklin Resources",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000038777"
+      }
+    },
+    {
+      "actor_id": "GPN",
+      "name": "Global Payments",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001123360"
+      }
+    },
+    {
+      "actor_id": "GL",
+      "name": "Globe Life",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000320335"
+      }
+    },
+    {
+      "actor_id": "GS",
+      "name": "Goldman Sachs",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000886982"
+      }
+    },
+    {
+      "actor_id": "HIG",
+      "name": "Hartford (The)",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000874766"
+      }
+    },
+    {
+      "actor_id": "HBAN",
+      "name": "Huntington Bancshares",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000049196"
+      }
+    },
+    {
+      "actor_id": "ICE",
+      "name": "Intercontinental Exchange",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001571949"
+      }
+    },
+    {
+      "actor_id": "IVZ",
+      "name": "Invesco",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000914208"
+      }
+    },
+    {
+      "actor_id": "JKHY",
+      "name": "Jack Henry & Associates",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000779152"
+      }
+    },
+    {
+      "actor_id": "JPM",
+      "name": "JPMorgan Chase",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000019617"
+      }
+    },
+    {
+      "actor_id": "KEY",
+      "name": "KeyCorp",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000091576"
+      }
+    },
+    {
+      "actor_id": "KKR",
+      "name": "KKR & Co.",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001404912"
+      }
+    },
+    {
+      "actor_id": "L",
+      "name": "Loews Corporation",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000060086"
+      }
+    },
+    {
+      "actor_id": "MTB",
+      "name": "M&T Bank",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000036270"
+      }
+    },
+    {
+      "actor_id": "MKTX",
+      "name": "MarketAxess",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001278021"
+      }
+    },
+    {
+      "actor_id": "MA",
+      "name": "Mastercard",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001141391"
+      }
+    },
+    {
+      "actor_id": "MET",
+      "name": "MetLife",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001099219"
+      }
+    },
+    {
+      "actor_id": "MCO",
+      "name": "Moody's Corporation",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001059556"
+      }
+    },
+    {
+      "actor_id": "MS",
+      "name": "Morgan Stanley",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000895421"
+      }
+    },
+    {
+      "actor_id": "MSCI",
+      "name": "MSCI Inc.",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001408198"
+      }
+    },
+    {
+      "actor_id": "NDAQ",
+      "name": "Nasdaq, Inc.",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001120193"
+      }
+    },
+    {
+      "actor_id": "NTRS",
+      "name": "Northern Trust",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000073124"
+      }
+    },
+    {
+      "actor_id": "PYPL",
+      "name": "PayPal",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001633917"
+      }
+    },
+    {
+      "actor_id": "PNC",
+      "name": "PNC Financial Services",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000713676"
+      }
+    },
+    {
+      "actor_id": "PFG",
+      "name": "Principal Financial Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001126328"
+      }
+    },
+    {
+      "actor_id": "PGR",
+      "name": "Progressive Corporation",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000080661"
+      }
+    },
+    {
+      "actor_id": "PRU",
+      "name": "Prudential Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001137774"
+      }
+    },
+    {
+      "actor_id": "RJF",
+      "name": "Raymond James Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000720005"
+      }
+    },
+    {
+      "actor_id": "RF",
+      "name": "Regions Financial Corporation",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001281761"
+      }
+    },
+    {
+      "actor_id": "SPGI",
+      "name": "S&P Global",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000064040"
+      }
+    },
+    {
+      "actor_id": "STT",
+      "name": "State Street Corporation",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000093751"
+      }
+    },
+    {
+      "actor_id": "SYF",
+      "name": "Synchrony Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001601712"
+      }
+    },
+    {
+      "actor_id": "TROW",
+      "name": "T. Rowe Price",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001113169"
+      }
+    },
+    {
+      "actor_id": "TRV",
+      "name": "Travelers Companies (The)",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000086312"
+      }
+    },
+    {
+      "actor_id": "TFC",
+      "name": "Truist Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000092230"
+      }
+    },
+    {
+      "actor_id": "USB",
+      "name": "U.S. Bancorp",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000036104"
+      }
+    },
+    {
+      "actor_id": "V",
+      "name": "Visa Inc.",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001403161"
+      }
+    },
+    {
+      "actor_id": "WRB",
+      "name": "W. R. Berkley Corporation",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000011544"
+      }
+    },
+    {
+      "actor_id": "WFC",
+      "name": "Wells Fargo",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000072971"
+      }
+    },
+    {
+      "actor_id": "WTW",
+      "name": "Willis Towers Watson",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001140536"
+      }
+    }
+  ]
+}

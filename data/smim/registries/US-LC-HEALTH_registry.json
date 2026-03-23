@@ -1,0 +1,649 @@
+{
+  "universe_id": "US-LC-HEALTH",
+  "description": "Equity-only registry for US-LC-HEALTH",
+  "data_regime": "Gold",
+  "date_range": [
+    "2005-01-03",
+    "2025-12-30"
+  ],
+  "actors": [
+    {
+      "actor_id": "ABT",
+      "name": "Abbott Laboratories",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000001800"
+      }
+    },
+    {
+      "actor_id": "ABBV",
+      "name": "AbbVie",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001551152"
+      }
+    },
+    {
+      "actor_id": "A",
+      "name": "Agilent Technologies",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001090872"
+      }
+    },
+    {
+      "actor_id": "ALGN",
+      "name": "Align Technology",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001097149"
+      }
+    },
+    {
+      "actor_id": "AMGN",
+      "name": "Amgen",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000318154"
+      }
+    },
+    {
+      "actor_id": "BAX",
+      "name": "Baxter International",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000010456"
+      }
+    },
+    {
+      "actor_id": "BDX",
+      "name": "Becton Dickinson",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000010795"
+      }
+    },
+    {
+      "actor_id": "TECH",
+      "name": "Bio-Techne",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000842023"
+      }
+    },
+    {
+      "actor_id": "BIIB",
+      "name": "Biogen",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000875045"
+      }
+    },
+    {
+      "actor_id": "BSX",
+      "name": "Boston Scientific",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000885725"
+      }
+    },
+    {
+      "actor_id": "BMY",
+      "name": "Bristol Myers Squibb",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000014272"
+      }
+    },
+    {
+      "actor_id": "CAH",
+      "name": "Cardinal Health",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000721371"
+      }
+    },
+    {
+      "actor_id": "COR",
+      "name": "Cencora",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001140859"
+      }
+    },
+    {
+      "actor_id": "CNC",
+      "name": "Centene Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001071739"
+      }
+    },
+    {
+      "actor_id": "CRL",
+      "name": "Charles River Laboratories",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001100682"
+      }
+    },
+    {
+      "actor_id": "CI",
+      "name": "Cigna",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001739940"
+      }
+    },
+    {
+      "actor_id": "COO",
+      "name": "Cooper Companies (The)",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000711404"
+      }
+    },
+    {
+      "actor_id": "CVS",
+      "name": "CVS Health",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000064803"
+      }
+    },
+    {
+      "actor_id": "DHR",
+      "name": "Danaher Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000313616"
+      }
+    },
+    {
+      "actor_id": "DVA",
+      "name": "DaVita",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000927066"
+      }
+    },
+    {
+      "actor_id": "DXCM",
+      "name": "Dexcom",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001093557"
+      }
+    },
+    {
+      "actor_id": "EW",
+      "name": "Edwards Lifesciences",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001099800"
+      }
+    },
+    {
+      "actor_id": "ELV",
+      "name": "Elevance Health",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001156039"
+      }
+    },
+    {
+      "actor_id": "GILD",
+      "name": "Gilead Sciences",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000882095"
+      }
+    },
+    {
+      "actor_id": "HCA",
+      "name": "HCA Healthcare",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000860730"
+      }
+    },
+    {
+      "actor_id": "HSIC",
+      "name": "Henry Schein",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001000228"
+      }
+    },
+    {
+      "actor_id": "HOLX",
+      "name": "Hologic",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000859737"
+      }
+    },
+    {
+      "actor_id": "HUM",
+      "name": "Humana",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000049071"
+      }
+    },
+    {
+      "actor_id": "IDXX",
+      "name": "Idexx Laboratories",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000874716"
+      }
+    },
+    {
+      "actor_id": "INCY",
+      "name": "Incyte",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000879169"
+      }
+    },
+    {
+      "actor_id": "PODD",
+      "name": "Insulet Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001145197"
+      }
+    },
+    {
+      "actor_id": "ISRG",
+      "name": "Intuitive Surgical",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001035267"
+      }
+    },
+    {
+      "actor_id": "IQV",
+      "name": "IQVIA",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001478242"
+      }
+    },
+    {
+      "actor_id": "JNJ",
+      "name": "Johnson & Johnson",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000200406"
+      }
+    },
+    {
+      "actor_id": "LH",
+      "name": "Labcorp",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000920148"
+      }
+    },
+    {
+      "actor_id": "LLY",
+      "name": "Lilly (Eli)",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000059478"
+      }
+    },
+    {
+      "actor_id": "MCK",
+      "name": "McKesson Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000927653"
+      }
+    },
+    {
+      "actor_id": "MDT",
+      "name": "Medtronic",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001613103"
+      }
+    },
+    {
+      "actor_id": "MRK",
+      "name": "Merck & Co.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000310158"
+      }
+    },
+    {
+      "actor_id": "MTD",
+      "name": "Mettler Toledo",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001037646"
+      }
+    },
+    {
+      "actor_id": "MRNA",
+      "name": "Moderna",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001682852"
+      }
+    },
+    {
+      "actor_id": "MOH",
+      "name": "Molina Healthcare",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001179929"
+      }
+    },
+    {
+      "actor_id": "PFE",
+      "name": "Pfizer",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000078003"
+      }
+    },
+    {
+      "actor_id": "DGX",
+      "name": "Quest Diagnostics",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001022079"
+      }
+    },
+    {
+      "actor_id": "REGN",
+      "name": "Regeneron Pharmaceuticals",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000872589"
+      }
+    },
+    {
+      "actor_id": "RMD",
+      "name": "ResMed",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000943819"
+      }
+    },
+    {
+      "actor_id": "RVTY",
+      "name": "Revvity",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000031791"
+      }
+    },
+    {
+      "actor_id": "STE",
+      "name": "Steris",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001757898"
+      }
+    },
+    {
+      "actor_id": "SYK",
+      "name": "Stryker Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000310764"
+      }
+    },
+    {
+      "actor_id": "TMO",
+      "name": "Thermo Fisher Scientific",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000097745"
+      }
+    },
+    {
+      "actor_id": "UNH",
+      "name": "UnitedHealth Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000731766"
+      }
+    },
+    {
+      "actor_id": "UHS",
+      "name": "Universal Health Services",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000352915"
+      }
+    },
+    {
+      "actor_id": "VRTX",
+      "name": "Vertex Pharmaceuticals",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000875320"
+      }
+    },
+    {
+      "actor_id": "VTRS",
+      "name": "Viatris",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001792044"
+      }
+    },
+    {
+      "actor_id": "WAT",
+      "name": "Waters Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001000697"
+      }
+    },
+    {
+      "actor_id": "WST",
+      "name": "West Pharmaceutical Services",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000105770"
+      }
+    },
+    {
+      "actor_id": "ZBH",
+      "name": "Zimmer Biomet",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001136869"
+      }
+    },
+    {
+      "actor_id": "ZTS",
+      "name": "Zoetis",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001555280"
+      }
+    }
+  ]
+}

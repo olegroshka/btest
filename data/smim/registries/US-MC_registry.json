@@ -1,0 +1,2079 @@
+{
+  "universe_id": "US-MC",
+  "description": "Equity-only registry for US-MC",
+  "data_regime": "Gold",
+  "date_range": [
+    "2005-01-03",
+    "2025-12-30"
+  ],
+  "actors": [
+    {
+      "actor_id": "AA",
+      "name": "Alcoa",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001675149"
+      }
+    },
+    {
+      "actor_id": "AAL",
+      "name": "American Airlines Group",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000006201"
+      }
+    },
+    {
+      "actor_id": "AAON",
+      "name": "AAON",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000824142"
+      }
+    },
+    {
+      "actor_id": "ACI",
+      "name": "Albertsons",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001646972"
+      }
+    },
+    {
+      "actor_id": "ACM",
+      "name": "AECOM",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000868857"
+      }
+    },
+    {
+      "actor_id": "ADC",
+      "name": "Agree Realty",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000917251"
+      }
+    },
+    {
+      "actor_id": "AEIS",
+      "name": "Advanced Energy",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000927003"
+      }
+    },
+    {
+      "actor_id": "AFG",
+      "name": "American Financial Group",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001042046"
+      }
+    },
+    {
+      "actor_id": "AGCO",
+      "name": "AGCO",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000880266"
+      }
+    },
+    {
+      "actor_id": "AIT",
+      "name": "Applied Industrial Technologies",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000109563"
+      }
+    },
+    {
+      "actor_id": "ALGM",
+      "name": "Allegro MicroSystems",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000866291"
+      }
+    },
+    {
+      "actor_id": "ALK",
+      "name": "Alaska Air Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000766421"
+      }
+    },
+    {
+      "actor_id": "ALLY",
+      "name": "Ally Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000040729"
+      }
+    },
+    {
+      "actor_id": "ALV",
+      "name": "Autoliv",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001034670"
+      }
+    },
+    {
+      "actor_id": "AM",
+      "name": "Antero Midstream",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001623925"
+      }
+    },
+    {
+      "actor_id": "AMG",
+      "name": "Affiliated Managers Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001004434"
+      }
+    },
+    {
+      "actor_id": "AMH",
+      "name": "American Homes 4 Rent",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001562401"
+      }
+    },
+    {
+      "actor_id": "AMKR",
+      "name": "Amkor Technology",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001047127"
+      }
+    },
+    {
+      "actor_id": "AN",
+      "name": "AutoNation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000350698"
+      }
+    },
+    {
+      "actor_id": "ANF",
+      "name": "Abercrombie & Fitch",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001018840"
+      }
+    },
+    {
+      "actor_id": "APG",
+      "name": "APi Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001796209"
+      }
+    },
+    {
+      "actor_id": "APPF",
+      "name": "AppFolio",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001433195"
+      }
+    },
+    {
+      "actor_id": "AR",
+      "name": "Antero Resources",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001433270"
+      }
+    },
+    {
+      "actor_id": "ARMK",
+      "name": "Aramark",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001584509"
+      }
+    },
+    {
+      "actor_id": "ARW",
+      "name": "Arrow Electronics",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000007536"
+      }
+    },
+    {
+      "actor_id": "ARWR",
+      "name": "Arrowhead Pharmaceuticals",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000879407"
+      }
+    },
+    {
+      "actor_id": "ASB",
+      "name": "Associated Bank",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000007789"
+      }
+    },
+    {
+      "actor_id": "ASGN",
+      "name": "ASGN Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000890564"
+      }
+    },
+    {
+      "actor_id": "ASH",
+      "name": "Ashland Global",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001674862"
+      }
+    },
+    {
+      "actor_id": "ATI",
+      "name": "ATI Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001018963"
+      }
+    },
+    {
+      "actor_id": "ATR",
+      "name": "AptarGroup",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000896622"
+      }
+    },
+    {
+      "actor_id": "AVAV",
+      "name": "AeroVironment",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001368622"
+      }
+    },
+    {
+      "actor_id": "AVNT",
+      "name": "Avient",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001122976"
+      }
+    },
+    {
+      "actor_id": "AVT",
+      "name": "Avnet",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000008858"
+      }
+    },
+    {
+      "actor_id": "AVTR",
+      "name": "Avantor",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001722482"
+      }
+    },
+    {
+      "actor_id": "AXTA",
+      "name": "Axalta",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001616862"
+      }
+    },
+    {
+      "actor_id": "AYI",
+      "name": "Acuity Brands",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001144215"
+      }
+    },
+    {
+      "actor_id": "BAH",
+      "name": "Booz Allen Hamilton",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001443646"
+      }
+    },
+    {
+      "actor_id": "BBWI",
+      "name": "Bath & Body Works, Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000701985"
+      }
+    },
+    {
+      "actor_id": "BC",
+      "name": "Brunswick",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000014930"
+      }
+    },
+    {
+      "actor_id": "BCO",
+      "name": "Brink's",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000078890"
+      }
+    },
+    {
+      "actor_id": "BDC",
+      "name": "Belden Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000913142"
+      }
+    },
+    {
+      "actor_id": "BHF",
+      "name": "Brighthouse Financial",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001685040"
+      }
+    },
+    {
+      "actor_id": "BILL",
+      "name": "Bill Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001786352"
+      }
+    },
+    {
+      "actor_id": "BIO",
+      "name": "Bio-Rad Laboratories",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000012208"
+      }
+    },
+    {
+      "actor_id": "BJ",
+      "name": "BJ's Wholesale Club",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001531152"
+      }
+    },
+    {
+      "actor_id": "BKH",
+      "name": "Black Hills Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001130464"
+      }
+    },
+    {
+      "actor_id": "BLD",
+      "name": "TopBuild Corp.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001633931"
+      }
+    },
+    {
+      "actor_id": "BLKB",
+      "name": "Blackbaud",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001280058"
+      }
+    },
+    {
+      "actor_id": "BMRN",
+      "name": "BioMarin Pharmaceutical",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001048477"
+      }
+    },
+    {
+      "actor_id": "BRBR",
+      "name": "BellRing Brands",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001772016"
+      }
+    },
+    {
+      "actor_id": "BRKR",
+      "name": "Bruker",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001109354"
+      }
+    },
+    {
+      "actor_id": "BRX",
+      "name": "Brixmor Property Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001581068"
+      }
+    },
+    {
+      "actor_id": "BSY",
+      "name": "Bentley Systems",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001031308"
+      }
+    },
+    {
+      "actor_id": "BURL",
+      "name": "Burlington Stores",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001579298"
+      }
+    },
+    {
+      "actor_id": "BWA",
+      "name": "BorgWarner",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000908255"
+      }
+    },
+    {
+      "actor_id": "BWXT",
+      "name": "BWX Technologies",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001486957"
+      }
+    },
+    {
+      "actor_id": "BYD",
+      "name": "Boyd Gaming",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000906553"
+      }
+    },
+    {
+      "actor_id": "CACI",
+      "name": "CACI International",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000016058"
+      }
+    },
+    {
+      "actor_id": "CAR",
+      "name": "Avis Budget Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000723612"
+      }
+    },
+    {
+      "actor_id": "CASY",
+      "name": "Casey's General Stores",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000726958"
+      }
+    },
+    {
+      "actor_id": "CBSH",
+      "name": "Commerce Bancshares",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000022356"
+      }
+    },
+    {
+      "actor_id": "CBT",
+      "name": "Cabot Corp",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000016040"
+      }
+    },
+    {
+      "actor_id": "CCK",
+      "name": "Crown Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001219601"
+      }
+    },
+    {
+      "actor_id": "CDP",
+      "name": "COPT Defense Properties",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000860546"
+      }
+    },
+    {
+      "actor_id": "CELH",
+      "name": "Celsius Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001341766"
+      }
+    },
+    {
+      "actor_id": "CFR",
+      "name": "Frost Bank",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000039263"
+      }
+    },
+    {
+      "actor_id": "CG",
+      "name": "Carlyle Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001527166"
+      }
+    },
+    {
+      "actor_id": "CGNX",
+      "name": "Cognex",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000851205"
+      }
+    },
+    {
+      "actor_id": "CHDN",
+      "name": "Churchill Downs Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000020212"
+      }
+    },
+    {
+      "actor_id": "CHE",
+      "name": "Chemed Corp.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000019584"
+      }
+    },
+    {
+      "actor_id": "CHH",
+      "name": "Choice Hotels",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001046311"
+      }
+    },
+    {
+      "actor_id": "CHRD",
+      "name": "Chord Energy",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001486159"
+      }
+    },
+    {
+      "actor_id": "CHWY",
+      "name": "Chewy",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001766502"
+      }
+    },
+    {
+      "actor_id": "CLF",
+      "name": "Cleveland-Cliffs",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000764065"
+      }
+    },
+    {
+      "actor_id": "CLH",
+      "name": "Clean Harbors",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000822818"
+      }
+    },
+    {
+      "actor_id": "CMC",
+      "name": "Commercial Metals",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000022444"
+      }
+    },
+    {
+      "actor_id": "CNH",
+      "name": "CNH Industrial",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001567094"
+      }
+    },
+    {
+      "actor_id": "CNO",
+      "name": "CNO Financial Group",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001224608"
+      }
+    },
+    {
+      "actor_id": "CNX",
+      "name": "CNX Resources",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001070412"
+      }
+    },
+    {
+      "actor_id": "CNXC",
+      "name": "Concentrix",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001803599"
+      }
+    },
+    {
+      "actor_id": "COHR",
+      "name": "Coherent Corp.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000820318"
+      }
+    },
+    {
+      "actor_id": "COKE",
+      "name": "Coca-Cola Consolidated",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000317540"
+      }
+    },
+    {
+      "actor_id": "COLB",
+      "name": "Columbia Banking System",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000887343"
+      }
+    },
+    {
+      "actor_id": "COLM",
+      "name": "Columbia Sportswear",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001050797"
+      }
+    },
+    {
+      "actor_id": "COTY",
+      "name": "Coty",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001024305"
+      }
+    },
+    {
+      "actor_id": "CPRI",
+      "name": "Capri Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001530721"
+      }
+    },
+    {
+      "actor_id": "CROX",
+      "name": "Crocs",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001334036"
+      }
+    },
+    {
+      "actor_id": "CRS",
+      "name": "Carpenter Technology",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000017843"
+      }
+    },
+    {
+      "actor_id": "CRUS",
+      "name": "Cirrus Logic",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000772406"
+      }
+    },
+    {
+      "actor_id": "CSL",
+      "name": "Carlisle Companies",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000790051"
+      }
+    },
+    {
+      "actor_id": "CUBE",
+      "name": "CubeSmart",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001298675"
+      }
+    },
+    {
+      "actor_id": "CUZ",
+      "name": "Cousins Properties",
+      "actor_type": "bank",
+      "layer": 2,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000025232"
+      }
+    },
+    {
+      "actor_id": "CVLT",
+      "name": "CommVault Systems",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001169561"
+      }
+    },
+    {
+      "actor_id": "CW",
+      "name": "Curtiss-Wright",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000026324"
+      }
+    },
+    {
+      "actor_id": "CXT",
+      "name": "Crane NXT",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000025445"
+      }
+    },
+    {
+      "actor_id": "CYTK",
+      "name": "Cytokinetics",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001061983"
+      }
+    },
+    {
+      "actor_id": "DAR",
+      "name": "Darling Ingredients",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000916540"
+      }
+    },
+    {
+      "actor_id": "DBX",
+      "name": "Dropbox",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001467623"
+      }
+    },
+    {
+      "actor_id": "DCI",
+      "name": "Donaldson Company",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000029644"
+      }
+    },
+    {
+      "actor_id": "DINO",
+      "name": "HF Sinclair",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001915657"
+      }
+    },
+    {
+      "actor_id": "DKS",
+      "name": "Dick's Sporting Goods",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001089063"
+      }
+    },
+    {
+      "actor_id": "DLB",
+      "name": "Dolby",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001308547"
+      }
+    },
+    {
+      "actor_id": "DOCU",
+      "name": "Docusign",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001261333"
+      }
+    },
+    {
+      "actor_id": "DT",
+      "name": "Dynatrace",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001773383"
+      }
+    },
+    {
+      "actor_id": "DY",
+      "name": "Dycom Industries",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000067215"
+      }
+    },
+    {
+      "actor_id": "EEFT",
+      "name": "Euronet Worldwide",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001029199"
+      }
+    },
+    {
+      "actor_id": "EGP",
+      "name": "EastGroup Properties",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000049600"
+      }
+    },
+    {
+      "actor_id": "EHC",
+      "name": "Encompass Health",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000785161"
+      }
+    },
+    {
+      "actor_id": "ELAN",
+      "name": "Elanco",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001739104"
+      }
+    },
+    {
+      "actor_id": "ELF",
+      "name": "e.l.f. Beauty",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001600033"
+      }
+    },
+    {
+      "actor_id": "ELS",
+      "name": "Equity Lifestyle Properties",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000895417"
+      }
+    },
+    {
+      "actor_id": "ENS",
+      "name": "EnerSys",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001289308"
+      }
+    },
+    {
+      "actor_id": "ENSG",
+      "name": "Ensign Group",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001125376"
+      }
+    },
+    {
+      "actor_id": "ENTG",
+      "name": "Entegris",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001101302"
+      }
+    },
+    {
+      "actor_id": "EPR",
+      "name": "EPR Properties",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001045450"
+      }
+    },
+    {
+      "actor_id": "EQH",
+      "name": "Equitable Holdings",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001333986"
+      }
+    },
+    {
+      "actor_id": "ESNT",
+      "name": "Essent Group Ltd.",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001448893"
+      }
+    },
+    {
+      "actor_id": "EVR",
+      "name": "Evercore",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001360901"
+      }
+    },
+    {
+      "actor_id": "EWBC",
+      "name": "East West Bancorp",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001069157"
+      }
+    },
+    {
+      "actor_id": "EXEL",
+      "name": "Exelixis",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000939767"
+      }
+    },
+    {
+      "actor_id": "EXLS",
+      "name": "EXL Service",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001297989"
+      }
+    },
+    {
+      "actor_id": "EXP",
+      "name": "Eagle Materials",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000918646"
+      }
+    },
+    {
+      "actor_id": "EXPO",
+      "name": "Exponent, Inc.",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000851520"
+      }
+    },
+    {
+      "actor_id": "FAF",
+      "name": "First American Financial Corporation",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001472787"
+      }
+    },
+    {
+      "actor_id": "FBIN",
+      "name": "Fortune Brands Innovations",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001519751"
+      }
+    },
+    {
+      "actor_id": "FCFS",
+      "name": "FirstCash",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000840489"
+      }
+    },
+    {
+      "actor_id": "FCN",
+      "name": "FTI Consulting",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000887936"
+      }
+    },
+    {
+      "actor_id": "FFIN",
+      "name": "First Financial Bankshares",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000036029"
+      }
+    },
+    {
+      "actor_id": "FHI",
+      "name": "Federated Hermes",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001056288"
+      }
+    },
+    {
+      "actor_id": "FHN",
+      "name": "First Horizon",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000036966"
+      }
+    },
+    {
+      "actor_id": "FIVE",
+      "name": "Five Below",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001177609"
+      }
+    },
+    {
+      "actor_id": "FLEX",
+      "name": "Flex Ltd.",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000866374"
+      }
+    },
+    {
+      "actor_id": "FLG",
+      "name": "Flagstar Bank",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000910073"
+      }
+    },
+    {
+      "actor_id": "FLO",
+      "name": "Flowers Foods",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001128928"
+      }
+    },
+    {
+      "actor_id": "FLR",
+      "name": "Fluor",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001124198"
+      }
+    },
+    {
+      "actor_id": "FLS",
+      "name": "Flowserve",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000030625"
+      }
+    },
+    {
+      "actor_id": "FN",
+      "name": "Fabrinet",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001408710"
+      }
+    },
+    {
+      "actor_id": "FNB",
+      "name": "FNB Corporation",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000037808"
+      }
+    },
+    {
+      "actor_id": "FND",
+      "name": "Floor & Decor",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001507079"
+      }
+    },
+    {
+      "actor_id": "FNF",
+      "name": "Fidelity National Financial",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001331875"
+      }
+    },
+    {
+      "actor_id": "FOUR",
+      "name": "Shift4",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001794669"
+      }
+    },
+    {
+      "actor_id": "FR",
+      "name": "First Industrial Realty Trust",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000921825"
+      }
+    },
+    {
+      "actor_id": "FTI",
+      "name": "TechnipFMC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001681459"
+      }
+    },
+    {
+      "actor_id": "G",
+      "name": "Genpact",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001398659"
+      }
+    },
+    {
+      "actor_id": "GAP",
+      "name": "Gap Inc.",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000039911"
+      }
+    },
+    {
+      "actor_id": "GATX",
+      "name": "GATX",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000040211"
+      }
+    },
+    {
+      "actor_id": "GBCI",
+      "name": "Glacier Bancorp",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000868671"
+      }
+    },
+    {
+      "actor_id": "GEF",
+      "name": "Greif, Inc.",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000043920"
+      }
+    },
+    {
+      "actor_id": "GGG",
+      "name": "Graco Inc.",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000042888"
+      }
+    },
+    {
+      "actor_id": "GHC",
+      "name": "Graham Holdings",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000104889"
+      }
+    },
+    {
+      "actor_id": "GLPI",
+      "name": "Gaming and Leisure Properties",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001575965"
+      }
+    },
+    {
+      "actor_id": "GME",
+      "name": "GameStop",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001326380"
+      }
+    },
+    {
+      "actor_id": "GMED",
+      "name": "Globus Medical",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001237831"
+      }
+    },
+    {
+      "actor_id": "GNTX",
+      "name": "Gentex",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000355811"
+      }
+    },
+    {
+      "actor_id": "GPK",
+      "name": "Graphic Packaging",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001408075"
+      }
+    },
+    {
+      "actor_id": "GT",
+      "name": "Goodyear Tire & Rubber",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000042582"
+      }
+    },
+    {
+      "actor_id": "GTLS",
+      "name": "Chart Industries",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000892553"
+      }
+    },
+    {
+      "actor_id": "GTM",
+      "name": "ZoomInfo",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001794515"
+      }
+    },
+    {
+      "actor_id": "GWRE",
+      "name": "Guidewire Software",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001528396"
+      }
+    },
+    {
+      "actor_id": "H",
+      "name": "Hyatt",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001468174"
+      }
+    },
+    {
+      "actor_id": "HAE",
+      "name": "Haemonetics",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000313143"
+      }
+    },
+    {
+      "actor_id": "HALO",
+      "name": "Halozyme",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001159036"
+      }
+    },
+    {
+      "actor_id": "HGV",
+      "name": "Hilton Grand Vacations",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001674168"
+      }
+    },
+    {
+      "actor_id": "HIMS",
+      "name": "Hims & Hers Health",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001773751"
+      }
+    },
+    {
+      "actor_id": "HL",
+      "name": "Hecla Mining",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000719413"
+      }
+    },
+    {
+      "actor_id": "HLI",
+      "name": "Houlihan Lokey",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001302215"
+      }
+    },
+    {
+      "actor_id": "HLNE",
+      "name": "Hamilton Lane",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001433642"
+      }
+    },
+    {
+      "actor_id": "HOG",
+      "name": "Harley-Davidson",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000793952"
+      }
+    },
+    {
+      "actor_id": "HOMB",
+      "name": "Home BancShares",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001331520"
+      }
+    },
+    {
+      "actor_id": "HQY",
+      "name": "HealthEquity",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001428336"
+      }
+    },
+    {
+      "actor_id": "HR",
+      "name": "Healthcare Realty Trust",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001360604"
+      }
+    },
+    {
+      "actor_id": "HRB",
+      "name": "H&R Block",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000012659"
+      }
+    },
+    {
+      "actor_id": "HWC",
+      "name": "Hancock Whitney",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000750577"
+      }
+    },
+    {
+      "actor_id": "HXL",
+      "name": "Hexcel",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000717605"
+      }
+    },
+    {
+      "actor_id": "IBOC",
+      "name": "Intl Bancshares Corp",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000315709"
+      }
+    },
+    {
+      "actor_id": "IDA",
+      "name": "Idacorp",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001057877"
+      }
+    },
+    {
+      "actor_id": "ILMN",
+      "name": "Illumina, Inc.",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001110803"
+      }
+    },
+    {
+      "actor_id": "INGR",
+      "name": "Ingredion",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001046257"
+      }
+    },
+    {
+      "actor_id": "IPGP",
+      "name": "IPG Photonics",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001111928"
+      }
+    },
+    {
+      "actor_id": "IRT",
+      "name": "IRT Living",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001466085"
+      }
+    },
+    {
+      "actor_id": "ITT",
+      "name": "ITT Inc.",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000216228"
+      }
+    },
+    {
+      "actor_id": "JAZZ",
+      "name": "Jazz Pharmaceuticals",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001232524"
+      }
+    },
+    {
+      "actor_id": "JEF",
+      "name": "Jefferies",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000096223"
+      }
+    },
+    {
+      "actor_id": "JHG",
+      "name": "Janus Henderson",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001274173"
+      }
+    },
+    {
+      "actor_id": "JLL",
+      "name": "Jones Lang LaSalle",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001037976"
+      }
+    },
+    {
+      "actor_id": "KBH",
+      "name": "KB Home",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000795266"
+      }
+    },
+    {
+      "actor_id": "KBR",
+      "name": "KBR, Inc.",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001357615"
+      }
+    }
+  ]
+}

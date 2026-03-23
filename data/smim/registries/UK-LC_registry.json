@@ -1,0 +1,884 @@
+{
+  "universe_id": "UK-LC",
+  "description": "Equity-only registry for UK-LC",
+  "data_regime": "Gold",
+  "date_range": [
+    "2005-01-03",
+    "2025-12-30"
+  ],
+  "actors": [
+    {
+      "actor_id": "III.L",
+      "name": "3i",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ADM.L",
+      "name": "Admiral Group",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AAF.L",
+      "name": "Airtel Africa",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ALW.L",
+      "name": "Alliance Witan",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AAL.L",
+      "name": "Anglo American plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ANTO.L",
+      "name": "Antofagasta plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ABF.L",
+      "name": "Associated British Foods",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AZN.L",
+      "name": "AstraZeneca",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AUTO.L",
+      "name": "Autotrader Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AV.L",
+      "name": "Aviva",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BAB.L",
+      "name": "Babcock International",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BA.L",
+      "name": "BAE Systems",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BARC.L",
+      "name": "Barclays",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BTRW.L",
+      "name": "Barratt Redrow",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BEZ.L",
+      "name": "Beazley",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BKG.L",
+      "name": "Berkeley Group Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BP.L",
+      "name": "BP",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BATS.L",
+      "name": "British American Tobacco",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BLND.L",
+      "name": "British Land",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BNZL.L",
+      "name": "Bunzl",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BRBY.L",
+      "name": "Burberry Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CNA.L",
+      "name": "Centrica",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CCEP.L",
+      "name": "Coca-Cola Europacific Partners",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CCH.L",
+      "name": "Coca-Cola HBC",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CPG.L",
+      "name": "Compass Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CTEC.L",
+      "name": "Convatec",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CRDA.L",
+      "name": "Croda International",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DCC.L",
+      "name": "DCC plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DGE.L",
+      "name": "Diageo",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DPLM.L",
+      "name": "Diploma",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "EDV.L",
+      "name": "Endeavour Mining",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ENT.L",
+      "name": "Entain",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "EXPN.L",
+      "name": "Experian",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FCIT.L",
+      "name": "F & C Investment Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FRES.L",
+      "name": "Fresnillo plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GAW.L",
+      "name": "Games Workshop",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GLEN.L",
+      "name": "Glencore",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GSK.L",
+      "name": "GSK plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HLMA.L",
+      "name": "Halma plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HSX.L",
+      "name": "Hiscox",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HWDN.L",
+      "name": "Howdens Joinery",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HSBA.L",
+      "name": "HSBC",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ICG.L",
+      "name": "ICG",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "IGG.L",
+      "name": "IG Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "IHG.L",
+      "name": "IHG Hotels & Resorts",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "IMI.L",
+      "name": "IMI",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "IMB.L",
+      "name": "Imperial Brands",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "INF.L",
+      "name": "Informa",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "IAG.L",
+      "name": "International Airlines Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ITRK.L",
+      "name": "Intertek",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "JD.L",
+      "name": "JD Sports",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BGEO.L",
+      "name": "Lion Finance Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "KGF.L",
+      "name": "Kingfisher plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "LAND.L",
+      "name": "Land Securities",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "LGEN.L",
+      "name": "Legal & General",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "LLOY.L",
+      "name": "Lloyds Banking Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "LMP.L",
+      "name": "LondonMetric Property",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "LSEG.L",
+      "name": "London Stock Exchange Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "MNG.L",
+      "name": "M&G",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "MKS.L",
+      "name": "Marks & Spencer",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "MRO.L",
+      "name": "Melrose Industries",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "MNDI.L",
+      "name": "Mondi",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "NG.L",
+      "name": "National Grid plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "NWG.L",
+      "name": "NatWest Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "NXT.L",
+      "name": "Next plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "PSON.L",
+      "name": "Pearson plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "PSH.L",
+      "name": "Pershing Square Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "PSN.L",
+      "name": "Persimmon",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "PCT.L",
+      "name": "Polar Capital Technology Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "PRU.L",
+      "name": "Prudential plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "RKT.L",
+      "name": "Reckitt",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "REL.L",
+      "name": "RELX",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "RTO.L",
+      "name": "Rentokil Initial",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "RMV.L",
+      "name": "Rightmove",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "RIO.L",
+      "name": "Rio Tinto",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "RR.L",
+      "name": "Rolls-Royce Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SGE.L",
+      "name": "Sage Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SBRY.L",
+      "name": "Sainsbury's",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SDR.L",
+      "name": "Schroders",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SMT.L",
+      "name": "Scottish Mortgage Investment Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SGRO.L",
+      "name": "Segro",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SVT.L",
+      "name": "Severn Trent",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SHEL.L",
+      "name": "Shell plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SMIN.L",
+      "name": "Smiths Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SN.L",
+      "name": "Smith & Nephew",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SPX.L",
+      "name": "Spirax Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SSE.L",
+      "name": "SSE plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "STAN.L",
+      "name": "Standard Chartered",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SDLF.L",
+      "name": "Standard Life",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "STJ.L",
+      "name": "St. James's Place",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "TSCO.L",
+      "name": "Tesco",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BBOX.L",
+      "name": "Tritax Big Box REIT",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ULVR.L",
+      "name": "Unilever",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "UU.L",
+      "name": "United Utilities",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "VOD.L",
+      "name": "Vodafone Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "WEIR.L",
+      "name": "Weir Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "WTB.L",
+      "name": "Whitbread",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    }
+  ]
+}

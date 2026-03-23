@@ -1,0 +1,857 @@
+{
+  "universe_id": "UK-MC",
+  "description": "Equity-only registry for UK-MC",
+  "data_regime": "Gold",
+  "date_range": [
+    "2005-01-03",
+    "2025-12-30"
+  ],
+  "actors": [
+    {
+      "actor_id": "3IN.L",
+      "name": "3i Infrastructure",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FOUR.L",
+      "name": "4imprint",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AAS.L",
+      "name": "Aberdeen Asia Focus",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ABDN.L",
+      "name": "Aberdeen Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ASL.L",
+      "name": "Aberforth Smaller Companies Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AEP.L",
+      "name": "AEP Plantations",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ALFA.L",
+      "name": "Alfa Financial Software",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ATT.L",
+      "name": "Allianz Technology Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AO.L",
+      "name": "AO World",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ASHM.L",
+      "name": "Ashmore Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AIE.L",
+      "name": "Ashoka India Equity Investment Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AML.L",
+      "name": "Aston Martin Lagonda",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ATYM.L",
+      "name": "Atalaya Mining",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AGT.L",
+      "name": "AVI Global Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AVON.L",
+      "name": "Avon Technologies",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BME.L",
+      "name": "B&M",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BGFD.L",
+      "name": "Baillie Gifford Japan Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "USA.L",
+      "name": "Baillie Gifford US Growth Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BBY.L",
+      "name": "Balfour Beatty",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BNKR.L",
+      "name": "Bankers Investment Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BAG.L",
+      "name": "A.G. Barr",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "AJB.L",
+      "name": "AJ Bell",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BWY.L",
+      "name": "Bellway",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BHMG.L",
+      "name": "BH Macro",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BYG.L",
+      "name": "Big Yellow Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BPCR.L",
+      "name": "Biopharma Credit",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BRGE.L",
+      "name": "BlackRock Greater Europe Investment Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BRSC.L",
+      "name": "BlackRock Smaller Companies Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "THRG.L",
+      "name": "BlackRock Throgmorton Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BRWM.L",
+      "name": "BlackRock World Mining Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BSIF.L",
+      "name": "Bluefield Solar Income Fund",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BOY.L",
+      "name": "Bodycote",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BREE.L",
+      "name": "Breedon Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BUT.L",
+      "name": "Brunner Investment Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "BYIT.L",
+      "name": "Bytes Technology Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CCR.L",
+      "name": "C&C Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CLDN.L",
+      "name": "Caledonia Investments",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CGT.L",
+      "name": "Capital Gearing Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CCL.L",
+      "name": "Carnival Corporation & plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CWR.L",
+      "name": "Ceres Power",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CHG.L",
+      "name": "Chemring Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CSN.L",
+      "name": "Chesnara",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CHRY.L",
+      "name": "Chrysalis Investments",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CTY.L",
+      "name": "City of London Investment Trust",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CKN.L",
+      "name": "Clarkson",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CBG.L",
+      "name": "Close Brothers Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CMCX.L",
+      "name": "CMC Markets",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "COA.L",
+      "name": "Coats Group",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CCC.L",
+      "name": "Computacenter",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "COST.L",
+      "name": "Costain Group",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CWK.L",
+      "name": "Cranswick",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CURY.L",
+      "name": "Currys",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CVSG.L",
+      "name": "CVS Group",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DLN.L",
+      "name": "Derwent London",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DSCV.L",
+      "name": "discoverIE",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DOM.L",
+      "name": "Domino's Pizza",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DRX.L",
+      "name": "Drax Group",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DNLM.L",
+      "name": "Dunelm Group",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "EZJ.L",
+      "name": "EasyJet",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "EDIN.L",
+      "name": "Edinburgh Investment Trust",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "EWI.L",
+      "name": "Edinburgh Worldwide Investment Trust",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ELM.L",
+      "name": "Elementis",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ENOG.L",
+      "name": "Energean",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "ESCT.L",
+      "name": "European Smaller Companies Trust",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FCSS.L",
+      "name": "Fidelity China Special Situations",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FEML.L",
+      "name": "Fidelity Emerging Markets",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FEV.L",
+      "name": "Fidelity European Trust",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FSV.L",
+      "name": "Fidelity Special Values",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FGT.L",
+      "name": "Finsbury Growth & Income Trust",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FGP.L",
+      "name": "FirstGroup",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FGEN.L",
+      "name": "Foresight Environmental Infrastructure",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FRAS.L",
+      "name": "Frasers Group",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "FCH.L",
+      "name": "Funding Circle",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GFRD.L",
+      "name": "Galliford Try",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GAMA.L",
+      "name": "Gamma Communications",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GBG.L",
+      "name": "GB Group",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GCP.L",
+      "name": "GCP Infrastructure Investments",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GEN.L",
+      "name": "Genuit Group",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GNS.L",
+      "name": "Genus",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GSCT.L",
+      "name": "Global Smaller Companies Trust",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GDWN.L",
+      "name": "Goodwin",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GFTU.L",
+      "name": "Grafton Group",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GRI.L",
+      "name": "Grainger",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GPE.L",
+      "name": "Great Portland Estates",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "UKW.L",
+      "name": "Greencoat UK Wind",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GNC.L",
+      "name": "Greencore",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "GRG.L",
+      "name": "Greggs",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HMSO.L",
+      "name": "Hammerson",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HVPE.L",
+      "name": "HarbourVest Global Private Equity",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HWG.L",
+      "name": "Harworth Group",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HAS.L",
+      "name": "Hays",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HTWS.L",
+      "name": "Helios Towers",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HSL.L",
+      "name": "Henderson Smaller Companies Investment Trust",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "HRI.L",
+      "name": "Herald Investment Trust",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    }
+  ]
+}

@@ -1,0 +1,845 @@
+{
+  "universe_id": "US-LC-INDUS",
+  "description": "Equity-only registry for US-LC-INDUS",
+  "data_regime": "Gold",
+  "date_range": [
+    "2005-01-03",
+    "2025-12-30"
+  ],
+  "actors": [
+    {
+      "actor_id": "MMM",
+      "name": "3M",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000066740"
+      }
+    },
+    {
+      "actor_id": "AOS",
+      "name": "A. O. Smith",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000091142"
+      }
+    },
+    {
+      "actor_id": "ALLE",
+      "name": "Allegion",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001579241"
+      }
+    },
+    {
+      "actor_id": "AME",
+      "name": "Ametek",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001037868"
+      }
+    },
+    {
+      "actor_id": "ADP",
+      "name": "Automatic Data Processing",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000008670"
+      }
+    },
+    {
+      "actor_id": "AXON",
+      "name": "Axon Enterprise",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001069183"
+      }
+    },
+    {
+      "actor_id": "BA",
+      "name": "Boeing",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000012927"
+      }
+    },
+    {
+      "actor_id": "BR",
+      "name": "Broadridge Financial Solutions",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001383312"
+      }
+    },
+    {
+      "actor_id": "BLDR",
+      "name": "Builders FirstSource",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001316835"
+      }
+    },
+    {
+      "actor_id": "CHRW",
+      "name": "C.H. Robinson",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001043277"
+      }
+    },
+    {
+      "actor_id": "CARR",
+      "name": "Carrier Global",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001783180"
+      }
+    },
+    {
+      "actor_id": "CAT",
+      "name": "Caterpillar Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000018230"
+      }
+    },
+    {
+      "actor_id": "CTAS",
+      "name": "Cintas",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000723254"
+      }
+    },
+    {
+      "actor_id": "CPRT",
+      "name": "Copart",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000900075"
+      }
+    },
+    {
+      "actor_id": "CSX",
+      "name": "CSX Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000277948"
+      }
+    },
+    {
+      "actor_id": "CMI",
+      "name": "Cummins",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000026172"
+      }
+    },
+    {
+      "actor_id": "DAY",
+      "name": "Dayforce",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "DE",
+      "name": "Deere & Company",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000315189"
+      }
+    },
+    {
+      "actor_id": "DAL",
+      "name": "Delta Air Lines",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000027904"
+      }
+    },
+    {
+      "actor_id": "DOV",
+      "name": "Dover Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000029905"
+      }
+    },
+    {
+      "actor_id": "ETN",
+      "name": "Eaton Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001551182"
+      }
+    },
+    {
+      "actor_id": "EMR",
+      "name": "Emerson Electric",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000032604"
+      }
+    },
+    {
+      "actor_id": "EFX",
+      "name": "Equifax",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000033185"
+      }
+    },
+    {
+      "actor_id": "EXPD",
+      "name": "Expeditors International",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000746515"
+      }
+    },
+    {
+      "actor_id": "FAST",
+      "name": "Fastenal",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000815556"
+      }
+    },
+    {
+      "actor_id": "FDX",
+      "name": "FedEx",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001048911"
+      }
+    },
+    {
+      "actor_id": "FTV",
+      "name": "Fortive",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001659166"
+      }
+    },
+    {
+      "actor_id": "GE",
+      "name": "GE Aerospace",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000040545"
+      }
+    },
+    {
+      "actor_id": "GNRC",
+      "name": "Generac",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001474735"
+      }
+    },
+    {
+      "actor_id": "GD",
+      "name": "General Dynamics",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000040533"
+      }
+    },
+    {
+      "actor_id": "HON",
+      "name": "Honeywell",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000773840"
+      }
+    },
+    {
+      "actor_id": "HWM",
+      "name": "Howmet Aerospace",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000004281"
+      }
+    },
+    {
+      "actor_id": "HUBB",
+      "name": "Hubbell Incorporated",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000048898"
+      }
+    },
+    {
+      "actor_id": "HII",
+      "name": "Huntington Ingalls Industries",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001501585"
+      }
+    },
+    {
+      "actor_id": "IEX",
+      "name": "IDEX Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000832101"
+      }
+    },
+    {
+      "actor_id": "ITW",
+      "name": "Illinois Tool Works",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000049826"
+      }
+    },
+    {
+      "actor_id": "IR",
+      "name": "Ingersoll Rand",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001699150"
+      }
+    },
+    {
+      "actor_id": "JBHT",
+      "name": "J.B. Hunt",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000728535"
+      }
+    },
+    {
+      "actor_id": "J",
+      "name": "Jacobs Solutions",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000052988"
+      }
+    },
+    {
+      "actor_id": "JCI",
+      "name": "Johnson Controls",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000833444"
+      }
+    },
+    {
+      "actor_id": "LHX",
+      "name": "L3Harris",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000202058"
+      }
+    },
+    {
+      "actor_id": "LDOS",
+      "name": "Leidos",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001336920"
+      }
+    },
+    {
+      "actor_id": "LII",
+      "name": "Lennox International",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001069202"
+      }
+    },
+    {
+      "actor_id": "LMT",
+      "name": "Lockheed Martin",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000936468"
+      }
+    },
+    {
+      "actor_id": "MAS",
+      "name": "Masco",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000062996"
+      }
+    },
+    {
+      "actor_id": "NDSN",
+      "name": "Nordson Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000072331"
+      }
+    },
+    {
+      "actor_id": "NSC",
+      "name": "Norfolk Southern",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000702165"
+      }
+    },
+    {
+      "actor_id": "NOC",
+      "name": "Northrop Grumman",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001133421"
+      }
+    },
+    {
+      "actor_id": "ODFL",
+      "name": "Old Dominion",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000878927"
+      }
+    },
+    {
+      "actor_id": "OTIS",
+      "name": "Otis Worldwide",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001781335"
+      }
+    },
+    {
+      "actor_id": "PCAR",
+      "name": "Paccar",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000075362"
+      }
+    },
+    {
+      "actor_id": "PH",
+      "name": "Parker Hannifin",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000076334"
+      }
+    },
+    {
+      "actor_id": "PAYX",
+      "name": "Paychex",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000723531"
+      }
+    },
+    {
+      "actor_id": "PAYC",
+      "name": "Paycom",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001590955"
+      }
+    },
+    {
+      "actor_id": "PNR",
+      "name": "Pentair",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000077360"
+      }
+    },
+    {
+      "actor_id": "PWR",
+      "name": "Quanta Services",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001050915"
+      }
+    },
+    {
+      "actor_id": "RTX",
+      "name": "RTX Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000101829"
+      }
+    },
+    {
+      "actor_id": "RSG",
+      "name": "Republic Services",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001060391"
+      }
+    },
+    {
+      "actor_id": "ROK",
+      "name": "Rockwell Automation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001024478"
+      }
+    },
+    {
+      "actor_id": "ROL",
+      "name": "Rollins, Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000084839"
+      }
+    },
+    {
+      "actor_id": "SNA",
+      "name": "Snap-on",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000091440"
+      }
+    },
+    {
+      "actor_id": "LUV",
+      "name": "Southwest Airlines",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000092380"
+      }
+    },
+    {
+      "actor_id": "SWK",
+      "name": "Stanley Black & Decker",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000093556"
+      }
+    },
+    {
+      "actor_id": "TXT",
+      "name": "Textron",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000217346"
+      }
+    },
+    {
+      "actor_id": "TT",
+      "name": "Trane Technologies",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001466258"
+      }
+    },
+    {
+      "actor_id": "TDG",
+      "name": "TransDigm Group",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001260221"
+      }
+    },
+    {
+      "actor_id": "UBER",
+      "name": "Uber",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001543151"
+      }
+    },
+    {
+      "actor_id": "UNP",
+      "name": "Union Pacific Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000100885"
+      }
+    },
+    {
+      "actor_id": "UAL",
+      "name": "United Airlines Holdings",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000100517"
+      }
+    },
+    {
+      "actor_id": "UPS",
+      "name": "United Parcel Service",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001090727"
+      }
+    },
+    {
+      "actor_id": "URI",
+      "name": "United Rentals",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001067701"
+      }
+    },
+    {
+      "actor_id": "VRSK",
+      "name": "Verisk Analytics",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001442145"
+      }
+    },
+    {
+      "actor_id": "GWW",
+      "name": "W. W. Grainger",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000277135"
+      }
+    },
+    {
+      "actor_id": "WAB",
+      "name": "Wabtec",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000943452"
+      }
+    },
+    {
+      "actor_id": "WM",
+      "name": "Waste Management",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000823768"
+      }
+    },
+    {
+      "actor_id": "XYL",
+      "name": "Xylem Inc.",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001524472"
+      }
+    }
+  ]
+}

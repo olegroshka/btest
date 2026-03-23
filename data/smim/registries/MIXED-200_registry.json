@@ -1,0 +1,287 @@
+{
+  "universe_id": "MIXED-200",
+  "description": "Equity-only registry for MIXED-200",
+  "data_regime": "Gold",
+  "date_range": [
+    "2005-01-03",
+    "2025-12-30"
+  ],
+  "actors": [
+    {
+      "actor_id": "APA",
+      "name": "APA Corporation",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001841666"
+      }
+    },
+    {
+      "actor_id": "BKR",
+      "name": "Baker Hughes",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001701605"
+      }
+    },
+    {
+      "actor_id": "CVX",
+      "name": "Chevron Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000093410"
+      }
+    },
+    {
+      "actor_id": "COP",
+      "name": "ConocoPhillips",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001163165"
+      }
+    },
+    {
+      "actor_id": "CTRA",
+      "name": "Coterra",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000858470"
+      }
+    },
+    {
+      "actor_id": "DVN",
+      "name": "Devon Energy",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001090012"
+      }
+    },
+    {
+      "actor_id": "FANG",
+      "name": "Diamondback Energy",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001539838"
+      }
+    },
+    {
+      "actor_id": "EOG",
+      "name": "EOG Resources",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000821189"
+      }
+    },
+    {
+      "actor_id": "EQT",
+      "name": "EQT Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000033213"
+      }
+    },
+    {
+      "actor_id": "XOM",
+      "name": "ExxonMobil",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000034088"
+      }
+    },
+    {
+      "actor_id": "HAL",
+      "name": "Halliburton",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000045012"
+      }
+    },
+    {
+      "actor_id": "KMI",
+      "name": "Kinder Morgan",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001506307"
+      }
+    },
+    {
+      "actor_id": "MPC",
+      "name": "Marathon Petroleum",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001510295"
+      }
+    },
+    {
+      "actor_id": "OXY",
+      "name": "Occidental Petroleum",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000797468"
+      }
+    },
+    {
+      "actor_id": "OKE",
+      "name": "Oneok",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001039684"
+      }
+    },
+    {
+      "actor_id": "PSX",
+      "name": "Phillips 66",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001534701"
+      }
+    },
+    {
+      "actor_id": "SLB",
+      "name": "Schlumberger",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000087347"
+      }
+    },
+    {
+      "actor_id": "TRGP",
+      "name": "Targa Resources",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001389170"
+      }
+    },
+    {
+      "actor_id": "TPL",
+      "name": "Texas Pacific Land Corporation",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001811074"
+      }
+    },
+    {
+      "actor_id": "VLO",
+      "name": "Valero Energy",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001035002"
+      }
+    },
+    {
+      "actor_id": "WMB",
+      "name": "Williams Companies",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000107263"
+      }
+    },
+    {
+      "actor_id": "BP.L",
+      "name": "BP",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "CNA.L",
+      "name": "Centrica",
+      "actor_type": "sector_leader",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "NG.L",
+      "name": "National Grid plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SHEL.L",
+      "name": "Shell plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    },
+    {
+      "actor_id": "SSE.L",
+      "name": "SSE plc",
+      "actor_type": "large_firm",
+      "layer": 2,
+      "geography": "UK",
+      "sector": "diversified",
+      "external_ids": {}
+    }
+  ]
+}
