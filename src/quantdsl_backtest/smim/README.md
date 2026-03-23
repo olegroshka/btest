@@ -473,6 +473,118 @@ Note: GKG NLP drops "and" from org names (`"securities exchange commission"`, no
 
 ---
 
+### IMF macro signals (WEO + IFS)
+
+```bash
+# No API key required — uses IMF DataMapper API
+uv run python scripts/smim_fetch_imf.py
+```
+
+Fetches international macro indicators from two IMF sources:
+
+**Primary — IMF DataMapper** (`https://www.imf.org/external/datamapper/api/v1/`):
+Annual WEO projections + history (2000–2030) for US, UK, Germany, Japan.
+
+| Indicator | Description | Countries |
+|-----------|-------------|-----------|
+| `NGDP_RPCH` | Real GDP growth (%) | US, GB, DE, JP |
+| `PCPIPCH` | CPI inflation (%) | US, GB, DE, JP |
+| `BCA` | Current account balance (USD bn) | US, GB |
+| `GGXCNL_NGDP` | Govt net lending (% of GDP) | US, GB |
+| `GGXWDG_NGDP` | Govt gross debt (% of GDP) | US, GB |
+| `LUR` | Unemployment rate (%) | US, GB |
+| `PPPGDP` | GDP PPP (international $bn) | US, GB, DE, JP |
+
+**Secondary — IMF IFS SDMX** (`dataservices.imf.org`): quarterly series
+(NGDP\_R\_XDC, PCPI\_IX, FPOLM\_PA, BCA\_BP6\_USD) attempted at runtime; skipped
+gracefully if the endpoint is unreachable (it times out in some network environments).
+
+A1 compliance: `pub_date = event_date + 365 days` (conservative annual publication lag).
+
+**Outputs:**
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/imf/<INDICATOR>.parquet` | Per-indicator raw DataMapper JSON |
+| `data/smim/processed/imf_macro.parquet` | Unified tidy table (618 rows) |
+| `data/smim/pit_store/imf.parquet` | PIT store shard — 7 signals, 4 actors |
+
+---
+
+### OECD macro signals (CLI + QNA)
+
+```bash
+# No API key required — OECD SDMX 3.0 public endpoint
+uv run python scripts/smim_fetch_oecd.py
+```
+
+Fetches two OECD SDMX 3.0 dataflows for US and UK, using the `all` key
+with in-memory filtering (the OECD 3.0 API requires all 9–14 dimensions to be
+specified exactly; `all` avoids that complexity).
+
+| Dataflow | Signals | Freq | Description |
+|----------|---------|------|-------------|
+| `DSD_STES@DF_CLI` | `LI`, `BCICP`, `CCICP` | Monthly | Composite Leading Indicator, Business Confidence, Consumer Confidence (amplitude-adjusted) |
+| `DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA` | `B1GQ_POP` | Quarterly | GDP per capita in USD PPP — levels, seasonally adjusted |
+
+Country codes: OECD uses ISO 3166-1 alpha-3 (USA, GBR); normalised to alpha-2 (US, GB) in the PIT store.
+
+A1 compliance: `pub_date = event_date + 45 days` (CLI) / `+ 75 days` (QNA).
+
+**Outputs:**
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/oecd/DSD_STES_DF_CLI_4.0.parquet` | Raw CLI response |
+| `data/smim/raw/oecd/DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA_1.1.parquet` | Raw QNA response |
+| `data/smim/processed/oecd_macro.parquet` | Unified tidy table (244 rows) |
+| `data/smim/pit_store/oecd.parquet` | PIT store shard — 4 signals, 2 actors |
+
+---
+
+### BEA Input-Output supply-chain coefficients
+
+```bash
+# With BEA API key (recommended — full industry detail):
+BEA_API_KEY=<your_key> uv run python scripts/smim_fetch_bea.py
+
+# Without API key (fallback — downloads published Excel from apps.bea.gov):
+uv run python scripts/smim_fetch_bea.py
+```
+
+Fetches the BEA "Use of Commodities by Industries, Before Redefinitions"
+table (TableID=259) for 2010–2024. Computes direct-requirements coefficients:
+
+```
+coeff[source→target] = flow[source, target] / column_total[target]
+```
+
+Maps BEA NAICS-based industry codes to SMIM sector labels:
+
+| NAICS prefixes | SMIM sector |
+|---------------|-------------|
+| 211, 213, 324 | Energy |
+| 334, 511, 518, 519 | Technology |
+| 521–525 | Financials |
+| 621–624 | Healthcare |
+| 331–333, 336, 337 | Industrials |
+
+A1 compliance: `pub_date = year-end + 548 days` (~18-month BEA publication lag).
+
+The fallback (no API key) downloads the BEA annual Use Table Excel file from
+`https://apps.bea.gov/industry/xls/io-annual/` and parses the flow matrix.
+Free BEA API keys: `https://apps.bea.gov/API/signup/`
+
+**Outputs:**
+
+| Path | Contents |
+|------|----------|
+| `data/smim/raw/bea/use_table_<year>.parquet` | Raw per-year API response |
+| `data/smim/processed/bea_io_tables.parquet` | Sector-mapped coefficients (26,852 rows, 2010–2024) |
+| `data/smim/pit_store/bea.parquet` | PIT store shard — `actor_id = "Src→Tgt"`, 315 sector-pair observations |
+
+---
+
 ## Running Tests
 
 ### Unit tests (~15 s)
