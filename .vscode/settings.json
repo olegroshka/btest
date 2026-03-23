@@ -1,6 +1,6 @@
 {
-    "python.defaultInterpreterPath": "c:/Personal/Business & Investments/Trading portfolio/Cogilator/btest/.venv/Scripts/python.exe",
-    "python.venvPath": "c:/Personal/Business & Investments/Trading portfolio/Cogilator/btest",
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.venvPath": "${workspaceFolder}",
     "python.terminal.activateEnvironment": true,
     "python.terminal.activateEnvInCurrentTerminal": false,
     "jupyter.jupyterServerType": "local",
@@ -35,5 +35,5 @@
     "jupyter.enableExtendedKernelCompletions": false,
     "jupyter.experiments.enabled": false,
     "jupyter.runStartupCommands": [],
-    "jupyter.notebookFileRoot": "c:/Personal/Business & Investments/Trading portfolio/Cogilator/btest"
+    "jupyter.notebookFileRoot": "${workspaceFolder}"
 }

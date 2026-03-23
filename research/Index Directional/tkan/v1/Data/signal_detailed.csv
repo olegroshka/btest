@@ -1,0 +1,3 @@
+Ticker,Signal_Date,Date,Signal_Value,Confidence,Source,Last_Actual_Price,Predicted Close Price,Price_Increase,Threshold_Used
+LVC,2026-03-15,2026-03-16,1,0.95,TKAN_model,40.49,44.237747,3.7477455,1.0
+LVC,2026-03-19,2026-03-20,1,0.95,TKAN_model,39.62,42.34457,2.7245712,1.0
