@@ -10,6 +10,7 @@ from .sources.registry import DataSourceRegistry
 from .sources.parquet import ParquetMarketBarsSource
 from .sources.yahoo import YahooMarketBarsSource
 from .sources.fred import FredMarketBarsSource, FredTimeSeriesSource
+from .sources.sfera import SferaMarketBarsSource, SferaTimeSeriesSource
 
 
 def default_registry() -> DataSourceRegistry:
@@ -18,6 +19,11 @@ def default_registry() -> DataSourceRegistry:
     reg.register(YahooMarketBarsSource())
     reg.register(FredMarketBarsSource())
     reg.register(FredTimeSeriesSource())
+    # Sfera PostgreSQL — primary internal data store
+    # sfera-bars://schema/table  → MarketBarsBundle (OHLCV)
+    # sfera://schema/table       → TimeSeriesBundle (any other data)
+    reg.register(SferaMarketBarsSource())
+    reg.register(SferaTimeSeriesSource())
     return reg
 
 
