@@ -10,14 +10,14 @@
 | Universe | Tickers (manifest) | OHLCV% | Regime | EDGAR% | Intensity | Notes |
 |----------|-------------------|--------|--------|--------|-----------|-------|
 | MIXED-200 | 27 (26 active) | 96% | 🥇 Gold | 81% | ✅ computed | UK equity 0% EDGAR (by design) |
-| UK-LC | 99 (97 active) | 98% | 🥇 Gold | 0% | ❌ **MISSING** | UK: no EDGAR, no Companies House adapter |
-| UK-MC | 100 (94 active) | 94% | 🥇 Gold | 0% | ❌ **MISSING** | Same |
-| US-LC | 200 (196 active) | 98% | 🥇 Gold | 99% | ✅ computed | |
+| UK-LC | 99 (97 active) | 98% | 🥇 Gold | 0% | ✅ computed (R4) | return_12m_xsrank (Path B); ρ=0.732 PASS |
+| UK-MC | 100 (94 active) | 94% | 🥇 Gold | 0% | ✅ computed (R4) | return_12m_xsrank (Path B); ρ=0.720 PASS |
+| US-LC | 200 (196 active) | 98% | 🥇 Gold | 99% | ✅ computed ⚠️ | ρ=0.660 WARN (inherits US-LC-FINS structural issue) |
 | US-LC-ENERGY | 22 (21 active) | 95% | 🥇 Gold | 100% | ✅ computed | 22 vs 40 planned (see §9) |
-| US-LC-FINS | 74 (71 active) | 96% | 🥇 Gold | 97% | ✅ computed ⚠️ | Rank stability ρ=0.040 (critical) |
+| US-LC-FINS | 74 (71 active) | 96% | 🥇 Gold | 97% | ✅ computed ⚠️ | ρ=-0.003 WARN (structural — BankCreditMapper cross-rank) |
 | US-LC-HEALTH | 60 (58 active) | 97% | 🥇 Gold | 100% | ✅ computed | |
 | US-LC-INDUS | 78 (76 active) | 97% | 🥇 Gold | 99% | ✅ computed | |
-| US-LC-TECH | 68 (68 active) | 100% | 🥇 Gold | 100% | ✅ computed ⚠️ | Rank stability ρ=0.653 (WARN) |
+| US-LC-TECH | 68 (68 active) | 100% | 🥇 Gold | 100% | ✅ computed ⚠️ | ρ=0.653 WARN (high-missing actors) |
 | US-MC | 200 (188 active) | 94% | 🥇 Gold | 100% | ✅ computed | |
 | US-SC | 200 (180 active) | 80% | 🥇 Gold | 94% | ✅ computed | Borderline: 39 tickers sparse/missing |
 
@@ -186,7 +186,7 @@
 
 ---
 
-## 6. OECD Macro Signals
+## 6. OECD Macro Signals — ✅ RESOLVED 2026-03-28 (R2)
 
 **Paths:** `data/smim/raw/oecd/DSD_STES_DF_CLI.parquet`, `data/smim/raw/oecd/DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA.parquet`, `data/smim/processed/oecd_macro.parquet`, `data/smim/pit_store/oecd.parquet`
 
@@ -194,29 +194,20 @@
 |--------|-------|
 | Indicators | 4 |
 | Countries | US, GB |
-| Total rows | **244** |
-| Expected rows (full history) | ~2,000+ (CLI monthly 2000–2025 × 2 countries × 3 indicators + QNA quarterly × 2) |
+| Total rows | **1,922** (was 244 before R2) |
 
-**⚠️ CRITICAL QUALITY ISSUE: OECD data is severely underpowered.**
+**R2 fix (2026-03-28):** "all" key omitted USA/GBR CLI series with METHODOLOGY=H. Fix: explicit dimension keys in `smim_fetch_oecd.py`. Re-fetched 1,922 rows. Gate G1-6 now passes.
 
-244 total rows across 4 indicators × 2 countries yields an average of **~30 observations per signal-country combination**. This is far below the expected full history:
-- CLI monthly (LI, BCICP, CCICP): ~300 months × 2 countries × 3 = ~1,800 rows expected
-- QNA quarterly (B1GQ_POP): ~100 quarters × 2 countries = ~200 rows expected
-
-**Actual coverage (from audit script output):**
+**Coverage post-R2:**
 
 | Indicator | US start–end | GB start–end | Assessment |
 |-----------|-------------|-------------|------------|
-| LI (Composite Leading Indicator) | 2015–2015 only | 2004–2005 only | ⚠️ Critically sparse — 1 year each |
-| BCICP (Business Confidence) | 2001–2020 | 2009–2014 | ⚠️ Incomplete — gaps, stops 2020 |
-| CCICP (Consumer Confidence) | 2003–2003 only | 2007–2008 only | ⚠️ Critically sparse — 1 year each |
-| B1GQ_POP (GDP per capita PPP) | 2000–2025 | 2014–2021 | ⚠️ US adequate; GB stops 2021 |
+| LI (Composite Leading Indicator) | 2000-01 – 2024-01 (289 rows) | 2000-01 – 2024-01 (289 rows) | ✅ Full history |
+| BCICP (Business Confidence) | 2000-01 – 2024-01 (289 rows) | 2000-01 – 2024-01 (289 rows) | ✅ Full history |
+| CCICP (Consumer Confidence) | 2000-01 – 2024-01 (289 rows) | 2000-01 – 2024-01 (289 rows) | ✅ Full history |
+| B1GQ_POP (GDP per capita PPP) | 2000-Q1 – 2025-Q4 (103 rows) | 2000-Q1 – 2025-Q4 (85 rows) | ✅ Full history |
 
-**Root cause:** The OECD SDMX 3.0 "all key" fetch approach (used to avoid 14-dimension key format errors) returned paginated/limited results. The `sdmx.oecd.org/public/rest/data/` endpoint appears to have returned only a subset of available observations.
-
-**Impact on experiments:** Any signal feed including OECD data (FULL, MACRO-ONLY, MACRO+MARKET) will have severely degraded OECD signal quality. FRED remains the primary macro source and is adequate as a standalone source. **OECD data is currently unfit for production use as a time-series signal.**
-
-**Naming discrepancy:** DATA_ACQUISITION.md documents raw file names as `DSD_STES_DF_CLI_4.0.parquet` and `DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA_1.1.parquet` (with version suffixes), but actual files on disk lack the version suffix. Documentation is incorrect.
+**Naming note:** Raw file names on disk are `DSD_STES_DF_CLI.parquet` and `DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA.parquet` (no version suffix) — DATA_ACQUISITION.md §6 has been updated to match.
 
 ---
 
@@ -239,7 +230,7 @@ All 5 SMIM sectors present. BEA I/O data is complete and fit for use in network-
 
 ## 8. A1 Leak Detection (pub_date < event_date)
 
-✅ **PASSED** — 0 violations across 541,730 rows checked (all PIT store shards combined).
+✅ **PASSED** — 0 violations across 543,768 rows checked (all PIT store shards combined, post-R1+R2).
 
 ---
 
@@ -249,26 +240,23 @@ All 5 SMIM sectors present. BEA I/O data is complete and fit for use in network-
 - **What:** 244 rows vs ~2,000 expected. Root cause: "all" key omitted USA/GBR CLI series with METHODOLOGY=H.
 - **Resolution (R2):** `smim_fetch_oecd.py` rewritten to use explicit dimension keys. Re-fetched 2026-03-28: 1,922 rows. LI/BCICP/CCICP 289 rows/country from 2000-01 to 2024-01; B1GQ_POP 85-103 rows/country from 2000-Q1 to 2025-Q4. Gate G1-6 now passes.
 
-### G-2: UK intensities not computed [HIGH SEVERITY]
+### G-2: UK intensities not computed [HIGH SEVERITY] — ✅ RESOLVED 2026-03-28 (R4)
 - **What:** No `UK-LC_intensities.parquet` or `UK-MC_intensities.parquet` in `data/smim/intensities/`.
-- **Impact:** Experiment E1 (UK-LC) is blocked. MIXED-200 uses only US energy tickers for intensity.
-- **Root cause:** `smim_compute_intensities.py` was not run for UK universes (or failed silently due to G-4 below).
-- **Action required:** Run intensity computation for UK-LC and UK-MC after resolving G-4.
+- **Resolution (R4):** Path B implemented — `compute_ohlcv_return_intensities()` added to `smim_compute_intensities.py`. Rolling 12-month price return, cross-sectionally ranked (`return_12m_xsrank`). UK-LC: 7,237 rows, N=97, ρ=0.732 PASS. UK-MC: 6,480 rows, N=94, ρ=0.720 PASS. E1 experiment unblocked. Methodology difference vs US universes (`capex_assets_xsrank`) must be disclosed in paper.
 
 ### G-3: CPIMEDSL not fetched [MEDIUM SEVERITY] — ✅ RESOLVED 2026-03-28
 - **What:** CPI Medical Care (`CPIMEDSL`) was planned as a healthcare-sector macro proxy; the original ID `CUSR0000SAM` does not exist.
 - **Resolution (R1):** `CUSR0000SAM` replaced with `CPIMEDSL` in `smim_fetch_fred.py`; `NAPM` also removed (defunct). Re-fetched 2026-03-28: 314 rows, 2000-01-01 to 2026-02-01, 0 A1 violations. PIT store now has 28 signals.
 
-### G-4: Companies House adapter never built [MEDIUM SEVERITY — structural]
+### G-4: Companies House adapter never built [MEDIUM SEVERITY — deferred]
 - **What:** EXPERIMENT_PLAN.md specified Companies House (UK) as the source for UK equity balance-sheet data (CapEx, Revenue, Assets). No adapter was built; no data was fetched.
-- **Impact:** UK equities (UK-LC, UK-MC) have 0% balance-sheet coverage. Intensity computation for UK equities falls back to OHLCV-derived metrics only (return-based intensity), which is a weaker signal.
-- **Action required:** Decide whether to (a) build a Companies House adapter, (b) use an alternative UK balance-sheet source (e.g., Refinitiv/Bloomberg if available, or scrape from annual reports), or (c) formally scope UK balance-sheet out and document intensity methodology for UK.
+- **Decision (R4):** Path B adopted — OHLCV return_12m_xsrank used as UK intensity proxy. G-2 resolved. Companies House adapter deferred as a future enhancement (Path A). Methodology difference must be disclosed in the research paper.
 
-### G-5: US-LC-FINS rank stability critically low [MEDIUM SEVERITY]
-- **What:** Spearman ρ=0.040 for US-LC-FINS intensities — far below the 0.7 threshold (A2 assumption).
-- **Impact:** Financials experiment (B1) intensity signal is unstable cross-sectionally.
-- **Root cause likely:** Financials sector has `sector_leader` actors at intensity=1.000 (constant) and `bank` actors at ~0.49 — the mix of actor types with very different scales creates near-zero rank correlation across periods when composition changes.
-- **Action required:** Investigate InvestmentIntensityMapper for Financials. Consider separate normalisation strata for bank vs sector_leader actor types within the sector.
+### G-5: US-LC-FINS rank stability critically low [MEDIUM SEVERITY — ⚠️ PARTIAL R3a]
+- **What:** Spearman ρ=-0.003 for US-LC-FINS intensities — below the 0.7 threshold (A2 assumption).
+- **R3a fix (2026-03-28):** Sector_leader constant intensity (was 1.000) fixed by z-score sigmoid fallback in `compute_equity_intensities()` when cross-section std==0. Sector_leader 'ALL' now has mean=0.490, std=0.208 (varying).
+- **Remaining structural issue:** Bank-only ρ=-0.007 (pre-fix, post-fix). Root cause: `BankCreditMapper` uses per-actor temporal z-score sigmoid. Mean-reverting asset growth makes high-growth banks switch cross-sectional rank position each quarter, producing near-random cross-sectional rankings. This is an architectural incompatibility in the bank intensity metric.
+- **Status:** Structural — requires rethinking BankCreditMapper to use a cross-sectional (not per-actor temporal) normalisation. Deferred as future work. B1 (Financials) experiment should document this limitation.
 
 ### G-6: Sector universe sizes diverge from EXPERIMENT_PLAN.md [LOW SEVERITY — informational]
 
@@ -298,7 +286,7 @@ These discrepancies reflect the EXPERIMENT_PLAN.md using rough estimates. The ac
 
 | Check | Criterion | Result | Notes |
 |-------|-----------|--------|-------|
-| G1-1 | A1 compliance: 0 pub_date < event_date leaks | ✅ PASS | 0 violations / 541,730 rows |
+| G1-1 | A1 compliance: 0 pub_date < event_date leaks | ✅ PASS | 0 violations / 543,768 rows (post-R1+R2) |
 | G1-2 | FRED: ≥80% of planned series fetched | ✅ PASS | 28/28 = 100% (R1: CPIMEDSL added 2026-03-28) |
 | G1-3 | EDGAR: ≥80% US tickers with filings | ✅ PASS | 765/772 = 99% (US-only; UK by-design 0%) |
 | G1-4 | GDELT: weekly continuity since 2015, no >4-week gaps | ✅ PASS | 9 signals, 566 weeks, no gaps |
@@ -306,26 +294,27 @@ These discrepancies reflect the EXPERIMENT_PLAN.md using rough estimates. The ac
 | G1-6 | OECD: indicators present with adequate history | ✅ PASS | 1,922 rows (R2: explicit key fix 2026-03-28); LI/BCICP/CCICP 289 rows/country 2000–2024 |
 | G1-7 | BEA: all 5 SMIM sectors mapped | ✅ PASS | 21 sector pairs, 2010–2024 |
 | G1-8 | OHLCV: ≥80% Gold/Silver for ≥80% of universe tickers | ✅ PASS | Marginal for US-SC (80%); others exceed threshold |
-| G1-9 | Intensities: computed for all experiment universes | ❌ FAIL | UK-LC and UK-MC intensities missing |
-| G1-10 | Rank stability ρ>0.7 for all universes with computed intensity | ⚠️ WARN | US-LC-FINS (0.040), US-LC-TECH (0.653), US-LC (0.660) below threshold |
+| G1-9 | Intensities: computed for all experiment universes | ✅ PASS | All 14 intensity files present (R4: UK-LC + UK-MC added 2026-03-28) |
+| G1-10 | Rank stability ρ>0.7 for all universes with computed intensity | ⚠️ WARN | US-LC-FINS (ρ=-0.003 structural), US-LC-TECH (ρ=0.653), US-LC (ρ=0.660) below threshold |
 
-### Overall: ⚠️ GATE G1 CONDITIONALLY PASSED — 3 issues require resolution before Phase A experiments
+### Overall: ⚠️ GATE G1 CONDITIONALLY PASSED — 1 structural issue remains (US-LC-FINS BankCreditMapper cross-rank)
 
-**Phase A (MIXED-200 energy) can proceed** with FRED+EDGAR+GDELT+BEA signals — all critical data for A1/A2 is present and usable.
+**Phase A (MIXED-200 energy) can proceed** — all critical data present and usable.
 
-**Phase E (UK-LC) is blocked** until G-2 and G-4 are resolved.
+**Phase E (UK-LC) is unblocked** — UK-LC and UK-MC intensities computed (R4, return_12m_xsrank).
 
-**OECD signals** are now fit for use (G-1 resolved, R2 complete 2026-03-28). LI/BCICP/CCICP have full 2000–2024 monthly history; B1GQ_POP has full 2000–2025 quarterly history.
+**Financials experiment (B1)** should document ρ=-0.003 limitation and interpret results with caution until BankCreditMapper cross-sectional normalisation is redesigned.
 
 ---
 
 ## 11. Recommendations (Priority Order)
 
-1. **[P1] Re-run OECD fetch** (G-1): Fix SDMX key construction in `smim_fetch_oecd.py` to retrieve full 2000–2025 monthly history for LI, BCICP, CCICP and full quarterly history for B1GQ_POP. Re-ingest into PIT store.
-2. **[P1 ✅ DONE] Fetch CPIMEDSL** (G-3): Completed 2026-03-28 (R1). `CPIMEDSL` now in PIT store, 314 rows.
-3. **[P2] Investigate US-LC-FINS rank stability** (G-5): Separate normalisation strata for bank vs sector_leader actor types.
-4. **[P2] Compute UK intensities** (G-2): Depends on resolving G-4 or defining OHLCV-only intensity for UK.
-5. **[P3] Decide on Companies House** (G-4): Either build adapter or formally scope out UK balance-sheet.
-6. **[P3] Archive old GDELT raw files** (G-7): Remove `gkg_weekly/` and `docapi_v2/` subdirectories.
-7. **[P3] Update EXPERIMENT_PLAN.md** (G-6): Correct universe size estimates to match actual GICS counts.
-8. **[P3] Fix OECD raw file naming in DATA_ACQUISITION.md** (G-8): Files on disk lack version suffix.
+Post-R1–R4 status (2026-03-28):
+
+1. **[P1 ✅ DONE] Re-run OECD fetch** (G-1, R2): 1,922 rows; explicit key fix; G1-6 passes.
+2. **[P1 ✅ DONE] Fetch CPIMEDSL** (G-3, R1): 314 rows; 28/28 FRED signals in PIT.
+3. **[P1 ✅ DONE] Compute UK intensities** (G-2, R4): UK-LC + UK-MC via return_12m_xsrank; E1 unblocked.
+4. **[P2 ⚠️ PARTIAL] US-LC-FINS rank stability** (G-5, R3a): Sector_leader constant fixed; bank ρ=-0.007 structural — BankCreditMapper cross-sectional normalisation requires architectural rethink (future work).
+5. **[P3] Archive old GDELT raw files** (G-7, R6): Remove `gkg_weekly/` and `docapi_v2/` subdirectories.
+6. **[P3] Update EXPERIMENT_PLAN.md** (G-6, R6): Correct universe size estimates to match actual GICS counts.
+7. **[P3] Companies House adapter** (G-4): Deferred — Path B adopted for UK intensity. Future enhancement.
