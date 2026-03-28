@@ -50,6 +50,7 @@ REGISTRY_DIR   = _ROOT / "data" / "smim" / "registries"
 PIT_DIR        = _ROOT / "data" / "smim" / "pit_store"
 INTENSITY_DIR  = _ROOT / "data" / "smim" / "intensities"
 REPORT_DIR     = _ROOT / "docs" / "smim" / "reports"
+OHLCV_DIR      = _ROOT / "equities" / "smim"
 
 # ── Quarterly period grid ──────────────────────────────────────────────────────
 
@@ -336,6 +337,59 @@ def compute_equity_intensities(
     return intensity, "capex_assets_xsrank"
 
 
+def compute_ohlcv_return_intensities(
+    equity_actors: list[Actor],
+    universe_id: str,
+    quarter_ends: pd.DatetimeIndex,
+) -> tuple[pd.DataFrame, str]:
+    """Rolling 12-month price return, cross-sectionally ranked. Returns (panel, method_name).
+
+    Used as a fallback when EDGAR balance-sheet data is unavailable (e.g. UK equities
+    that do not file with SEC EDGAR).  A1 compliance is maintained because OHLCV prices
+    are observable with zero publication lag (price at quarter-end is public immediately).
+
+    Args:
+        equity_actors: Actors whose actor_id matches a ticker in the OHLCV parquet.
+        universe_id:   Universe identifier (e.g. "UK-LC") — used to locate the OHLCV file.
+        quarter_ends:  DatetimeIndex of quarter-end dates.
+
+    Returns:
+        (panel, "return_12m_xsrank") where panel is (T × N) with values in [0, 1].
+        Actors with no OHLCV coverage are all-NaN.
+    """
+    ohlcv_path = OHLCV_DIR / universe_id / "ohlcv.parquet"
+    if not ohlcv_path.exists():
+        log.warning("  OHLCV file not found for %s: %s", universe_id, ohlcv_path)
+        actor_ids = [a.actor_id for a in equity_actors]
+        return pd.DataFrame(index=quarter_ends, columns=actor_ids, dtype=float), "return_12m_xsrank"
+
+    ohlcv = pd.read_parquet(ohlcv_path)
+    ohlcv["date"] = pd.to_datetime(ohlcv["date"]).dt.tz_localize(None)
+
+    # Pivot to wide format: dates × tickers, value = close price
+    price_wide = ohlcv.pivot_table(index="date", columns="ticker", values="close", aggfunc="last")
+    price_wide = price_wide.sort_index()
+
+    # Resample to quarter-end grid: last available close at or before each quarter-end
+    price_q = price_wide.reindex(
+        price_wide.index.union(quarter_ends)
+    ).ffill().reindex(quarter_ends)
+
+    # 12-month return: close_Q / close_{Q-4} - 1 (requires 4 prior quarters)
+    ret_12m = price_q.pct_change(periods=4, fill_method=None)
+
+    # Align columns to actor_ids (tickers)
+    actor_ids = [a.actor_id for a in equity_actors]
+    for aid in actor_ids:
+        if aid not in ret_12m.columns:
+            ret_12m[aid] = np.nan
+    ret_12m = ret_12m[actor_ids]
+
+    # Cross-sectional percentile rank at each quarter
+    intensity = cross_section_rank(ret_12m)
+    return intensity, "return_12m_xsrank"
+
+
 def compute_bank_intensities(
     bank_actors: list[Actor],
     edgar_df: pd.DataFrame,
@@ -430,11 +484,16 @@ def compute_registry_intensities(
     gdelt_df: pd.DataFrame,
     quarter_ends: pd.DatetimeIndex,
     quarter_starts: pd.DatetimeIndex,
+    universe_id: str = "",
 ) -> pd.DataFrame:
     """Compute intensities for all actors in registry.
 
     Returns long-format DataFrame with columns:
         actor_id, period, intensity_value, normalisation_method
+
+    Args:
+        universe_id: Used to locate OHLCV fallback data when EDGAR coverage is absent
+                     (e.g. for UK universes that do not file with SEC EDGAR).
     """
     frames: list[pd.DataFrame] = []
 
@@ -474,6 +533,17 @@ def compute_registry_intensities(
     equity_actors = [a for a in registry.actors if a.actor_type in equity_types]
     if equity_actors:
         panel, method = compute_equity_intensities(equity_actors, edgar_df, quarter_ends)
+        # If EDGAR returned no data for equity actors (e.g. UK equities not on SEC EDGAR),
+        # fall back to OHLCV rolling 12-month return cross-section rank.
+        if panel.empty or panel.isna().all().all():
+            if universe_id:
+                log.info(
+                    "    EDGAR equity panel empty for %s — falling back to "
+                    "OHLCV return_12m_xsrank", universe_id,
+                )
+                panel, method = compute_ohlcv_return_intensities(
+                    equity_actors, universe_id, quarter_ends
+                )
         long = _panel_to_long(panel, quarter_starts, method, "equity")
         frames.append(long)
         log.info("    Equity: %d actors, %d obs", len(equity_actors), len(long))
@@ -808,7 +878,8 @@ def main() -> None:
                   for l in Layer if registry.actors_in_layer(l)})
 
         long_df = compute_registry_intensities(
-            registry, edgar_df, fred_df, gdelt_df, QUARTER_ENDS, QUARTER_STARTS
+            registry, edgar_df, fred_df, gdelt_df, QUARTER_ENDS, QUARTER_STARTS,
+            universe_id=uni_id,
         )
 
         if long_df.empty:

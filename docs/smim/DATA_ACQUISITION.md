@@ -620,20 +620,13 @@ uv run python scripts/smim_fetch_bea.py
 
 2. **OECD data re-fetch [P1 — ✅ DONE 2026-03-28]** — Root cause: "all" key omitted USA/GBR CLI series with METHODOLOGY=H. Fix applied in `smim_fetch_oecd.py`: explicit dimension keys replace the "all" key. Re-fetched: 1,922 rows, LI/BCICP/CCICP 2000-01 to 2024-01 (289 rows each per country), B1GQ_POP 2000-Q1 to 2025-Q4, 0 A1 violations. Gate G1-6 resolved.
 
-3. **US-LC-FINS intensity normalisation [P1]** — sector_leader actors in Financials have constant intensity=1.000 causing Spearman ρ=0.040 (threshold 0.7). Fix the InvestmentIntensityMapper to apply separate normalisation strata for bank vs sector_leader actor types within the Financials sector. Recompute US-LC-FINS, US-LC, experiment_fast, and experiment_phased intensities.
+3. **US-LC-FINS intensity normalisation [P1 — ⚠️ PARTIAL 2026-03-28]** — sector_leader constant intensity=1.000 (R3a) fixed by z-score sigmoid fallback when cross-section std==0. Remaining issue: bank-only rank stability ρ=-0.007 is structural — BankCreditMapper uses per-actor temporal z-score sigmoid, which produces near-random cross-sectional rankings because mean-reverting asset growth makes high-growth banks switch position each quarter. Documented as structural incompatibility; requires architectural rethink (deeper than R3 scope).
 
 ### Priority 2 — Needed for specific experiments
 
-4. **UK intensities [P2]** — `UK-LC_intensities.parquet` and `UK-MC_intensities.parquet` do not exist. Blocks E1 experiment. Requires decision on UK balance-sheet source (see item 5).
+4. **UK intensities [P2 — ✅ DONE 2026-03-28]** — Path B implemented: `compute_ohlcv_return_intensities()` added to `smim_compute_intensities.py`. Rolling 12-month price return, cross-sectionally ranked. UK-LC: 7,237 rows, ρ=0.732 PASS; UK-MC: 6,480 rows, ρ=0.720 PASS. E1 experiment unblocked. Methodology recorded as `normalisation_method="return_12m_xsrank"`.
 
-5. **Companies House adapter [P2 — structural gap]** — EXPERIMENT_PLAN.md specified Companies House (UK) as the source for UK equity balance-sheet data (CapEx, Revenue, Assets). No adapter was built; no data was ever fetched. UK equities (UK-LC, UK-MC) therefore have 0% balance-sheet coverage. This was NOT documented as a known gap until now.
-
-   Decision required: either
-   (a) Build `smim/data/adapters/companies_house.py` adapter — Companies House provides free API for company filings (https://developer.company-information.service.gov.uk/). Requires registration for API key.
-   (b) Accept OHLCV-only intensity for UK equities (return-based intensity proxy) — simpler but weaker signal; document explicitly.
-   (c) Use Refinitiv/Bloomberg data if available — requires separate data access.
-
-   Until resolved, UK intensity computation will produce OHLCV-derived fallback intensity only.
+5. **Companies House adapter [P2 — deferred]** — Path B (OHLCV return-based intensity) implemented as the interim solution. Companies House adapter remains a future enhancement for Path A (balance-sheet-based intensity matching US methodology). UK intensity methodology difference (`return_12m_xsrank` vs `capex_assets_xsrank`) must be disclosed in the research paper and in experiment metadata.
 
 ### Priority 3 — Housekeeping / informational
 

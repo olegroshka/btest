@@ -375,6 +375,6 @@ Week 4:
 | R1: FRED CPIMEDSL | ✅ Complete | 2026-03-28 | CPIMEDSL 314 rows; NAPM removed; 28/28 signals in PIT |
 | R2: OECD re-fetch | ✅ Complete | 2026-03-28 | 1,922 rows; explicit key METHODOLOGY=H fix; G1-6 passes |
 | R3: Intensity fix | ⚠️ Partial | 2026-03-28 | R3a done: z-score sigmoid fallback for constant columns; sector_leader ALL fixed. ρ still -0.003 — structural BankCreditMapper issue |
-| R4: UK intensities | ⬜ Pending | — | Path A or B decision needed |
+| R4: UK intensities | ✅ Complete | 2026-03-28 | Path B (OHLCV return_12m_xsrank): UK-LC ρ=0.732 PASS; UK-MC ρ=0.720 PASS; E1 unblocked |
 | R5: Full validation | ⬜ Pending | — | Depends on R1–R4 |
 | R6: Housekeeping | ⬜ Pending | — | Independent |
