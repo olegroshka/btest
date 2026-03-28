@@ -1,6 +1,6 @@
 # SMIM Data Acquisition Status
 
-Last updated: 2026-03-22 (IMF DataMapper + OECD SDMX 3.0 + BEA I/O tables fetched and ingested)
+Last updated: 2026-03-28 (data audit completed; OECD sparse-data issue identified; new remediation items added)
 
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
@@ -24,7 +24,7 @@ Only `data/smim/universes/*.csv` are committed to git.
 | SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
 | GDELT narrative | `smim_fetch_gdelt.py` | ✅ Complete (9/9 signals, daily-derived weekly) | ~37K daily rows; ~4.7K weekly rows | 2015-02-19 – 2025-12-31 |
 | IMF WEO (DataMapper) | `smim_fetch_imf.py` | ✅ Complete (7/7 series) | 618 rows | 2000-12-31 – 2030-12-31 |
-| OECD SDMX 3.0 | `smim_fetch_oecd.py` | ✅ Complete (4 signals) | 244 rows | 2000-01-01 – 2025-10-01 |
+| OECD SDMX 3.0 | `smim_fetch_oecd.py` | ⚠️ Partial (244 rows — severely sparse; see §6 and Remediation) | 244 rows | Varies per indicator (1–21 years) |
 | BEA I/O | `smim_fetch_bea.py` | ✅ Complete (2010–2024, API) | 26,852 sector rows / 315 PIT pairs | 2010 – 2024 |
 | BIS | — | ⬜ Not started | — | — |
 
@@ -453,11 +453,11 @@ uv run python scripts/smim_fetch_imf.py
 
 ---
 
-## 6. OECD SDMX 3.0 — ✅ Complete
+## 6. OECD SDMX 3.0 — ⚠️ Partial (fetch succeeded but data is severely underpowered)
 
 **Script:** `scripts/smim_fetch_oecd.py`
 **Adapter:** `smim/data/adapters/oecd_sdmx.py`
-**Status:** Complete — 4 signals (CLI + QNA), US + UK
+**Status:** ⚠️ PARTIAL — 4 signals fetched, 244 rows total (expected ~2,000+). Most CLI indicators cover only 1–5 years. Data is NOT fit for production use as time-series signals. See Remediation §2.
 **Run date:** 2026-03-22
 **API key:** None required
 
@@ -479,7 +479,16 @@ dimension keys with partial wildcards return 422 errors).
 
 **Total:** 244 rows. LI/BCICP/CCICP are monthly; B1GQ_POP is quarterly.
 
-**Date range:** CLI from 2000-01-01; QNA from earliest available through 2025-Q4.
+**⚠️ ACTUAL DATE RANGES ARE SEVERELY TRUNCATED** (from data_audit findings):
+
+| Indicator | US coverage | GB coverage |
+|-----------|------------|------------|
+| LI | 2015 only (~12 months) | 2004–2005 (~24 months) |
+| BCICP | 2001–2020 (~240 months) | 2009–2014 (~72 months) |
+| CCICP | 2003 only (~12 months) | 2007–2008 (~24 months) |
+| B1GQ_POP | 2000–2025 (adequate) | 2014–2021 only |
+
+The "date range: CLI from 2000-01-01" above is the EXPECTED range — it was NOT achieved. The "all" key OECD SDMX fetch returned a server-limited subset. Re-fetch required (see Remediation §2).
 
 ### OECD country codes
 
@@ -613,10 +622,50 @@ uv run python scripts/smim_fetch_bea.py
 
 ## Remediation TODO
 
-1. **`CPIMEDSL`** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care
-2. **ISM PMI** — `MANEMP` is the accepted proxy; actual ISM data requires a subscription or use `DALLASMPMC` (Dallas Fed Manufacturing Activity, available on FRED)
-3. **BEA** — ✅ complete (`smim_fetch_bea.py`). API key gives full industry detail; no-key fallback uses published Excel. Re-run anytime to pick up the latest BEA release.
-4. **GDELT** — ✅ complete (daily-derived weekly pipeline). To re-run: `uv run python scripts/smim_fetch_gdelt.py` (uses per-day cache; add `--force-refetch` to re-download all files). Use `--weekly-only` to rebuild weekly panel from existing daily cache without any new downloads.
-5. **IMF** — ✅ complete (DataMapper API, 7 WEO indicators). IFS SDMX quarterly data (`dataservices.imf.org`) still times out; add a proxy or VPN to unblock. Missing WEO codes: `BCA_NGDPDP`, `NID_NGDP`, `NGAP_NPGDP` — not in DataMapper.
-6. **OECD** — ✅ complete (SDMX 3.0, CLI + QNA). Only US + GB currently; add more OECD countries by modifying `filters["REF_AREA"]` in `smim_fetch_oecd.py`.
-7. **BIS** — adapters not yet built; bulk fetch script not written
+### Priority 1 — Blocks experiments or violates data quality gates
+
+1. **`CPIMEDSL` [P1 — NOT YET DONE]** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care (original plan used `CUSR0000SAM` which does not exist). Required for healthcare CPI proxy in MACRO-ONLY feeds for US-LC-HEALTH experiments.
+
+2. **OECD data re-fetch [P1 — CRITICAL]** — The OECD SDMX 3.0 fetch using the "all" key approach returned only 244 rows (expected ~2,000+). Most CLI indicators (LI, BCICP, CCICP) have ≤5 years of data rather than the full 2000–2025 monthly history. **The current OECD PIT store data is unfit for production use as a time-series signal.**
+
+   Root cause: the "all" key (`sdmx.oecd.org/public/rest/data/{dataflow}/all?...`) approach appears to return a server-paginated or filtered subset.
+
+   Fix: rewrite `smim_fetch_oecd.py` to use explicit dimension keys instead of "all" key. For CLI dataflow `DSD_STES@DF_CLI`, the correct dimension key for US+GB should be constructed as:
+   ```
+   https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.0/USA+GBR.M.LI+BCICP+CCICP.AA.CTGY.ST?startPeriod=2000-01
+   ```
+   After re-fetch, re-ingest into PIT store and recompute `oecd_macro.parquet`.
+
+   Note: Raw files on disk are named `DSD_STES_DF_CLI.parquet` and `DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA.parquet` (without version suffixes). DATA_ACQUISITION.md §6 documentation incorrectly lists version-suffixed names.
+
+3. **US-LC-FINS intensity normalisation [P1]** — sector_leader actors in Financials have constant intensity=1.000 causing Spearman ρ=0.040 (threshold 0.7). Fix the InvestmentIntensityMapper to apply separate normalisation strata for bank vs sector_leader actor types within the Financials sector. Recompute US-LC-FINS, US-LC, experiment_fast, and experiment_phased intensities.
+
+### Priority 2 — Needed for specific experiments
+
+4. **UK intensities [P2]** — `UK-LC_intensities.parquet` and `UK-MC_intensities.parquet` do not exist. Blocks E1 experiment. Requires decision on UK balance-sheet source (see item 5).
+
+5. **Companies House adapter [P2 — structural gap]** — EXPERIMENT_PLAN.md specified Companies House (UK) as the source for UK equity balance-sheet data (CapEx, Revenue, Assets). No adapter was built; no data was ever fetched. UK equities (UK-LC, UK-MC) therefore have 0% balance-sheet coverage. This was NOT documented as a known gap until now.
+
+   Decision required: either
+   (a) Build `smim/data/adapters/companies_house.py` adapter — Companies House provides free API for company filings (https://developer.company-information.service.gov.uk/). Requires registration for API key.
+   (b) Accept OHLCV-only intensity for UK equities (return-based intensity proxy) — simpler but weaker signal; document explicitly.
+   (c) Use Refinitiv/Bloomberg data if available — requires separate data access.
+
+   Until resolved, UK intensity computation will produce OHLCV-derived fallback intensity only.
+
+### Priority 3 — Housekeeping / informational
+
+6. **ISM PMI** — `MANEMP` (manufacturing employment) is the accepted academic proxy. Actual ISM Manufacturing PMI requires subscription. Alternative: `DALLASMPMC` (Dallas Fed Manufacturing Activity) is on FRED as a free supplement. No action required unless ISM precision is needed.
+
+7. **IMF IFS quarterly** — `dataservices.imf.org` still times out. Missing: NGDP_R_XDC (real GDP level), PCPI_IX (CPI level), FPOLM_PA (policy rate). The WEO DataMapper provides adequate annual-frequency substitutes. Missing WEO codes: `BCA_NGDPDP`, `NID_NGDP`, `NGAP_NPGDP` — not in DataMapper catalogue. No action required for Phase A.
+
+8. **GDELT raw directory cleanup** — `data/smim/raw/gdelt/` contains 3 generations of superseded artifacts:
+   - `gkg_weekly/`: 516 ISO-week files from the old "one Monday noon snapshot" approach
+   - `docapi_v2/`: 119 year-sliced files from DOC API v2 (only healthcare + 4 actors; missing sector_energy/tech/financials)
+   - Root-level consolidated files: partial consolidation from DOC API v2 (sector_macro + 4 actors consolidated; sector_energy/tech/financials absent)
+
+   The canonical GDELT data is `data/smim/cache/gdelt/` (3,609 daily cache files) → `data/smim/processed/gdelt_narrative*.parquet`. Archive or delete Gen 1 and Gen 2 raw files.
+
+9. **BEA** — ✅ complete. Re-run anytime: `BEA_API_KEY=<key> uv run python scripts/smim_fetch_bea.py` to pick up future BEA releases.
+
+10. **BIS** — adapters not yet built; BIS SDMX endpoint needs exploration. Not blocking any current Phase A-D experiments.
