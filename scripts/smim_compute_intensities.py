@@ -16,6 +16,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -876,6 +877,73 @@ def run_final_pit_check() -> dict[str, Any]:
     return {"rows_checked": total_checked, "violations": violations, "passed": violations == 0}
 
 
+# ── Return-intensity batch (RP2) ───────────────────────────────────────────────
+
+def run_return_intensities() -> dict[str, dict]:
+    """Compute return_12m_xsrank for every universe that has an OHLCV file.
+
+    Writes `data/smim/intensities/{uni_id}_return_intensities.parquet`.
+    Returns dict of QC results keyed by universe_id.
+    """
+    INTENSITY_DIR.mkdir(parents=True, exist_ok=True)
+    registry_paths = sorted(REGISTRY_DIR.glob("*_registry.json"))
+    qc_results: dict[str, dict] = {}
+
+    for reg_path in registry_paths:
+        uni_id = reg_path.stem.replace("_registry", "")
+        ohlcv_path = OHLCV_DIR / uni_id / "ohlcv.parquet"
+        if not ohlcv_path.exists():
+            log.debug("  No OHLCV for %s — skip return intensities", uni_id)
+            continue
+
+        registry = ActorRegistry.from_json(reg_path)
+        equity_actors = [
+            a for a in registry.actors
+            if a.actor_type in (ActorType.LARGE_FIRM, ActorType.BANK,
+                                ActorType.SECTOR_LEADER, ActorType.SME,
+                                ActorType.RETAIL_INVESTOR)
+        ]
+        if not equity_actors:
+            continue
+
+        log.info("\n--- %s (return intensities) ---", uni_id)
+        panel, method = compute_ohlcv_return_intensities(equity_actors, uni_id, QUARTER_ENDS)
+
+        # Convert wide panel → long format matching primary intensity schema
+        rows = []
+        for period_end, qs in zip(QUARTER_ENDS, QUARTER_STARTS):
+            for actor_id in panel.columns:
+                val = panel.loc[period_end, actor_id] if period_end in panel.index else np.nan
+                rows.append({
+                    "actor_id": actor_id,
+                    "period": qs,
+                    "intensity_value": float(val) if not pd.isna(val) else np.nan,
+                    "normalisation_method": method,
+                })
+        long_df = pd.DataFrame(rows).dropna(subset=["intensity_value"])
+
+        out_path = INTENSITY_DIR / f"{uni_id}_return_intensities.parquet"
+        long_df.to_parquet(out_path, index=False)
+        log.info("  Saved %d rows → %s", len(long_df), out_path.name)
+
+        # QC
+        qc = quality_check_intensities(long_df, registry)
+        qc_results[uni_id] = qc
+        rho_rec = qc.get("mean_rank_stability_recent", float("nan"))
+        rho_rec_str = f" | rho_recent={rho_rec:.3f}" if not np.isnan(rho_rec) else ""
+        log.info(
+            "  QC: range=%s | rho_full=%.3f%s (%s) | hi_missing=%d | obs=%d",
+            "PASS" if qc["range_ok"] else "FAIL",
+            qc["mean_rank_stability"],
+            rho_rec_str,
+            "PASS" if qc["rank_stability_ok"] else "WARN",
+            qc["high_missing_count"],
+            qc["total_obs"],
+        )
+
+    return qc_results
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -982,4 +1050,22 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Compute SMIM investment intensities.")
+    parser.add_argument(
+        "--method",
+        choices=["capex", "return", "both"],
+        default="capex",
+        help=(
+            "capex (default): CapEx/Assets cross-section rank from EDGAR. "
+            "return: return_12m_xsrank from OHLCV for every universe with OHLCV data. "
+            "both: run capex first, then return."
+        ),
+    )
+    args = parser.parse_args()
+
+    if args.method in ("capex", "both"):
+        main()
+    if args.method in ("return", "both"):
+        log.info("\n%s\nReturn intensity computation (return_12m_xsrank)\n%s",
+                 "=" * 60, "=" * 60)
+        run_return_intensities()
