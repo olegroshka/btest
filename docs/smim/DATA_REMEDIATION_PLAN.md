@@ -373,7 +373,7 @@ Week 4:
 | Milestone | Status | Completed | Notes |
 |-----------|--------|-----------|-------|
 | R1: FRED CPIMEDSL | ✅ Complete | 2026-03-28 | CPIMEDSL 314 rows; NAPM removed; 28/28 signals in PIT |
-| R2: OECD re-fetch | ⬜ Pending | — | |
+| R2: OECD re-fetch | ✅ Complete | 2026-03-28 | 1,922 rows; explicit key METHODOLOGY=H fix; G1-6 passes |
 | R3: Intensity fix | ⬜ Pending | — | Depends on R1 |
 | R4: UK intensities | ⬜ Pending | — | Path A or B decision needed |
 | R5: Full validation | ⬜ Pending | — | Depends on R1–R4 |

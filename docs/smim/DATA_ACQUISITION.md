@@ -1,6 +1,6 @@
 # SMIM Data Acquisition Status
 
-Last updated: 2026-03-28 (R1 complete: CPIMEDSL added; OECD sparse-data issue identified; new remediation items added)
+Last updated: 2026-03-28 (R1+R2 complete: CPIMEDSL added; OECD re-fetched with explicit keys — 1,922 rows)
 
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
@@ -24,7 +24,7 @@ Only `data/smim/universes/*.csv` are committed to git.
 | SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
 | GDELT narrative | `smim_fetch_gdelt.py` | ✅ Complete (9/9 signals, daily-derived weekly) | ~37K daily rows; ~4.7K weekly rows | 2015-02-19 – 2025-12-31 |
 | IMF WEO (DataMapper) | `smim_fetch_imf.py` | ✅ Complete (7/7 series) | 618 rows | 2000-12-31 – 2030-12-31 |
-| OECD SDMX 3.0 | `smim_fetch_oecd.py` | ⚠️ Partial (244 rows — severely sparse; see §6 and Remediation) | 244 rows | Varies per indicator (1–21 years) |
+| OECD SDMX 3.0 | `smim_fetch_oecd.py` | ✅ Complete (R2 remediation: 1,922 rows; explicit key fix) | 1,922 rows | 2000-01-01 – 2024-01-01 (CLI) / 2000-Q1 – 2025-Q4 (QNA) |
 | BEA I/O | `smim_fetch_bea.py` | ✅ Complete (2010–2024, API) | 26,852 sector rows / 315 PIT pairs | 2010 – 2024 |
 | BIS | — | ⬜ Not started | — | — |
 
@@ -452,42 +452,35 @@ uv run python scripts/smim_fetch_imf.py
 
 ---
 
-## 6. OECD SDMX 3.0 — ⚠️ Partial (fetch succeeded but data is severely underpowered)
+## 6. OECD SDMX 3.0 — ✅ Complete (R2 remediation: explicit key fix)
 
 **Script:** `scripts/smim_fetch_oecd.py`
 **Adapter:** `smim/data/adapters/oecd_sdmx.py`
-**Status:** ⚠️ PARTIAL — 4 signals fetched, 244 rows total (expected ~2,000+). Most CLI indicators cover only 1–5 years. Data is NOT fit for production use as time-series signals. See Remediation §2.
-**Run date:** 2026-03-22
+**Status:** ✅ COMPLETE — 4 signals, 1,922 rows. Full history 2000–2024 (CLI) / 2000–2025 (QNA).
+**Run date:** 2026-03-28 (re-fetched with explicit key fix)
 **API key:** None required
 
 ### Method
 
-Uses OECD SDMX 3.0 REST API (`https://sdmx.oecd.org/public/rest/data/`) with the
-`all` key approach: fetch the full dataflow (filtered by `startPeriod`/`endPeriod`)
-and filter to the desired countries and measures in-memory.
+Uses OECD SDMX 3.0 REST API (`https://sdmx.oecd.org/public/rest/data/`) with **explicit
+dimension keys**. The previous "all" key approach silently returned a server-limited
+subset (244 rows), omitting USA/GBR CLI series with METHODOLOGY=H. Explicit keys fixed
+the root cause.
 
-This approach avoids the 14-dimension key format problem of SDMX 3.0 (direct
-dimension keys with partial wildcards return 422 errors).
+- **CLI key:** `USA+GBR.M.LI+BCICP+CCICP.IX._Z.AA.IX._Z.H` (9 dimensions)
+- **QNA key:** `Q.Y.USA+GBR.S1.S1.B1GQ_POP._Z._Z._Z.USD_PPP_PS.LR.LA.T0102` (13 dimensions)
+
+Note: METHODOLOGY=H is required for USA/GBR CLI data. The QNA TRANSFORMATION is `LA`
+(log-annual), not `LG` as was incorrectly specified in the original config.
 
 ### Coverage
 
-| Dataflow | Signals fetched | Countries | Rows |
-|----------|----------------|-----------|------|
-| `DSD_STES@DF_CLI,4.0` | LI (Composite Leading Indicator), BCICP (Business Confidence), CCICP (Consumer Confidence) | US, GB | 180 |
-| `DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA,1.1` | B1GQ_POP (GDP per capita, USD PPP, level) | US, GB | 64 |
+| Dataflow | Signals fetched | Countries | Rows | Date range |
+|----------|----------------|-----------|------|------------|
+| `DSD_STES@DF_CLI,4.0` | LI, BCICP, CCICP | US, GB | 1,734 | 2000-01 to 2024-01 |
+| `DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA,1.1` | B1GQ_POP | US, GB | 188 | 2000-Q1 to 2025-Q4 |
 
-**Total:** 244 rows. LI/BCICP/CCICP are monthly; B1GQ_POP is quarterly.
-
-**⚠️ ACTUAL DATE RANGES ARE SEVERELY TRUNCATED** (from data_audit findings):
-
-| Indicator | US coverage | GB coverage |
-|-----------|------------|------------|
-| LI | 2015 only (~12 months) | 2004–2005 (~24 months) |
-| BCICP | 2001–2020 (~240 months) | 2009–2014 (~72 months) |
-| CCICP | 2003 only (~12 months) | 2007–2008 (~24 months) |
-| B1GQ_POP | 2000–2025 (adequate) | 2014–2021 only |
-
-The "date range: CLI from 2000-01-01" above is the EXPECTED range — it was NOT achieved. The "all" key OECD SDMX fetch returned a server-limited subset. Re-fetch required (see Remediation §2).
+**Total:** 1,922 rows. 0 A1 violations (pub_date ≥ event_date enforced via pub_lag).
 
 ### OECD country codes
 
@@ -498,8 +491,8 @@ normalises these to alpha-2 (US, GB) for consistency with the rest of the PIT st
 
 | Path | Contents |
 |------|----------|
-| `data/smim/raw/oecd/DSD_STES_DF_CLI_4.0.parquet` | Raw CLI response (all countries) |
-| `data/smim/raw/oecd/DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA_1.1.parquet` | Raw QNA response |
+| `data/smim/raw/oecd/DSD_STES_DF_CLI.parquet` | Raw CLI response (USA+GBR, explicit key) |
+| `data/smim/raw/oecd/DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA.parquet` | Raw QNA response (USA+GBR, explicit key) |
 | `data/smim/processed/oecd_macro.parquet` | Unified tidy table |
 | `data/smim/pit_store/oecd.parquet` | PIT store shard |
 
@@ -625,17 +618,7 @@ uv run python scripts/smim_fetch_bea.py
 
 1. **`CPIMEDSL` [P1 — ✅ DONE 2026-03-28]** — `CUSR0000SAM` replaced with `CPIMEDSL` in `smim_fetch_fred.py`; `NAPM` removed (defunct, replaced by `MANEMP`). Re-fetched and ingested: 314 rows, 2000-01-01 to 2026-02-01, 0 A1 violations. PIT store now has 28 signals.
 
-2. **OECD data re-fetch [P1 — CRITICAL]** — The OECD SDMX 3.0 fetch using the "all" key approach returned only 244 rows (expected ~2,000+). Most CLI indicators (LI, BCICP, CCICP) have ≤5 years of data rather than the full 2000–2025 monthly history. **The current OECD PIT store data is unfit for production use as a time-series signal.**
-
-   Root cause: the "all" key (`sdmx.oecd.org/public/rest/data/{dataflow}/all?...`) approach appears to return a server-paginated or filtered subset.
-
-   Fix: rewrite `smim_fetch_oecd.py` to use explicit dimension keys instead of "all" key. For CLI dataflow `DSD_STES@DF_CLI`, the correct dimension key for US+GB should be constructed as:
-   ```
-   https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.0/USA+GBR.M.LI+BCICP+CCICP.AA.CTGY.ST?startPeriod=2000-01
-   ```
-   After re-fetch, re-ingest into PIT store and recompute `oecd_macro.parquet`.
-
-   Note: Raw files on disk are named `DSD_STES_DF_CLI.parquet` and `DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA.parquet` (without version suffixes). DATA_ACQUISITION.md §6 documentation incorrectly lists version-suffixed names.
+2. **OECD data re-fetch [P1 — ✅ DONE 2026-03-28]** — Root cause: "all" key omitted USA/GBR CLI series with METHODOLOGY=H. Fix applied in `smim_fetch_oecd.py`: explicit dimension keys replace the "all" key. Re-fetched: 1,922 rows, LI/BCICP/CCICP 2000-01 to 2024-01 (289 rows each per country), B1GQ_POP 2000-Q1 to 2025-Q4, 0 A1 violations. Gate G1-6 resolved.
 
 3. **US-LC-FINS intensity normalisation [P1]** — sector_leader actors in Financials have constant intensity=1.000 causing Spearman ρ=0.040 (threshold 0.7). Fix the InvestmentIntensityMapper to apply separate normalisation strata for bank vs sector_leader actor types within the Financials sector. Recompute US-LC-FINS, US-LC, experiment_fast, and experiment_phased intensities.
 

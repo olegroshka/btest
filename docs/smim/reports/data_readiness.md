@@ -15,16 +15,16 @@ Key:
 
 | Experiment | Registry | Intensity | FRED | EDGAR | GDELT | BEA | IMF | OECD |
 |------------|----------|-----------|------|-------|-------|-----|-----|------|
-| A1 (MIXED-200 energy, full) | OK | OK | OK | OK | OK | OK | OK | ⚠️ WARN |
-| A2 (Naïve baselines, MIXED-200) | OK | OK | OK | OK | OK | OK | OK | ⚠️ WARN |
-| B1 (US-LC financials) | OK | ⚠️ WARN | OK | OK | OK | OK | OK | ⚠️ WARN |
-| C1 (US-LC all sectors) | OK | ⚠️ WARN | OK | OK | OK | OK | OK | ⚠️ WARN |
-| D1 (US-LC fast run) | OK | ⚠️ WARN | OK | OK | OK | OK | OK | ⚠️ WARN |
-| E1 (UK-LC) | OK | ❌ MISS | OK | ❌ MISS | OK | N/A | OK | ⚠️ WARN |
+| A1 (MIXED-200 energy, full) | OK | OK | OK | OK | OK | OK | OK | OK |
+| A2 (Naïve baselines, MIXED-200) | OK | OK | OK | OK | OK | OK | OK | OK |
+| B1 (US-LC financials) | OK | ⚠️ WARN | OK | OK | OK | OK | OK | OK |
+| C1 (US-LC all sectors) | OK | ⚠️ WARN | OK | OK | OK | OK | OK | OK |
+| D1 (US-LC fast run) | OK | ⚠️ WARN | OK | OK | OK | OK | OK | OK |
+| E1 (UK-LC) | OK | ❌ MISS | OK | ❌ MISS | OK | N/A | OK | OK |
 
 ### Column notes
 
-**OECD WARN (all experiments):** The OECD fetch returned only 244 rows (expected ~2,000+). Most CLI indicators cover ≤5 years. OECD signals should be excluded from all experiment runs until a corrected re-fetch is completed. FRED macro is an adequate substitute for all current Phase A-D experiments.
+**OECD OK (all experiments, post-R2):** Re-fetched 2026-03-28 with explicit dimension keys. LI/BCICP/CCICP: 289 monthly rows per country, 2000-01 to 2024-01. B1GQ_POP: ~100 quarterly rows per country. OECD signals are now fit for use in all experiments.
 
 **Intensity WARN (B1, C1, D1):** US-LC-FINS rank stability is critically low (Spearman ρ=0.040, threshold 0.7). US-LC and US-LC-TECH are also below threshold (0.660 and 0.653 respectively). Intensity signals for these universes violate standing assumption A2 (typed comparability).
 
@@ -239,7 +239,7 @@ All 14 registry JSON files exist in `data/smim/registries/`:
 ### Overall: ⚠️ CONDITIONALLY READY — Phase A (MIXED-200 energy) can proceed; Phase E (UK) blocked; OECD signals excluded
 
 **Experiments that CAN proceed now:**
-- A1 (MIXED-200 energy, full pipeline) — use FRED+EDGAR+GDELT+BEA; exclude OECD signals
+- A1 (MIXED-200 energy, full pipeline) — FRED+EDGAR+GDELT+BEA+OECD all usable (R2 complete)
 - A2 (Naïve baselines, MIXED-200)
 
 **Experiments that MUST WAIT:**

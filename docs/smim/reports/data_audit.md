@@ -245,11 +245,9 @@ All 5 SMIM sectors present. BEA I/O data is complete and fit for use in network-
 
 ## 9. Critical Data Gaps and Inconsistencies
 
-### G-1: OECD data severely underpowered [HIGH SEVERITY]
-- **What:** 244 rows vs ~2,000 expected. Most CLI indicators cover only 1–5 years instead of 2000–2025.
-- **Impact:** OECD signals in FULL/MACRO-ONLY feeds are effectively unusable as time-series inputs.
-- **Pipeline needs this:** C5 (supply-chain edges via OECD KEI) and all experiments using international macro context.
-- **Action required:** Re-run `smim_fetch_oecd.py` with corrected SDMX key construction (dimension-specific keys rather than "all" key) to retrieve full history. See DATA_ACQUISITION.md §Remediation.
+### G-1: OECD data severely underpowered [HIGH SEVERITY] — ✅ RESOLVED 2026-03-28
+- **What:** 244 rows vs ~2,000 expected. Root cause: "all" key omitted USA/GBR CLI series with METHODOLOGY=H.
+- **Resolution (R2):** `smim_fetch_oecd.py` rewritten to use explicit dimension keys. Re-fetched 2026-03-28: 1,922 rows. LI/BCICP/CCICP 289 rows/country from 2000-01 to 2024-01; B1GQ_POP 85-103 rows/country from 2000-Q1 to 2025-Q4. Gate G1-6 now passes.
 
 ### G-2: UK intensities not computed [HIGH SEVERITY]
 - **What:** No `UK-LC_intensities.parquet` or `UK-MC_intensities.parquet` in `data/smim/intensities/`.
@@ -305,7 +303,7 @@ These discrepancies reflect the EXPERIMENT_PLAN.md using rough estimates. The ac
 | G1-3 | EDGAR: ≥80% US tickers with filings | ✅ PASS | 765/772 = 99% (US-only; UK by-design 0%) |
 | G1-4 | GDELT: weekly continuity since 2015, no >4-week gaps | ✅ PASS | 9 signals, 566 weeks, no gaps |
 | G1-5 | IMF: indicators present for experiment countries | ⚠️ PARTIAL | 3/7 indicators cover US+GB+DE+JP; 4/7 indicators cover US+GB only |
-| G1-6 | OECD: indicators present with adequate history | ❌ FAIL | 244 rows vs ~2,000 expected; most series cover ≤5 years |
+| G1-6 | OECD: indicators present with adequate history | ✅ PASS | 1,922 rows (R2: explicit key fix 2026-03-28); LI/BCICP/CCICP 289 rows/country 2000–2024 |
 | G1-7 | BEA: all 5 SMIM sectors mapped | ✅ PASS | 21 sector pairs, 2010–2024 |
 | G1-8 | OHLCV: ≥80% Gold/Silver for ≥80% of universe tickers | ✅ PASS | Marginal for US-SC (80%); others exceed threshold |
 | G1-9 | Intensities: computed for all experiment universes | ❌ FAIL | UK-LC and UK-MC intensities missing |
@@ -317,7 +315,7 @@ These discrepancies reflect the EXPERIMENT_PLAN.md using rough estimates. The ac
 
 **Phase E (UK-LC) is blocked** until G-2 and G-4 are resolved.
 
-**OECD-dependent signals** should be excluded from Phase A experiment runs until G-1 (OECD re-fetch) is resolved. FRED macro is an adequate substitute.
+**OECD signals** are now fit for use (G-1 resolved, R2 complete 2026-03-28). LI/BCICP/CCICP have full 2000–2024 monthly history; B1GQ_POP has full 2000–2025 quarterly history.
 
 ---
 
