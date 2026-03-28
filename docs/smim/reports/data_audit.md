@@ -69,9 +69,9 @@
 | FRED ID | Reason | Status |
 |---------|--------|--------|
 | `NAPM` | Series does not exist on FRED (ISM PMI) | Replaced by `MANEMP` (accepted proxy) ✅ |
-| `CUSR0000SAM` | Wrong series ID in original plan | **❌ NOT remediated** — correct ID is `CPIMEDSL` (CPI Medical Care). Affects healthcare experiments that need a CPI-medical proxy in MACRO-ONLY feeds. |
+| `CUSR0000SAM` | Wrong series ID in original plan | **✅ Remediated (R1, 2026-03-28)** — replaced with correct ID `CPIMEDSL`; 314 rows ingested into PIT store; 0 A1 violations. |
 
-**Acquired series (27):** DFF, BAMLH0A0HYM2, T10Y2Y, VIXCLS, BAA10Y, DCOILWTICO, DCOILBRENTEU, DTWEXBGS, INDPRO, GASREGW, TOTBKCR, STLFSI2, GDP, CPIAUCSL, UNRATE, FEDFUNDS, CPILFESL, GS10, GS2, MANEMP, GDPC1, PCEPI, UMCSENT, USSLIND, HOUST, M2SL, DRCCLACBS.
+**Acquired series (28):** DFF, BAMLH0A0HYM2, T10Y2Y, VIXCLS, BAA10Y, DCOILWTICO, DCOILBRENTEU, DTWEXBGS, INDPRO, GASREGW, TOTBKCR, STLFSI2, GDP, CPIAUCSL, UNRATE, FEDFUNDS, CPILFESL, GS10, GS2, MANEMP, GDPC1, PCEPI, UMCSENT, USSLIND, HOUST, M2SL, DRCCLACBS, **CPIMEDSL**.
 
 ---
 
@@ -257,10 +257,9 @@ All 5 SMIM sectors present. BEA I/O data is complete and fit for use in network-
 - **Root cause:** `smim_compute_intensities.py` was not run for UK universes (or failed silently due to G-4 below).
 - **Action required:** Run intensity computation for UK-LC and UK-MC after resolving G-4.
 
-### G-3: CPIMEDSL not fetched [MEDIUM SEVERITY]
-- **What:** CPI Medical Care (`CPIMEDSL`) was planned as a healthcare-sector macro proxy; the original ID `CUSR0000SAM` does not exist. Correct ID is known but re-fetch has not been run.
-- **Impact:** Healthcare experiments (US-LC-HEALTH) lack a sector-specific CPI proxy in MACRO-ONLY and MACRO+NARRATIVE signal feeds.
-- **Action required:** Add `CPIMEDSL` to `smim_fetch_fred.py` MACRO_SERIES list and re-run.
+### G-3: CPIMEDSL not fetched [MEDIUM SEVERITY] — ✅ RESOLVED 2026-03-28
+- **What:** CPI Medical Care (`CPIMEDSL`) was planned as a healthcare-sector macro proxy; the original ID `CUSR0000SAM` does not exist.
+- **Resolution (R1):** `CUSR0000SAM` replaced with `CPIMEDSL` in `smim_fetch_fred.py`; `NAPM` also removed (defunct). Re-fetched 2026-03-28: 314 rows, 2000-01-01 to 2026-02-01, 0 A1 violations. PIT store now has 28 signals.
 
 ### G-4: Companies House adapter never built [MEDIUM SEVERITY — structural]
 - **What:** EXPERIMENT_PLAN.md specified Companies House (UK) as the source for UK equity balance-sheet data (CapEx, Revenue, Assets). No adapter was built; no data was fetched.
@@ -302,7 +301,7 @@ These discrepancies reflect the EXPERIMENT_PLAN.md using rough estimates. The ac
 | Check | Criterion | Result | Notes |
 |-------|-----------|--------|-------|
 | G1-1 | A1 compliance: 0 pub_date < event_date leaks | ✅ PASS | 0 violations / 541,730 rows |
-| G1-2 | FRED: ≥80% of planned series fetched | ✅ PASS | 27/29 = 93% |
+| G1-2 | FRED: ≥80% of planned series fetched | ✅ PASS | 28/28 = 100% (R1: CPIMEDSL added 2026-03-28) |
 | G1-3 | EDGAR: ≥80% US tickers with filings | ✅ PASS | 765/772 = 99% (US-only; UK by-design 0%) |
 | G1-4 | GDELT: weekly continuity since 2015, no >4-week gaps | ✅ PASS | 9 signals, 566 weeks, no gaps |
 | G1-5 | IMF: indicators present for experiment countries | ⚠️ PARTIAL | 3/7 indicators cover US+GB+DE+JP; 4/7 indicators cover US+GB only |
@@ -325,7 +324,7 @@ These discrepancies reflect the EXPERIMENT_PLAN.md using rough estimates. The ac
 ## 11. Recommendations (Priority Order)
 
 1. **[P1] Re-run OECD fetch** (G-1): Fix SDMX key construction in `smim_fetch_oecd.py` to retrieve full 2000–2025 monthly history for LI, BCICP, CCICP and full quarterly history for B1GQ_POP. Re-ingest into PIT store.
-2. **[P1] Fetch CPIMEDSL** (G-3): Add to `smim_fetch_fred.py` MACRO_SERIES and re-run.
+2. **[P1 ✅ DONE] Fetch CPIMEDSL** (G-3): Completed 2026-03-28 (R1). `CPIMEDSL` now in PIT store, 314 rows.
 3. **[P2] Investigate US-LC-FINS rank stability** (G-5): Separate normalisation strata for bank vs sector_leader actor types.
 4. **[P2] Compute UK intensities** (G-2): Depends on resolving G-4 or defining OHLCV-only intensity for UK.
 5. **[P3] Decide on Companies House** (G-4): Either build adapter or formally scope out UK balance-sheet.

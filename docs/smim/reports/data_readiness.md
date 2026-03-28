@@ -112,7 +112,7 @@ Note: N=12 is the equity-only component (large_firm actors), not the full experi
 - Rank stability (Spearman ρ): 0.708 — PASS (marginally)
 - High-missing actors (>50%): 6
 
-Note: CPIMEDSL (healthcare CPI proxy) is missing from FRED. Healthcare experiments using MACRO-ONLY feeds will lack this signal.
+Note: CPIMEDSL (healthcare CPI proxy) — **now present in FRED PIT store** (R1 remediation 2026-03-28). 314 rows, 2000–2026. Healthcare experiments using MACRO-ONLY feeds now have this signal.
 
 | ActorType | N obs | Mean | Std | Skew |
 |-----------|-------|------|-----|------|
@@ -249,4 +249,4 @@ All 14 registry JSON files exist in `data/smim/registries/`:
 **Recommended immediate actions before Phase B/C/D:**
 1. Fix US-LC-FINS sector_leader normalisation → recompute US-LC-FINS, US-LC intensities
 2. Re-fetch OECD with corrected SDMX key → recompute OECD PIT store
-3. Fetch CPIMEDSL → re-run FRED ingest
+3. ~~Fetch CPIMEDSL → re-run FRED ingest~~ **✅ Done (R1, 2026-03-28)**

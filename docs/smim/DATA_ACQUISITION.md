@@ -1,6 +1,6 @@
 # SMIM Data Acquisition Status
 
-Last updated: 2026-03-28 (data audit completed; OECD sparse-data issue identified; new remediation items added)
+Last updated: 2026-03-28 (R1 complete: CPIMEDSL added; OECD sparse-data issue identified; new remediation items added)
 
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
@@ -19,8 +19,8 @@ Only `data/smim/universes/*.csv` are committed to git.
 | Source | Script | Status | Records | Event date range |
 |--------|--------|--------|---------|-----------------|
 | Equity OHLCV (Yahoo Finance) | `smim_build_universes.py` | ✅ Complete | 11 universes | 2005-01-03 – 2025-12-30 |
-| FRED macro signals | `smim_fetch_fred.py` | ✅ Complete (27/29 series) | 71,761 rows | 2000-01-01 – 2026-03-20 |
-| ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | 8,956 vintage rows (subset above) | 2000-01-01 – 2026-03-20 |
+| FRED macro signals | `smim_fetch_fred.py` | ✅ Complete (28/28 series) | 72,121 rows | 2000-01-01 – 2026-03-27 |
+| ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | included in 72,121 rows above | 2000-01-01 – 2026-03-27 |
 | SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
 | GDELT narrative | `smim_fetch_gdelt.py` | ✅ Complete (9/9 signals, daily-derived weekly) | ~37K daily rows; ~4.7K weekly rows | 2015-02-19 – 2025-12-31 |
 | IMF WEO (DataMapper) | `smim_fetch_imf.py` | ✅ Complete (7/7 series) | 618 rows | 2000-12-31 – 2030-12-31 |
@@ -72,29 +72,27 @@ sector     str  (from universe CSV; may be NaN for UK tickers)
 ## 2. FRED Macro Signals + ALFRED Vintages
 
 **Script:** `scripts/smim_fetch_fred.py`
-**Status:** Complete — 27/29 series acquired
-**Run date:** 2026-03-22
+**Status:** Complete — 28/28 series acquired (R1 remediation complete 2026-03-28)
+**Run date:** 2026-03-28
 **API key:** `FRED_API_KEY` environment variable
 
 ### Row counts (from `data/smim/processed/fred_signals.parquet`)
 
 | Metric | Value |
 |--------|-------|
-| Total rows | 71,761 |
-| Distinct signals | 27 |
-| Event date range | 2000-01-01 – 2026-03-20 |
-| Pub date range | 2000-01-31 – 2026-04-19 |
-| ALFRED vintage rows | 8,956 (subset of total, for GDP/UNRATE/CPIAUCSL/INDPRO/FEDFUNDS) |
+| Total rows | 72,121 |
+| Distinct signals | 28 |
+| Event date range | 2000-01-01 – 2026-03-27 |
+| ALFRED vintage rows | included in total (GDP/UNRATE/CPIAUCSL/INDPRO/FEDFUNDS) |
 
 ### PIT store (`data/smim/pit_store/fred.parquet`)
 
 | Metric | Value |
 |--------|-------|
-| Rows | 64,165 (de-duped on natural key vs 71,761 processed; ALFRED revisions keep latest pub_date) |
 | actor_id | 1 (always "MACRO") |
-| signal_id | 27 |
+| signal_id | 28 |
 
-### Acquired series (27)
+### Acquired series (28)
 
 | FRED ID | Rows | Frequency | Layer |
 |---------|------|-----------|-------|
@@ -125,6 +123,7 @@ sector     str  (from universe CSV; may be NaN for UK tickers)
 | `HOUST` | ~310 | Monthly | L0 exogenous |
 | `M2SL` | ~310 | Monthly | L0 exogenous |
 | `DRCCLACBS` | ~85 | Quarterly | Financials sector |
+| `CPIMEDSL` | 314 | Monthly | Healthcare sector (R1: replaces defunct CUSR0000SAM) |
 
 ### ALFRED vintage series (5)
 
@@ -138,18 +137,18 @@ Full historical vintage histories (each revision = separate PIT record):
 | `INDPRO` | Annual benchmark revisions; real-time data often revised 1–3% |
 | `FEDFUNDS` | Monthly average published after month-end; daily `DFF` is the PIT alternative |
 
-### Failed series (2)
+### Removed series (1) — replaced at source
 
-| FRED ID | Error | Root cause | Replacement |
-|---------|-------|-----------|-------------|
-| `NAPM` | `Bad Request. The series does not exist.` | ISM Manufacturing PMI renamed to ISM; never uploaded to FRED as a continuous series. | `MANEMP` (manufacturing employment) — already acquired. Standard academic proxy. |
-| `CUSR0000SAM` | `Bad Request. The series does not exist.` | CPI Medical Care subindex ID changed. | Correct ID is `CPIMEDSL`. Not yet re-fetched — see Remediation TODO. |
+| FRED ID | Status | Root cause | Resolution |
+|---------|--------|-----------|------------|
+| `NAPM` | Removed from MACRO_SERIES | ISM Manufacturing PMI series discontinued on FRED; returns 404. | Replaced by `MANEMP` (manufacturing employment) — standard academic proxy; already acquired. |
+| `CUSR0000SAM` | Removed from MACRO_SERIES | CPI Medical Care subindex ID changed. Returns 404. | Replaced by `CPIMEDSL` (correct ID). Re-fetched 2026-03-28 (R1 complete). |
 
 ### Output paths
 
 | Path | Contents |
 |------|----------|
-| `data/smim/raw/fred/<SERIES>.parquet` | Raw per-series observations from FRED API (27 files) |
+| `data/smim/raw/fred/<SERIES>.parquet` | Raw per-series observations from FRED API (28 files) |
 | `data/smim/raw/fred/<SERIES>_alfred.parquet` | Raw ALFRED all-releases for 5 vintaged series |
 | `data/smim/processed/fred_signals.parquet` | Unified normalised table — columns: `signal_id, event_date, value, pub_date, vintage_id` |
 | `data/smim/pit_store/fred.parquet` | PIT store shard — A1-compliant, queryable by `as_of` |
@@ -624,7 +623,7 @@ uv run python scripts/smim_fetch_bea.py
 
 ### Priority 1 — Blocks experiments or violates data quality gates
 
-1. **`CPIMEDSL` [P1 — NOT YET DONE]** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care (original plan used `CUSR0000SAM` which does not exist). Required for healthcare CPI proxy in MACRO-ONLY feeds for US-LC-HEALTH experiments.
+1. **`CPIMEDSL` [P1 — ✅ DONE 2026-03-28]** — `CUSR0000SAM` replaced with `CPIMEDSL` in `smim_fetch_fred.py`; `NAPM` removed (defunct, replaced by `MANEMP`). Re-fetched and ingested: 314 rows, 2000-01-01 to 2026-02-01, 0 A1 violations. PIT store now has 28 signals.
 
 2. **OECD data re-fetch [P1 — CRITICAL]** — The OECD SDMX 3.0 fetch using the "all" key approach returned only 244 rows (expected ~2,000+). Most CLI indicators (LI, BCICP, CCICP) have ≤5 years of data rather than the full 2000–2025 monthly history. **The current OECD PIT store data is unfit for production use as a time-series signal.**
 
