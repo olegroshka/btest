@@ -180,9 +180,13 @@ def compute_bank_asset_growth(
     actor_ids: list[str],
     quarter_ends: pd.DatetimeIndex,
 ) -> pd.DataFrame:
-    """Returns (T × N) panel of Assets QoQ growth rates for banks."""
+    """Returns (T × N) panel of Assets YoY (4-quarter) growth rates for banks.
+
+    Uses 4-period pct_change to match the return_12m_xsrank approach and remove
+    seasonal patterns that confound quarterly bank reporting.
+    """
     assets_panel = pit_to_quarterly_panel(edgar_df, quarter_ends, actor_ids, ASSETS_SIGNAL)
-    growth = assets_panel.pct_change(fill_method=None)
+    growth = assets_panel.pct_change(periods=4, fill_method=None)
     return growth
 
 
@@ -395,12 +399,16 @@ def compute_bank_intensities(
     edgar_df: pd.DataFrame,
     quarter_ends: pd.DatetimeIndex,
 ) -> tuple[pd.DataFrame, str]:
-    """Assets QoQ growth, z-score then sigmoid per actor."""
+    """Assets YoY growth, cross-sectionally ranked to [0,1].
+
+    Changed from per-actor z-score sigmoid (RP1 fix): cross-sectional rank
+    is stable by construction and eliminates the near-random cross-sectional
+    rankings produced by per-actor temporal normalisation.
+    """
     actor_ids = [a.actor_id for a in bank_actors]
     growth = compute_bank_asset_growth(edgar_df, actor_ids, quarter_ends)
-    # BankCreditMapper: z-score then sigmoid per column
-    intensity = zscore_sigmoid(growth)
-    return intensity, "asset_growth_zscore_sigmoid"
+    intensity = cross_section_rank(growth)
+    return intensity, "asset_growth_yoy_xsrank"
 
 
 def compute_macro_intensities(

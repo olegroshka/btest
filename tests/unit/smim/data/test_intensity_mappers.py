@@ -1,12 +1,20 @@
 """Tests for smim/data/intensity_mappers.py.
 
-Regression test for R3 fix (2026-03-28):
+Regression tests for two fixes:
+
+R3 fix (2026-03-28):
   Single-actor equity cross-sections (e.g. sole SECTOR_LEADER in US-LC-FINS)
   produce a degenerate constant intensity=1.0 from cross-sectional percentile
   rank.  The script-level fix in compute_equity_intensities() detects constant
   columns and applies z-score sigmoid fallback.  The mapper class itself
   (CorporateCapexMapper) retains the original percentile rank behaviour — the
   fix is at the aggregation layer in smim_compute_intensities.py.
+
+RP1 fix (2026-03-28):
+  BankCreditMapper previously used per-actor temporal z-score sigmoid, which
+  produces near-random cross-sectional rankings because each bank's series is
+  independently normalised to mean~0.5.  Changed to cross-sectional percentile
+  rank (same as CorporateCapexMapper).  Output is now [0,1] inclusive.
 """
 
 import numpy as np
@@ -118,10 +126,11 @@ class TestBankCreditMapper:
     def test_actor_type_is_bank(self) -> None:
         assert self.mapper.actor_type == ActorType.BANK
 
-    def test_output_strictly_within_unit_interval(self) -> None:
+    def test_output_within_unit_interval(self) -> None:
+        """Cross-sectional rank is [0,1] inclusive (can reach 0.0 and 1.0)."""
         result = self.mapper.compute(self.raw, self.actor)
-        assert (result.dropna() > 0.0).all()
-        assert (result.dropna() < 1.0).all()
+        assert (result.dropna() >= 0.0).all()
+        assert (result.dropna() <= 1.0).all()
 
     def test_output_index_matches_input_index(self) -> None:
         result = self.mapper.compute(self.raw, self.actor)
@@ -133,23 +142,45 @@ class TestBankCreditMapper:
         result = self.mapper.compute(raw, self.actor)
         assert pd.isna(result.iloc[3])
 
-    def test_constant_series_maps_to_half(self) -> None:
-        raw = pd.DataFrame({"bank": [0.05] * 10}, index=_date_index(10))
-        result = self.mapper.compute(raw, _actor("bank", ActorType.BANK))
-        assert (result.dropna() == 0.5).all()
+    def test_all_equal_values_get_same_rank(self) -> None:
+        """When ALL actors have the same value at every date, they all receive the
+        same tied rank.  With rank(pct=True) and N equal values, ties are averaged:
+        each actor gets (N+1)/(2N).  The important invariant is that all actors
+        get identical intensity (no spurious differentiation from tied data)."""
+        raw = pd.DataFrame(
+            {"bank_a": [0.05] * 10, "bank_b": [0.05] * 10},
+            index=_date_index(10),
+        )
+        result_a = self.mapper.compute(raw, _actor("bank_a", ActorType.BANK))
+        result_b = self.mapper.compute(raw, _actor("bank_b", ActorType.BANK))
+        pd.testing.assert_series_equal(
+            result_a.dropna().reset_index(drop=True),
+            result_b.dropna().reset_index(drop=True),
+            check_names=False,
+        )
 
     def test_unknown_actor_raises_key_error(self) -> None:
         with pytest.raises(KeyError, match="not found"):
             self.mapper.compute(self.raw, _actor("no_such_bank", ActorType.BANK))
 
-    def test_monotone_relative_to_z_score(self) -> None:
-        """Higher raw values should map to higher intensity (sigmoid is monotone)."""
+    def test_dominant_actor_always_ranks_highest(self) -> None:
+        """Bank with consistently higher asset growth should always receive rank=1.0."""
+        rng = np.random.default_rng(42)
+        dates = _date_index(12)
         raw = pd.DataFrame(
-            {"a": [-2.0, -1.0, 0.0, 1.0, 2.0]},
-            index=_date_index(5),
+            {
+                "strong": rng.uniform(0.08, 0.12, 12),  # always higher
+                "weak":   rng.uniform(0.01, 0.03, 12),  # always lower
+            },
+            index=dates,
         )
-        result = self.mapper.compute(raw, _actor("a", ActorType.BANK))
-        assert result.is_monotonic_increasing
+        result_strong = self.mapper.compute(raw, _actor("strong", ActorType.BANK))
+        result_weak   = self.mapper.compute(raw, _actor("weak",   ActorType.BANK))
+        assert (result_strong.dropna() > result_weak.dropna()).all()
+        # In a 2-actor panel: top rank = 2/2 = 1.0; bottom rank = 1/2 = 0.5
+        # (rank(pct=True) maps rank k of N actors to k/N, so minimum is 1/N, not 0)
+        assert (result_strong.dropna() == 1.0).all()
+        assert (result_weak.dropna() == 0.5).all()
 
 
 # ═══════════════════════════════════════════════════════════

@@ -12,9 +12,9 @@
 | MIXED-200 | 27 (26 active) | 96% | 🥇 Gold | 81% | ✅ computed | UK equity 0% EDGAR (by design) |
 | UK-LC | 99 (97 active) | 98% | 🥇 Gold | 0% | ✅ computed (R4) | return_12m_xsrank (Path B); ρ=0.732 PASS |
 | UK-MC | 100 (94 active) | 94% | 🥇 Gold | 0% | ✅ computed (R4) | return_12m_xsrank (Path B); ρ=0.720 PASS |
-| US-LC | 200 (196 active) | 98% | 🥇 Gold | 99% | ✅ computed ⚠️ | ρ=0.660 WARN (inherits US-LC-FINS structural issue) |
+| US-LC | 200 (196 active) | 98% | 🥇 Gold | 99% | ✅ computed | ρ=0.761 PASS (RP1 fix) |
 | US-LC-ENERGY | 22 (21 active) | 95% | 🥇 Gold | 100% | ✅ computed | 22 vs 40 planned (see §9) |
-| US-LC-FINS | 74 (71 active) | 96% | 🥇 Gold | 97% | ✅ computed ⚠️ | ρ=-0.003 WARN (structural — BankCreditMapper cross-rank) |
+| US-LC-FINS | 74 (71 active) | 96% | 🥇 Gold | 97% | ✅ computed | ρ=0.769 PASS (RP1 fix) |
 | US-LC-HEALTH | 60 (58 active) | 97% | 🥇 Gold | 100% | ✅ computed | |
 | US-LC-INDUS | 78 (76 active) | 97% | 🥇 Gold | 99% | ✅ computed | |
 | US-LC-TECH | 68 (68 active) | 100% | 🥇 Gold | 100% | ✅ computed ⚠️ | ρ=0.653 WARN (high-missing actors) |
@@ -252,11 +252,10 @@ All 5 SMIM sectors present. BEA I/O data is complete and fit for use in network-
 - **What:** EXPERIMENT_PLAN.md specified Companies House (UK) as the source for UK equity balance-sheet data (CapEx, Revenue, Assets). No adapter was built; no data was fetched.
 - **Decision (R4):** Path B adopted — OHLCV return_12m_xsrank used as UK intensity proxy. G-2 resolved. Companies House adapter deferred as a future enhancement (Path A). Methodology difference must be disclosed in the research paper.
 
-### G-5: US-LC-FINS rank stability critically low [MEDIUM SEVERITY — ⚠️ PARTIAL R3a]
+### G-5: US-LC-FINS rank stability critically low [MEDIUM SEVERITY — ✅ RESOLVED 2026-03-28 (RP1)]
 - **What:** Spearman ρ=-0.003 for US-LC-FINS intensities — below the 0.7 threshold (A2 assumption).
-- **R3a fix (2026-03-28):** Sector_leader constant intensity (was 1.000) fixed by z-score sigmoid fallback in `compute_equity_intensities()` when cross-section std==0. Sector_leader 'ALL' now has mean=0.490, std=0.208 (varying).
-- **Remaining structural issue:** Bank-only ρ=-0.007 (pre-fix, post-fix). Root cause: `BankCreditMapper` uses per-actor temporal z-score sigmoid. Mean-reverting asset growth makes high-growth banks switch cross-sectional rank position each quarter, producing near-random cross-sectional rankings. This is an architectural incompatibility in the bank intensity metric.
-- **Status:** Structural — requires rethinking BankCreditMapper to use a cross-sectional (not per-actor temporal) normalisation. Deferred as future work. B1 (Financials) experiment should document this limitation.
+- **R3a fix (2026-03-28):** Sector_leader constant intensity fixed by z-score sigmoid fallback when cross-section std==0.
+- **RP1 fix (2026-03-28):** Root cause resolved — `BankCreditMapper` changed from per-actor temporal z-score sigmoid to cross-sectional percentile rank of YoY asset growth (same approach as `CorporateCapexMapper`). YoY growth (4-period pct_change) removes seasonal patterns. Result: US-LC-FINS ρ=0.769 PASS; US-LC ρ=0.761 PASS.
 
 ### G-6: Sector universe sizes diverge from EXPERIMENT_PLAN.md [LOW SEVERITY — informational]
 
@@ -295,15 +294,17 @@ These discrepancies reflect the EXPERIMENT_PLAN.md using rough estimates. The ac
 | G1-7 | BEA: all 5 SMIM sectors mapped | ✅ PASS | 21 sector pairs, 2010–2024 |
 | G1-8 | OHLCV: ≥80% Gold/Silver for ≥80% of universe tickers | ✅ PASS | Marginal for US-SC (80%); others exceed threshold |
 | G1-9 | Intensities: computed for all experiment universes | ✅ PASS | All 14 intensity files present (R4: UK-LC + UK-MC added 2026-03-28) |
-| G1-10 | Rank stability ρ>0.7 for all universes with computed intensity | ⚠️ WARN | US-LC-FINS (ρ=-0.003 structural), US-LC-TECH (ρ=0.653), US-LC (ρ=0.660) below threshold |
+| G1-10 | Rank stability ρ>0.7 for all universes with computed intensity | ⚠️ WARN | US-LC-TECH (ρ=0.653) below threshold; all others PASS |
 
-### Overall: ⚠️ GATE G1 CONDITIONALLY PASSED — 1 structural issue remains (US-LC-FINS BankCreditMapper cross-rank)
+### Overall: ⚠️ GATE G1 CONDITIONALLY PASSED — 1 residual issue (US-LC-TECH sparse XBRL)
 
 **Phase A (MIXED-200 energy) can proceed** — all critical data present and usable.
 
-**Phase E (UK-LC) is unblocked** — UK-LC and UK-MC intensities computed (R4, return_12m_xsrank).
+**Phase B1 (Financials) is unblocked** — US-LC-FINS ρ=0.769 PASS after RP1 fix.
 
-**Financials experiment (B1)** should document ρ=-0.003 limitation and interpret results with caution until BankCreditMapper cross-sectional normalisation is redesigned.
+**Phase C1 (US-LC all sectors) is unblocked** — US-LC ρ=0.761 PASS after RP1 fix.
+
+**US-LC-TECH ρ=0.653 WARN** is a data quality constraint (11/60 actors with sparse XBRL CapEx coverage for recent IPOs), not a mapper issue. Acceptable for Phase C experiments.
 
 ---
 
@@ -314,7 +315,7 @@ Post-R1–R4 status (2026-03-28):
 1. **[P1 ✅ DONE] Re-run OECD fetch** (G-1, R2): 1,922 rows; explicit key fix; G1-6 passes.
 2. **[P1 ✅ DONE] Fetch CPIMEDSL** (G-3, R1): 314 rows; 28/28 FRED signals in PIT.
 3. **[P1 ✅ DONE] Compute UK intensities** (G-2, R4): UK-LC + UK-MC via return_12m_xsrank; E1 unblocked.
-4. **[P2 ⚠️ PARTIAL] US-LC-FINS rank stability** (G-5, R3a): Sector_leader constant fixed; bank ρ=-0.007 structural — BankCreditMapper cross-sectional normalisation requires architectural rethink (future work).
+4. **[P2 ✅ DONE] US-LC-FINS rank stability** (G-5, RP1 2026-03-28): BankCreditMapper switched to cross-sectional rank of YoY asset growth. US-LC-FINS ρ: -0.003 → 0.769 PASS; US-LC ρ: 0.660 → 0.761 PASS.
 5. **[P3] Archive old GDELT raw files** (G-7, R6): Remove `gkg_weekly/` and `docapi_v2/` subdirectories.
 6. **[P3] Update EXPERIMENT_PLAN.md** (G-6, R6): Correct universe size estimates to match actual GICS counts.
 7. **[P3] Companies House adapter** (G-4): Deferred — Path B adopted for UK intensity. Future enhancement.
