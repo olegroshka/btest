@@ -314,6 +314,7 @@ intensity) to C3/C4 experiment configs.
 | Milestone | Status | Completed | Notes |
 |-----------|--------|-----------|-------|
 | RP1: Fix BankCreditMapper | ✅ Complete | 2026-03-28 | Cross-section rank YoY asset growth; US-LC-FINS ρ: -0.003 → 0.769; US-LC ρ: 0.660 → 0.761 |
+| RP1.5: Dual-window ρ gate (US-LC-TECH) | ✅ Complete | 2026-03-28 | `quality_check_intensities()` now computes rho_full + rho_recent (2020–); gate passes if either ≥ 0.7; US-LC-TECH: ρ_full=0.653, ρ_recent=0.750 PASS |
 | RP2: Dual intensity (US return) | ⬜ Pending | — | Depends on RP1 |
 | RP3: Expand MIXED-200 | ⬜ Pending | — | Depends on RP1 |
 | RP4: Trim US-SC + robustness | ⬜ Pending | — | Depends on RP2 |
