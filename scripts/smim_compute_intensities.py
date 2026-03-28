@@ -294,11 +294,45 @@ def compute_equity_intensities(
     edgar_df: pd.DataFrame,
     quarter_ends: pd.DatetimeIndex,
 ) -> tuple[pd.DataFrame, str]:
-    """CapEx/Assets, cross-sectionally ranked. Returns (panel, method_name)."""
+    """CapEx/Assets, cross-sectionally ranked. Returns (panel, method_name).
+
+    When the equity cross-section contains only one actor (e.g. a sole
+    SECTOR_LEADER with no LARGE_FIRM peers in the universe), the cross-sectional
+    percentile rank degenerates to a constant 1.0 for that actor across all
+    periods, producing zero temporal variance and Spearman ρ ≈ 0 — a violation
+    of assumption A2 (rank stability).
+
+    For such degenerate columns (intensity std == 0 across time), this function
+    falls back to z-score sigmoid across time (per-actor temporal normalisation),
+    consistent with BankCreditMapper. A truly constant raw ratio maps to 0.5.
+    """
     actor_ids = [a.actor_id for a in equity_actors]
     ratio = compute_edgar_capex_ratio(edgar_df, actor_ids, quarter_ends)
-    # Cross-sectional rank within the group
     intensity = cross_section_rank(ratio)
+
+    # Detect degenerate constant columns — typically a single actor in the
+    # equity cross-section that always receives rank = 1.0.
+    col_std = intensity.std(skipna=True, ddof=1)
+    degenerate_cols = col_std[col_std == 0.0].index.tolist()
+    if degenerate_cols:
+        log.warning(
+            "  Degenerate constant intensity for %d actor(s) after cross-section "
+            "rank (single-actor cross-section?): %s  —  applying z-score sigmoid "
+            "fallback.",
+            len(degenerate_cols),
+            degenerate_cols,
+        )
+        for col in degenerate_cols:
+            raw_col = ratio[col]
+            sigma = raw_col.std(skipna=True, ddof=1)
+            if sigma == 0.0 or pd.isna(sigma):
+                # Truly constant raw ratio → no temporal signal → uniform 0.5
+                intensity[col] = raw_col.where(raw_col.isna(), 0.5)
+            else:
+                mu = raw_col.mean(skipna=True)
+                z = (raw_col - mu) / sigma
+                intensity[col] = 1.0 / (1.0 + np.exp(-z))
+
     return intensity, "capex_assets_xsrank"
 
 

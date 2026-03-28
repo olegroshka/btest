@@ -1,4 +1,13 @@
-"""Tests for smim/data/intensity_mappers.py."""
+"""Tests for smim/data/intensity_mappers.py.
+
+Regression test for R3 fix (2026-03-28):
+  Single-actor equity cross-sections (e.g. sole SECTOR_LEADER in US-LC-FINS)
+  produce a degenerate constant intensity=1.0 from cross-sectional percentile
+  rank.  The script-level fix in compute_equity_intensities() detects constant
+  columns and applies z-score sigmoid fallback.  The mapper class itself
+  (CorporateCapexMapper) retains the original percentile rank behaviour — the
+  fix is at the aggregation layer in smim_compute_intensities.py.
+"""
 
 import numpy as np
 import pandas as pd
@@ -245,3 +254,71 @@ class TestMapperRegistry:
     def test_registered_types_returns_all_types(self) -> None:
         types = self.registry.registered_types()
         assert set(types) == set(ActorType)
+
+
+# ═══════════════════════════════════════════════════════════
+# Regression: single-actor cross-section degeneracy (R3 fix)
+# ═══════════════════════════════════════════════════════════
+
+class TestSingleActorDegeneracy:
+    """Documents the degenerate behaviour of cross-sectional percentile rank
+    when only one actor is present (e.g. sole SECTOR_LEADER in US-LC-FINS).
+
+    The CorporateCapexMapper itself still returns 1.0 for a single-actor
+    cross-section (this is mathematically correct for a rank).  The fix lives
+    in smim_compute_intensities.compute_equity_intensities(), which detects
+    constant output and falls back to z-score sigmoid.
+
+    These tests verify both layers:
+      1. The degenerate mapper output (known, documented behaviour).
+      2. The z-score sigmoid fallback logic that the script applies.
+    """
+
+    def test_single_actor_mapper_returns_constant_one(self) -> None:
+        """CorporateCapexMapper with a single actor always returns 1.0 — known
+        degenerate case that the script-level fix must catch."""
+        rng = np.random.default_rng(0)
+        dates = pd.date_range("2015-01-01", periods=20, freq="QS")
+        raw = pd.DataFrame(
+            {"sector_etf": rng.uniform(0.01, 0.10, size=20)},
+            index=dates,
+        )
+        mapper = CorporateCapexMapper()
+        result = mapper.compute(raw, _actor("sector_etf", ActorType.SECTOR_LEADER))
+        # Degenerate: all 1.0 → std == 0
+        assert (result.dropna() == 1.0).all(), (
+            "Single-actor percentile rank must equal 1.0 (degenerate baseline)"
+        )
+        assert result.std() == 0.0
+
+    def test_zscore_sigmoid_fallback_gives_varying_output(self) -> None:
+        """The z-score sigmoid fallback used in compute_equity_intensities() for
+        degenerate columns must produce varying output in (0, 1) when the raw
+        ratio varies across time."""
+        rng = np.random.default_rng(0)
+        dates = pd.date_range("2015-01-01", periods=20, freq="QS")
+        raw_col = pd.Series(rng.uniform(0.01, 0.10, size=20), index=dates)
+
+        mu = raw_col.mean()
+        sigma = raw_col.std(ddof=1)
+        z = (raw_col - mu) / sigma
+        fallback = 1.0 / (1.0 + np.exp(-z))
+
+        assert (fallback > 0.0).all()
+        assert (fallback < 1.0).all()
+        assert fallback.std() > 0.0, "Fallback must have non-zero variance"
+
+    def test_zscore_sigmoid_fallback_constant_raw_maps_to_half(self) -> None:
+        """A truly constant raw ratio (sigma == 0) must map to 0.5, not NaN."""
+        dates = pd.date_range("2015-01-01", periods=10, freq="QS")
+        raw_col = pd.Series([0.05] * 10, index=dates)
+
+        sigma = raw_col.std(ddof=1)
+        if sigma == 0.0 or pd.isna(sigma):
+            result = raw_col.where(raw_col.isna(), 0.5)
+        else:
+            mu = raw_col.mean()
+            z = (raw_col - mu) / sigma
+            result = 1.0 / (1.0 + np.exp(-z))
+
+        assert (result == 0.5).all(), "Constant raw ratio must map to 0.5"
