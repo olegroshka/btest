@@ -1,0 +1,30 @@
+experiment_id: A3-STACK-VALIDATION
+falsification_b: 100
+institutions: INST-MINIMAL
+k_max_candidates: 15
+k_star: 1
+max_granger_lag: 2
+n_actors: 50
+n_actors_requested: 50
+period: RECENT
+pipeline_depth: full
+runtime_seconds:
+  benchmark_modal: 1.52e-05
+  benchmark_predictive: 1.61e-05
+  falsification_b100: 0.0907704
+  granger_edges: 0.1956899
+  kalman_filter_em: 0.0774182
+  kalman_filter_test: 0.00035
+  load_data: 0.1804289
+  metrics_computation: 0.0002419
+  mode_selection: 0.0002813
+  sparsification: 0.0007505
+  spectral_decomposition: 0.0007008
+signals: MACRO+MARKET
+spectral_energy_retention: 0.9999999999999983
+target_density: 0.15
+test_end: '2025-12-31'
+test_start: '2024-01-01'
+train_end: '2023-12-31'
+train_start: '2018-01-01'
+universe: US-LC

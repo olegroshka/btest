@@ -1,0 +1,158 @@
+decision_gate: PASS
+experiment_id: A4-SCALING
+flagged_components: []
+institutions: INST-MINIMAL
+k_max_candidates: 15
+n_targets:
+- 20
+- 50
+- 99
+- 125
+- 270
+per_n_summary:
+- N: 20
+  k_star: 1
+  oos_r2: -2.4639318232982785
+  peak_mem_mb: 33.7
+  timings:
+    benchmark_modal: 3.0e-05
+    benchmark_predictive: 2.3e-05
+    granger_edges: 0.224322
+    kalman_filter_em: 0.245477
+    kalman_filter_test: 0.001061
+    load_data: 0.244239
+    mode_selection: 0.000531
+    sparsification: 0.000509
+    spectral_decomposition: 0.000318
+  total_s: 0.7165
+- N: 50
+  k_star: 1
+  oos_r2: -1.6459
+  peak_mem_mb: 0.0
+  timings:
+    benchmark_modal: 1.5e-05
+    benchmark_predictive: 1.6e-05
+    granger_edges: 0.19569
+    kalman_filter_em: 0.077418
+    kalman_filter_test: 0.00035
+    load_data: 0.180429
+    mode_selection: 0.000281
+    sparsification: 0.00075
+    spectral_decomposition: 0.000701
+  total_s: 0.4557
+- N: 99
+  k_star: 1
+  oos_r2: -1.8069928067826737
+  peak_mem_mb: 78.1
+  timings:
+    benchmark_modal: 2.7e-05
+    benchmark_predictive: 2.3e-05
+    granger_edges: 0.037533
+    kalman_filter_em: 0.266277
+    kalman_filter_test: 0.001286
+    load_data: 0.183242
+    mode_selection: 0.000554
+    sparsification: 0.001026
+    spectral_decomposition: 0.009877
+  total_s: 0.4998
+- N: 125
+  k_star: 1
+  oos_r2: -1.6602515899525625
+  peak_mem_mb: 95.4
+  timings:
+    benchmark_modal: 3.0e-05
+    benchmark_predictive: 3.3e-05
+    granger_edges: 0.055509
+    kalman_filter_em: 0.597193
+    kalman_filter_test: 0.006846
+    load_data: 0.215425
+    mode_selection: 0.000568
+    sparsification: 0.001365
+    spectral_decomposition: 0.026562
+  total_s: 0.9035
+- N: 270
+  k_star: 1
+  oos_r2: -1.87509286906708
+  peak_mem_mb: 140.4
+  timings:
+    benchmark_modal: 3.3e-05
+    benchmark_predictive: 2.9e-05
+    granger_edges: 0.219415
+    kalman_filter_em: 1.48955
+    kalman_filter_test: 0.01872
+    load_data: 0.373424
+    mode_selection: 0.00062
+    sparsification: 0.004387
+    spectral_decomposition: 0.07391
+  total_s: 2.1801
+pipeline_depth: full
+scaling_table:
+- alpha_exponent: 0.14
+  component: load_data
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.3734
+  t_n400_s: 0.3734
+  t_n500_est_s: 0.4
+- alpha_exponent: -0.25
+  component: granger_edges
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.2194
+  t_n400_s: 0.2194
+  t_n500_est_s: 0.2
+- alpha_exponent: 0.78
+  component: sparsification
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.0044
+  t_n400_s: 0.0044
+  t_n500_est_s: 0.0
+- alpha_exponent: 2.3
+  component: spectral_decomposition
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.0739
+  t_n400_s: 0.0739
+  t_n500_est_s: 0.1
+- alpha_exponent: 0.14
+  component: mode_selection
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.0006
+  t_n400_s: 0.0006
+  t_n500_est_s: 0.0
+- alpha_exponent: 0.81
+  component: kalman_filter_em
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 1.4896
+  t_n400_s: 1.4896
+  t_n500_est_s: 1.8
+- alpha_exponent: 1.26
+  component: kalman_filter_test
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.0187
+  t_n400_s: 0.0187
+  t_n500_est_s: 0.0
+- alpha_exponent: 0.16
+  component: benchmark_predictive
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.0
+  t_n400_s: 0.0
+  t_n500_est_s: 0.0
+- alpha_exponent: 0.11
+  component: benchmark_modal
+  exceeds_gate: false
+  feasible_n500: true
+  t_n200_s: 0.0
+  t_n400_s: 0.0
+  t_n500_est_s: 0.0
+signals: MACRO+MARKET
+test_end: '2025-12-31'
+test_start: '2024-01-01'
+total_pipeline_alpha: 0.41
+train_end: '2023-12-31'
+train_start: '2018-01-01'

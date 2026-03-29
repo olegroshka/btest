@@ -123,3 +123,28 @@ class TestKalmanFilterEM:
         result = kf.em_estimate(obs, mf, max_iter=5)
         assert "ll_history" in result.params
         assert len(result.params["ll_history"]) >= 1
+
+    def test_em_large_n_small_t_finite_log_likelihood(self) -> None:
+        """Regression: N=100, T=24, K=1 (N>>T) must yield finite LL.
+
+        Guards against numerical instability in the EM when the number of
+        actors far exceeds the number of time steps, as in A4-SCALING.
+        """
+        rng = np.random.default_rng(42)
+        N, K, T = 100, 1, 24  # N >> T: the A4 problematic regime
+        U, _ = np.linalg.qr(rng.standard_normal((N, K)))
+        obs = rng.uniform(0.0, 1.0, (T, N))  # capex_assets_xsrank-like [0,1]
+        modal_frame = ModalFrame(
+            basis=U,
+            eigenvalues=np.array([0.9], dtype=complex),
+            method=DecompositionMethod.SCHUR,
+        )
+        kf = KalmanFilter()
+        state = kf.em_estimate(obs, modal_frame, max_iter=50)
+        assert np.isfinite(state.log_likelihood), (
+            f"log_likelihood={state.log_likelihood} not finite for N={N}, T={T}"
+        )
+        assert np.all(np.isfinite(state.alpha_filtered)), \
+            "alpha_filtered contains non-finite values"
+        assert np.all(np.isfinite(state.alpha_predicted)), \
+            "alpha_predicted contains non-finite values"

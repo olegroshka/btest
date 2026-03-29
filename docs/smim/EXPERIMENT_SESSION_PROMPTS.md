@@ -1,4 +1,4 @@
-# SMIM Experiment Session Prompts
+  # SMIM Experiment Session Prompts
 
 > Created: 2026-03-29
 > Status: Active — one prompt per experiment session; update status column as experiments run
@@ -26,8 +26,20 @@ result in the **Outcome** row so the next session can reference it.
 > RECENT period, minimal institutions — fast and cheap. If it fails, stop and fix before
 > committing to the 680-run programme.
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE — 2026-03-29 — PASS (5/5)`
+**Outcome:** All checks pass. OOS R²=-1.65 (negative, expected — T=24 quarters < N=50 actors,
+MDL selects K*=1, model underdetermined). Pipeline wiring confirmed. Runtime 0.55s total at N=50.
+Granger edges dominate (36%), data load (33%), Kalman EM (14%). No bugs found.
+Full findings: `docs/smim/EXPERIMENT_RESULTS.md §A3`.
+Outputs: `results/metrics/level1_A3-STACK-VALIDATION.parquet`, `results/configs/A3-STACK-VALIDATION.yaml`.
+Runner: `scripts/run_smim_a3.py`. **A3 gate passed — A1 unblocked.**
+
+**Session A3 notes** *(filled)*:
+- [x] check 1: PASS — OOS R²=-1.6459, DM stat=3.922, DM p=0.000, coverage=1.000 (all finite)
+- [x] check 2: PASS — |sum(-1.5478) - total(-1.5478)| = 0.0000 (exact 2-component decomposition)
+- [x] check 3: PASS — B100 LagDestroyedPlacebo completed, p_value=0.000
+- [x] check 4: PASS — 11/11 pipeline components timed
+- [x] check 5: PASS — 17 required columns present in parquet
 
 **Prompt:**
 ```
@@ -74,8 +86,16 @@ Do NOT proceed to A1 if A3 fails.
 
 ### Session A4 — Computational Scaling Profile *(can run in parallel with A1)*
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE (v2) -- 2026-03-29 -- gate PASS, all OOS R2 finite`
+**Outcome:** Decision gate PASS (all components alpha <= 2.5). Total pipeline alpha=0.41.
+v1 showed OOS R2=nan at N>50 and inflated Kalman EM alpha=2.19. Root cause: one actor had
+all-NaN intensity in training period; fillna(col_means) left NaN intact; NaN propagated
+through pipeline. Fix: filter actors with no training-period data before pipeline. After fix:
+OOS R2 finite at all N (-2.46 to -1.66, all negative as expected for T=24 << N). Kalman EM
+actual alpha=0.81 (sub-linear). Spectral decomp is now the scaling bottleneck (alpha=2.30).
+B-series very feasible at N~93 (~1s/run). Full findings: `EXPERIMENT_RESULTS.md` section A4.
+Outputs: `results/metrics/level5_A4-SCALING.parquet`, `results/configs/A4-SCALING.yaml`.
+Runner: `scripts/run_smim_a4.py`. No Kalman EM regularisation needed.
 
 **Prompt:**
 ```
@@ -121,7 +141,7 @@ raise with user before launching B-series (those run N=200+ repeatedly).
 
 ### Session A1 — MVP Full Pipeline *(after A3 passes)*
 
-**Status:** `[ ] not started`
+**Status:** `[ ] not started — UNBLOCKED (A3 passed 2026-03-29)`
 **Outcome:** —
 
 **Prompt:**

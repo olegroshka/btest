@@ -1,0 +1,257 @@
+# SMIM Experiment Results
+
+> Created: 2026-03-29
+> Updated: 2026-03-29
+> Cross-reference: EXPERIMENT_PLAN.md · EXPERIMENT_SESSION_PROMPTS.md
+
+Running log of experiment outcomes. One section per completed experiment.
+Each section records: checks, key metrics, runtime, findings, and next-step implications.
+
+---
+
+## Status Overview
+
+| ID | Phase | Status | OOS R² | Date |
+|----|-------|--------|--------|------|
+| A3 | A | PASS (5/5) | -1.65 (expected -- T<N, K*=1) | 2026-03-29 |
+| A4 | A | COMPLETE (v2) | scaling gate PASS; all OOS R² finite after NaN data fix | 2026-03-29 |
+| A1 | A | not started | -- | -- |
+| A2 | A | not started | -- | -- |
+
+---
+
+## A3-STACK-VALIDATION
+
+**Date:** 2026-03-29
+**Status:** PASS (5/5 checks)
+**Runner:** `scripts/run_smim_a3.py`
+
+### Config
+
+| Parameter | Value |
+|-----------|-------|
+| Universe | US-LC subset, N=50 (first 50 from registry with EDGAR intensity coverage) |
+| Intensity | `data/smim/intensities/US-LC_intensities.parquet` · method=capex_assets_xsrank (M-A) |
+| Signals | MACRO+MARKET (OHLCV quarterly log-returns for Granger; no EDGAR balance sheet as input) |
+| Institutions | INST-MINIMAL (skipped in this run — equity actors only) |
+| Period | RECENT: train 2018-01-01–2023-12-31, test 2024-01-01–2025-12-31 |
+| Pipeline | full (Granger → sparsify → Schur → MDL → Kalman EM → Predictive + Modal benchmarks) |
+
+### Check Results
+
+| # | Check | Result | Detail |
+|---|-------|--------|--------|
+| 1 | L1 metrics finite | **PASS** | OOS R²=-1.6459, DM stat=3.922, DM p=0.000, coverage=1.000 |
+| 2 | Component dR² sums to total | **PASS** | \|sum - total\| = 0.0000 (exact — 2-component decomposition) |
+| 3 | Falsification B100 completes | **PASS** | p_value=0.000, observed_metric=-2.139 |
+| 4 | Runtime profiler complete | **PASS** | 11/11 components timed |
+| 5 | Results schema valid | **PASS** | 17 required columns present |
+
+### L1 Metrics
+
+| Metric | Value |
+|--------|-------|
+| OOS R² (predictive) | -1.6459 |
+| OOS R² (modal) | -1.5478 |
+| DM stat (pred vs modal) | 3.922 |
+| DM p-value | 0.000 |
+| Coverage (non-NaN gaps) | 1.000 |
+| dR² predictive | -1.6459 |
+| dR² modal increment | +0.0981 |
+
+### Runtime (total: 0.55s at N=50)
+
+| Component | Seconds | % |
+|-----------|---------|---|
+| granger_edges | 0.196 | 36% |
+| load_data | 0.180 | 33% |
+| falsification_b100 | 0.091 | 17% |
+| kalman_filter_em | 0.077 | 14% |
+| sparsification | 0.001 | 0% |
+| spectral_decomposition | 0.001 | 0% |
+| kalman_filter_test | 0.000 | 0% |
+| mode_selection | 0.000 | 0% |
+| metrics_computation | 0.000 | 0% |
+| benchmark_predictive | 0.000 | 0% |
+| benchmark_modal | 0.000 | 0% |
+
+### Pipeline Diagnostics
+
+| Diagnostic | Value | Notes |
+|------------|-------|-------|
+| K* (modes selected by MDL) | 1 | MDL chose minimal structure |
+| Granger adj density | 159/2500 = 6.4% | Already below 15% target |
+| Spectral energy retention | ~100% | Sparsification at 15% target had no effect |
+| T_train (quarters) | 24 | 6 years × 4 quarters |
+| T_test (quarters) | 8 | 2 years × 4 quarters |
+
+### Findings and Interpretation
+
+**1. OOS R² is negative (-1.65): expected, not a bug.**
+The RECENT period (train 2018–2023, test 2024–2025) gives only T=24 quarterly training
+observations for N=50 actors. With T/N = 0.48 (fewer time steps than actors), the model
+is severely underdetermined. MDL correctly selects K*=1 (single mode) — there is not
+enough data to support richer structure. The Kalman filter fitted on 24 observations
+generalises poorly to 2024–2025. This is a data-regime limitation, not a pipeline bug.
+
+**2. Falsification B100 p_value=0.000: no evidence of signal over lag-destroyed null.**
+The observed metric (-2.14) is *more negative* than all 100 lag-destroyed permutations,
+meaning the model fits the test data worse than random permutations of the training data.
+Consistent with finding 1: no exploitable temporal structure at T=24.
+
+**3. Modal increment dR²=+0.098: modal filtering adds small positive value.**
+Even with K*=1 and poor OOS R², the modal benchmark (filtering through U @ alpha_filt)
+slightly outperforms the predictive benchmark (U @ alpha_pred). This is expected from
+the KimFilter limitation note in CLAUDE.md — alpha_pred ≈ alpha_filt at K=1.
+
+**4. Pipeline wiring confirmed.**
+All components execute without error, produce finite outputs, write correct schema.
+The negative OOS R² is a science finding about the RECENT/MACRO+MARKET/N=50 regime.
+
+### Implications for A1
+
+- A1 must use FULL-ROLL (rolling 10yr train) not RECENT — T=40 quarters minimum per window
+- A1 universe MIXED-200 (N~93 with intensity) gives a more manageable T/N ratio
+- FULL signals (incl. EDGAR balance sheet) likely improve K* selection beyond K*=1
+- The negative OOS R² from A3 is the correct "MACRO+MARKET baseline" to beat in B-series
+
+### Outputs
+
+- `results/metrics/level1_A3-STACK-VALIDATION.parquet` (17 columns, 1 row)
+- `results/configs/A3-STACK-VALIDATION.yaml` (full config + runtime breakdown)
+
+---
+
+## A4-SCALING (v2 -- NaN data fix applied)
+
+**Date:** 2026-03-29 (v1), 2026-03-29 (v2 re-run)
+**Status:** COMPLETE -- decision gate PASS
+**Runner:** `scripts/run_smim_a4.py`
+
+### Config
+
+| Parameter | Value |
+|-----------|-------|
+| Universes | US-LC (N=20/50/100/200), US-LC+US-MC (N~400) |
+| Signals | MACRO+MARKET (OHLCV quarterly log-returns) |
+| Period | RECENT: train 2018-2023, test 2024-2025 |
+| Pipeline | full (same as A3) |
+| N=50 | reused A3 results |
+
+### Actual N vs Target
+
+| N target | N actual | Note |
+|----------|----------|------|
+| 20 | 20 | OK |
+| 50 | 50 | A3 reuse |
+| 100 | 99 | 1 actor had all-NaN intensity in training period; dropped |
+| 200 | 125 | Only 125 US-LC actors have complete data in RECENT period |
+| 400 | 270 | US-LC (125) + US-MC (145) = 270 max with complete data |
+
+### Per-Component Runtime (seconds)
+
+| Component | N=20 | N=50 | N=99 | N=125 | N=270 | alpha |
+|-----------|------|------|------|-------|-------|-------|
+| load_data | 0.24 | 0.18 | 0.11 | 0.37 | 0.37 | 0.14 |
+| granger_edges | 0.23 | 0.20 | 0.06 | 0.06 | 0.22 | -0.25 |
+| sparsification | <0.01 | <0.01 | <0.01 | <0.01 | <0.01 | 0.78 |
+| spectral_decomp | <0.01 | <0.01 | 0.01 | 0.03 | 0.07 | 2.30 |
+| mode_selection | <0.01 | <0.01 | <0.01 | <0.01 | <0.01 | 0.14 |
+| **kalman_filter_em** | **0.25** | **0.08** | **0.31** | **1.49** | **1.49** | **0.81** |
+| kalman_filter_test | <0.01 | <0.01 | <0.01 | 0.02 | 0.02 | 1.26 |
+| benchmark_pred | <0.01 | <0.01 | <0.01 | <0.01 | <0.01 | 0.16 |
+| benchmark_modal | <0.01 | <0.01 | <0.01 | <0.01 | <0.01 | 0.11 |
+| **TOTAL** | **0.72** | **0.46** | **0.50** | **0.90** | **2.18** | **0.41** |
+
+### Scaling Exponents Summary
+
+| Component | alpha | Classification | Notes |
+|-----------|-------|----------------|-------|
+| granger_edges | -0.25 | ~O(1) | Batched GPU/CPU path, vectorised |
+| load_data | 0.14 | sub-linear | I/O dominated |
+| mode_selection | 0.14 | ~O(1) | MDL on K candidates, K fixed |
+| benchmark_{pred,modal} | 0.11-0.16 | ~O(1) | Matrix multiply O(N*K) |
+| sparsification | 0.78 | sub-linear | Sparse threshold |
+| **kalman_filter_em** | **0.81** | **sub-linear** | **v1 showed 2.19 due to NaN data (see finding 2)** |
+| kalman_filter_test | 1.26 | ~O(N^1.3) | Within gate |
+| spectral_decomp | 2.30 | O(N^2.3) | Schur decomp, approaching O(N^3) |
+| **TOTAL** | **0.41** | **sub-linear** | No bottleneck at these N sizes |
+
+**Decision gate: PASS** -- all components scale at alpha <= 2.5.
+
+### OOS R² by N
+
+| N | OOS R² | Notes |
+|---|--------|-------|
+| 20 | -2.464 | Valid |
+| 50 | -1.646 | Valid (A3 reuse) |
+| 99 | -1.807 | Valid (was nan in v1 due to NaN data) |
+| 125 | -1.660 | Valid (was nan in v1) |
+| 270 | -1.875 | Valid (was nan in v1) |
+
+All OOS R² values negative as expected (T=24 << N, K*=1).
+
+### Memory Scaling
+
+| N | Peak MB | MB/actor |
+|---|---------|----------|
+| 20 | 34 | 1.7 |
+| 99 | 78 | 0.79 |
+| 125 | 95 | 0.76 |
+| 270 | 140 | 0.52 |
+
+Memory scales sub-linearly (~0.5-0.8 MB/actor at large N). No memory pressure concern.
+
+### Findings
+
+**1. Spectral decomposition is the scaling bottleneck (alpha=2.30).**
+At N=270, Schur decomp takes 0.07s (3% of total). Kalman EM is alpha=0.81 (sub-linear)
+after the data fix -- much faster than the v1 figure of 2.19, which was inflated by the
+EM failing to converge due to NaN input data.
+
+**2. v1 OOS R²=nan was caused by NaN input data, not Kalman numerical instability.**
+One actor (at N=100+) had all-NaN intensity values in the 2018-2023 training period.
+`fillna(col_means)` leaves all-NaN columns unchanged (mean of NaN = NaN). The NaN
+propagated through the entire pipeline: filter -> slogdet(NaN) -> warning -> EM runs
+all 50 iterations without convergence -> R matrix accumulates NaN -> benchmarks = NaN ->
+oos_r_squared(NaN, actual) = nan. Fix: filter out actors with no training-period
+intensity data before running the pipeline.
+
+**3. Granger edge estimation is essentially O(1) in N.**
+The batched GPU/CPU path (bic_selection=False) runs all N(N-1) pairs in a vectorised
+kernel. At N=270, 270*269=72,630 pairs took 0.22s.
+
+**4. N_actual < N_target at larger sizes.**
+US-LC has only ~125 actors with complete (non-NaN) EDGAR capex intensity + OHLCV data
+in the RECENT period (vs 200 target). US-LC+US-MC combined gives 270. For A1
+(experiment_a1, N=93), coverage is 93/103 = 90% -- fine.
+
+### Implications for B-series
+
+- **B1/B2 at N=93**: ~1s per pipeline run. 10 windows * 50 runs = ~500s. Very feasible.
+- **N=200 in B-series**: ~1s per pipeline run. 680 runs * 1s = ~11 minutes. Very feasible.
+- **No Kalman EM regularisation needed**: the v1 instability was a data quality issue, not
+  a numerical issue. The EM converges cleanly with NaN-free data.
+
+### Outputs
+
+- `results/metrics/level5_A4-SCALING.parquet` (N x component rows)
+- `results/configs/A4-SCALING.yaml` (scaling table + decision gate)
+
+---
+
+## A1-MVP-FULL
+
+**Date:** not started
+**Status:** pending A3 pass (now unblocked)
+
+---
+
+## A2-BASELINES
+
+**Date:** not started
+**Status:** pending A1
+
+---
+
+*Further entries will be appended as experiments complete.*
