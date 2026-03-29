@@ -170,25 +170,35 @@
 - Range [0,1]: PASS
 - Rank stability (mean Spearman rho): 0.905 | recent (2020–): 0.916 (PASS)
 - High-missing actors (>50%): 48
+- **Note:** 48/142 actors (34%) are high-missing (recent IPOs). Use `US-SC_trimmed` for C3 experiments. See RP4.
 
 | ActorType | N | Mean | Std | Skew | NaN% |
 |-----------|---|------|-----|------|------|
 | retail_investor | 2,739 | 0.454 | 0.332 | 0.333 | 0.00% |
 | sme | 3,476 | 0.546 | 0.242 | -0.227 | 0.00% |
 
+### US-SC_trimmed (N=94, 5,120 obs)
+- Range [0,1]: PASS
+- Rank stability (mean Spearman rho): 0.907 | recent (2020–): 0.920 (PASS)
+- High-missing actors (>50%): 0
+- **Methodology: `capex_assets_xsrank` (M-A)** — 94 well-covered actors only (RP4). Primary universe for C3 experiments.
+
 ## Pre-Experiment Quality Gate
 
 - All intensity values in [0,1]: PASS
 - Rank stability ρ > 0.7 (full or recent): PASS
+- C3 high-missing check: PASS (US-SC_trimmed has 0 high-missing actors)
+- C4 methodology homogeneity: PASS (return_12m_xsrank for US-LC and UK-LC)
 
 ### Overall: DATA READY FOR EXPERIMENTS
 
-**Remediation summary (R1–R6 + RP1–RP3 complete 2026-03-29):**
+**Remediation summary (R1–R6 + RP1–RP4 complete 2026-03-29):**
 - R1 ✅ FRED CPIMEDSL — 28/28 signals in PIT
 - R2 ✅ OECD explicit key fix — 1,922 rows
 - R3 ✅ Sector_leader degeneracy fixed; RP1 resolves bank ρ
 - R4 ✅ UK intensities — return_12m_xsrank; UK-LC ρ=0.732, UK-MC ρ=0.720
 - RP1 ✅ BankCreditMapper cross-section rank — US-LC-FINS ρ: -0.003 → 0.769
 - RP1.5 ✅ Dual-window ρ gate — US-LC-TECH: ρ_full=0.653, ρ_recent=0.750 PASS
-- RP2 ✅ return_12m_xsrank for all universes; US-LC median ρ(capex,return)=-0.003 → C4 uses homogeneous methodology
-- RP3 ✅ MIXED-200 expanded: 38 → 103 actors (91 equity, 6 sectors, US+UK)
+- RP2 ✅ return_12m_xsrank for all universes; US-LC median ρ(capex,return)=-0.003 → C4 uses homogeneous M-B
+- RP3 ✅ MIXED-200 expanded: 38 → 103 actors (91 equity, 6 sectors, US+UK); ρ=0.792 PASS
+- RP4 ✅ US-SC trimmed: 142 → 94 actors (0 high-missing); ρ=0.907 PASS; METHODOLOGY_ROBUSTNESS_PLAN.md created

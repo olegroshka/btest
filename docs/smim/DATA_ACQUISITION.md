@@ -1,6 +1,6 @@
 # SMIM Data Acquisition Status
 
-Last updated: 2026-03-28 (R1+R2 complete: CPIMEDSL added; OECD re-fetched with explicit keys — 1,922 rows)
+Last updated: 2026-03-29 (RP1–RP4 complete: BankCreditMapper fixed; return intensities for all universes; MIXED-200 expanded to 103 actors; US-SC trimmed to 94 actors)
 
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
@@ -50,7 +50,7 @@ Only `data/smim/universes/*.csv` are committed to git.
 | `US-SC` | 200 (Russell 2000, stratified seed=42) | `equities/smim/US-SC/ohlcv.parquet` |
 | `UK-LC` | ~99 (FTSE 100, `.L` suffix) | `equities/smim/UK-LC/ohlcv.parquet` |
 | `UK-MC` | ~100 (FTSE 250 ex-100) | `equities/smim/UK-MC/ohlcv.parquet` |
-| `MIXED-200` | ~27 (US + UK energy MVP) | `equities/smim/MIXED-200/ohlcv.parquet` |
+| `MIXED-200` | ~27 equity in OHLCV file (103 actors in expanded registry — see RP3) | `equities/smim/MIXED-200/ohlcv.parquet` |
 
 **Date range:** 2005-01-03 to 2025-12-30. Tickers listed after 2005 start from
 their IPO date — shorter history is correct, not a gap.
@@ -620,13 +620,19 @@ uv run python scripts/smim_fetch_bea.py
 
 2. **OECD data re-fetch [P1 — ✅ DONE 2026-03-28]** — Root cause: "all" key omitted USA/GBR CLI series with METHODOLOGY=H. Fix applied in `smim_fetch_oecd.py`: explicit dimension keys replace the "all" key. Re-fetched: 1,922 rows, LI/BCICP/CCICP 2000-01 to 2024-01 (289 rows each per country), B1GQ_POP 2000-Q1 to 2025-Q4, 0 A1 violations. Gate G1-6 resolved.
 
-3. **US-LC-FINS intensity normalisation [P1 — ⚠️ PARTIAL 2026-03-28]** — sector_leader constant intensity=1.000 (R3a) fixed by z-score sigmoid fallback when cross-section std==0. Remaining issue: bank-only rank stability ρ=-0.007 is structural — BankCreditMapper uses per-actor temporal z-score sigmoid, which produces near-random cross-sectional rankings because mean-reverting asset growth makes high-growth banks switch position each quarter. Documented as structural incompatibility; requires architectural rethink (deeper than R3 scope).
+3. **US-LC-FINS intensity normalisation [P1 — ✅ DONE 2026-03-29 (RP1)]** — R3a fixed sector_leader constant intensity via z-score sigmoid fallback. RP1 resolved the structural bank issue: `BankCreditMapper` switched from per-actor temporal z-score sigmoid to cross-sectional percentile rank of YoY asset growth (same approach as `CorporateCapexMapper`). US-LC-FINS ρ: -0.003 → 0.769 PASS. US-LC ρ: 0.660 → 0.761 PASS.
 
 ### Priority 2 — Needed for specific experiments
 
 4. **UK intensities [P2 — ✅ DONE 2026-03-28]** — Path B implemented: `compute_ohlcv_return_intensities()` added to `smim_compute_intensities.py`. Rolling 12-month price return, cross-sectionally ranked. UK-LC: 7,237 rows, ρ=0.732 PASS; UK-MC: 6,480 rows, ρ=0.720 PASS. E1 experiment unblocked. Methodology recorded as `normalisation_method="return_12m_xsrank"`.
 
-5. **Companies House adapter [P2 — deferred]** — Path B (OHLCV return-based intensity) implemented as the interim solution. Companies House adapter remains a future enhancement for Path A (balance-sheet-based intensity matching US methodology). UK intensity methodology difference (`return_12m_xsrank` vs `capex_assets_xsrank`) must be disclosed in the research paper and in experiment metadata.
+5. **Return intensities for all US universes [P2 — ✅ DONE 2026-03-29 (RP2)]** — `--method return` flag added to `smim_compute_intensities.py`. `return_12m_xsrank` computed for 11 universes; files: `{uni_id}_return_intensities.parquet`. Per-actor Spearman ρ(capex, return) = -0.003 for US-LC (orthogonal constructs). C4 uses homogeneous methodology (M-B for both US and UK). Script `smim_methodology_correlation.py` created; report `intensity_methodology_correlation.md` generated.
+
+6. **MIXED-200 expansion [P2 — ✅ DONE 2026-03-29 (RP3)]** — `smim_build_mixed_expanded.py` created. Registry expanded from 38 → 103 actors: 6 sectors (energy, tech, fins, health, industrials, diversified), US+UK, all layers. experiment_a1 ρ=0.792 PASS. MIXED-200.csv updated.
+
+7. **US-SC trimming [P2 — ✅ DONE 2026-03-29 (RP4)]** — `US-SC_trimmed_registry.json` created (94 actors; 0 high-missing). Trimmed intensities written: ρ=0.907 PASS. `docs/smim/METHODOLOGY_ROBUSTNESS_PLAN.md` created; defines C3a/C3b and C4a variants.
+
+8. **Companies House adapter [P2 — deferred]** — Path B (OHLCV return-based intensity) implemented as the interim solution. Companies House adapter remains a future enhancement for Path A (balance-sheet-based intensity matching US methodology). UK intensity methodology difference (`return_12m_xsrank` vs `capex_assets_xsrank`) must be disclosed in the research paper and in experiment metadata.
 
 ### Priority 3 — Housekeeping / informational
 

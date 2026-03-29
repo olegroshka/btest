@@ -1,6 +1,6 @@
 # SMIM Intensity Methodology Correlation Report
 
-> Generated: 2026-03-28
+> Generated: 2026-03-29 (RP2 + RP4 complete)
 > Methodology A: `capex_assets_xsrank` (CapEx/Assets, EDGAR, US only)
 > Methodology B: `return_12m_xsrank` (12-month price return, OHLCV)
 > Per-actor Spearman ρ across shared quarterly periods (min 8 quarters)
@@ -35,7 +35,9 @@
 | C4a (primary) | `return_12m_xsrank` | `return_12m_xsrank` | Homogeneous |
 | C4b (robustness) | `capex_assets_xsrank` | `return_12m_xsrank` | Heterogeneous |
 
-| Variant | US universe | US intensity | SC universe | SC intensity | Type |
-|---------|------------|-------------|------------|-------------|------|
-| C3a (primary) | US-LC | `capex_assets_xsrank` | US-SC_trimmed | `capex_assets_xsrank` | Homogeneous |
-| C3b (robustness) | US-LC | `return_12m_xsrank` | US-SC_trimmed | `return_12m_xsrank` | Homogeneous |
+| Variant | US universe | US intensity | SC universe | SC intensity | Type | Status |
+|---------|------------|-------------|------------|-------------|------|--------|
+| C3a (primary) | US-LC | `capex_assets_xsrank` | US-SC_trimmed (N=94) | `capex_assets_xsrank` | Homogeneous | Active |
+| C3b (robustness) | US-LC | `return_12m_xsrank` | US-SC_trimmed (N=94) | `return_12m_xsrank` | Homogeneous | Active |
+
+**Note (RP4):** US-SC_trimmed uses 94 well-covered actors only (48 high-missing actors removed). Both M-A and M-B return intensities are available for the trimmed universe. See `docs/smim/METHODOLOGY_ROBUSTNESS_PLAN.md`.
