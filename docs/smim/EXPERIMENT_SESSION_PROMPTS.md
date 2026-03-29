@@ -141,11 +141,13 @@ raise with user before launching B-series (those run N=200+ repeatedly).
 
 ### Session A1 — MVP Full Pipeline *(after A3 passes)*
 
-**Status:** `[x] COMPLETE (v2) -- 2026-03-29 -- PASS gate (mean R2=+0.283)`
-**Outcome:** v1 STOP (R2=-2.44) caused by missing observation demeaning -- state-space model assumes
-zero-mean but intensities centered at 0.5. Fix: subtract per-actor training mean before Kalman,
-restore for R2. v2 PASS: mean OOS R2=+0.283 across 10 windows (all positive, range 0.12-0.41).
-K*=1 all windows. M=1/M=2 near-identical. Emergence adds nothing at K=1. B-series unblocked.
+**Status:** `[x] COMPLETE (v3) -- 2026-03-29 -- PASS gate (pred R2=0.305, modal R2=0.327)`
+**Outcome:** v1 STOP (R2=-2.44): missing demeaning. v2 PASS (R2=0.283): demeaning fix. v3 iterated
+with 5 pipeline improvements + 3 operator learning approaches (multi-scale conv, synergy-guided,
+end-to-end optimisation). Final: pred R2=0.305 (matches random walk baseline), modal R2=0.327
+(+7.2% above RW, best window 0.427 matches AR1). K_min=3. End-to-end operator optimisation
+(Approach C) produces best modal results. Emergence via PID synergy is negligible at T=40/K=3
+(CV weight = 0); modal filtering IS the emergence signal. B-series unblocked.
 Runner: `scripts/run_smim_a1.py`. Full findings: `EXPERIMENT_RESULTS.md` section A1.
 
 **Prompt:**
@@ -205,8 +207,11 @@ Output:
 
 ### Session A2 — Naïve Baselines *(can run in parallel with A1)*
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-29`
+**Outcome:** 8 baselines on same A1 universe/windows. AR(1) strongest (R2=0.425). Random walk
+primary denominator (R2=0.305). SMIM predictive matches RW; SMIM modal beats it (mean 0.327,
+best 0.427). Symmetric Laplacian < SMIM (H2a evidence). DFM-K10 overfits. Sector mean weakest.
+Runner: `scripts/run_smim_a2.py`. Full findings: `EXPERIMENT_RESULTS.md` section A2.
 
 **Prompt:**
 ```

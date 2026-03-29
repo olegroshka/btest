@@ -1,0 +1,38 @@
+experiment_id: A2-BASELINES
+timestamp: '2026-03-29 23:26:32'
+n_models: 8
+n_windows: 10
+models:
+- historical_mean
+- random_walk
+- sector_mean
+- ar1_per_actor
+- dfm_k5
+- dfm_k10
+- var_bic
+- sym_laplacian_k3
+summary:
+  ar1_per_actor:
+    mean_r2: 0.42458
+    std_r2: 0.094404
+  random_walk:
+    mean_r2: 0.304967
+    std_r2: 0.101443
+  var_bic:
+    mean_r2: 0.299276
+    std_r2: 0.132526
+  dfm_k5:
+    mean_r2: 0.299276
+    std_r2: 0.132526
+  sym_laplacian_k3:
+    mean_r2: 0.286235
+    std_r2: 0.091626
+  historical_mean:
+    mean_r2: 0.280867
+    std_r2: 0.090398
+  dfm_k10:
+    mean_r2: 0.248952
+    std_r2: 0.171951
+  sector_mean:
+    mean_r2: 0.094366
+    std_r2: 0.040208
