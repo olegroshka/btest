@@ -529,41 +529,57 @@ def compute_emergence(
 ) -> tuple[np.ndarray | None, np.ndarray | None, Any | None, float]:
     """Compute synergy, criticality, emergence-aware benchmark.
 
+    Three fixes over the naive approach:
+      1. Synergy estimated from TRAINING data (T=40) not test data (T=4).
+         T=4 gives rank-deficient covariance → unreliable PID.
+      2. Criticality computed from TRAINING alpha with proper window_size=8,
+         then the final value is carried forward to the test period.
+         T=4 with window_size=2 gave constant 1.0 (no information).
+      3. Training-period gap proxy: residuals from train filter (obs - U@alpha_filt)
+         used as target for PID, giving stable synergy estimates.
+
     Returns (synergy, criticality, gap_ea, oos_r2_ea).
     """
+    state_train = result["state_train"]
     state_test = result["state_test"]
     modal_frame = result["modal_frame"]
-    gap_pred = result["gap_pred"]
+    obs_train = result["obs_train"]
     obs_test = result["obs_test"]
     bench_registry = result["bench_registry"]
     K = result["K"]
+    T_test = result["T_test"]
 
     try:
-        alpha_test = state_test.alpha_filtered  # (T_test, K)
-        gaps = gap_pred.gaps  # (N, T_test)
+        # --- Fix 1: Synergy from TRAINING data (T=40, not T=4) ---------------
+        alpha_train = state_train.alpha_filtered  # (T_train, K)
+        U = modal_frame.basis
+        # Training-period gap proxy: actual - filtered reconstruction
+        recon_train = alpha_train @ U.T  # (T_train, N)
+        train_gaps = (obs_train - recon_train).T  # (N, T_train)
+        synergy = compute_synergy_matrix(alpha_train, train_gaps, K)
 
-        # PID synergy
-        synergy = compute_synergy_matrix(alpha_test, gaps, K)
-
-        # Order parameter + criticality
+        # --- Fix 2: Criticality from TRAINING alpha (T=40, window=8) ---------
         d = min(3, K)
-        psi = extract_order_parameter(alpha_test, d=d)
-        crit = criticality_index(psi, window_size=min(8, result["T_test"] // 2))
+        psi_train = extract_order_parameter(alpha_train, d=d)
+        crit_train = criticality_index(psi_train, window_size=8)  # (T_train,)
+        # Carry the last training criticality forward into the test period
+        crit_last = crit_train[-1] if len(crit_train) > 0 else 1.0
+        crit_test = np.full(T_test, crit_last)
 
-        # Emergence-aware benchmark
+        # --- Fix 3: Emergence-aware benchmark with reliable inputs -----------
         ea_bench = EmergenceAwareBenchmark(
             synergy_matrix=synergy,
-            criticality=crit,
+            criticality=crit_test,
         )
         gap_ea = ea_bench.compute(obs_test, state_test, modal_frame, bench_registry)
 
-        # Restore mean for R² (benchmarks are in demeaned space)
+        # Restore mean for R²
         obs_mean = result["obs_mean"]
         actual = result["obs_test_raw"].T.ravel()
         ea_restored = (gap_ea.benchmarks + obs_mean.T).ravel()
         oos_r2_ea = float(oos_r_squared(ea_restored, actual))
 
-        return synergy, crit, gap_ea, oos_r2_ea
+        return synergy, crit_test, gap_ea, oos_r2_ea
     except Exception as exc:
         print(f"      [WARN] emergence failed: {exc}")
         return None, None, None, float("nan")
