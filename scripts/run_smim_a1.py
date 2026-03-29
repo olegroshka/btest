@@ -402,31 +402,47 @@ def run_window(
         else:
             granger_adj = sp.csr_matrix((N, N))
 
-    # --- Intensity cross-correlation operator (covers all N actors) -----------
-    with timed("intensity_correlation", timings):
-        # Build correlation matrix from demeaned training intensities.
-        # This gives edges for ALL N actors (not just the 61 with OHLCV).
-        corr_matrix = np.corrcoef(obs_train.T)  # (N, N) Pearson correlation
-        np.fill_diagonal(corr_matrix, 0.0)
-        # Threshold small correlations to keep structure sparse
-        corr_matrix[np.abs(corr_matrix) < 0.1] = 0.0
-        corr_sparse = sp.csr_matrix(corr_matrix)
+    # --- Multi-scale convolutional operator (Approach A) -----------------------
+    # Instead of imposing structure from Granger, LEARN the operator from the
+    # intensity data itself.  Apply temporal convolutions at 3 scales to
+    # discover which actors co-move at which timescales, then build a
+    # multi-resolution similarity operator.
+    with timed("learned_operator", timings):
+        scales = [4, 8, 16]  # quarters: 1yr, 2yr, 4yr
+        op_combined = np.zeros((N, N))
+        for scale in scales:
+            if obs_train.shape[0] < scale + 1:
+                continue
+            # Temporal convolution: rolling mean at this scale
+            # Each column is an actor's smoothed intensity trajectory
+            kernel = np.ones(scale) / scale
+            smoothed = np.apply_along_axis(
+                lambda x: np.convolve(x, kernel, mode="valid"), axis=0, arr=obs_train
+            )  # (T - scale + 1, N)
+            if smoothed.shape[0] < 2:
+                continue
+            # Cosine similarity between actors' smoothed trajectories
+            norms = np.linalg.norm(smoothed, axis=0, keepdims=True)  # (1, N)
+            norms = np.maximum(norms, 1e-10)
+            normed = smoothed / norms  # (T', N)
+            sim = normed.T @ normed  # (N, N) cosine similarity
+            np.fill_diagonal(sim, 0.0)
+            # Weight shorter scales higher (more data points, more reliable)
+            weight = 1.0 / np.log2(scale + 1)
+            op_combined += sim * weight
 
-    # --- Sparsification (combine Granger + correlation channels) -------------
-    with timed("sparsification", timings):
-        channels = {RelationChannel.FINANCIAL: granger_adj}
-        # Align Granger to N if needed (it may be sized to N_signal < N)
+        # Threshold weak edges
+        threshold = np.percentile(np.abs(op_combined[op_combined != 0]), 50) if np.any(op_combined != 0) else 0.1
+        op_combined[np.abs(op_combined) < threshold] = 0.0
+
+        # Add Granger edges as a directed layer on top
         N_granger = granger_adj.shape[0]
-        if N_granger < N:
-            padded_granger = sp.lil_matrix((N, N))
-            padded_granger[:N_granger, :N_granger] = granger_adj
-            channels[RelationChannel.FINANCIAL] = padded_granger.tocsr()
-        aggregate = AggregateOperator(channel_matrices=channels)
-        combined = aggregate.compute()
-        # Add intensity correlation as second layer
-        if combined.shape == corr_sparse.shape:
-            combined = combined + corr_sparse * 0.5  # weight correlation lower than Granger
-        sparse_op = l1_sparsify(combined, target_density=TARGET_DENSITY)
+        if N_granger > 0:
+            granger_dense = granger_adj.toarray() if sp.issparse(granger_adj) else granger_adj
+            n_g = min(N_granger, N)
+            op_combined[:n_g, :n_g] += granger_dense[:n_g, :n_g] * 2.0  # weight Granger higher
+
+        sparse_op = sp.csr_matrix(op_combined)
 
     # --- Spectral decomposition ----------------------------------------------
     op_dense = sparse_op.toarray()[:N, :N]
