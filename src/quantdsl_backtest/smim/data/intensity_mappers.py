@@ -25,9 +25,9 @@ CorporateCapexMapper
     cross-section; only the target actor's column is returned.
 
 BankCreditMapper
-    Normalises loan-growth rate to [0,1] via **z-score across time**
-    then a **sigmoid** transform, applied per-actor (no cross-section
-    needed; ``raw_data`` may contain any actors).
+    Normalises YoY asset growth rate to [0,1] via **cross-sectional
+    percentile rank** at each date (same approach as CorporateCapexMapper).
+    ``raw_data`` must contain all peer bank actors.
 
 AgencyBudgetMapper
     Normalises budget-share values to [0,1] via **min-max** across the
@@ -142,18 +142,27 @@ class CorporateCapexMapper:
 
 
 class BankCreditMapper:
-    """Normalises loan-growth rate to [0, 1] via z-score then sigmoid.
+    """Normalises YoY asset growth rate to [0, 1] via cross-sectional percentile rank.
 
     Intended for ``ActorType.BANK``.
 
     ``raw_data`` must have actor_ids as columns and dates as index;
-    each cell should be the quarterly loan-growth rate (a float, possibly
-    negative). The z-score is computed **across time** (per column, using
-    the entire available history), so the normalisation is stable and
-    does not require a cross-section of other actors.
+    each cell should be the YoY (4-quarter) asset growth rate.  At each
+    date the row is ranked cross-sectionally across **all bank actors in
+    the panel**, so the result is a relative measure of investment intensity
+    within the bank peer group.  A bank that consistently grows faster than
+    its peers receives higher intensity; a bank that shrinks or grows slowly
+    receives lower intensity.
 
-    A sigmoid ensures the output is always in (0, 1). Missing values
-    (NaN) are propagated.
+    This approach mirrors ``CorporateCapexMapper`` and guarantees rank
+    stability by construction for any persistent differences in bank growth
+    levels.
+
+    Output is in [0, 1] inclusive (can reach exactly 0.0 and 1.0).
+    Missing values (NaN) are propagated.
+
+    Important: ``raw_data`` must contain the full cross-section of bank
+    actors, not just the target actor, for the rank to be meaningful.
     """
 
     @property
@@ -165,14 +174,15 @@ class BankCreditMapper:
         raw_data: pd.DataFrame,
         actor: Actor,
     ) -> pd.Series:
-        """Return sigmoid-of-z-score intensity for ``actor``.
+        """Return cross-sectionally ranked intensity for ``actor``.
 
         Args:
-            raw_data: DataFrame (dates × actor_ids) of loan-growth rates.
+            raw_data: DataFrame (dates × actor_ids) of YoY asset growth rates.
+                      Must contain all peer bank actors for meaningful ranking.
             actor: The actor whose intensity series to return.
 
         Returns:
-            pd.Series indexed by date, values in (0, 1) (NaN where raw is NaN).
+            pd.Series indexed by date, values in [0, 1] (NaN where raw is NaN).
 
         Raises:
             KeyError: If actor.actor_id is not a column in raw_data.
@@ -181,18 +191,8 @@ class BankCreditMapper:
             raise KeyError(
                 f"Actor {actor.actor_id!r} not found in raw_data columns."
             )
-        col = raw_data[actor.actor_id]
-        mu = col.mean(skipna=True)
-        sigma = col.std(skipna=True, ddof=1)
-        if pd.isna(sigma) or sigma == 0.0:
-            # Constant or single-observation series: map uniformly to 0.5
-            return pd.Series(
-                np.where(col.isna(), np.nan, 0.5),
-                index=raw_data.index,
-                name=actor.actor_id,
-            )
-        z = (col - mu) / sigma
-        return _sigmoid(z).rename(actor.actor_id)
+        ranked = _cross_section_percentile_rank(raw_data)
+        return ranked[actor.actor_id].rename(actor.actor_id)
 
 
 class AgencyBudgetMapper:

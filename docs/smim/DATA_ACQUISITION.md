@@ -1,6 +1,6 @@
 # SMIM Data Acquisition Status
 
-Last updated: 2026-03-28 (data audit completed; OECD sparse-data issue identified; new remediation items added)
+Last updated: 2026-03-29 (RP1–RP4 complete: BankCreditMapper fixed; return intensities for all universes; MIXED-200 expanded to 103 actors; US-SC trimmed to 94 actors)
 
 This document tracks every data source required by the experiment plan, what
 has been acquired, what failed, and why. Update it after every acquisition run.
@@ -19,12 +19,12 @@ Only `data/smim/universes/*.csv` are committed to git.
 | Source | Script | Status | Records | Event date range |
 |--------|--------|--------|---------|-----------------|
 | Equity OHLCV (Yahoo Finance) | `smim_build_universes.py` | ✅ Complete | 11 universes | 2005-01-03 – 2025-12-30 |
-| FRED macro signals | `smim_fetch_fred.py` | ✅ Complete (27/29 series) | 71,761 rows | 2000-01-01 – 2026-03-20 |
-| ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | 8,956 vintage rows (subset above) | 2000-01-01 – 2026-03-20 |
+| FRED macro signals | `smim_fetch_fred.py` | ✅ Complete (28/28 series) | 72,121 rows | 2000-01-01 – 2026-03-27 |
+| ALFRED vintages | `smim_fetch_fred.py` | ✅ Complete (5 series) | included in 72,121 rows above | 2000-01-01 – 2026-03-27 |
 | SEC EDGAR XBRL | `smim_fetch_edgar.py` | ✅ Complete (765/772 tickers) | 461,203 rows | 2005-07-04 – 2026-02-28 |
 | GDELT narrative | `smim_fetch_gdelt.py` | ✅ Complete (9/9 signals, daily-derived weekly) | ~37K daily rows; ~4.7K weekly rows | 2015-02-19 – 2025-12-31 |
 | IMF WEO (DataMapper) | `smim_fetch_imf.py` | ✅ Complete (7/7 series) | 618 rows | 2000-12-31 – 2030-12-31 |
-| OECD SDMX 3.0 | `smim_fetch_oecd.py` | ⚠️ Partial (244 rows — severely sparse; see §6 and Remediation) | 244 rows | Varies per indicator (1–21 years) |
+| OECD SDMX 3.0 | `smim_fetch_oecd.py` | ✅ Complete (R2 remediation: 1,922 rows; explicit key fix) | 1,922 rows | 2000-01-01 – 2024-01-01 (CLI) / 2000-Q1 – 2025-Q4 (QNA) |
 | BEA I/O | `smim_fetch_bea.py` | ✅ Complete (2010–2024, API) | 26,852 sector rows / 315 PIT pairs | 2010 – 2024 |
 | BIS | — | ⬜ Not started | — | — |
 
@@ -50,7 +50,7 @@ Only `data/smim/universes/*.csv` are committed to git.
 | `US-SC` | 200 (Russell 2000, stratified seed=42) | `equities/smim/US-SC/ohlcv.parquet` |
 | `UK-LC` | ~99 (FTSE 100, `.L` suffix) | `equities/smim/UK-LC/ohlcv.parquet` |
 | `UK-MC` | ~100 (FTSE 250 ex-100) | `equities/smim/UK-MC/ohlcv.parquet` |
-| `MIXED-200` | ~27 (US + UK energy MVP) | `equities/smim/MIXED-200/ohlcv.parquet` |
+| `MIXED-200` | ~27 equity in OHLCV file (103 actors in expanded registry — see RP3) | `equities/smim/MIXED-200/ohlcv.parquet` |
 
 **Date range:** 2005-01-03 to 2025-12-30. Tickers listed after 2005 start from
 their IPO date — shorter history is correct, not a gap.
@@ -72,29 +72,27 @@ sector     str  (from universe CSV; may be NaN for UK tickers)
 ## 2. FRED Macro Signals + ALFRED Vintages
 
 **Script:** `scripts/smim_fetch_fred.py`
-**Status:** Complete — 27/29 series acquired
-**Run date:** 2026-03-22
+**Status:** Complete — 28/28 series acquired (R1 remediation complete 2026-03-28)
+**Run date:** 2026-03-28
 **API key:** `FRED_API_KEY` environment variable
 
 ### Row counts (from `data/smim/processed/fred_signals.parquet`)
 
 | Metric | Value |
 |--------|-------|
-| Total rows | 71,761 |
-| Distinct signals | 27 |
-| Event date range | 2000-01-01 – 2026-03-20 |
-| Pub date range | 2000-01-31 – 2026-04-19 |
-| ALFRED vintage rows | 8,956 (subset of total, for GDP/UNRATE/CPIAUCSL/INDPRO/FEDFUNDS) |
+| Total rows | 72,121 |
+| Distinct signals | 28 |
+| Event date range | 2000-01-01 – 2026-03-27 |
+| ALFRED vintage rows | included in total (GDP/UNRATE/CPIAUCSL/INDPRO/FEDFUNDS) |
 
 ### PIT store (`data/smim/pit_store/fred.parquet`)
 
 | Metric | Value |
 |--------|-------|
-| Rows | 64,165 (de-duped on natural key vs 71,761 processed; ALFRED revisions keep latest pub_date) |
 | actor_id | 1 (always "MACRO") |
-| signal_id | 27 |
+| signal_id | 28 |
 
-### Acquired series (27)
+### Acquired series (28)
 
 | FRED ID | Rows | Frequency | Layer |
 |---------|------|-----------|-------|
@@ -125,6 +123,7 @@ sector     str  (from universe CSV; may be NaN for UK tickers)
 | `HOUST` | ~310 | Monthly | L0 exogenous |
 | `M2SL` | ~310 | Monthly | L0 exogenous |
 | `DRCCLACBS` | ~85 | Quarterly | Financials sector |
+| `CPIMEDSL` | 314 | Monthly | Healthcare sector (R1: replaces defunct CUSR0000SAM) |
 
 ### ALFRED vintage series (5)
 
@@ -138,18 +137,18 @@ Full historical vintage histories (each revision = separate PIT record):
 | `INDPRO` | Annual benchmark revisions; real-time data often revised 1–3% |
 | `FEDFUNDS` | Monthly average published after month-end; daily `DFF` is the PIT alternative |
 
-### Failed series (2)
+### Removed series (1) — replaced at source
 
-| FRED ID | Error | Root cause | Replacement |
-|---------|-------|-----------|-------------|
-| `NAPM` | `Bad Request. The series does not exist.` | ISM Manufacturing PMI renamed to ISM; never uploaded to FRED as a continuous series. | `MANEMP` (manufacturing employment) — already acquired. Standard academic proxy. |
-| `CUSR0000SAM` | `Bad Request. The series does not exist.` | CPI Medical Care subindex ID changed. | Correct ID is `CPIMEDSL`. Not yet re-fetched — see Remediation TODO. |
+| FRED ID | Status | Root cause | Resolution |
+|---------|--------|-----------|------------|
+| `NAPM` | Removed from MACRO_SERIES | ISM Manufacturing PMI series discontinued on FRED; returns 404. | Replaced by `MANEMP` (manufacturing employment) — standard academic proxy; already acquired. |
+| `CUSR0000SAM` | Removed from MACRO_SERIES | CPI Medical Care subindex ID changed. Returns 404. | Replaced by `CPIMEDSL` (correct ID). Re-fetched 2026-03-28 (R1 complete). |
 
 ### Output paths
 
 | Path | Contents |
 |------|----------|
-| `data/smim/raw/fred/<SERIES>.parquet` | Raw per-series observations from FRED API (27 files) |
+| `data/smim/raw/fred/<SERIES>.parquet` | Raw per-series observations from FRED API (28 files) |
 | `data/smim/raw/fred/<SERIES>_alfred.parquet` | Raw ALFRED all-releases for 5 vintaged series |
 | `data/smim/processed/fred_signals.parquet` | Unified normalised table — columns: `signal_id, event_date, value, pub_date, vintage_id` |
 | `data/smim/pit_store/fred.parquet` | PIT store shard — A1-compliant, queryable by `as_of` |
@@ -453,42 +452,35 @@ uv run python scripts/smim_fetch_imf.py
 
 ---
 
-## 6. OECD SDMX 3.0 — ⚠️ Partial (fetch succeeded but data is severely underpowered)
+## 6. OECD SDMX 3.0 — ✅ Complete (R2 remediation: explicit key fix)
 
 **Script:** `scripts/smim_fetch_oecd.py`
 **Adapter:** `smim/data/adapters/oecd_sdmx.py`
-**Status:** ⚠️ PARTIAL — 4 signals fetched, 244 rows total (expected ~2,000+). Most CLI indicators cover only 1–5 years. Data is NOT fit for production use as time-series signals. See Remediation §2.
-**Run date:** 2026-03-22
+**Status:** ✅ COMPLETE — 4 signals, 1,922 rows. Full history 2000–2024 (CLI) / 2000–2025 (QNA).
+**Run date:** 2026-03-28 (re-fetched with explicit key fix)
 **API key:** None required
 
 ### Method
 
-Uses OECD SDMX 3.0 REST API (`https://sdmx.oecd.org/public/rest/data/`) with the
-`all` key approach: fetch the full dataflow (filtered by `startPeriod`/`endPeriod`)
-and filter to the desired countries and measures in-memory.
+Uses OECD SDMX 3.0 REST API (`https://sdmx.oecd.org/public/rest/data/`) with **explicit
+dimension keys**. The previous "all" key approach silently returned a server-limited
+subset (244 rows), omitting USA/GBR CLI series with METHODOLOGY=H. Explicit keys fixed
+the root cause.
 
-This approach avoids the 14-dimension key format problem of SDMX 3.0 (direct
-dimension keys with partial wildcards return 422 errors).
+- **CLI key:** `USA+GBR.M.LI+BCICP+CCICP.IX._Z.AA.IX._Z.H` (9 dimensions)
+- **QNA key:** `Q.Y.USA+GBR.S1.S1.B1GQ_POP._Z._Z._Z.USD_PPP_PS.LR.LA.T0102` (13 dimensions)
+
+Note: METHODOLOGY=H is required for USA/GBR CLI data. The QNA TRANSFORMATION is `LA`
+(log-annual), not `LG` as was incorrectly specified in the original config.
 
 ### Coverage
 
-| Dataflow | Signals fetched | Countries | Rows |
-|----------|----------------|-----------|------|
-| `DSD_STES@DF_CLI,4.0` | LI (Composite Leading Indicator), BCICP (Business Confidence), CCICP (Consumer Confidence) | US, GB | 180 |
-| `DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA,1.1` | B1GQ_POP (GDP per capita, USD PPP, level) | US, GB | 64 |
+| Dataflow | Signals fetched | Countries | Rows | Date range |
+|----------|----------------|-----------|------|------------|
+| `DSD_STES@DF_CLI,4.0` | LI, BCICP, CCICP | US, GB | 1,734 | 2000-01 to 2024-01 |
+| `DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA,1.1` | B1GQ_POP | US, GB | 188 | 2000-Q1 to 2025-Q4 |
 
-**Total:** 244 rows. LI/BCICP/CCICP are monthly; B1GQ_POP is quarterly.
-
-**⚠️ ACTUAL DATE RANGES ARE SEVERELY TRUNCATED** (from data_audit findings):
-
-| Indicator | US coverage | GB coverage |
-|-----------|------------|------------|
-| LI | 2015 only (~12 months) | 2004–2005 (~24 months) |
-| BCICP | 2001–2020 (~240 months) | 2009–2014 (~72 months) |
-| CCICP | 2003 only (~12 months) | 2007–2008 (~24 months) |
-| B1GQ_POP | 2000–2025 (adequate) | 2014–2021 only |
-
-The "date range: CLI from 2000-01-01" above is the EXPECTED range — it was NOT achieved. The "all" key OECD SDMX fetch returned a server-limited subset. Re-fetch required (see Remediation §2).
+**Total:** 1,922 rows. 0 A1 violations (pub_date ≥ event_date enforced via pub_lag).
 
 ### OECD country codes
 
@@ -499,8 +491,8 @@ normalises these to alpha-2 (US, GB) for consistency with the rest of the PIT st
 
 | Path | Contents |
 |------|----------|
-| `data/smim/raw/oecd/DSD_STES_DF_CLI_4.0.parquet` | Raw CLI response (all countries) |
-| `data/smim/raw/oecd/DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA_1.1.parquet` | Raw QNA response |
+| `data/smim/raw/oecd/DSD_STES_DF_CLI.parquet` | Raw CLI response (USA+GBR, explicit key) |
+| `data/smim/raw/oecd/DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA.parquet` | Raw QNA response (USA+GBR, explicit key) |
 | `data/smim/processed/oecd_macro.parquet` | Unified tidy table |
 | `data/smim/pit_store/oecd.parquet` | PIT store shard |
 
@@ -624,34 +616,23 @@ uv run python scripts/smim_fetch_bea.py
 
 ### Priority 1 — Blocks experiments or violates data quality gates
 
-1. **`CPIMEDSL` [P1 — NOT YET DONE]** — add to `MACRO_SERIES` in `smim_fetch_fred.py` and re-run; correct ID for CPI Medical Care (original plan used `CUSR0000SAM` which does not exist). Required for healthcare CPI proxy in MACRO-ONLY feeds for US-LC-HEALTH experiments.
+1. **`CPIMEDSL` [P1 — ✅ DONE 2026-03-28]** — `CUSR0000SAM` replaced with `CPIMEDSL` in `smim_fetch_fred.py`; `NAPM` removed (defunct, replaced by `MANEMP`). Re-fetched and ingested: 314 rows, 2000-01-01 to 2026-02-01, 0 A1 violations. PIT store now has 28 signals.
 
-2. **OECD data re-fetch [P1 — CRITICAL]** — The OECD SDMX 3.0 fetch using the "all" key approach returned only 244 rows (expected ~2,000+). Most CLI indicators (LI, BCICP, CCICP) have ≤5 years of data rather than the full 2000–2025 monthly history. **The current OECD PIT store data is unfit for production use as a time-series signal.**
+2. **OECD data re-fetch [P1 — ✅ DONE 2026-03-28]** — Root cause: "all" key omitted USA/GBR CLI series with METHODOLOGY=H. Fix applied in `smim_fetch_oecd.py`: explicit dimension keys replace the "all" key. Re-fetched: 1,922 rows, LI/BCICP/CCICP 2000-01 to 2024-01 (289 rows each per country), B1GQ_POP 2000-Q1 to 2025-Q4, 0 A1 violations. Gate G1-6 resolved.
 
-   Root cause: the "all" key (`sdmx.oecd.org/public/rest/data/{dataflow}/all?...`) approach appears to return a server-paginated or filtered subset.
-
-   Fix: rewrite `smim_fetch_oecd.py` to use explicit dimension keys instead of "all" key. For CLI dataflow `DSD_STES@DF_CLI`, the correct dimension key for US+GB should be constructed as:
-   ```
-   https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI,4.0/USA+GBR.M.LI+BCICP+CCICP.AA.CTGY.ST?startPeriod=2000-01
-   ```
-   After re-fetch, re-ingest into PIT store and recompute `oecd_macro.parquet`.
-
-   Note: Raw files on disk are named `DSD_STES_DF_CLI.parquet` and `DSD_NAMAIN1_DF_QNA_EXPENDITURE_CAPITA.parquet` (without version suffixes). DATA_ACQUISITION.md §6 documentation incorrectly lists version-suffixed names.
-
-3. **US-LC-FINS intensity normalisation [P1]** — sector_leader actors in Financials have constant intensity=1.000 causing Spearman ρ=0.040 (threshold 0.7). Fix the InvestmentIntensityMapper to apply separate normalisation strata for bank vs sector_leader actor types within the Financials sector. Recompute US-LC-FINS, US-LC, experiment_fast, and experiment_phased intensities.
+3. **US-LC-FINS intensity normalisation [P1 — ✅ DONE 2026-03-29 (RP1)]** — R3a fixed sector_leader constant intensity via z-score sigmoid fallback. RP1 resolved the structural bank issue: `BankCreditMapper` switched from per-actor temporal z-score sigmoid to cross-sectional percentile rank of YoY asset growth (same approach as `CorporateCapexMapper`). US-LC-FINS ρ: -0.003 → 0.769 PASS. US-LC ρ: 0.660 → 0.761 PASS.
 
 ### Priority 2 — Needed for specific experiments
 
-4. **UK intensities [P2]** — `UK-LC_intensities.parquet` and `UK-MC_intensities.parquet` do not exist. Blocks E1 experiment. Requires decision on UK balance-sheet source (see item 5).
+4. **UK intensities [P2 — ✅ DONE 2026-03-28]** — Path B implemented: `compute_ohlcv_return_intensities()` added to `smim_compute_intensities.py`. Rolling 12-month price return, cross-sectionally ranked. UK-LC: 7,237 rows, ρ=0.732 PASS; UK-MC: 6,480 rows, ρ=0.720 PASS. E1 experiment unblocked. Methodology recorded as `normalisation_method="return_12m_xsrank"`.
 
-5. **Companies House adapter [P2 — structural gap]** — EXPERIMENT_PLAN.md specified Companies House (UK) as the source for UK equity balance-sheet data (CapEx, Revenue, Assets). No adapter was built; no data was ever fetched. UK equities (UK-LC, UK-MC) therefore have 0% balance-sheet coverage. This was NOT documented as a known gap until now.
+5. **Return intensities for all US universes [P2 — ✅ DONE 2026-03-29 (RP2)]** — `--method return` flag added to `smim_compute_intensities.py`. `return_12m_xsrank` computed for 11 universes; files: `{uni_id}_return_intensities.parquet`. Per-actor Spearman ρ(capex, return) = -0.003 for US-LC (orthogonal constructs). C4 uses homogeneous methodology (M-B for both US and UK). Script `smim_methodology_correlation.py` created; report `intensity_methodology_correlation.md` generated.
 
-   Decision required: either
-   (a) Build `smim/data/adapters/companies_house.py` adapter — Companies House provides free API for company filings (https://developer.company-information.service.gov.uk/). Requires registration for API key.
-   (b) Accept OHLCV-only intensity for UK equities (return-based intensity proxy) — simpler but weaker signal; document explicitly.
-   (c) Use Refinitiv/Bloomberg data if available — requires separate data access.
+6. **MIXED-200 expansion [P2 — ✅ DONE 2026-03-29 (RP3)]** — `smim_build_mixed_expanded.py` created. Registry expanded from 38 → 103 actors: 6 sectors (energy, tech, fins, health, industrials, diversified), US+UK, all layers. experiment_a1 ρ=0.792 PASS. MIXED-200.csv updated.
 
-   Until resolved, UK intensity computation will produce OHLCV-derived fallback intensity only.
+7. **US-SC trimming [P2 — ✅ DONE 2026-03-29 (RP4)]** — `US-SC_trimmed_registry.json` created (94 actors; 0 high-missing). Trimmed intensities written: ρ=0.907 PASS. `docs/smim/METHODOLOGY_ROBUSTNESS_PLAN.md` created; defines C3a/C3b and C4a variants.
+
+8. **Companies House adapter [P2 — deferred]** — Path B (OHLCV return-based intensity) implemented as the interim solution. Companies House adapter remains a future enhancement for Path A (balance-sheet-based intensity matching US methodology). UK intensity methodology difference (`return_12m_xsrank` vs `capex_assets_xsrank`) must be disclosed in the research paper and in experiment metadata.
 
 ### Priority 3 — Housekeeping / informational
 

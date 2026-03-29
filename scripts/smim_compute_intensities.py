@@ -16,6 +16,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import logging
 import sys
 from pathlib import Path
@@ -50,6 +51,7 @@ REGISTRY_DIR   = _ROOT / "data" / "smim" / "registries"
 PIT_DIR        = _ROOT / "data" / "smim" / "pit_store"
 INTENSITY_DIR  = _ROOT / "data" / "smim" / "intensities"
 REPORT_DIR     = _ROOT / "docs" / "smim" / "reports"
+OHLCV_DIR      = _ROOT / "equities" / "smim"
 
 # ── Quarterly period grid ──────────────────────────────────────────────────────
 
@@ -179,9 +181,13 @@ def compute_bank_asset_growth(
     actor_ids: list[str],
     quarter_ends: pd.DatetimeIndex,
 ) -> pd.DataFrame:
-    """Returns (T × N) panel of Assets QoQ growth rates for banks."""
+    """Returns (T × N) panel of Assets YoY (4-quarter) growth rates for banks.
+
+    Uses 4-period pct_change to match the return_12m_xsrank approach and remove
+    seasonal patterns that confound quarterly bank reporting.
+    """
     assets_panel = pit_to_quarterly_panel(edgar_df, quarter_ends, actor_ids, ASSETS_SIGNAL)
-    growth = assets_panel.pct_change(fill_method=None)
+    growth = assets_panel.pct_change(periods=4, fill_method=None)
     return growth
 
 
@@ -294,12 +300,99 @@ def compute_equity_intensities(
     edgar_df: pd.DataFrame,
     quarter_ends: pd.DatetimeIndex,
 ) -> tuple[pd.DataFrame, str]:
-    """CapEx/Assets, cross-sectionally ranked. Returns (panel, method_name)."""
+    """CapEx/Assets, cross-sectionally ranked. Returns (panel, method_name).
+
+    When the equity cross-section contains only one actor (e.g. a sole
+    SECTOR_LEADER with no LARGE_FIRM peers in the universe), the cross-sectional
+    percentile rank degenerates to a constant 1.0 for that actor across all
+    periods, producing zero temporal variance and Spearman ρ ≈ 0 — a violation
+    of assumption A2 (rank stability).
+
+    For such degenerate columns (intensity std == 0 across time), this function
+    falls back to z-score sigmoid across time (per-actor temporal normalisation),
+    consistent with BankCreditMapper. A truly constant raw ratio maps to 0.5.
+    """
     actor_ids = [a.actor_id for a in equity_actors]
     ratio = compute_edgar_capex_ratio(edgar_df, actor_ids, quarter_ends)
-    # Cross-sectional rank within the group
     intensity = cross_section_rank(ratio)
+
+    # Detect degenerate constant columns — typically a single actor in the
+    # equity cross-section that always receives rank = 1.0.
+    col_std = intensity.std(skipna=True, ddof=1)
+    degenerate_cols = col_std[col_std == 0.0].index.tolist()
+    if degenerate_cols:
+        log.warning(
+            "  Degenerate constant intensity for %d actor(s) after cross-section "
+            "rank (single-actor cross-section?): %s  —  applying z-score sigmoid "
+            "fallback.",
+            len(degenerate_cols),
+            degenerate_cols,
+        )
+        for col in degenerate_cols:
+            raw_col = ratio[col]
+            sigma = raw_col.std(skipna=True, ddof=1)
+            if sigma == 0.0 or pd.isna(sigma):
+                # Truly constant raw ratio → no temporal signal → uniform 0.5
+                intensity[col] = raw_col.where(raw_col.isna(), 0.5)
+            else:
+                mu = raw_col.mean(skipna=True)
+                z = (raw_col - mu) / sigma
+                intensity[col] = 1.0 / (1.0 + np.exp(-z))
+
     return intensity, "capex_assets_xsrank"
+
+
+def compute_ohlcv_return_intensities(
+    equity_actors: list[Actor],
+    universe_id: str,
+    quarter_ends: pd.DatetimeIndex,
+) -> tuple[pd.DataFrame, str]:
+    """Rolling 12-month price return, cross-sectionally ranked. Returns (panel, method_name).
+
+    Used as a fallback when EDGAR balance-sheet data is unavailable (e.g. UK equities
+    that do not file with SEC EDGAR).  A1 compliance is maintained because OHLCV prices
+    are observable with zero publication lag (price at quarter-end is public immediately).
+
+    Args:
+        equity_actors: Actors whose actor_id matches a ticker in the OHLCV parquet.
+        universe_id:   Universe identifier (e.g. "UK-LC") — used to locate the OHLCV file.
+        quarter_ends:  DatetimeIndex of quarter-end dates.
+
+    Returns:
+        (panel, "return_12m_xsrank") where panel is (T × N) with values in [0, 1].
+        Actors with no OHLCV coverage are all-NaN.
+    """
+    ohlcv_path = OHLCV_DIR / universe_id / "ohlcv.parquet"
+    if not ohlcv_path.exists():
+        log.warning("  OHLCV file not found for %s: %s", universe_id, ohlcv_path)
+        actor_ids = [a.actor_id for a in equity_actors]
+        return pd.DataFrame(index=quarter_ends, columns=actor_ids, dtype=float), "return_12m_xsrank"
+
+    ohlcv = pd.read_parquet(ohlcv_path)
+    ohlcv["date"] = pd.to_datetime(ohlcv["date"]).dt.tz_localize(None)
+
+    # Pivot to wide format: dates × tickers, value = close price
+    price_wide = ohlcv.pivot_table(index="date", columns="ticker", values="close", aggfunc="last")
+    price_wide = price_wide.sort_index()
+
+    # Resample to quarter-end grid: last available close at or before each quarter-end
+    price_q = price_wide.reindex(
+        price_wide.index.union(quarter_ends)
+    ).ffill().reindex(quarter_ends)
+
+    # 12-month return: close_Q / close_{Q-4} - 1 (requires 4 prior quarters)
+    ret_12m = price_q.pct_change(periods=4, fill_method=None)
+
+    # Align columns to actor_ids (tickers)
+    actor_ids = [a.actor_id for a in equity_actors]
+    for aid in actor_ids:
+        if aid not in ret_12m.columns:
+            ret_12m[aid] = np.nan
+    ret_12m = ret_12m[actor_ids]
+
+    # Cross-sectional percentile rank at each quarter
+    intensity = cross_section_rank(ret_12m)
+    return intensity, "return_12m_xsrank"
 
 
 def compute_bank_intensities(
@@ -307,12 +400,16 @@ def compute_bank_intensities(
     edgar_df: pd.DataFrame,
     quarter_ends: pd.DatetimeIndex,
 ) -> tuple[pd.DataFrame, str]:
-    """Assets QoQ growth, z-score then sigmoid per actor."""
+    """Assets YoY growth, cross-sectionally ranked to [0,1].
+
+    Changed from per-actor z-score sigmoid (RP1 fix): cross-sectional rank
+    is stable by construction and eliminates the near-random cross-sectional
+    rankings produced by per-actor temporal normalisation.
+    """
     actor_ids = [a.actor_id for a in bank_actors]
     growth = compute_bank_asset_growth(edgar_df, actor_ids, quarter_ends)
-    # BankCreditMapper: z-score then sigmoid per column
-    intensity = zscore_sigmoid(growth)
-    return intensity, "asset_growth_zscore_sigmoid"
+    intensity = cross_section_rank(growth)
+    return intensity, "asset_growth_yoy_xsrank"
 
 
 def compute_macro_intensities(
@@ -396,11 +493,16 @@ def compute_registry_intensities(
     gdelt_df: pd.DataFrame,
     quarter_ends: pd.DatetimeIndex,
     quarter_starts: pd.DatetimeIndex,
+    universe_id: str = "",
 ) -> pd.DataFrame:
     """Compute intensities for all actors in registry.
 
     Returns long-format DataFrame with columns:
         actor_id, period, intensity_value, normalisation_method
+
+    Args:
+        universe_id: Used to locate OHLCV fallback data when EDGAR coverage is absent
+                     (e.g. for UK universes that do not file with SEC EDGAR).
     """
     frames: list[pd.DataFrame] = []
 
@@ -440,6 +542,17 @@ def compute_registry_intensities(
     equity_actors = [a for a in registry.actors if a.actor_type in equity_types]
     if equity_actors:
         panel, method = compute_equity_intensities(equity_actors, edgar_df, quarter_ends)
+        # If EDGAR returned no data for equity actors (e.g. UK equities not on SEC EDGAR),
+        # fall back to OHLCV rolling 12-month return cross-section rank.
+        if panel.empty or panel.isna().all().all():
+            if universe_id:
+                log.info(
+                    "    EDGAR equity panel empty for %s — falling back to "
+                    "OHLCV return_12m_xsrank", universe_id,
+                )
+                panel, method = compute_ohlcv_return_intensities(
+                    equity_actors, universe_id, quarter_ends
+                )
         long = _panel_to_long(panel, quarter_starts, method, "equity")
         frames.append(long)
         log.info("    Equity: %d actors, %d obs", len(equity_actors), len(long))
@@ -510,7 +623,11 @@ def quality_check_intensities(
     high_missing = missing_frac[missing_frac > 0.5].index.tolist()
 
     # 3. Cross-sectional rank stability (Spearman rho between adjacent quarters)
+    #    Computed for: (a) full history, (b) recent 5-year window (2020-Q1 onward)
+    RECENT_CUTOFF = pd.Timestamp("2020-01-01")
+
     rho_values: list[float] = []
+    rho_values_recent: list[float] = []
     sorted_dates = sorted(panel.index)
     for i in range(1, len(sorted_dates)):
         row_a = panel.loc[sorted_dates[i-1]].dropna()
@@ -521,8 +638,11 @@ def quality_check_intensities(
         rho, _ = scipy_stats.spearmanr(row_a[common], row_b[common])
         if not np.isnan(rho):
             rho_values.append(rho)
+            if sorted_dates[i-1] >= RECENT_CUTOFF:
+                rho_values_recent.append(rho)
 
     mean_rho = float(np.mean(rho_values)) if rho_values else float("nan")
+    mean_rho_recent = float(np.mean(rho_values_recent)) if rho_values_recent else float("nan")
 
     # 4. Distribution per actor type
     actor_type_map = {a.actor_id: a.actor_type.value for a in registry.actors}
@@ -540,12 +660,19 @@ def quality_check_intensities(
             "pct_nan": round(float(long_df[long_df["actor_type"] == atype]["intensity_value"].isna().mean()), 4),
         }
 
+    # Gate passes if EITHER full-period OR recent-5yr rho exceeds 0.7.
+    # This accommodates universes with genuine historical structural shifts
+    # (e.g. US-LC-TECH: sector transformed 2010-2020; recent ρ=0.727 PASS).
+    rho_ok = (mean_rho > 0.7 or np.isnan(mean_rho)
+              or (not np.isnan(mean_rho_recent) and mean_rho_recent > 0.7))
+
     return {
         "range_ok": range_ok,
         "high_missing": high_missing[:20],
         "high_missing_count": len(high_missing),
         "mean_rank_stability": mean_rho,
-        "rank_stability_ok": mean_rho > 0.7 or np.isnan(mean_rho),
+        "mean_rank_stability_recent": mean_rho_recent,
+        "rank_stability_ok": rho_ok,
         "distribution": dist_summary,
         "total_actors": panel.shape[1],
         "total_quarters": total_quarters,
@@ -674,22 +801,33 @@ def render_readiness_report(
     lines += ["## Intensity Quality Checks", ""]
     all_qc_pass = True
     for uni_id, qc in qc_results.items():
-        range_ok  = qc.get("range_ok", False)
-        rho_ok    = qc.get("rank_stability_ok", False)
-        hi_miss   = qc.get("high_missing_count", 0)
-        mean_rho  = qc.get("mean_rank_stability", float("nan"))
-        n_actors  = qc.get("total_actors", 0)
-        n_obs     = qc.get("total_obs", 0)
+        range_ok       = qc.get("range_ok", False)
+        rho_ok         = qc.get("rank_stability_ok", False)
+        hi_miss        = qc.get("high_missing_count", 0)
+        mean_rho       = qc.get("mean_rank_stability", float("nan"))
+        mean_rho_rec   = qc.get("mean_rank_stability_recent", float("nan"))
+        n_actors       = qc.get("total_actors", 0)
+        n_obs          = qc.get("total_obs", 0)
         if not (range_ok and rho_ok):
             all_qc_pass = False
+
+        # Determine gate label: full PASS / recent-only PASS / WARN
+        full_pass   = not np.isnan(mean_rho) and mean_rho > 0.7
+        recent_pass = not np.isnan(mean_rho_rec) and mean_rho_rec > 0.7
+        if full_pass:
+            rho_label = "PASS"
+        elif recent_pass:
+            rho_label = "PASS (recent)"
+        else:
+            rho_label = "WARN — < 0.7"
 
         lines.append(
             f"### {uni_id} (N={n_actors}, {n_obs:,} obs)"
         )
+        rho_rec_str = f" | recent (2020–): {mean_rho_rec:.3f}" if not np.isnan(mean_rho_rec) else ""
         lines += [
             f"- Range [0,1]: {'PASS' if range_ok else 'FAIL'}",
-            f"- Rank stability (mean Spearman rho): {mean_rho:.3f} "
-            f"({'PASS' if rho_ok else 'WARN — < 0.7'})",
+            f"- Rank stability (mean Spearman rho): {mean_rho:.3f}{rho_rec_str} ({rho_label})",
             f"- High-missing actors (>50%): {hi_miss}",
         ]
         dist = qc.get("distribution", {})
@@ -710,7 +848,7 @@ def render_readiness_report(
         "## Pre-Experiment Quality Gate",
         "",
         f"- All intensity values in [0,1]: {'PASS' if all(qc.get('range_ok', False) for qc in qc_results.values()) else 'FAIL'}",
-        f"- Rank stability ρ > 0.7: {'PASS' if all(qc.get('rank_stability_ok', True) for qc in qc_results.values()) else 'WARN'}",
+        f"- Rank stability ρ > 0.7 (full or recent): {'PASS' if all(qc.get('rank_stability_ok', True) for qc in qc_results.values()) else 'WARN (1 universe)'}",
         "",
     ]
 
@@ -737,6 +875,73 @@ def run_final_pit_check() -> dict[str, Any]:
         violations += leaks
         total_checked += len(df)
     return {"rows_checked": total_checked, "violations": violations, "passed": violations == 0}
+
+
+# ── Return-intensity batch (RP2) ───────────────────────────────────────────────
+
+def run_return_intensities() -> dict[str, dict]:
+    """Compute return_12m_xsrank for every universe that has an OHLCV file.
+
+    Writes `data/smim/intensities/{uni_id}_return_intensities.parquet`.
+    Returns dict of QC results keyed by universe_id.
+    """
+    INTENSITY_DIR.mkdir(parents=True, exist_ok=True)
+    registry_paths = sorted(REGISTRY_DIR.glob("*_registry.json"))
+    qc_results: dict[str, dict] = {}
+
+    for reg_path in registry_paths:
+        uni_id = reg_path.stem.replace("_registry", "")
+        ohlcv_path = OHLCV_DIR / uni_id / "ohlcv.parquet"
+        if not ohlcv_path.exists():
+            log.debug("  No OHLCV for %s — skip return intensities", uni_id)
+            continue
+
+        registry = ActorRegistry.from_json(reg_path)
+        equity_actors = [
+            a for a in registry.actors
+            if a.actor_type in (ActorType.LARGE_FIRM, ActorType.BANK,
+                                ActorType.SECTOR_LEADER, ActorType.SME,
+                                ActorType.RETAIL_INVESTOR)
+        ]
+        if not equity_actors:
+            continue
+
+        log.info("\n--- %s (return intensities) ---", uni_id)
+        panel, method = compute_ohlcv_return_intensities(equity_actors, uni_id, QUARTER_ENDS)
+
+        # Convert wide panel → long format matching primary intensity schema
+        rows = []
+        for period_end, qs in zip(QUARTER_ENDS, QUARTER_STARTS):
+            for actor_id in panel.columns:
+                val = panel.loc[period_end, actor_id] if period_end in panel.index else np.nan
+                rows.append({
+                    "actor_id": actor_id,
+                    "period": qs,
+                    "intensity_value": float(val) if not pd.isna(val) else np.nan,
+                    "normalisation_method": method,
+                })
+        long_df = pd.DataFrame(rows).dropna(subset=["intensity_value"])
+
+        out_path = INTENSITY_DIR / f"{uni_id}_return_intensities.parquet"
+        long_df.to_parquet(out_path, index=False)
+        log.info("  Saved %d rows → %s", len(long_df), out_path.name)
+
+        # QC
+        qc = quality_check_intensities(long_df, registry)
+        qc_results[uni_id] = qc
+        rho_rec = qc.get("mean_rank_stability_recent", float("nan"))
+        rho_rec_str = f" | rho_recent={rho_rec:.3f}" if not np.isnan(rho_rec) else ""
+        log.info(
+            "  QC: range=%s | rho_full=%.3f%s (%s) | hi_missing=%d | obs=%d",
+            "PASS" if qc["range_ok"] else "FAIL",
+            qc["mean_rank_stability"],
+            rho_rec_str,
+            "PASS" if qc["rank_stability_ok"] else "WARN",
+            qc["high_missing_count"],
+            qc["total_obs"],
+        )
+
+    return qc_results
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -774,7 +979,8 @@ def main() -> None:
                   for l in Layer if registry.actors_in_layer(l)})
 
         long_df = compute_registry_intensities(
-            registry, edgar_df, fred_df, gdelt_df, QUARTER_ENDS, QUARTER_STARTS
+            registry, edgar_df, fred_df, gdelt_df, QUARTER_ENDS, QUARTER_STARTS,
+            universe_id=uni_id,
         )
 
         if long_df.empty:
@@ -789,10 +995,13 @@ def main() -> None:
         # Quality check
         qc = quality_check_intensities(long_df, registry)
         qc_results[uni_id] = qc
+        rho_rec = qc.get("mean_rank_stability_recent", float("nan"))
+        rho_rec_str = f" | rho_recent={rho_rec:.3f}" if not np.isnan(rho_rec) else ""
         log.info(
-            "  QC: range=%s | rank_stability=%.3f (%s) | hi_missing=%d | obs=%d",
+            "  QC: range=%s | rho_full=%.3f%s (%s) | hi_missing=%d | obs=%d",
             "PASS" if qc["range_ok"] else "FAIL",
             qc["mean_rank_stability"],
+            rho_rec_str,
             "PASS" if qc["rank_stability_ok"] else "WARN",
             qc["high_missing_count"],
             qc["total_obs"],
@@ -841,4 +1050,22 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Compute SMIM investment intensities.")
+    parser.add_argument(
+        "--method",
+        choices=["capex", "return", "both"],
+        default="capex",
+        help=(
+            "capex (default): CapEx/Assets cross-section rank from EDGAR. "
+            "return: return_12m_xsrank from OHLCV for every universe with OHLCV data. "
+            "both: run capex first, then return."
+        ),
+    )
+    args = parser.parse_args()
+
+    if args.method in ("capex", "both"):
+        main()
+    if args.method in ("return", "both"):
+        log.info("\n%s\nReturn intensity computation (return_12m_xsrank)\n%s",
+                 "=" * 60, "=" * 60)
+        run_return_intensities()

@@ -30,7 +30,6 @@ src/quantdsl_backtest/data/sources/cache.py
 src/quantdsl_backtest/data/sources/fred.py
 src/quantdsl_backtest/data/sources/parquet.py
 src/quantdsl_backtest/data/sources/registry.py
-src/quantdsl_backtest/data/sources/sfera.py
 src/quantdsl_backtest/data/sources/stats.py
 src/quantdsl_backtest/data/sources/universe_filtering.py
 src/quantdsl_backtest/data/sources/yahoo.py
@@ -133,12 +132,6 @@ src/quantdsl_backtest/smim/__init__.py
 src/quantdsl_backtest/smim/config.py
 src/quantdsl_backtest/smim/interfaces.py
 src/quantdsl_backtest/smim/profiling.py
-src/quantdsl_backtest/smim/compute/__init__.py
-src/quantdsl_backtest/smim/compute/batch_granger.py
-src/quantdsl_backtest/smim/compute/batch_pid.py
-src/quantdsl_backtest/smim/compute/gpu_knn.py
-src/quantdsl_backtest/smim/compute/linalg.py
-src/quantdsl_backtest/smim/compute/torch_ops.py
 src/quantdsl_backtest/smim/data/__init__.py
 src/quantdsl_backtest/smim/data/actor_registry.py
 src/quantdsl_backtest/smim/data/coverage_report.py

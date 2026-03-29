@@ -42,12 +42,12 @@ btest parquet pipeline for OHLCV.
 | `US-SC` | US small cap | 200 | Russell 2000, random stratified sample | Bronze | 2010–2025 |
 | `UK-LC` | UK large cap | 100 | FTSE 100 | Gold | 2005–2025 |
 | `UK-MC` | UK mid cap | 100 | FTSE 250 (ex-FTSE 100) | Silver | 2008–2025 |
-| `US-LC-ENERGY` | US large cap, energy sector | 40 | S&P 500 Energy (GICS 10) | Gold | 2005–2025 |
-| `US-LC-TECH` | US large cap, technology | 60 | S&P 500 IT (GICS 45) | Gold | 2005–2025 |
-| `US-LC-FINS` | US large cap, financials | 50 | S&P 500 Financials (GICS 40) | Gold | 2005–2025 |
-| `US-LC-HEALTH` | US large cap, healthcare | 45 | S&P 500 Health Care (GICS 35) | Gold | 2005–2025 |
-| `US-LC-INDUS` | US large cap, industrials | 50 | S&P 500 Industrials (GICS 20) | Gold | 2005–2025 |
-| `MIXED-200` | MVP experiment: mixed energy US+UK | 200 | As per actor taxonomy | Gold/Silver mix | 2005–2025 |
+| `US-LC-ENERGY` | US large cap, energy sector | 22 | S&P 500 Energy (GICS 10) — actual count | Gold | 2005–2025 |
+| `US-LC-TECH` | US large cap, technology | 68 | S&P 500 IT (GICS 45) — actual count | Gold | 2005–2025 |
+| `US-LC-FINS` | US large cap, financials | 74 | S&P 500 Financials (GICS 40) — actual count | Gold | 2005–2025 |
+| `US-LC-HEALTH` | US large cap, healthcare | 60 | S&P 500 Health Care (GICS 35) — actual count | Gold | 2005–2025 |
+| `US-LC-INDUS` | US large cap, industrials | 78 | S&P 500 Industrials (GICS 20) — actual count | Gold | 2005–2025 |
+| `MIXED-200` | Multi-sector, cross-geography MVP universe | 103 (91 equity, 12 institutional) | 6 sectors (energy, tech, fins, health, industrials, diversified), US+UK, all layers (L0–L2); expanded 2026-03-29 via RP3 | Gold/Silver mix | 2005–2025 |
 
 ### Institutional Actor Sets (Layers 0–1)
 

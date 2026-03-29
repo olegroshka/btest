@@ -46,7 +46,6 @@ MACRO_SERIES: list[str] = [
     "INDPRO",
     # Employment / PMI proxy
     "MANEMP",
-    "NAPM",
     # Unemployment
     "UNRATE",
     # Inflation
@@ -81,7 +80,7 @@ MACRO_SERIES: list[str] = [
     "DCOILBRENTEU",
     "GASREGW",
     # Sector-specific
-    "CUSR0000SAM",   # CPI medical (Healthcare)
+    "CPIMEDSL",      # CPI medical care (Healthcare)
     "DRCCLACBS",     # CC delinquency rate (Financials)
 ]
 

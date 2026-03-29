@@ -1,0 +1,1038 @@
+{
+  "actors": [
+    {
+      "actor_id": "PLUG",
+      "name": "PLUG POWER INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001093691"
+      }
+    },
+    {
+      "actor_id": "FLR",
+      "name": "FLUOR CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001124198"
+      }
+    },
+    {
+      "actor_id": "DNOW",
+      "name": "DNOW INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001599617"
+      }
+    },
+    {
+      "actor_id": "TRN",
+      "name": "TRINITY INDUSTRIES INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000099780"
+      }
+    },
+    {
+      "actor_id": "MWA",
+      "name": "MUELLER WATER PRODUCTS INC SERIES",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001350593"
+      }
+    },
+    {
+      "actor_id": "BXC",
+      "name": "BLUELINX HOLDINGS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001301787"
+      }
+    },
+    {
+      "actor_id": "UFPI",
+      "name": "UFP INDUSTRIES INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000912767"
+      }
+    },
+    {
+      "actor_id": "CMPR",
+      "name": "CIMPRESS PLC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001262976"
+      }
+    },
+    {
+      "actor_id": "GTLS",
+      "name": "CHART INDUSTRIES INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000892553"
+      }
+    },
+    {
+      "actor_id": "NPO",
+      "name": "ENPRO INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001164863"
+      }
+    },
+    {
+      "actor_id": "RUN",
+      "name": "SUNRUN INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001469367"
+      }
+    },
+    {
+      "actor_id": "GFF",
+      "name": "GRIFFON CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000050725"
+      }
+    },
+    {
+      "actor_id": "HRI",
+      "name": "HERC HOLDINGS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001364479"
+      }
+    },
+    {
+      "actor_id": "ORN",
+      "name": "ORION GROUP INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001402829"
+      }
+    },
+    {
+      "actor_id": "RPD",
+      "name": "RAPID7 INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001560327"
+      }
+    },
+    {
+      "actor_id": "ADTN",
+      "name": "ADTRAN HOLDINGS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000926282"
+      }
+    },
+    {
+      "actor_id": "CLFD",
+      "name": "CLEARFIELD INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000796505"
+      }
+    },
+    {
+      "actor_id": "VECO",
+      "name": "VEECO INSTRUMENTS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000103145"
+      }
+    },
+    {
+      "actor_id": "BOX",
+      "name": "BOX INC CLASS A",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001372612"
+      }
+    },
+    {
+      "actor_id": "SSTI",
+      "name": "SOUNDTHINKING INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001351636"
+      }
+    },
+    {
+      "actor_id": "KLIC",
+      "name": "KULICKE AND SOFFA INDUSTRIES INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0000056978"
+      }
+    },
+    {
+      "actor_id": "WULF",
+      "name": "TERAWULF INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001083301"
+      }
+    },
+    {
+      "actor_id": "CARS",
+      "name": "CARS.COM INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001683606"
+      }
+    },
+    {
+      "actor_id": "GSAT",
+      "name": "GLOBALSTAR VOTING INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001366868"
+      }
+    },
+    {
+      "actor_id": "EVC",
+      "name": "ENTRAVISION COMMUNICATIONS CORP CL",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001109116"
+      }
+    },
+    {
+      "actor_id": "YELP",
+      "name": "YELP INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "technology",
+      "external_ids": {
+        "cik": "0001345016"
+      }
+    },
+    {
+      "actor_id": "CMT",
+      "name": "CORE MOLDING TECHNOLOGIES INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001026655"
+      }
+    },
+    {
+      "actor_id": "VHI",
+      "name": "VALHI INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000059255"
+      }
+    },
+    {
+      "actor_id": "ASIX",
+      "name": "ADVANSIX INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0001673985"
+      }
+    },
+    {
+      "actor_id": "SXT",
+      "name": "SENSIENT TECHNOLOGIES CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "industrials",
+      "external_ids": {
+        "cik": "0000310142"
+      }
+    },
+    {
+      "actor_id": "ASTH",
+      "name": "ASTRANA HEALTH INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001083446"
+      }
+    },
+    {
+      "actor_id": "ADMA",
+      "name": "ADMA BIOLOGICS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001368514"
+      }
+    },
+    {
+      "actor_id": "ARDX",
+      "name": "ARDELYX INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001437402"
+      }
+    },
+    {
+      "actor_id": "EBS",
+      "name": "EMERGENT BIOSOLUTIONS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001367644"
+      }
+    },
+    {
+      "actor_id": "TBRG",
+      "name": "TRUBRIDGE INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001169445"
+      }
+    },
+    {
+      "actor_id": "ADUS",
+      "name": "ADDUS HOMECARE CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001468328"
+      }
+    },
+    {
+      "actor_id": "ABUS",
+      "name": "ARBUTUS BIOPHARMA CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001447028"
+      }
+    },
+    {
+      "actor_id": "AMN",
+      "name": "AMN HEALTHCARE INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001142750"
+      }
+    },
+    {
+      "actor_id": "ACU",
+      "name": "ACME UNITED CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000002098"
+      }
+    },
+    {
+      "actor_id": "LFCR",
+      "name": "LIFECORE BIOMEDICAL INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001005286"
+      }
+    },
+    {
+      "actor_id": "UTMD",
+      "name": "UTAH MEDICAL PRODUCTS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0000706698"
+      }
+    },
+    {
+      "actor_id": "CHRS",
+      "name": "COHERUS ONCOLOGY INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001512762"
+      }
+    },
+    {
+      "actor_id": "CCRN",
+      "name": "CROSS COUNTRY HEALTHCARE INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001141103"
+      }
+    },
+    {
+      "actor_id": "CAPR",
+      "name": "CAPRICOR THERAPEUTICS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001133869"
+      }
+    },
+    {
+      "actor_id": "ELMD",
+      "name": "ELECTROMED INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001488917"
+      }
+    },
+    {
+      "actor_id": "ALDX",
+      "name": "ALDEYRA THERAPEUTICS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001341235"
+      }
+    },
+    {
+      "actor_id": "JYNT",
+      "name": "JOINT CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001612630"
+      }
+    },
+    {
+      "actor_id": "CRSP",
+      "name": "CRISPR THERAPEUTICS AG",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001674416"
+      }
+    },
+    {
+      "actor_id": "ANIP",
+      "name": "ANI PHARMACEUTICALS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "healthcare",
+      "external_ids": {
+        "cik": "0001023024"
+      }
+    },
+    {
+      "actor_id": "RMAX",
+      "name": "RE MAX HOLDINGS INC CLASS A",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001581091"
+      }
+    },
+    {
+      "actor_id": "FFIC",
+      "name": "FLUSHING FINANCIAL CORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000923139"
+      }
+    },
+    {
+      "actor_id": "FBNC",
+      "name": "FIRST BANCORP",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000811589"
+      }
+    },
+    {
+      "actor_id": "DFIN",
+      "name": "DONNELLEY FINANCIAL SOLUTIONS INC",
+      "actor_type": "sme",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001669811"
+      }
+    },
+    {
+      "actor_id": "BANC",
+      "name": "BANC OF CALIFORNIA INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001169770"
+      }
+    },
+    {
+      "actor_id": "NODK",
+      "name": "NI HOLDINGS INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001681206"
+      }
+    },
+    {
+      "actor_id": "ACIC",
+      "name": "AMERICAN COASTAL INSURANCE CORP",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001401521"
+      }
+    },
+    {
+      "actor_id": "FNWD",
+      "name": "FINWARD BANCORP",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000919864"
+      }
+    },
+    {
+      "actor_id": "SMBK",
+      "name": "SMARTFINANCIAL INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001038773"
+      }
+    },
+    {
+      "actor_id": "FSBW",
+      "name": "FS BANCORP INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001530249"
+      }
+    },
+    {
+      "actor_id": "BFST",
+      "name": "BUSINESS FIRST BANCSHARES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001624322"
+      }
+    },
+    {
+      "actor_id": "UNTY",
+      "name": "UNITY BANCORP INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000920427"
+      }
+    },
+    {
+      "actor_id": "SFST",
+      "name": "SOUTHERN FIRST BANCSHARES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001090009"
+      }
+    },
+    {
+      "actor_id": "FLG",
+      "name": "FLAGSTAR BANK NATIONAL ASSOCIATION",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000910073"
+      }
+    },
+    {
+      "actor_id": "NIC",
+      "name": "NICOLET BANKSHARES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001174850"
+      }
+    },
+    {
+      "actor_id": "KFS",
+      "name": "KINGSWAY FINANCIAL SERVICES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001072627"
+      }
+    },
+    {
+      "actor_id": "BANR",
+      "name": "BANNER CORP",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000946673"
+      }
+    },
+    {
+      "actor_id": "MCHB",
+      "name": "MECHANICS BANCORP CLASS A",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001518715"
+      }
+    },
+    {
+      "actor_id": "EGBN",
+      "name": "EAGLE BANCORP INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001050441"
+      }
+    },
+    {
+      "actor_id": "CNOB",
+      "name": "CONNECTONE BANCORP INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000712771"
+      }
+    },
+    {
+      "actor_id": "ITIC",
+      "name": "INVESTORS TITLE",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000720858"
+      }
+    },
+    {
+      "actor_id": "UBSI",
+      "name": "UNITED BANKSHARES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000729986"
+      }
+    },
+    {
+      "actor_id": "SBCF",
+      "name": "SEACOAST BANKING OF FLORIDA",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000730708"
+      }
+    },
+    {
+      "actor_id": "ACTG",
+      "name": "ACACIA RESEARCH CORP",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000934549"
+      }
+    },
+    {
+      "actor_id": "FMAO",
+      "name": "FARMERS AND MERCHANTS BANCORP INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0000792966"
+      }
+    },
+    {
+      "actor_id": "LARK",
+      "name": "LANDMARK BANCORP INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "financials",
+      "external_ids": {
+        "cik": "0001141688"
+      }
+    },
+    {
+      "actor_id": "TUSK",
+      "name": "MAMMOTH ENERGY SERVICES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001679268"
+      }
+    },
+    {
+      "actor_id": "BTU",
+      "name": "PEABODY ENERGY CORP",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001064728"
+      }
+    },
+    {
+      "actor_id": "CRK",
+      "name": "COMSTOCK RESOURCES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000023194"
+      }
+    },
+    {
+      "actor_id": "TTI",
+      "name": "TETRA TECHNOLOGIES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000844965"
+      }
+    },
+    {
+      "actor_id": "HP",
+      "name": "HELMERICH & PAYNE INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000046765"
+      }
+    },
+    {
+      "actor_id": "RGCO",
+      "name": "RGC RESOURCES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001069533"
+      }
+    },
+    {
+      "actor_id": "CWCO",
+      "name": "CONSOLIDATED WATER LTD",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0000928340"
+      }
+    },
+    {
+      "actor_id": "OGS",
+      "name": "ONE GAS INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "energy",
+      "external_ids": {
+        "cik": "0001587732"
+      }
+    },
+    {
+      "actor_id": "VAC",
+      "name": "MARRIOTT VACATIONS WORLDWIDE CORP",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001524358"
+      }
+    },
+    {
+      "actor_id": "WEYS",
+      "name": "WEYCO GROUP INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000106532"
+      }
+    },
+    {
+      "actor_id": "APEI",
+      "name": "AMERICAN PUBLIC EDUCATION INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001201792"
+      }
+    },
+    {
+      "actor_id": "GT",
+      "name": "GOODYEAR TIRE & RUBBER",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000042582"
+      }
+    },
+    {
+      "actor_id": "LIND",
+      "name": "LINDBLAD EXPEDITIONS HOLDINGS INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001512499"
+      }
+    },
+    {
+      "actor_id": "PRDO",
+      "name": "PERDOCEO EDUCATION CORP",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001046568"
+      }
+    },
+    {
+      "actor_id": "EAT",
+      "name": "BRINKER INTERNATIONAL INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000703351"
+      }
+    },
+    {
+      "actor_id": "PRKS",
+      "name": "UNITED PARKS AND RESORTS INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001564902"
+      }
+    },
+    {
+      "actor_id": "PLAY",
+      "name": "DAVE AND BUSTERS ENTERTAINMENT INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0001525769"
+      }
+    },
+    {
+      "actor_id": "TR",
+      "name": "TOOTSIE ROLL INDUSTRIES INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000098677"
+      }
+    },
+    {
+      "actor_id": "LWAY",
+      "name": "LIFEWAY FOODS INC",
+      "actor_type": "retail_investor",
+      "layer": 3,
+      "geography": "US",
+      "sector": "consumer",
+      "external_ids": {
+        "cik": "0000814586"
+      }
+    }
+  ]
+}

@@ -1,16 +1,19 @@
 """Fetch OECD SDMX 3.0 macro signals and ingest into the SMIM PIT store.
 
-Uses OECD SDMX 3.0 REST API (no key required):
-    https://sdmx.oecd.org/public/rest/data/{agency},{dataflow},{version}/all
-    ?format=jsondata&startPeriod={start}&endPeriod={end}
+Uses OECD SDMX 3.0 REST API (no key required) with **explicit dimension keys**.
+The previous "all" key approach returned a server-limited subset (244 rows vs ~2,000
+expected). Explicit keys are required to retrieve the full time series.
 
 Fetches:
   DF_CLI (Composite Leading Indicators) — monthly for USA + GBR
-    Measure: LI (Composite Leading Indicator), Adjustment: AA (Amplitude Adjusted)
-    Measure: BCICP (Business Confidence Index), Measure: CCICP (Consumer Confidence Index)
+    Key: USA+GBR.M.LI+BCICP+CCICP.IX._Z.AA.IX._Z.H
+    Measures: LI, BCICP, CCICP (Amplitude Adjusted, Methodology H)
+    Expected: ~1,700+ rows, 2000-01 to present
 
   DF_QNA_EXPENDITURE_CAPITA (Quarterly GDP per capita) — quarterly for USA + GBR
-    Transaction: B1GQ_POP, Unit: USD_PPP_PS, Transformation: LG (Log)
+    Key: Q.Y.USA+GBR.S1.S1.B1GQ_POP._Z._Z._Z.USD_PPP_PS.LR.LA.T0102
+    Transaction: B1GQ_POP, Chain-linked volumes, Log-annual transformation
+    Expected: ~200 rows, 2000-Q1 to present
 
 Usage:
     uv run python scripts/smim_fetch_oecd.py
@@ -55,41 +58,46 @@ _RATE_LIMIT_PAUSE = 1.0
 
 OECD_DATAFLOWS: list[dict] = [
     {
-        "agency":    "OECD.SDD.STES",
-        "dataflow":  "DSD_STES@DF_CLI",
-        "version":   "4.0",
-        "label":     "composite_leading_indicators",
-        "freq":      "M",
-        "start":     "2000-01",
-        "end":       "2026-03",
-        "pub_lag":   45,
+        "agency":       "OECD.SDD.STES",
+        "dataflow":     "DSD_STES@DF_CLI",
+        "version":      "4.0",
+        "label":        "composite_leading_indicators",
+        "freq":         "M",
+        "start":        "2000-01",
+        "end":          "2026-03",
+        "pub_lag":      45,
+        # Explicit dimension key (9 dims): REF_AREA.FREQ.MEASURE.UNIT_MEASURE.ACTIVITY.ADJUSTMENT.TRANSFORMATION.TIME_HORIZ.METHODOLOGY
+        # METHODOLOGY=H is required for USA/GBR CLI data; "all" key silently omitted these series.
+        "explicit_key": "USA+GBR.M.LI+BCICP+CCICP.IX._Z.AA.IX._Z.H",
         "filters": {
             "REF_AREA":    {"USA", "GBR"},
             "FREQ":        {"M"},
             "MEASURE":     {"LI", "BCICP", "CCICP"},
             "ADJUSTMENT":  {"AA"},
         },
-        # Which dimension to use as actor_id and signal_id
-        "actor_dim":  "REF_AREA",
-        "signal_dim": "MEASURE",
+        "actor_dim":    "REF_AREA",
+        "signal_dim":   "MEASURE",
     },
     {
-        "agency":    "OECD.SDD.NAD",
-        "dataflow":  "DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA",
-        "version":   "1.1",
-        "label":     "qna_gdp_per_capita",
-        "freq":      "Q",
-        "start":     "2000-Q1",
-        "end":       "2026-Q1",
-        "pub_lag":   75,
+        "agency":       "OECD.SDD.NAD",
+        "dataflow":     "DSD_NAMAIN1@DF_QNA_EXPENDITURE_CAPITA",
+        "version":      "1.1",
+        "label":        "qna_gdp_per_capita",
+        "freq":         "Q",
+        "start":        "2000-Q1",
+        "end":          "2026-Q1",
+        "pub_lag":      75,
+        # Explicit key (13 dims): FREQ.ADJUSTMENT.REF_AREA.SECTOR.COUNTERPART_SECTOR.TRANSACTION.INSTR_ASSET.ACTIVITY.EXPENDITURE.UNIT_MEASURE.PRICE_BASE.TRANSFORMATION.TABLE_IDENTIFIER
+        # TRANSFORMATION=LA (log-annual); original config had LG which is not a valid value.
+        "explicit_key": "Q.Y.USA+GBR.S1.S1.B1GQ_POP._Z._Z._Z.USD_PPP_PS.LR.LA.T0102",
         "filters": {
             "REF_AREA":     {"USA", "GBR"},
             "FREQ":         {"Q"},
             "TRANSACTION":  {"B1GQ_POP"},
-            "PRICE_BASE":   {"LR", "V"},
+            "PRICE_BASE":   {"LR"},
         },
-        "actor_dim":  "REF_AREA",
-        "signal_dim": "TRANSACTION",
+        "actor_dim":    "REF_AREA",
+        "signal_dim":   "TRANSACTION",
     },
 ]
 
@@ -222,16 +230,21 @@ def parse_sdmx3_response(
 # ── Fetch ──────────────────────────────────────────────────────────────────────
 
 def fetch_dataflow(cfg: dict, session: requests.Session) -> pd.DataFrame:
-    """Fetch one OECD SDMX 3.0 dataflow using `all` key, then filter in-memory."""
-    agency   = cfg["agency"]
-    dataflow = cfg["dataflow"]
-    version  = cfg["version"]
-    label    = cfg["label"]
-    start    = cfg["start"]
-    end      = cfg["end"]
+    """Fetch one OECD SDMX 3.0 dataflow using an explicit dimension key.
+
+    Explicit keys are required because the "all" key returns a server-limited subset
+    that silently omits USA/GBR CLI series with METHODOLOGY=H.
+    """
+    agency       = cfg["agency"]
+    dataflow     = cfg["dataflow"]
+    version      = cfg["version"]
+    label        = cfg["label"]
+    start        = cfg["start"]
+    end          = cfg["end"]
+    explicit_key = cfg.get("explicit_key", "all")
 
     url = (
-        f"{_BASE}/{agency},{dataflow},{version}/all"
+        f"{_BASE}/{agency},{dataflow},{version}/{explicit_key}"
         f"?format=jsondata&startPeriod={start}&endPeriod={end}"
     )
     log.info("OECD: fetching %s …", label)
