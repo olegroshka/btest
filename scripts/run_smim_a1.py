@@ -403,75 +403,135 @@ def run_window(
         else:
             granger_adj = sp.csr_matrix((N, N))
 
-    # --- Synergy-guided iterative operator (Approach B) ------------------------
-    # Start with intensity correlation operator.  Then iterate:
-    #   1. Decompose → Kalman filter → compute synergy between mode pairs
-    #   2. Actors loading on high-synergy modes get stronger edges
-    #   3. Re-build operator with refined weights
-    # This learns an operator where edges reflect emergent interactions.
+    # --- Approach C: End-to-end operator optimisation ---------------------------
+    # Build a library of basis operators (correlation, lagged-corr, multi-scale,
+    # Granger).  Then optimise the channel weights w to maximise sub-validation
+    # R² through the full pipeline: A(w) → Schur → Kalman EM → predict → R².
+    # This is truly end-to-end: the operator is shaped by what makes the
+    # Kalman filter predictive, not by proxy metrics.
     with timed("learned_operator", timings):
-        # Initial operator: intensity cross-correlation
-        corr_matrix = np.corrcoef(obs_train.T)  # (N, N)
-        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0)  # constant actors → NaN corr
-        np.fill_diagonal(corr_matrix, 0.0)
-        corr_matrix[np.abs(corr_matrix) < 0.1] = 0.0
+        from scipy.optimize import minimize as sp_minimize
 
-        # Add Granger edges
+        # ---- Build basis operator library -----------------------------------
+        basis_ops: list[np.ndarray] = []
+        basis_names: list[str] = []
+
+        # B0: instantaneous cross-correlation
+        corr0 = np.corrcoef(obs_train.T)
+        corr0 = np.nan_to_num(corr0, nan=0.0)
+        np.fill_diagonal(corr0, 0.0)
+        basis_ops.append(corr0)
+        basis_names.append("corr_inst")
+
+        # B1: lag-1 cross-correlation (directed: actor i at t predicts j at t+1)
+        if T_train > 2:
+            lag1 = np.zeros((N, N))
+            for lag_offset in [1, 2]:
+                if T_train > lag_offset:
+                    x_prev = obs_train[:-lag_offset]  # (T-lag, N)
+                    x_next = obs_train[lag_offset:]   # (T-lag, N)
+                    # Per-pair correlation of lagged series
+                    xp_dm = x_prev - x_prev.mean(axis=0)
+                    xn_dm = x_next - x_next.mean(axis=0)
+                    num = (xp_dm.T @ xn_dm) / max(len(xp_dm) - 1, 1)
+                    sp_std = np.std(x_prev, axis=0, keepdims=True).T
+                    sn_std = np.std(x_next, axis=0, keepdims=True)
+                    denom = np.maximum(sp_std @ sn_std, 1e-10)
+                    lag_corr = num / denom
+                    lag1 += np.nan_to_num(lag_corr, nan=0.0)
+            np.fill_diagonal(lag1, 0.0)
+            basis_ops.append(lag1)
+            basis_names.append("corr_lag")
+
+        # B2-B3: multi-scale cosine similarity (4Q, 8Q)
+        for scale in [4, 8]:
+            if T_train >= scale + 1:
+                kernel = np.ones(scale) / scale
+                sm = np.apply_along_axis(
+                    lambda x: np.convolve(x, kernel, mode="valid"), axis=0, arr=obs_train
+                )
+                if sm.shape[0] >= 2:
+                    norms = np.maximum(np.linalg.norm(sm, axis=0, keepdims=True), 1e-10)
+                    normed = sm / norms
+                    sim = normed.T @ normed
+                    np.fill_diagonal(sim, 0.0)
+                    basis_ops.append(sim)
+                    basis_names.append(f"cosine_{scale}Q")
+
+        # B4: Granger (padded to N)
         N_granger = granger_adj.shape[0]
         if N_granger > 0:
             g_dense = granger_adj.toarray() if sp.issparse(granger_adj) else granger_adj
+            g_padded = np.zeros((N, N))
             n_g = min(N_granger, N)
-            corr_matrix[:n_g, :n_g] += g_dense[:n_g, :n_g] * 0.5
+            g_padded[:n_g, :n_g] = g_dense[:n_g, :n_g]
+            basis_ops.append(g_padded)
+            basis_names.append("granger")
 
-        op_current = corr_matrix.copy()
-        K_iter = K_MIN
+        n_bases = len(basis_ops)
 
-        n_refine = 3  # refinement iterations
-        for ref_iter in range(n_refine):
-            # Decompose current operator
-            mf_iter = SchurDecomposer().decompose(op_current, k=min(K_MAX_CANDIDATES, N))
-            U_iter = mf_iter.basis[:, :K_iter]
-            eig_iter = mf_iter.eigenvalues[:K_iter]
-            mf_k = ModalFrame(basis=U_iter, eigenvalues=eig_iter, method=mf_iter.method)
+        # ---- Sub-train / sub-val split for optimisation ---------------------
+        t_split = int(T_train * 0.75)
+        obs_st = obs_train[:t_split]
+        obs_sv = obs_train[t_split:]
+        K_opt = K_MIN
 
-            # Quick Kalman filter on training data
-            kf_iter = KalmanFilter()
-            state_iter = kf_iter.em_estimate(obs_train, mf_k, max_iter=20)
-
-            # Compute synergy from training states
-            alpha_iter = state_iter.alpha_filtered  # (T_train, K)
-            recon = alpha_iter @ U_iter.T
-            gaps_iter = (obs_train - recon).T  # (N, T_train)
+        def objective(weights: np.ndarray) -> float:
+            """Negative sub-val R² for given operator channel weights."""
             try:
-                syn = compute_synergy_matrix(alpha_iter, gaps_iter, K_iter)
+                # Build weighted operator
+                A = np.zeros((N, N))
+                for w, B in zip(weights, basis_ops):
+                    A += w * B
+                # Threshold
+                thr = np.percentile(np.abs(A[A != 0]), 30) if np.any(A != 0) else 0.01
+                A[np.abs(A) < thr] = 0.0
+                # Decompose
+                mf_opt = SchurDecomposer().decompose(A, k=min(K_MAX_CANDIDATES, N))
+                U_opt = mf_opt.basis[:, :K_opt]
+                mf_k = ModalFrame(
+                    basis=U_opt,
+                    eigenvalues=mf_opt.eigenvalues[:K_opt],
+                    method=mf_opt.method,
+                )
+                # Kalman on sub-train
+                kf_opt = KalmanFilter()
+                state_opt = kf_opt.em_estimate(obs_st, mf_k, max_iter=15)
+                # Predict sub-val
+                kf_sv = KalmanFilter(
+                    F=state_opt.params.get("F"),
+                    Q=state_opt.params.get("Q"),
+                    R=state_opt.params.get("R"),
+                )
+                state_sv = kf_sv.filter(obs_sv, mf_k)
+                pred_sv = state_sv.alpha_predicted @ U_opt.T
+                r2 = float(oos_r_squared(pred_sv.T.ravel(), obs_sv.T.ravel()))
+                return -r2 if np.isfinite(r2) else 1e6
             except Exception:
-                break  # can't compute synergy, stop refining
+                return 1e6
 
-            # Synergy-weighted actor coupling: actors that load heavily on
-            # high-synergy mode pairs should be more connected.
-            # coupling[i,j] = Σ_{m,n: m<n} |U[i,m] * U[j,n]| * S[m,n]
-            coupling = np.zeros((N, N))
-            for m in range(K_iter):
-                for n in range(m + 1, K_iter):
-                    s_mn = abs(syn[m, n])
-                    if s_mn < 1e-6:
-                        continue
-                    outer = np.abs(np.outer(U_iter[:, m], U_iter[:, n]))
-                    coupling += outer * s_mn
+        # ---- Optimise with Nelder-Mead (gradient-free, ~100-200 evals) ------
+        x0 = np.ones(n_bases) / n_bases  # equal initial weights
+        opt_result = sp_minimize(
+            objective, x0, method="Nelder-Mead",
+            options={"maxiter": 150, "xatol": 0.01, "fatol": 0.001},
+        )
+        w_opt = opt_result.x
 
-            coupling = (coupling + coupling.T) / 2
-            np.fill_diagonal(coupling, 0.0)
+        if verbose:
+            print(f"      operator weights: "
+                  + ", ".join(f"{n}={w:.3f}" for n, w in zip(basis_names, w_opt))
+                  + f"  sub-val R2={-opt_result.fun:.4f}")
 
-            # Blend: keep base correlation structure + add synergy coupling
-            blend = 0.3  # how much synergy influences the operator
-            op_current = (1 - blend) * corr_matrix + blend * coupling
-            # Re-threshold
-            threshold = np.percentile(np.abs(op_current[op_current != 0]), 40) if np.any(op_current != 0) else 0.05
-            op_current[np.abs(op_current) < threshold] = 0.0
+        # ---- Build final operator with optimal weights ----------------------
+        A_final = np.zeros((N, N))
+        for w, B in zip(w_opt, basis_ops):
+            A_final += w * B
+        thr = np.percentile(np.abs(A_final[A_final != 0]), 30) if np.any(A_final != 0) else 0.01
+        A_final[np.abs(A_final) < thr] = 0.0
+        sparse_op = sp.csr_matrix(A_final)
 
-        sparse_op = sp.csr_matrix(op_current)
-
-    # --- Spectral decomposition (on refined operator) -------------------------
+    # --- Spectral decomposition (on optimised operator) -----------------------
     op_dense = sparse_op.toarray()[:N, :N]
     K_cand = min(K_MAX_CANDIDATES, N)
 
