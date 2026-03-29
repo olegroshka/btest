@@ -272,6 +272,14 @@ def load_edgar_signals(actor_ids: list[str]) -> pd.DataFrame:
             q_change = np.log(q / q.shift(1)).replace([np.inf, -np.inf], np.nan)
             frames[ticker] = q_change
 
+    # Cross-sectional rank transform: convert raw log-changes to [0,1] ranks
+    # per quarter.  This matches the intensity normalisation and reduces
+    # outlier influence from noisy quarterly balance-sheet revisions.
+    if frames:
+        raw = pd.DataFrame(frames)
+        ranked = raw.rank(axis=1, pct=True)
+        frames = {c: ranked[c] for c in ranked.columns}
+
     if not frames:
         return pd.DataFrame()
 
