@@ -600,6 +600,20 @@ def compute_emergence(
         train_gaps = (obs_train - recon_train).T  # (N, T_train)
         synergy = compute_synergy_matrix(alpha_train, train_gaps, K)
 
+        # --- Signed synergy: PID synergy is always >= 0 (magnitude only).
+        # Compute the DIRECTION of each mode-pair interaction from the
+        # cross-covariance of the interaction term with the aggregate gap.
+        # sign(cov(alpha_j * alpha_k, gap_mean)) tells us whether the modes
+        # interact constructively (+) or destructively (-).
+        gap_target = train_gaps.mean(axis=0)  # (T_train,)
+        for j in range(K):
+            for k in range(j + 1, K):
+                interaction = alpha_train[:, j] * alpha_train[:, k]
+                cross_cov = np.cov(interaction, gap_target)[0, 1]
+                direction = np.sign(cross_cov) if abs(cross_cov) > 1e-10 else 0.0
+                synergy[j, k] *= direction
+                synergy[k, j] *= direction
+
         # --- Fix 2: Criticality from TRAINING alpha (T=40, window=8) ---------
         d = min(3, K)
         psi_train = extract_order_parameter(alpha_train, d=d)
