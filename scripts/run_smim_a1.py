@@ -342,20 +342,34 @@ def run_window(
         else:
             granger_adj = sp.csr_matrix((N, N))
 
-    # --- Sparsification ------------------------------------------------------
+    # --- Intensity cross-correlation operator (covers all N actors) -----------
+    with timed("intensity_correlation", timings):
+        # Build correlation matrix from demeaned training intensities.
+        # This gives edges for ALL N actors (not just the 61 with OHLCV).
+        corr_matrix = np.corrcoef(obs_train.T)  # (N, N) Pearson correlation
+        np.fill_diagonal(corr_matrix, 0.0)
+        # Threshold small correlations to keep structure sparse
+        corr_matrix[np.abs(corr_matrix) < 0.1] = 0.0
+        corr_sparse = sp.csr_matrix(corr_matrix)
+
+    # --- Sparsification (combine Granger + correlation channels) -------------
     with timed("sparsification", timings):
-        aggregate = AggregateOperator(channel_matrices={RelationChannel.FINANCIAL: granger_adj})
+        channels = {RelationChannel.FINANCIAL: granger_adj}
+        # Align Granger to N if needed (it may be sized to N_signal < N)
+        N_granger = granger_adj.shape[0]
+        if N_granger < N:
+            padded_granger = sp.lil_matrix((N, N))
+            padded_granger[:N_granger, :N_granger] = granger_adj
+            channels[RelationChannel.FINANCIAL] = padded_granger.tocsr()
+        aggregate = AggregateOperator(channel_matrices=channels)
         combined = aggregate.compute()
+        # Add intensity correlation as second layer
+        if combined.shape == corr_sparse.shape:
+            combined = combined + corr_sparse * 0.5  # weight correlation lower than Granger
         sparse_op = l1_sparsify(combined, target_density=TARGET_DENSITY)
 
     # --- Spectral decomposition ----------------------------------------------
-    N_op = min(sparse_op.shape[0], N)
-    op_dense = sparse_op.toarray()[:N_op, :N_op]
-    # Pad to N if operator is smaller (signal actors < intensity actors)
-    if N_op < N:
-        padded = np.zeros((N, N))
-        padded[:N_op, :N_op] = op_dense
-        op_dense = padded
+    op_dense = sparse_op.toarray()[:N, :N]
     K_cand = min(K_MAX_CANDIDATES, N)
 
     with timed("spectral_decomposition", timings):
