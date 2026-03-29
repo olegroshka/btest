@@ -558,8 +558,10 @@ Output:
 
 ### Session B7 — Robustness: Time Series Length Sweep
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** L1 OLS most stable across T (0.34-0.40 for T>=8yr). Kalman erratic (0.05-0.41).
+Kim M=2 more robust than Kalman (0.31-0.38). All beat RW (0.22). Best T for L1: 8yr.
+Runner: `scripts/run_smim_b7.py`.
 
 **Prompt:**
 ```

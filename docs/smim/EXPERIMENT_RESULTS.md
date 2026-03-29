@@ -20,6 +20,7 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 | B1 | B | COMPLETE | Graph-factor OLS (0.328) > Kalman (0.291) > full (0.305) | 2026-03-29 |
 | B2 | B | COMPLETE | DMD wins (0.359); H2a supported (+0.020 vs PCA) | 2026-03-30 |
 | B6 | B | COMPLETE | L1 OLS R2=0.70-0.82 >> RW (0.55-0.80); graceful N degradation | 2026-03-30 |
+| B7 | B | COMPLETE | L1 OLS stable (0.34-0.40); Kalman erratic; Kim robust | 2026-03-30 |
 
 ---
 
