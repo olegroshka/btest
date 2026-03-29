@@ -1,11 +1,12 @@
 experiment_id: A1-MVP-FULL
-timestamp: '2026-03-29 22:43:31'
+timestamp: '2026-03-29 22:47:54'
 registry: data\smim\registries\experiment_a1_registry.json
 intensities: data\smim\intensities\experiment_a1_intensities.parquet
 n_actors_registry: 93
 n_actors_intensity: 93
 n_signals_ohlcv: 54
 n_signals_fred: 7
+n_signals_edgar: 59
 regimes_tested:
 - 1
 - 2
@@ -13,14 +14,14 @@ regimes_tested:
 windows: 10
 falsification: false
 decision_gate: PASS
-mean_oos_r2: 0.300025
+mean_oos_r2: 0.297086
 per_window:
 - window_id: W2015
-  best_M: 2
+  best_M: 1
   K: 3
   N: 88
-  oos_r2_pred: 0.286484
-  oos_r2_modal: 0.286484
+  oos_r2_pred: 0.288365
+  oos_r2_modal: 0.294616
 - window_id: W2017
   best_M: 2
   K: 3
@@ -34,11 +35,11 @@ per_window:
   oos_r2_pred: 0.293315
   oos_r2_modal: 0.293315
 - window_id: W2019
-  best_M: 1
+  best_M: 2
   K: 3
   N: 92
-  oos_r2_pred: 0.348309
-  oos_r2_modal: 0.289503
+  oos_r2_pred: 0.330724
+  oos_r2_modal: 0.330724
 - window_id: W2020
   best_M: 2
   K: 3
@@ -67,5 +68,5 @@ per_window:
   best_M: 1
   K: 3
   N: 93
-  oos_r2_pred: 0.377607
-  oos_r2_modal: 0.390328
+  oos_r2_pred: 0.366857
+  oos_r2_modal: 0.368338

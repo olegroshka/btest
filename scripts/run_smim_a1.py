@@ -80,6 +80,7 @@ OHLCV_PATHS = {
     "UK-LC": PROJECT_ROOT / "equities" / "smim" / "UK-LC" / "ohlcv.parquet",
 }
 FRED_PATH = PROJECT_ROOT / "data" / "smim" / "processed" / "fred_signals.parquet"
+EDGAR_PATH = PROJECT_ROOT / "data" / "smim" / "processed" / "edgar_balance_sheet.parquet"
 
 K_MAX_CANDIDATES = 15
 K_MIN = 3                # MDL floor: at T/N < 1, MDL always picks K=1; force minimum
@@ -242,16 +243,66 @@ def load_fred_signals(actor_fred_mapping: dict[str, str]) -> pd.DataFrame:
     return result
 
 
+def load_edgar_signals(actor_ids: list[str]) -> pd.DataFrame:
+    """Load EDGAR balance sheet data as quarterly log-change signals.
+
+    Uses Assets and CapEx tags to produce quarterly change signals for
+    actors with EDGAR coverage. This directly relates to the intensity
+    target (CapEx/Assets) and gives richer Granger inputs.
+
+    Returns wide DataFrame: (T_quarters, N_edgar_actors) with quarterly changes.
+    """
+    if not EDGAR_PATH.exists():
+        return pd.DataFrame()
+
+    df = pd.read_parquet(EDGAR_PATH)
+    df = df[df["ticker"].isin(actor_ids)].copy()
+    df["event_date"] = pd.to_datetime(df["event_date"])
+
+    # Use Assets quarterly change as signal; column name = actor_id (ticker).
+    # This fills signal gaps for actors without OHLCV data.
+    frames = {}
+    sub = df[df["tag"] == "Assets"].copy()
+    if not sub.empty:
+        for ticker, group in sub.groupby("ticker"):
+            g = group.set_index("event_date")["value"].sort_index()
+            g = g[~g.index.duplicated(keep="last")]
+            q = g.resample("QE").last().dropna()
+            q.index = q.index.to_period("Q").to_timestamp()
+            q_change = np.log(q / q.shift(1)).replace([np.inf, -np.inf], np.nan)
+            frames[ticker] = q_change
+
+    if not frames:
+        return pd.DataFrame()
+
+    result = pd.DataFrame(frames)
+    idx = pd.date_range("2005-01-01", "2025-12-31", freq="QS")
+    result = result.reindex(idx)
+    return result
+
+
 def build_signal_matrix(
     ohlcv_returns: pd.DataFrame,
     fred_signals: pd.DataFrame,
+    edgar_signals: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Combine OHLCV and FRED into a unified signal matrix for Granger."""
+    """Combine OHLCV, FRED, and EDGAR into a unified signal matrix for Granger.
+
+    OHLCV takes priority: if an actor has both OHLCV and EDGAR, OHLCV is used.
+    EDGAR fills gaps for actors without OHLCV coverage.
+    """
     parts = []
+    ohlcv_cols = set()
     if not ohlcv_returns.empty:
         parts.append(ohlcv_returns)
+        ohlcv_cols = set(ohlcv_returns.columns)
     if not fred_signals.empty:
         parts.append(fred_signals)
+    if edgar_signals is not None and not edgar_signals.empty:
+        # Only use EDGAR for actors NOT already covered by OHLCV
+        edgar_only = edgar_signals[[c for c in edgar_signals.columns if c not in ohlcv_cols]]
+        if not edgar_only.empty:
+            parts.append(edgar_only)
     if not parts:
         return pd.DataFrame()
     return pd.concat(parts, axis=1)
@@ -652,10 +703,13 @@ def run_a1(
     fred_signals = load_fred_signals(fred_mapping)
     n_fred = len(fred_signals.columns) if not fred_signals.empty else 0
 
-    signal_matrix = build_signal_matrix(ohlcv_returns, fred_signals)
+    edgar_signals = load_edgar_signals(actor_ids)
+    n_edgar = len(edgar_signals.columns) if not edgar_signals.empty else 0
+
+    signal_matrix = build_signal_matrix(ohlcv_returns, fred_signals, edgar_signals)
     n_signals = len(signal_matrix.columns) if not signal_matrix.empty else 0
 
-    print(f" done. {len(actor_ids)} actors, {n_ohlcv} OHLCV + {n_fred} FRED = {n_signals} signals")
+    print(f" done. {len(actor_ids)} actors, {n_ohlcv} OHLCV + {n_fred} FRED + {n_edgar} EDGAR = {n_signals} signals")
 
     # --- Generate windows ----------------------------------------------------
     if single_window is not None:
@@ -903,6 +957,7 @@ def run_a1(
         "n_actors_intensity": len(actor_ids),
         "n_signals_ohlcv": n_ohlcv,
         "n_signals_fred": n_fred,
+        "n_signals_edgar": n_edgar,
         "regimes_tested": regimes,
         "windows": len(windows),
         "falsification": not skip_falsification,
