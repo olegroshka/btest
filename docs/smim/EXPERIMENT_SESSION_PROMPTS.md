@@ -315,8 +315,10 @@ The component value table from B1 is the centrepiece of the paper's results sect
 
 ### Session B2 — Spectral Method Comparison
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** DMD wins (R2=0.359, +0.020 vs PCA/Schur at 0.339). H2a SUPPORTED: data-driven DMD
+outperforms all static operator decompositions. Schur/Polar/Hermitian identical (operator nearly
+symmetric). DMD captures temporal dynamics directly from snapshots. Runner: `scripts/run_smim_b2.py`.
 
 **Prompt:**
 ```

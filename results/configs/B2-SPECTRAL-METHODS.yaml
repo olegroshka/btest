@@ -1,0 +1,13 @@
+experiment_id: B2-SPECTRAL-METHODS
+timestamp: '2026-03-30 00:18:50'
+methods:
+- schur
+- polar
+- hermitian_dilation
+- directed_variation
+- dmd
+- extended_dmd
+- pca
+n_windows: 10
+K: 3
+winner: dmd
