@@ -55,9 +55,8 @@ def _format_cmd(argv: list[str]) -> str:
 
 
 def _pytest_launcher() -> list[str]:
-    # Prefer uv (matches README), but keep a graceful fallback.
-    if shutil.which("uv"):
-        return ["uv", "run", "pytest"]
+    # Always use python -m pytest; avoids PATH lookup failures on Windows where
+    # `uv run pytest` fails with "program not found" even when pytest is installed.
     return [sys.executable, "-m", "pytest"]
 
 

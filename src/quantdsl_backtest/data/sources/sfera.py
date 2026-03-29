@@ -1,25 +1,28 @@
 """
-Sfera PostgreSQL data-source adapters for btest.
+Sfera PostgreSQL data-source adapter for btest.
 
-Two URI schemes:
+One URI scheme for everything:
 
-    sfera://schema/table
-        Generic adapter — returns TimeSeriesBundle.
-        Works with ANY table in sfera: bond yields, macro, spreads,
-        event data, intelligence findings — anything with a date column.
+    sfera://schema/table[?date_col=x&ticker_col=y&deprecated_filter=0]
 
-        Example:
-            DataConfig(source="sfera://mxbdprc/bond_market_data",
-                       frequency="1d")
+The adapter auto-detects what to return based on DataConfig.kind:
+  - kind="market_bars"  → MarketBarsBundle  (OHLCV price data)
+  - kind="timeseries"   → TimeSeriesBundle  (any other data: macro, yields, events…)
 
-    sfera-bars://schema/table
-        Price adapter — returns MarketBarsBundle (OHLCV shape).
-        Use only when the table has open/high/low/close/volume columns
-        (or close at minimum), and a ticker/instrument column.
+Sfera is one database — no need for a separate URI prefix.
 
-        Example:
-            DataConfig(source="sfera-bars://bbgidx/index_prices",
-                       frequency="1d")
+Examples:
+    DataConfig(source="sfera://bbgidx/index_prices",       frequency="1d")
+    DataConfig(source="sfera://mxbdprc/bond_market_data",  frequency="1d")
+    DataConfig(source="sfera://ecocal/events?deprecated_filter=0")
+
+URI options:
+    date_col=<col>       Date/datetime column name  (default: auto-detect)
+    ticker_col=<col>     Instrument/ticker column    (default: auto-detect)
+    deprecated_filter=1  Add WHERE deprecated_at IS NULL  (default: 1)
+
+Backward-compat:  sfera-bars://schema/table  still accepted (treated as
+                  sfera:// with kind=market_bars).
 
 Configuration
 ─────────────
@@ -27,15 +30,6 @@ All connection credentials come from sfera-db (env vars or .env file):
     DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 
 No credentials are hardcoded here — safe to push to public repos.
-
-URI options (appended as query-string style params after '?'):
-    date_col=<col>      Date/datetime column name  (default: auto-detect)
-    ticker_col=<col>    Instrument/ticker column    (default: auto-detect)
-    deprecated_filter=1 Add WHERE deprecated_at IS NULL  (default: 1)
-
-Examples with options:
-    sfera://mxbdprc/bond_yields?date_col=tradedate&deprecated_filter=1
-    sfera-bars://bbgidx/index_prices?ticker_col=ticker&date_col=trade_date
 """
 
 from __future__ import annotations
@@ -144,7 +138,10 @@ def _coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
     """Coerce all non-datetime object columns to numeric where possible."""
     for col in df.columns:
         if df[col].dtype == object:
-            df[col] = pd.to_numeric(df[col], errors="ignore")
+            try:
+                df[col] = pd.to_numeric(df[col])
+            except (ValueError, TypeError):
+                pass  # leave non-numeric columns as-is
     return df
 
 
@@ -205,42 +202,69 @@ def _fetch_raw(uri: _ParsedUri, start: str, end: str) -> pd.DataFrame:
     return df
 
 
-# ── TimeSeriesBundle adapter (generic — any sfera table) ─────────────────────
+# ── Unified Sfera adapter ────────────────────────────────────────────────────
 
 @dataclass(slots=True)
-class SferaTimeSeriesSource:
+class SferaSource:
     """
-    Generic sfera adapter — returns a TimeSeriesBundle.
+    Single adapter for all Sfera PostgreSQL tables.
 
     URI:  sfera://schema/table[?date_col=x&ticker_col=y&deprecated_filter=0]
 
-    If a ticker/instrument column is detected the data is split per instrument.
-    If not (e.g. pure macro series), the whole table is returned as one entity
-    keyed by "schema/table".
+    The return type is determined by DataConfig.kind (from the strategy):
+      - kind="market_bars"  → MarketBarsBundle  (OHLCV price data)
+      - kind="timeseries"   → TimeSeriesBundle  (macro, yields, events, …)
 
-    Works for:
-        • Bond yields / spreads   (mxbdprc.bond_yields, mxbdprc.bond_market_data)
-        • Macro / econ calendar   (tvcal.*, bbgidx.*)
-        • Intelligence findings   (intelligence.findings)
-        • Any future sfera table
+    Sfera is one database — one URI scheme is enough.  The old sfera-bars://
+    prefix is still accepted for backward compatibility.
+
+    OHLCV column aliases are normalised automatically:
+        open_price → open,  close_price → close, etc.
+
+    Examples:
+        DataConfig(source="sfera://bbgidx/index_prices",      kind="market_bars")
+        DataConfig(source="sfera://mxbdprc/bond_market_data", kind="timeseries")
     """
 
-    name: str = "sfera_timeseries"
+    name: str = "sfera"
 
     def can_load(self, request: DataRequest) -> bool:
         src = request.source.lower()
-        return src.startswith(SFERA_PREFIX) and not src.startswith(SFERA_BARS_PREFIX)
+        return src.startswith(SFERA_PREFIX) or src.startswith(SFERA_BARS_PREFIX)
 
     def load(
         self,
         request: DataRequest,
         universe: Optional[Universe],
         cache: Optional[CacheStore],
-    ) -> TimeSeriesBundle:
+    ) -> DataBundle:
         uri = _parse_uri(request.source)
         df  = _fetch_raw(uri, request.start, request.end)
 
+        # Determine intent from request.kind; sfera-bars:// always means market_bars
+        want_bars = (
+            request.kind == KIND_MARKET_BARS
+            or request.source.lower().startswith(SFERA_BARS_PREFIX)
+        )
+
+        # ── common: filter by universe instruments ───────────────────────────
+        instr_col = uri.ticker_col or _detect_col(df, _TICKER_CANDIDATES)
+        entities_filter = (
+            universe.static_instruments
+            if universe is not None and universe.static_instruments
+            else None
+        )
+        if instr_col and df is not None and not df.empty and entities_filter:
+            df = df[df[instr_col].isin(entities_filter)]
+
         if df.empty:
+            if want_bars:
+                return MarketBarsBundle(
+                    kind=KIND_MARKET_BARS, source=request.source,
+                    start=request.start, end=request.end,
+                    frequency=request.frequency,
+                    bars={}, instruments=[], fields=[],
+                )
             return TimeSeriesBundle(
                 kind=KIND_TIME_SERIES, source=request.source,
                 start=request.start, end=request.end,
@@ -248,17 +272,52 @@ class SferaTimeSeriesSource:
                 frames={}, entities=[], fields=[],
             )
 
-        # apply universe instrument filter if provided
-        instr_col = uri.ticker_col or _detect_col(df, _TICKER_CANDIDATES)
-        entities_filter = (
-            universe.static_instruments
-            if universe is not None and universe.static_instruments
-            else None
-        )
-        if instr_col and entities_filter:
-            df = df[df[instr_col].isin(entities_filter)]
+        # ── market bars path ─────────────────────────────────────────────────
+        if want_bars:
+            # normalise OHLCV column names (also handles Bloomberg-style aliases)
+            col_map: Dict[str, str] = {}
+            lower = {c.lower(): c for c in df.columns}
+            for std in _OHLCV_CANDIDATES:
+                for alias in [std, f"{std}_price", f"{std[0]}_{std[1:]}"]:
+                    if alias in lower:
+                        col_map[lower[alias]] = std
+                        break
+            df = df.rename(columns=col_map)
 
-        # split into per-entity frames (or return whole table as one entity)
+            if "close" not in df.columns:
+                raise ValueError(
+                    f"sfera table {uri.schema}.{uri.table} has no close-price column — "
+                    f"cannot load as market_bars. Columns found: {list(df.columns)}. "
+                    f"Use kind='timeseries' if this is not OHLCV data."
+                )
+
+            bars: Dict[str, pd.DataFrame] = {}
+            ohlcv_cols = [c for c in _OHLCV_CANDIDATES if c in df.columns]
+
+            if instr_col and instr_col in df.columns:
+                for instr, sub in df.groupby(instr_col):
+                    sub = sub.drop(columns=[instr_col])
+                    keep  = [c for c in ohlcv_cols if c in sub.columns]
+                    extra = [c for c in sub.columns if c not in keep]
+                    bars[str(instr)] = sub[keep + extra]
+            else:
+                keep  = [c for c in ohlcv_cols if c in df.columns]
+                extra = [c for c in df.columns if c not in keep]
+                bars[uri.table] = df[keep + extra]
+
+            instruments = list(bars.keys())
+            fields = list(next(iter(bars.values())).columns) if bars else []
+
+            return MarketBarsBundle(
+                kind=KIND_MARKET_BARS, source=request.source,
+                start=request.start, end=request.end,
+                frequency=request.frequency,
+                calendar=getattr(request, "calendar", None),
+                tz=getattr(request, "tz", None),
+                bars=bars, instruments=instruments, fields=fields,
+            )
+
+        # ── time-series path ─────────────────────────────────────────────────
         frames: Dict[str, pd.DataFrame] = {}
         if instr_col and instr_col in df.columns:
             for entity, sub in df.groupby(instr_col):
@@ -268,8 +327,7 @@ class SferaTimeSeriesSource:
                     sub = sub[keep] if keep else sub
                 frames[str(entity)] = sub
         else:
-            entity_key = f"{uri.schema}/{uri.table}"
-            frames[entity_key] = df
+            frames[f"{uri.schema}/{uri.table}"] = df
 
         entities = list(frames.keys())
         fields   = list(next(iter(frames.values())).columns) if frames else []
@@ -282,95 +340,6 @@ class SferaTimeSeriesSource:
         )
 
 
-# ── MarketBarsBundle adapter (OHLCV tables only) ─────────────────────────────
-
-@dataclass(slots=True)
-class SferaMarketBarsSource:
-    """
-    OHLCV-specific sfera adapter — returns a MarketBarsBundle.
-
-    URI:  sfera-bars://schema/table[?ticker_col=x&date_col=y]
-
-    The table must have at minimum a 'close' column.
-    Columns are mapped:  open/high/low/close/volume  (case-insensitive).
-
-    Use for:
-        • bbgidx.index_prices    (Bloomberg index OHLCV)
-        • Any future equity price table added to sfera
-    """
-
-    name: str = "sfera_market_bars"
-
-    def can_load(self, request: DataRequest) -> bool:
-        return (request.kind == KIND_MARKET_BARS
-                and request.source.lower().startswith(SFERA_BARS_PREFIX))
-
-    def load(
-        self,
-        request: DataRequest,
-        universe: Optional[Universe],
-        cache: Optional[CacheStore],
-    ) -> MarketBarsBundle:
-        uri = _parse_uri(request.source)
-        df  = _fetch_raw(uri, request.start, request.end)
-
-        if df.empty:
-            return MarketBarsBundle(
-                kind=KIND_MARKET_BARS, source=request.source,
-                start=request.start, end=request.end,
-                frequency=request.frequency,
-                bars={}, instruments=[], fields=[],
-            )
-
-        # detect ticker column
-        instr_col = uri.ticker_col or _detect_col(df, _TICKER_CANDIDATES)
-        entities_filter = (
-            universe.static_instruments
-            if universe is not None and universe.static_instruments
-            else None
-        )
-        if instr_col and entities_filter:
-            df = df[df[instr_col].isin(entities_filter)]
-
-        # normalise OHLCV column names (close is mandatory, rest optional)
-        col_map: Dict[str, str] = {}
-        lower = {c.lower(): c for c in df.columns}
-        for std in _OHLCV_CANDIDATES:
-            # also handle Bloomberg-style aliases: close_price → close, etc.
-            for alias in [std, f"{std}_price", f"{std[0]}_{std[1:]}"]:
-                if alias in lower:
-                    col_map[lower[alias]] = std
-                    break
-        df = df.rename(columns=col_map)
-
-        if "close" not in df.columns:
-            raise ValueError(
-                f"sfera-bars table {uri.schema}.{uri.table} has no close-price column. "
-                f"Columns found: {list(df.columns)}. "
-                f"Use sfera:// (TimeSeriesBundle) instead if this is not price data."
-            )
-
-        bars: Dict[str, pd.DataFrame] = {}
-        ohlcv_cols = [c for c in _OHLCV_CANDIDATES if c in df.columns]
-
-        if instr_col and instr_col in df.columns:
-            for instr, sub in df.groupby(instr_col):
-                sub = sub.drop(columns=[instr_col])
-                keep = [c for c in ohlcv_cols if c in sub.columns]
-                extra = [c for c in sub.columns if c not in keep]
-                bars[str(instr)] = sub[keep + extra]
-        else:
-            # single-instrument table — use table name as key
-            keep = [c for c in ohlcv_cols if c in df.columns]
-            extra = [c for c in df.columns if c not in keep]
-            bars[uri.table] = df[keep + extra]
-
-        instruments = list(bars.keys())
-        fields = list(next(iter(bars.values())).columns) if bars else []
-
-        return MarketBarsBundle(
-            kind=KIND_MARKET_BARS, source=request.source,
-            start=request.start, end=request.end,
-            frequency=request.frequency, calendar=request.calendar, tz=request.tz,
-            bars=bars, instruments=instruments, fields=fields,
-        )
+# ── Backward-compat aliases (import name unchanged) ──────────────────────────
+SferaMarketBarsSource  = SferaSource   # was: sfera-bars:// only
+SferaTimeSeriesSource  = SferaSource   # was: sfera:// only (timeseries)

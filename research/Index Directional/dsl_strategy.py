@@ -113,17 +113,12 @@ _ivol_z = ZScoreRolling(
     window=IVOL_WINDOW,
     min_periods=IVOL_WINDOW // 2,
 )
-_ivol_ok = MaskFromBoolean(
-    name="ivol_ok",
-    expr=Less(left="ivol_z", right=IVOL_Z_THRESH),
-)
-_tkan_ok = MaskFromBoolean(
-    name="tkan_ok",
-    expr=GreaterEqual(left="tkan_pred", right=TKAN_THRESH),
-)
 _entry_signal = MaskFromBoolean(
     name="entry_signal",
-    expr=And(left="tkan_ok", right="ivol_ok"),
+    expr=And(
+        left=GreaterEqual(left="tkan_pred", right=TKAN_THRESH),
+        right=Less(left="ivol_z", right=IVOL_Z_THRESH),
+    ),
 )
 
 # 1e. Portfolio
@@ -163,10 +158,8 @@ strategy = Strategy(
         "ivol_raw":  _ivol_raw,
     },
     signals={
-        "ivol_z":       _ivol_z,
-        "ivol_ok":      _ivol_ok,
-        "tkan_ok":      _tkan_ok,
-        "entry_signal": _entry_signal,
+        "ivol_z":       _ivol_z,       # continuous z-score — kept for charting & sweep
+        "entry_signal": _entry_signal,  # trading signal — TKAN bullish AND IVol regime OK
     },
     portfolio=_portfolio,
     execution=_execution,
@@ -260,7 +253,9 @@ result = runner.run(
 
 position    = result["position"]
 entry       = result["entry"]
-strat_ret   = result["strat_ret"]
+strat_ret   = result["strat_ret"]      # net of commission + slippage
+gross_ret   = result["gross_ret"]      # pre-cost
+cost_ret    = result["cost_ret"]       # cost drag per bar
 daily_ret   = result["daily_ret"]
 tkan_score  = result["factors"]["tkan_pred"]
 ivol_z_vals = result["signals"]["ivol_z"]
@@ -273,6 +268,21 @@ print(f"    tkan_pred  : {tkan_score.notna().sum():,} non-null rows")
 print(f"    tkan_pred range : min={tkan_score.min():.4f}  max={tkan_score.max():.4f}  mean={tkan_score.mean():.4f}")
 print(f"    tkan_pred pct>0 : {100*(tkan_score>0).mean():.1f}%  (should not be near 0% or 100% if model works)")
 print(f"    weights path    : {_WEIGHTS / 'pred_cache.pkl'}")
+trade_days  = (position.diff().abs().fillna(0) > 0).sum()
+print(f"    trade days : {trade_days}  |  total cost drag : {cost_ret.sum()*100:.2f}%  ({cost_ret[cost_ret>0].mean()*10_000:.1f} bps avg per trade)")
+
+# Per-day ledger — inspect or export
+ledger = pd.DataFrame({
+    "position":   position,
+    "tkan_pred":  tkan_score,
+    "ivol_z":     ivol_z_vals,
+    "bh_ret":     daily_ret,
+    "gross_ret":  gross_ret,
+    "cost_ret":   cost_ret,
+    "net_ret":    strat_ret,
+    "equity":     equity_strat,
+})
+ledger.index.name = "date"
 
 
 # =============================================================================
@@ -288,13 +298,14 @@ def _sig(mask):
     return mask.shift(1).fillna(False).infer_objects(copy=False).astype(int)
 
 ivol_sig = _sig(ivol_z_vals < IVOL_Z_THRESH)
-tkan_sig = _sig(result["signals"]["tkan_ok"])
+tkan_sig = _sig(tkan_score >= TKAN_THRESH)
 
 rows = [
-    compute_metrics(bh_ret,                      bh_ret, bh_pos,   "Buy & Hold"),
+    compute_metrics(bh_ret,                        bh_ret, bh_pos,   "Buy & Hold"),
     compute_metrics((ivol_sig * bh_ret).fillna(0), bh_ret, ivol_sig, "IVol z-score"),
     compute_metrics((tkan_sig * bh_ret).fillna(0), bh_ret, tkan_sig, "TKAN v3"),
-    compute_metrics(strat_ret,                   bh_ret, position, "TKAN + IVol (DSL)"),
+    compute_metrics(gross_ret,                     bh_ret, position, "TKAN + IVol (gross)"),
+    compute_metrics(strat_ret,                     bh_ret, position, "TKAN + IVol (net)"),
 ]
 
 metrics_df = pd.DataFrame(rows).set_index("Label")
@@ -310,31 +321,7 @@ print(f"\n  saved → {out_path}")
 
 
 # =============================================================================
-# ── 6. Signum — 4-pane diagnostic chart ──────────────────────────────────────
-#
-# Pane 1 — CACT price with signal-state shading:
-#           ■ green  = TKAN+IVol combined → strategy is long
-#           ■ amber  = TKAN is bullish but IVol regime blocked the entry
-#           (no shade = neither signal active)
-#
-# Pane 2 — Raw signal inputs (the "why"):
-#           baseline = TKAN 5-day cumulative prediction (green ≥ 0, red < 0)
-#           line     = IVol z-score; dashed horizontal = gate threshold
-#           Reading: when baseline is green AND line is below the gate → both
-#           conditions met → strategy enters (green shade on pane 1)
-#
-# Pane 3 — Binary activity timeline (when was each component ON?):
-#           lane ③ (top)    = combined TKAN+IVol  [green]
-#           lane ②          = IVol regime open     [blue]
-#           lane ① (bottom) = TKAN signal          [amber]
-#           Compare ② vs ① to see how often the IVol gate is the binding
-#           constraint vs TKAN being the binding constraint.
-#
-# Pane 4 — Equity curves — one line per signal layer:
-#           grey  = Buy & Hold benchmark
-#           amber = IVol regime filter alone (no TKAN)
-#           red   = TKAN alone (no IVol gate)
-#           green = combined strategy  ← target
+# ── 6. Diagnostic chart ───────────────────────────────────────────────────────
 # =============================================================================
 
 try:
@@ -344,136 +331,95 @@ except ImportError:
     Dashboard = None
 
 if Dashboard is not None:
-    # ── Derived signal states ─────────────────────────────────────────────
-    tkan_on  = result["signals"]["tkan_ok"]         # TKAN pred ≥ threshold
-    ivol_ok  = result["signals"]["ivol_ok"]         # IVol regime favourable
-    combined = tkan_on & ivol_ok                    # both ON → actual long
-    blocked  = tkan_on & ~ivol_ok                   # TKAN bullish, IVol says no
     idx      = df.index
+    tkan_on  = tkan_score >= TKAN_THRESH
+    ivol_ok  = ivol_z_vals < IVOL_Z_THRESH
+    combined = tkan_on & ivol_ok
+    blocked  = tkan_on & ~ivol_ok
 
-    def shade_df(mask):
-        """Position DataFrame (0/1) for shade() — accepts DatetimeIndex."""
-        return pd.DataFrame(
-            {"position": mask.reindex(idx).fillna(False).astype(int)},
-            index=idx,
-        )
+    def _shade(mask):
+        return pd.DataFrame({"position": mask.reindex(idx).fillna(False).astype(int)}, index=idx)
 
-    eq_bh       = (1 + bh_ret).cumprod()
-    eq_ivol     = (1 + (ivol_sig * bh_ret).fillna(0)).cumprod()
-    eq_tkan     = (1 + (tkan_sig * bh_ret).fillna(0)).cumprod()
-    eq_combined = equity_strat
+    def _binary(mask):
+        return mask.reindex(idx).fillna(False).astype(int)
 
-    # Pull metrics for legend annotation
-    m_strat = metrics_df.loc["TKAN + IVol (DSL)"]
-    m_bh    = metrics_df.loc["Buy & Hold"]
+    def _roll_sharpe(ret_s, w=252):
+        mu = ret_s.rolling(w, min_periods=w // 2).mean()
+        sd = ret_s.rolling(w, min_periods=w // 2).std()
+        return (mu / (sd + 1e-9)) * np.sqrt(252)
 
-    def step_line(mask, on_val, off_val):
-        return pd.Series(
-            np.where(mask.reindex(idx).fillna(False), float(on_val), float(off_val)),
-            index=idx,
-        )
+    eq_bh   = (1 + bh_ret).cumprod()
+    eq_ivol = (1 + (ivol_sig * bh_ret).fillna(0)).cumprod()
+    eq_tkan = (1 + (tkan_sig * bh_ret).fillna(0)).cumprod()
+    eq_strat = equity_strat
 
-    # ── Pane 1 — Equity curves: result first ─────────────────────────────
-    # All curves rebased to 1.0. Strategy (green) vs B&H (grey) is the primary
-    # comparison. IVol-only (amber) and TKAN-only (red) isolate each component.
+    m  = metrics_df.loc["TKAN + IVol (net)"]
+    mb = metrics_df.loc["Buy & Hold"]
+
+    # 1 — Equity curves
     pane1 = Chart(watermark="Equity curves — rebased to 1.0", theme="dark", height=300)
-    pane1.line(eq_bh.rename("bh"),
-               name="Buy & Hold",
-               color="#78909c", width=1)
-    pane1.line(eq_ivol.rename("ivol"),
-               name="IVol regime only",
-               color="#f9a825", width=1)
-    pane1.line(eq_tkan.rename("tkan"),
-               name="TKAN v3 only",
-               color="#ef5350", width=1)
-    pane1.line(eq_combined.rename("combined"),
-               name="TKAN + IVol (strategy)",
-               color="#66bb6a", width=2)
+    pane1.line(eq_bh.rename("bh"),       name="Buy & Hold",          color="#78909c", width=1)
+    pane1.line(eq_ivol.rename("ivol"),   name="IVol regime only",    color="#f9a825", width=1)
+    pane1.line(eq_tkan.rename("tkan"),   name="TKAN v3 only",        color="#ef5350", width=1)
+    pane1.line(eq_strat.rename("strat"), name="TKAN + IVol (net)",   color="#66bb6a", width=2)
     pane1.stats_legend({
-        "── Strategy ──":    "",
-        "Total Return":      f"{m_strat['TotalReturn']:.1f}%",
-        "CAGR":              f"{m_strat['CAGR']:.1f}%",
-        "Sharpe":            f"{m_strat['Sharpe']:.2f}",
-        "Max DD":            f"{m_strat['MaxDD']:.1f}%",
-        "In-market":         f"{m_strat['InMktPct']:.0f}%",
-        "── Buy & Hold ──":  "",
-        "B&H Total Return":  f"{m_bh['TotalReturn']:.1f}%",
-        "B&H CAGR":          f"{m_bh['CAGR']:.1f}%",
-        "B&H Sharpe":        f"{m_bh['Sharpe']:.2f}",
-        "B&H Max DD":        f"{m_bh['MaxDD']:.1f}%",
+        "── Strategy ──":   "",
+        "Total Return":     f"{m['TotalReturn']:.1f}%",
+        "CAGR":             f"{m['CAGR']:.1f}%",
+        "Sharpe":           f"{m['Sharpe']:.2f}",
+        "Max DD":           f"{m['MaxDD']:.1f}%",
+        "In-market":        f"{m['InMktPct']:.0f}%",
+        "── Buy & Hold ──": "",
+        "B&H Total Return": f"{mb['TotalReturn']:.1f}%",
+        "B&H CAGR":         f"{mb['CAGR']:.1f}%",
+        "B&H Sharpe":       f"{mb['Sharpe']:.2f}",
+        "B&H Max DD":       f"{mb['MaxDD']:.1f}%",
     }, position="top-left")
 
-    # ── Pane 2 — CACT price + entry shading ──────────────────────────────
-    # Green background = strategy is long. Amber = TKAN bullish but IVol blocked it.
-    pane2 = Chart(
-        watermark="CACT total return  |  green bg = strategy long  |  amber bg = TKAN bullish but IVol regime blocked entry",
-        theme="dark", height=250,
-    )
-    pane2.line(df["close"].rename("close"), name="CACT total return index", color="#7cb9e8", width=2)
-    pane2.shade(shade_df(combined), color="#66bb6a", opacity=0.15)
-    pane2.shade(shade_df(blocked),  color="#f9a825", opacity=0.12)
+    # 2 — CACT price + entry shading
+    pane2 = Chart(watermark="CACT  |  green = long  |  amber = TKAN bullish, IVol blocked", theme="dark", height=250)
+    pane2.line(df["close"].rename("close"), name="CACT TR index", color="#7cb9e8", width=2)
+    pane2.shade(_shade(combined), color="#66bb6a", opacity=0.15)
+    pane2.shade(_shade(blocked),  color="#f9a825", opacity=0.12)
 
-    # ── Pane 3 — TKAN 5-day cumulative return prediction ─────────────────
-    # Baseline chart: green fill = model predicts positive 5d return (→ entry signal ON).
-    # Red fill = model predicts negative return (→ signal OFF).
-    # Scale is ~[-0.05, +0.05] log return — looks flat if mixed with IVol (0–8 range).
-    pane3 = Chart(
-        watermark=f"TKAN v3: 5-day cumulative return prediction  |  green fill = bullish (pred >= {TKAN_THRESH})  |  red fill = bearish",
-        theme="dark", height=180,
-    )
-    pane3.baseline(
-        tkan_score.rename("tkan_pred"),
-        base_value=float(TKAN_THRESH),
-        title=f"TKAN 5d pred (sum r1..r5)",
-        topFillColor1="rgba(102,187,106,0.40)", topFillColor2="rgba(102,187,106,0.08)",
-        bottomFillColor1="rgba(239,83,80,0.35)", bottomFillColor2="rgba(239,83,80,0.08)",
-        topLineColor="#66bb6a", bottomLineColor="#ef5350",
-    )
-    pane3.price_line(float(TKAN_THRESH), title="entry threshold (0)", color="rgba(255,255,255,0.3)")
+    # 3 — TKAN prediction
+    pane3 = Chart(watermark=f"TKAN 5d cumulative prediction  |  green = bullish (≥ {TKAN_THRESH})  |  red = bearish", theme="dark", height=160)
+    pane3.baseline(tkan_score.rename("tkan_pred"), base_value=float(TKAN_THRESH),
+                   title="TKAN 5d pred",
+                   topFillColor1="rgba(102,187,106,0.40)", topFillColor2="rgba(102,187,106,0.08)",
+                   bottomFillColor1="rgba(239,83,80,0.35)", bottomFillColor2="rgba(239,83,80,0.08)",
+                   topLineColor="#66bb6a", bottomLineColor="#ef5350")
+    pane3.price_line(float(TKAN_THRESH), title=f"threshold {TKAN_THRESH}", color="rgba(255,255,255,0.3)")
 
-    # ── Pane 4 — IVol z-score (regime filter) ────────────────────────────
-    # Amber line = IVol z-score relative to 6-month rolling mean.
-    # BELOW dashed threshold (z < 1.0) = low-fear regime = IVol gate OPEN → allow entries.
-    # ABOVE threshold = elevated fear / vol spike = gate CLOSED → block entries even if TKAN bullish.
-    pane4 = Chart(
-        watermark=(
-            f"IVol z-score  —  (IVol − rolling {IVOL_WINDOW}d mean) / rolling {IVOL_WINDOW}d std  ({IVOL_WINDOW} trading days ≈ 6 months)  |  "
-            f"z < {IVOL_Z_THRESH} → IVol is BELOW its recent average → low-fear regime → gate OPEN  |  "
-            f"z ≥ {IVOL_Z_THRESH} → IVol spike above average → elevated fear → gate CLOSED"
-        ),
-        theme="dark", height=160,
-    )
-    pane4.line(ivol_z_vals.rename("ivol_z"),
-               name=f"IVol z-score  (gate opens when z < {IVOL_Z_THRESH})",
-               color="#f9a825", width=1)
-    pane4.price_line(IVOL_Z_THRESH, title=f"gate threshold z={IVOL_Z_THRESH}", color="#f9a825")
-    pane4.price_line(0.0,           title="zero",                              color="rgba(255,255,255,0.2)")
+    # 4 — IVol z-score
+    pane4 = Chart(watermark=f"IVol z-score ({IVOL_WINDOW}d)  |  z < {IVOL_Z_THRESH} = gate OPEN  |  z ≥ {IVOL_Z_THRESH} = gate CLOSED", theme="dark", height=140)
+    pane4.line(ivol_z_vals.rename("ivol_z"), name="IVol z-score", color="#f9a825", width=1)
+    pane4.price_line(IVOL_Z_THRESH, title=f"gate threshold {IVOL_Z_THRESH}", color="#f9a825")
+    pane4.price_line(0.0, title="zero", color="rgba(255,255,255,0.2)")
 
-    # ── Pane 5 — Signal ON/OFF timeline ──────────────────────────────────
-    # Step lines per component. Line HIGH = signal is ON, LOW = OFF.
-    # When green (③) is high → strategy is long.
-    # When amber (①) is high but green (③) is low → TKAN bullish but IVol blocked it.
-    # When blue (②) is high but green (③) is low → IVol open but TKAN is bearish.
-    pane5 = Chart(
-        watermark="Signal ON/OFF  |  ① TKAN bullish  ② IVol gate open  ③ Strategy long  |  HIGH=ON  LOW=OFF",
-        theme="dark", height=120,
-    )
-    pane5.line(step_line(combined, 2.8, 2.2).rename("combined"),
-               name="③ Strategy LONG (TKAN AND IVol both active)", color="#66bb6a", width=2)
-    pane5.line(step_line(ivol_ok,  1.8, 1.2).rename("ivol_gate"),
-               name="② IVol regime OK — gate open (z-score < 1.0)", color="#5b9bd5", width=2)
-    pane5.line(step_line(tkan_on,  0.8, 0.2).rename("tkan_signal"),
-               name="① TKAN bullish — 5d prediction >= 0",           color="#f9a825", width=2)
+    # 5a/b/c — Binary signals (0/1 each)
+    pane5a = Chart(watermark=f"① TKAN bullish  (pred ≥ {TKAN_THRESH})", theme="dark", height=80)
+    pane5a.line(_binary(tkan_on).rename("tkan"), name="TKAN bullish", color="#f9a825", width=1)
+
+    pane5b = Chart(watermark=f"② IVol gate open  (z < {IVOL_Z_THRESH})", theme="dark", height=80)
+    pane5b.line(_binary(ivol_ok).rename("ivol_gate"), name="IVol gate open", color="#5b9bd5", width=1)
+
+    pane5c = Chart(watermark="③ Strategy long  (① AND ②)", theme="dark", height=80)
+    pane5c.line(_binary(combined).rename("combined"), name="Strategy long", color="#66bb6a", width=1)
+
+    # 6 — Rolling Sharpe
+    pane6 = Chart(watermark="Rolling Sharpe (252-day)  |  green = strategy (net)  |  grey = B&H", theme="dark", height=140)
+    pane6.line(_roll_sharpe(bh_ret).rename("rs_bh"),     name="Buy & Hold",        color="#78909c", width=1)
+    pane6.line(_roll_sharpe(strat_ret).rename("rs_strat"), name="TKAN + IVol (net)", color="#66bb6a", width=2)
+    pane6.price_line(0.0, title="zero", color="rgba(255,255,255,0.2)")
+    pane6.shade(_shade(combined), color="#66bb6a", opacity=0.08)
 
     Dashboard(
-        panes=[pane1, pane2, pane3, pane4, pane5],
-        titles=[
-            "1 — Equity Curves (strategy result)",
-            "2 — CACT Price + Entry Regions",
-            "3 — TKAN Signal: 5-day return prediction",
-            "4 — IVol Regime Filter: z-score gate",
-            "5 — Signal ON/OFF Timeline",
-        ],
+        panes=[pane1, pane2, pane3, pane4, pane5a, pane5b, pane5c, pane6],
+        titles=["1 — Equity Curves", "2 — CACT Price",
+                "3 — TKAN Prediction", "4 — IVol z-score",
+                "5a — TKAN (0/1)", "5b — IVol gate (0/1)", "5c — Strategy (0/1)",
+                "6 — Rolling Sharpe"],
         theme="dark",
     ).show()
 
@@ -481,98 +427,12 @@ if Dashboard is not None:
 # =============================================================================
 # ── 7. Threshold sweep — TKAN cutoff ─────────────────────────────────────────
 # =============================================================================
+from quantdsl_backtest.utils.sweep import threshold_sweep
 
-t_range = np.percentile(tkan_score.dropna(), np.arange(5, 76, 5))
-sweep_rows = []
-
-for thr in t_range:
-    for ivol_gate in [False, True]:
-        tkan_mask = tkan_score >= thr
-        if ivol_gate:
-            mask  = tkan_mask & (ivol_z_vals < IVOL_Z_THRESH)
-            label = f"TKAN+IVol  thr={thr:.4f}"
-        else:
-            mask  = tkan_mask
-            label = f"TKAN only  thr={thr:.4f}"
-        pos_s = mask.shift(1).fillna(False).infer_objects(copy=False).astype(int)
-        ret_s = (pos_s * daily_ret).fillna(0)
-        m     = compute_metrics(ret_s, bh_ret, pos_s, label)
-        m["thr"]       = round(float(thr), 5)
-        m["ivol_gate"] = ivol_gate
-        sweep_rows.append(m)
-
-sweep_df = pd.DataFrame(sweep_rows).set_index("Label")
-print("\n── Threshold Sweep ──────────────────────────────────────────────────")
-print(sweep_df[["thr", "ivol_gate", "Sharpe", "CAGR", "MaxDD", "Calmar", "InMktPct"]].to_string())
-
-best = sweep_df["Sharpe"].idxmax()
-print(f"\n  ★ Best Sharpe → {best}  "
-      f"(Sharpe={sweep_df.loc[best,'Sharpe']:.3f}, "
-      f"CAGR={sweep_df.loc[best,'CAGR']:.1f}%, "
-      f"InMkt={sweep_df.loc[best,'InMktPct']:.0f}%)")
-
-# Sweep chart — matplotlib (Signum forces datetime x-axis; sweep needs numeric x)
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-
-tonly = sweep_df[~sweep_df["ivol_gate"]].sort_values("thr")
-tcomb = sweep_df[ sweep_df["ivol_gate"]].sort_values("thr")
-x     = tonly["thr"].values          # actual threshold values on x-axis
-
-BG   = "#131722"
-AX   = "#1e222d"
-RED  = "#ef5350"
-GRN  = "#66bb6a"
-GREY = "#78909c"
-WHT  = "#d1d4dc"
-
-fig, axes = plt.subplots(3, 1, figsize=(11, 8), sharex=True,
-                         gridspec_kw={"height_ratios": [3, 2, 2]})
-fig.patch.set_facecolor(BG)
-fig.suptitle("TKAN threshold sensitivity sweep  —  red = TKAN only,  green = TKAN + IVol regime filter",
-             color=WHT, fontsize=11, y=0.98)
-
-for ax in axes:
-    ax.set_facecolor(AX)
-    ax.tick_params(colors=GREY, labelsize=9)
-    ax.spines[:].set_color("#2a2e39")
-    for spine in ax.spines.values():
-        spine.set_linewidth(0.5)
-    ax.grid(axis="both", color="#2a2e39", linewidth=0.5, linestyle="--")
-
-# ── Panel 1 : Sharpe ──────────────────────────────────────────────────────────
-ax = axes[0]
-ax.plot(x, tonly["Sharpe"].values, color=RED, linewidth=2, label="TKAN only")
-ax.plot(x, tcomb["Sharpe"].values, color=GRN, linewidth=2, label="TKAN + IVol")
-ax.axhline(0, color=GREY, linewidth=0.8, linestyle=":")
-# mark the best combined point
-best_idx = tcomb["Sharpe"].idxmax()
-bx, by = tcomb.loc[best_idx, "thr"], tcomb.loc[best_idx, "Sharpe"]
-ax.scatter([bx], [by], color="white", zorder=5, s=60)
-ax.annotate(f"  ★ best  thr={bx:.4f}  Sharpe={by:.2f}",
-            (bx, by), color="white", fontsize=8, va="center")
-ax.set_ylabel("Sharpe ratio", color=WHT, fontsize=9)
-ax.legend(loc="lower left", fontsize=8, facecolor=AX, edgecolor="#2a2e39",
-          labelcolor=WHT, framealpha=0.85)
-
-# ── Panel 2 : CAGR ───────────────────────────────────────────────────────────
-ax = axes[1]
-ax.plot(x, tonly["CAGR"].values, color=RED, linewidth=1.5, label="TKAN only")
-ax.plot(x, tcomb["CAGR"].values, color=GRN, linewidth=2,   label="TKAN + IVol")
-ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.1f%%"))
-ax.set_ylabel("CAGR", color=WHT, fontsize=9)
-
-# ── Panel 3 : In-market % ─────────────────────────────────────────────────────
-ax = axes[2]
-ax.plot(x, tonly["InMktPct"].values, color=RED, linewidth=1.5, label="TKAN only")
-ax.plot(x, tcomb["InMktPct"].values, color=GRN, linewidth=2,   label="TKAN + IVol")
-ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.0f%%"))
-ax.set_ylabel("In-market %", color=WHT, fontsize=9)
-ax.set_xlabel("TKAN 5d-return threshold  (lower = more permissive, more in-market)",
-              color=GREY, fontsize=9)
-
-fig.tight_layout()
-plt.savefig(str(_HERE / "sweep_chart.png"), dpi=130, bbox_inches="tight",
-            facecolor=BG)
-plt.show()
-print(f"  sweep chart saved → {_HERE / 'sweep_chart.png'}")
+sweep_df = threshold_sweep(
+    factor    = tkan_score,
+    gate      = ivol_z_vals < IVOL_Z_THRESH,
+    daily_ret = daily_ret,
+    bh_ret    = bh_ret,
+)
+# inspect: sweep_df.sort_values("Sharpe", ascending=False)

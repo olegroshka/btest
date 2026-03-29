@@ -3,7 +3,7 @@ import pandas as pd
 
 from quantdsl_backtest.data.schema import MarketData
 from quantdsl_backtest.engine.factor_engine import FactorEngine
-from quantdsl_backtest.dsl.factors import ReturnFactor, VolatilityFactor, FiboRetraceFactor
+from quantdsl_backtest.dsl.factors import ReturnFactor, VolatilityFactor, FiboRetraceFactor, ExternalFactor, FieldFactor
 
 
 def _make_md(index: pd.DatetimeIndex, instruments: list[str], close_panel: pd.DataFrame,
@@ -87,3 +87,50 @@ def test_fibo_retrace_factor_basic():
     lo = low.rolling(2, min_periods=2).min()
     expected = lo + (hi - lo) * 0.5
     pd.testing.assert_frame_equal(out, expected)
+
+
+# ── ExternalFactor / FieldFactor — Index Directional DSL nodes ───────────────
+
+
+def test_external_factor_node_construction():
+    """ExternalFactor stores name, path, and optional column without error."""
+    ef = ExternalFactor(name="tkan_pred", path="/some/path/pred_cache.pkl", column=None)
+    assert ef.name == "tkan_pred"
+    assert ef.path == "/some/path/pred_cache.pkl"
+    assert ef.column is None
+
+    ef_col = ExternalFactor(name="tkan_r1", path="/data/preds.parquet", column="r1")
+    assert ef_col.column == "r1"
+
+
+def test_field_factor_node_construction():
+    """FieldFactor stores name and field without error."""
+    ff = FieldFactor(name="ivol_raw", field="ivol")
+    assert ff.name == "ivol_raw"
+    assert ff.field == "ivol"
+
+
+def test_external_factor_unsupported_by_factor_engine():
+    """FactorEngine raises TypeError for ExternalFactor (handled by TimingRunner)."""
+    import pytest
+    idx = pd.date_range("2020-01-01", periods=3, freq="D")
+    close = pd.DataFrame([[100.0], [101.0], [102.0]], index=idx, columns=["A"])
+    md = _make_md(idx, ["A"], close)
+    engine = FactorEngine(md, close)
+
+    ef = ExternalFactor(name="tkan_pred", path="/dummy.pkl")
+    with pytest.raises(TypeError, match="Unsupported factor node type"):
+        engine.compute("tkan_pred", ef)
+
+
+def test_field_factor_unsupported_by_factor_engine():
+    """FactorEngine raises TypeError for FieldFactor (handled by TimingRunner)."""
+    import pytest
+    idx = pd.date_range("2020-01-01", periods=3, freq="D")
+    close = pd.DataFrame([[100.0], [101.0], [102.0]], index=idx, columns=["A"])
+    md = _make_md(idx, ["A"], close)
+    engine = FactorEngine(md, close)
+
+    ff = FieldFactor(name="ivol_raw", field="ivol")
+    with pytest.raises(TypeError, match="Unsupported factor node type"):
+        engine.compute("ivol_raw", ff)

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, Union
 
 from .data_config import DataConfig
 from .signals import SignalNode
 from .universe import Universe
 from .factors import FactorNode
-from .portfolio import LongShortPortfolio
+from .portfolio import LongShortPortfolio, TimingPortfolio
 from .execution import Execution
 from .costs import Costs
 from .backtest_config import BacktestConfig
@@ -31,7 +31,7 @@ class Strategy:
     factors: Dict[str, FactorNode]
     signals: Dict[str, SignalNode]          # you’ll replace `object` with a proper base class later
 
-    portfolio: LongShortPortfolio
+    portfolio: Union[LongShortPortfolio, TimingPortfolio]
     execution: Execution
     costs: Costs
     backtest: BacktestConfig
