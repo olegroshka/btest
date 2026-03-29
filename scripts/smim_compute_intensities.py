@@ -86,7 +86,7 @@ GDELT_ACTOR_MAP: dict[str, str] = {
     "inst_sec_us":  "actor_SEC",
     "inst_boe_uk":  "actor_BOE",
     "inst_imf":     "actor_IMF",
-    "inst_fca_uk":  None,   # not in GDELT — will use IMF proxy
+    "inst_fca_uk":  "actor_BOE",   # proxy: BoE narrative (closest UK regulatory signal in GDELT)
 }
 
 # ── A1-compliant quarterly pivot builder ─────────────────────────────────────
@@ -542,9 +542,17 @@ def compute_registry_intensities(
     equity_actors = [a for a in registry.actors if a.actor_type in equity_types]
     if equity_actors:
         panel, method = compute_equity_intensities(equity_actors, edgar_df, quarter_ends)
-        # If EDGAR returned no data for equity actors (e.g. UK equities not on SEC EDGAR),
-        # fall back to OHLCV rolling 12-month return cross-section rank.
-        if panel.empty or panel.isna().all().all():
+
+        # Identify actors with no EDGAR coverage (all-NaN column).
+        # This handles mixed US+UK registries (e.g. experiment_a1, MIXED-200) where
+        # the whole-panel fallback never fires because US actors have EDGAR data.
+        all_nan_ids: set[str] = {
+            a.actor_id for a in equity_actors
+            if a.actor_id in panel.columns and panel[a.actor_id].isna().all()
+        }
+
+        # Whole-panel fallback (pure non-EDGAR universes such as UK-LC, UK-MC).
+        if not all_nan_ids and (panel.empty or panel.isna().all().all()):
             if universe_id:
                 log.info(
                     "    EDGAR equity panel empty for %s — falling back to "
@@ -553,9 +561,75 @@ def compute_registry_intensities(
                 panel, method = compute_ohlcv_return_intensities(
                     equity_actors, universe_id, quarter_ends
                 )
-        long = _panel_to_long(panel, quarter_starts, method, "equity")
-        frames.append(long)
-        log.info("    Equity: %d actors, %d obs", len(equity_actors), len(long))
+            long = _panel_to_long(panel, quarter_starts, method, "equity")
+            frames.append(long)
+            log.info("    Equity: %d actors, %d obs", len(equity_actors), len(long))
+
+        else:
+            # Emit EDGAR-covered actors.
+            edgar_cols = [c for c in panel.columns if c not in all_nan_ids]
+            if edgar_cols:
+                long = _panel_to_long(panel[edgar_cols], quarter_starts, method, "equity")
+                frames.append(long)
+                log.info("    Equity (EDGAR/%s): %d actors, %d obs",
+                         method, len(edgar_cols), len(long))
+
+            # Per-actor OHLCV fallback for actors with no EDGAR coverage.
+            # ONLY applied for non-US geographies (e.g. UK) — actors from EDGAR-reporting
+            # jurisdictions (US) that lack a CapEx tag have a data-pipeline gap and must
+            # be fixed by fetching alternative EDGAR tags (see G-13 in data_audit.md).
+            # Using OHLCV proxy for US actors would mix M-A and M-B in the same cross-section,
+            # degrading rank stability below threshold (empirically: ρ drops from 0.759 → 0.699
+            # for US-LC-ENERGY when 9/21 actors get OHLCV fallback).
+            # Each non-US geography is ranked within its own OHLCV cross-section (A2 compliant).
+            if all_nan_ids:
+                missing_actors = [a for a in equity_actors if a.actor_id in all_nan_ids]
+                # Separate: non-US actors eligible for OHLCV; US actors logged as data gap.
+                non_us_missing = [a for a in missing_actors if a.geography != "US"]
+                us_missing = [a for a in missing_actors if a.geography == "US"]
+                if us_missing:
+                    log.warning(
+                        "    %d US equity actors have no EDGAR CapEx tag — "
+                        "no OHLCV fallback applied (data gap, see G-13): %s",
+                        len(us_missing), [a.actor_id for a in us_missing],
+                    )
+                if non_us_missing:
+                    log.info(
+                        "    Per-actor OHLCV fallback for %d non-US equity actors with no EDGAR data",
+                        len(non_us_missing),
+                    )
+                    _geo_search: dict[str, list[str]] = {
+                        "UK": ["UK-LC", "UK-MC"],
+                    }
+                    still_missing: list[Actor] = []
+                    for geo, uni_list in _geo_search.items():
+                        remaining = [a for a in non_us_missing if a.geography == geo]
+                        if not remaining:
+                            continue
+                        for uni in uni_list:
+                            ohlcv_panel, ohlcv_method = compute_ohlcv_return_intensities(
+                                remaining, uni, quarter_ends
+                            )
+                            covered = [c for c in ohlcv_panel.columns
+                                       if not ohlcv_panel[c].isna().all()]
+                            if covered:
+                                ohlcv_long = _panel_to_long(
+                                    ohlcv_panel[covered], quarter_starts, ohlcv_method, "equity"
+                                )
+                                frames.append(ohlcv_long)
+                                log.info(
+                                    "      %s OHLCV (%s): %d/%d actors covered",
+                                    geo, uni, len(covered), len(remaining),
+                                )
+                                remaining = [a for a in remaining if a.actor_id not in set(covered)]
+                            if not remaining:
+                                break
+                        still_missing.extend(remaining)
+                    if still_missing:
+                        log.warning(
+                            "    %d non-US equity actors still uncovered after OHLCV fallback: %s",
+                            len(still_missing), [a.actor_id for a in still_missing],
+                        )
 
     if not frames:
         return pd.DataFrame(columns=["actor_id", "period", "intensity_value", "normalisation_method"])

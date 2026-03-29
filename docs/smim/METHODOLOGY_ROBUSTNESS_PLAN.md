@@ -140,4 +140,4 @@ C4a (M-B vs M-B) remains the only valid cross-geography experiment.
 | `UK-LC_intensities.parquet` | UK-LC | M-B | 7,237 | 0.732 | 0.722 |
 | `UK-MC_intensities.parquet` | UK-MC | M-B | 6,480 | 0.720 | 0.722 |
 | `MIXED-200_intensities.parquet` | MIXED-200 | M-A+M-B | 4,316 | 0.789 | 0.811 |
-| `experiment_a1_intensities.parquet` | experiment_a1 (103 actors) | M-A+M-B | 4,492 | 0.792 | 0.820 |
+| `experiment_a1_intensities.parquet` | experiment_a1 (103 in registry; 70 actors with computed intensities) | M-A+M-B | 4,492 | 0.792 | 0.820 |

@@ -62,7 +62,7 @@ btest parquet pipeline for OHLCV.
 
 | Feed ID | Signal Families Included | Data Sources | Notes |
 |---------|------------------------|--------------|-------|
-| `FULL` | All 6 families (macro, policy, market, balance sheet, narrative, network) | FRED, EDGAR, GDELT, BEA I/O, Yahoo Finance, central bank APIs | Maximum signal coverage |
+| `FULL` | All 6 families (macro, policy, market, balance sheet, narrative, network) | FRED, EDGAR, GDELT, BEA I/O, Yahoo Finance, central bank APIs | **G-11 disclosure**: BIS CBS/LBS adapter not built; cross-border financial-channel (C2) edges absent. Domestic substitutes present: BAMLH0A0HYM2, BAA10Y (credit spreads), TOTBKCR (bank credit), DRCCLACBS (delinquency). Impact is limited to cross-border contagion edges, primarily relevant for C4. |
 | `NO-NARRATIVE` | All except narrative | FRED, EDGAR, BEA I/O, Yahoo Finance | Tests narrative marginal value |
 | `NO-MARKET` | All except market pricing | FRED, EDGAR, GDELT, BEA I/O | Tests whether market signals dominate |
 | `NO-NETWORK` | All except network position | FRED, EDGAR, GDELT, Yahoo Finance | Tests supply-chain edge value |
@@ -94,10 +94,15 @@ experiments compare against.
 
 ```yaml
 experiment_id: A1-MVP-FULL
-description: "Full pipeline on MVP domain — the reference benchmark"
+description: >
+  Full pipeline on multi-sector MVP domain — the reference benchmark.
+  Universe: MIXED-200 (RP3 expansion: 103 actors in registry, 91 equity across 6 sectors US+UK,
+  12 institutional; however experiment_a1_intensities.parquet covers 70 actors with computed
+  intensities — N_registry=103, N_intensity=70; see G-12 in data_audit.md).
+  NOTE: signals=FULL excludes BIS cross-border banking edges (adapter not built; see G-11).
 universe: MIXED-200
 institutions: INST-US + INST-UK
-signals: FULL
+signals: FULL  # excludes BIS financial-channel edges; BEA I/O supply-chain edges present
 period: FULL-ROLL
 pipeline_depth: full  # all components active
 spectral_method: [best from WP3]  # use the G3-selected method
@@ -502,18 +507,38 @@ description: "Large cap model applied to mid and small cap"
 train_universe: US-LC
 train_period: 2010-2022
 
-test_iterations:
-  - test_universe: US-MC, transfer_mode: zero_shot
-  - test_universe: US-MC, transfer_mode: fine_tune
-  - test_universe: US-SC, transfer_mode: zero_shot
-  - test_universe: US-SC, transfer_mode: fine_tune
+# C3a (primary): homogeneous M-A intensities — balance-sheet investment allocation.
+# C3b (robustness): homogeneous M-B intensities — market-return proxy.
+# Both variants use US-SC_trimmed (N=94, 0 high-missing actors; RP4 2026-03-29).
+# US-SC_trimmed files: US-SC_trimmed_intensities.parquet (M-A), US-SC_trimmed_return_intensities.parquet (M-B).
+# Do NOT use US-SC (full 142-actor registry): 48/142 actors are high-missing (RP4 finding).
+
+iterations:
+  # C3a — primary
+  - variant: C3a
+    train_intensity: capex_assets_xsrank  # M-A
+    test_iterations:
+      - test_universe: US-MC,         test_intensity: capex_assets_xsrank, transfer_mode: zero_shot
+      - test_universe: US-MC,         test_intensity: capex_assets_xsrank, transfer_mode: fine_tune
+      - test_universe: US-SC_trimmed, test_intensity: capex_assets_xsrank, transfer_mode: zero_shot
+      - test_universe: US-SC_trimmed, test_intensity: capex_assets_xsrank, transfer_mode: fine_tune
+
+  # C3b — robustness check
+  - variant: C3b
+    train_intensity: return_12m_xsrank  # M-B
+    test_iterations:
+      - test_universe: US-MC,         test_intensity: return_12m_xsrank, transfer_mode: zero_shot
+      - test_universe: US-MC,         test_intensity: return_12m_xsrank, transfer_mode: fine_tune
+      - test_universe: US-SC_trimmed, test_intensity: return_12m_xsrank, transfer_mode: zero_shot
+      - test_universe: US-SC_trimmed, test_intensity: return_12m_xsrank, transfer_mode: fine_tune
 
 measurements: [L1, L3]
 ```
 
 **Expected output**: tests H5b (mid cap ≥70% retention) and H5c (small cap <50%
 due to data degradation). The gap between zero-shot and fine-tuned reveals
-what breaks across cap tiers.
+what breaks across cap tiers. C3a and C3b agreement validates result robustness
+across intensity methodology; divergence requires investigation (see METHODOLOGY_ROBUSTNESS_PLAN.md).
 
 ### Experiment C4: Cross-Geography Transfer
 
@@ -524,6 +549,19 @@ train_universe: US-LC
 train_institutions: INST-US
 train_period: 2010-2022
 
+# CRITICAL: C4 MUST use homogeneous intensity methodology (M-B) for both geographies.
+# M-A (capex_assets_xsrank) is EDGAR-based and unavailable for UK equities.
+# M-A and M-B are orthogonal constructs (median per-actor rho = -0.003, RP2 2026-03-29);
+# mixing them in a cross-geography comparison tests a confounded quantity, not methodology
+# sensitivity. C4b (US M-A vs UK M-B) is DROPPED. See METHODOLOGY_ROBUSTNESS_PLAN.md.
+#
+# Intensity files:
+#   train (US-LC): US-LC_return_intensities.parquet  (M-B)
+#   test  (UK-LC): UK-LC_intensities.parquet         (M-B, primary UK methodology)
+
+train_intensity: return_12m_xsrank  # M-B — must match test intensity
+test_intensity: return_12m_xsrank   # M-B — homogeneous with train
+
 test_iterations:
   - test_universe: UK-LC, test_institutions: INST-UK, transfer_mode: zero_shot
   - test_universe: UK-LC, test_institutions: INST-UK, transfer_mode: fine_tune
@@ -533,7 +571,8 @@ measurements: [L1, L3]
 
 **Expected output**: which components are geography-specific?
 Expectation: macro regimes transfer, edge weights don't, institutional actors
-need full re-specification.
+need full re-specification. Supplementary table should report US-LC gap estimates
+under both M-A and M-B to quantify the sensitivity to intensity methodology choice.
 
 ### Experiment C5: Cross-Period Transfer (Structural Break)
 
@@ -838,8 +877,8 @@ merely replicate VIX/volatility signals, they don't justify their complexity.
 | D6 | D | MIXED-200 | FULL | 1 | analysis only | High |
 | **Total** | | | | | **~680 pipeline runs** | |
 
-At ~5 minutes per pipeline run (N=200, T=80Q), total compute ≈ 57 hours.
-At ~15 minutes (N=500 or full signals), ≈ 170 hours. Parallelisable across runs.
+At ~5 minutes per pipeline run (N=103 for MIXED-200 post-RP3 expansion; N=200 for US-LC; T=80Q), total
+compute ≈ 40–57 hours. At ~15 minutes (full signals or US-LC), ≈ 100–170 hours. Parallelisable across runs.
 
 ---
 

@@ -1,6 +1,9 @@
-# SMIM Data Source Audit — MVP Energy US + UK
+# SMIM Data Source Audit — API Technical Reference
 
-**Experiment**: `experiments/mvp_energy_us_uk.yaml`
+> This file is the technical reference for data source APIs: endpoints, authentication, rate limits, response formats, key fields, and PIT compliance formulas.
+> For data status, quality gates, acquisition state, and gaps see **DATA_STATUS.md**.
+> For experiment configurations see **EXPERIMENT_PLAN.md**.
+
 **Scope**: 7 primary sources (FRED/ALFRED, EDGAR, GDELT, IMF, OECD, BEA, BIS)
 **Critical requirement**: every source must have its publication lag documented and
 honoured by the PIT store (Assumption A1).
@@ -110,13 +113,17 @@ between requests or the bulk ZIP downloads (recommended for full-panel pulls).
 
 | Tag (us-gaap namespace) | Description | Period type |
 |---|---|---|
-| `CapitalExpenditures` | Capital expenditures (cash flow statement) | Duration (quarterly/annual) |
-| `PaymentsToAcquirePropertyPlantAndEquipment` | CapEx — alternative tag used by some filers | Duration |
+| `PaymentsToAcquirePropertyPlantAndEquipment` | CapEx — primary modern tag (611 tickers) | Duration |
+| `CapitalExpenditures` | CapEx — legacy tag; **0 filings in current fetch; do not use** | Duration |
 | `Assets` | Total assets | Instant (period-end) |
 | `PropertyPlantAndEquipmentNet` | PP&E net (proxy for energy capital stock) | Instant |
 | `ResearchAndDevelopmentExpense` | R&D (relevant for energy transition firms) | Duration |
 | `LongTermDebtNoncurrent` | Long-term debt (leverage indicator) | Instant |
 | `Revenues` | Total revenues (denominator for intensity measures) | Duration |
+
+**Note on alternative CapEx tags**: 27+ US actors file CapEx under non-standard tags
+(`AdditionsToPropertyPlantAndEquipmentNet`, `PurchasesOfPropertyPlantAndEquipment`,
+company-specific variants). These are not yet fetched — see DATA_STATUS.md §4.4 (G-13).
 
 **Publication lag**: 10-Q must be filed within 40 days of quarter-end (large
 accelerated filers) or 45 days (accelerated filers). 10-K within 60 or 75 days
@@ -230,7 +237,6 @@ header or use the `SDMX_JSON.svc` endpoint prefix.
 | Database code | `IFS` |
 | Coverage | 190+ countries, 1948–present for some series |
 | Frequency codes | `A` (annual), `Q` (quarterly), `M` (monthly) |
-| Key indicator codes (energy-relevant) | |
 
 | Indicator | Code | Frequency | Coverage |
 |---|---|---|---|
@@ -269,6 +275,12 @@ international organisation signals (`INTL_ORG`).
 endpoint (`sdmx.oecd.org`) is more reliable than the legacy `stats.oecd.org`.
 
 **Response format**: SDMX-JSON (via `?format=jsondata`) or SDMX-ML XML.
+
+**Important**: Use explicit dimension keys, not `"all"`. The `"all"` key silently
+omits USA/GBR CLI series with METHODOLOGY=H (root cause of R2 remediation — returned
+only 244 rows instead of ~2,000). Always specify full dimension key strings:
+- CLI key: `USA+GBR.M.LI+BCICP+CCICP.IX._Z.AA.IX._Z.H` (9 dimensions)
+- QNA key: `Q.Y.USA+GBR.S1.S1.B1GQ_POP._Z._Z._Z.USD_PPP_PS.LR.LA.T0102` (13 dimensions)
 
 ### QNA Dataset (MVP target)
 
@@ -348,6 +360,10 @@ Used primarily for supply-chain edge estimation (channel C5).
 
 ## 7  BIS Statistics (CBS + LBS + PP)
 
+**Status: Not started** — No adapter has been built. BIS SDMX endpoint exploration
+is required before implementation. Not blocking any current Phase A–D experiments.
+See DATA_STATUS.md §5 G-11 for impact on FULL signal feed.
+
 ### Endpoints
 
 | Operation | URL pattern |
@@ -395,60 +411,14 @@ exposure provides financial channel (C2) edge weights. Layer 1 macro backdrop.
 
 ---
 
-## Coverage Gap Analysis
-
-### By Signal Family (Proposal §3)
-
-| Signal family | Source | Coverage | Gap |
-|---|---|---|---|
-| **Macro / policy rates** | FRED/ALFRED | Full (ALFRED vintage) | None — fully vintaged |
-| **Firm-level investment** | EDGAR XBRL | 2009+ quarterly | 2005–2008: annual 10-K only; no quarterly CapEx for pre-XBRL period |
-| **Narrative / sentiment** | GDELT 2.0 | 2013-02-19+ | 2005–2013: no narrative channel (C4); must exclude from pre-2013 edge estimation |
-| **International macro** | IMF IFS | 1948+ (un-vintaged) | No vintage archive; A1 compliance via lag buffer only |
-| **OECD macro aggregates** | OECD QNA | 1960+ (un-vintaged) | As IMF — no vintage |
-| **Supply-chain linkages** | BEA I/O | 1997+ (annual) | Long pub lag (18+ months); use 2-year lagged I/O for point-in-time supply-chain edges |
-| **Cross-border bank flows** | BIS CBS/LBS | 1977+ (quarterly, un-vintaged) | Reporting country breakdown available but industry breakdown limited to broad sectors |
-| **UK-specific regulatory** | BoE / OFGEM | Direct downloads only | Not covered by any of the 7 primary sources; requires manual scraping |
-| **Energy price volatility (UK)** | FRED | Limited (ICE Brent global) | No UK-specific natural gas spot (NBP) in FRED; needs direct ICE/Refinitiv download |
-
-### By Actor Layer
-
-| Layer | Sources | Coverage rating | Notes |
-|---|---|---|---|
-| 0 — Exogenous | FRED | ★★★★★ | ALFRED vintage; complete for MVP series |
-| 1 — Upstream | FRED + GDELT + IMF + OECD | ★★★☆☆ | Narrative gap 2005–2013; IMF/OECD un-vintaged |
-| 2 — Transmission | EDGAR + BIS | ★★★★☆ | EDGAR gap 2005–2008 (annual only); BIS industry breakdown coarse |
-| 3 — Downstream | BEA + EDGAR (aggregates) | ★★★☆☆ | BEA 18-month lag; SME XBRL coverage sparse |
-
-### PIT Store: Recommended pub_date Offsets
+## PIT Store: pub_date Offset Reference
 
 | Source | Recommended `pub_date` formula | Vintage available? |
 |---|---|---|
 | FRED/ALFRED | `realtime_start` parameter (exact vintage) | ✅ Yes |
 | EDGAR | `filed` date from submission index (exact) | ✅ Yes (immutable) |
-| GDELT | File timestamp from master list (exact) | ✅ Yes (append-only) |
+| GDELT | `week_start + 7 days` (data complete by Monday W+1) | ✅ Yes (append-only) |
 | IMF IFS | `reference_date + 90 days` (quarterly) | ❌ Buffer only |
 | OECD QNA | `reference_date + 75 days` (quarterly) | ❌ Buffer only |
 | BEA I/O | `reference_year_end + 548 days` (18 months) | ❌ Buffer only |
 | BIS CBS/LBS | `quarter_end + 105 days` (3.5 months) | ❌ Buffer only |
-
----
-
-## Implementation Priority for M1.2
-
-Adapters should be built in this order (highest data quality / lowest risk first):
-
-1. **FRED/ALFRED** — cleanest PIT compliance; needed for Layer 0 shocks and Layer 1
-   central bank signals; ALFRED vintage retrieval is unique value.
-2. **EDGAR** — largest actor coverage (all Layer 2 firms); exact filing dates
-   available; XBRL bulk frames allow efficient full-panel pulls.
-3. **GDELT** — append-only, no vintage issue; bulk CSV processing; covers
-   narrative channel C4 (2013+).
-4. **BEA I/O** — supply-chain edge estimation (C5); annual only; simplest
-   schema; long lag is handled by conservative PIT buffer.
-5. **IMF IFS** — macro backdrop; un-vintaged but low revision risk for
-   long-established series; needed for Layer 0/1.
-6. **BIS CBS** — financial channel edges (C2); coarser industry breakdown
-   limits precision; lower priority than EDGAR for Layer 2.
-7. **OECD QNA** — macro context; partially redundant with IMF IFS for MVP;
-   lowest priority.
