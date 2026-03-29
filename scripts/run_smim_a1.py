@@ -63,6 +63,7 @@ from quantdsl_backtest.smim.interfaces import (
     ActorType,
     DateRange,
     Layer,
+    ModalFrame,
     RelationChannel,
 )
 from quantdsl_backtest.smim.spectral.mode_selection import MDLModeSelector
@@ -402,49 +403,75 @@ def run_window(
         else:
             granger_adj = sp.csr_matrix((N, N))
 
-    # --- Multi-scale convolutional operator (Approach A) -----------------------
-    # Instead of imposing structure from Granger, LEARN the operator from the
-    # intensity data itself.  Apply temporal convolutions at 3 scales to
-    # discover which actors co-move at which timescales, then build a
-    # multi-resolution similarity operator.
+    # --- Synergy-guided iterative operator (Approach B) ------------------------
+    # Start with intensity correlation operator.  Then iterate:
+    #   1. Decompose → Kalman filter → compute synergy between mode pairs
+    #   2. Actors loading on high-synergy modes get stronger edges
+    #   3. Re-build operator with refined weights
+    # This learns an operator where edges reflect emergent interactions.
     with timed("learned_operator", timings):
-        scales = [4, 8, 16]  # quarters: 1yr, 2yr, 4yr
-        op_combined = np.zeros((N, N))
-        for scale in scales:
-            if obs_train.shape[0] < scale + 1:
-                continue
-            # Temporal convolution: rolling mean at this scale
-            # Each column is an actor's smoothed intensity trajectory
-            kernel = np.ones(scale) / scale
-            smoothed = np.apply_along_axis(
-                lambda x: np.convolve(x, kernel, mode="valid"), axis=0, arr=obs_train
-            )  # (T - scale + 1, N)
-            if smoothed.shape[0] < 2:
-                continue
-            # Cosine similarity between actors' smoothed trajectories
-            norms = np.linalg.norm(smoothed, axis=0, keepdims=True)  # (1, N)
-            norms = np.maximum(norms, 1e-10)
-            normed = smoothed / norms  # (T', N)
-            sim = normed.T @ normed  # (N, N) cosine similarity
-            np.fill_diagonal(sim, 0.0)
-            # Weight shorter scales higher (more data points, more reliable)
-            weight = 1.0 / np.log2(scale + 1)
-            op_combined += sim * weight
+        # Initial operator: intensity cross-correlation
+        corr_matrix = np.corrcoef(obs_train.T)  # (N, N)
+        corr_matrix = np.nan_to_num(corr_matrix, nan=0.0)  # constant actors → NaN corr
+        np.fill_diagonal(corr_matrix, 0.0)
+        corr_matrix[np.abs(corr_matrix) < 0.1] = 0.0
 
-        # Threshold weak edges
-        threshold = np.percentile(np.abs(op_combined[op_combined != 0]), 50) if np.any(op_combined != 0) else 0.1
-        op_combined[np.abs(op_combined) < threshold] = 0.0
-
-        # Add Granger edges as a directed layer on top
+        # Add Granger edges
         N_granger = granger_adj.shape[0]
         if N_granger > 0:
-            granger_dense = granger_adj.toarray() if sp.issparse(granger_adj) else granger_adj
+            g_dense = granger_adj.toarray() if sp.issparse(granger_adj) else granger_adj
             n_g = min(N_granger, N)
-            op_combined[:n_g, :n_g] += granger_dense[:n_g, :n_g] * 2.0  # weight Granger higher
+            corr_matrix[:n_g, :n_g] += g_dense[:n_g, :n_g] * 0.5
 
-        sparse_op = sp.csr_matrix(op_combined)
+        op_current = corr_matrix.copy()
+        K_iter = K_MIN
 
-    # --- Spectral decomposition ----------------------------------------------
+        n_refine = 3  # refinement iterations
+        for ref_iter in range(n_refine):
+            # Decompose current operator
+            mf_iter = SchurDecomposer().decompose(op_current, k=min(K_MAX_CANDIDATES, N))
+            U_iter = mf_iter.basis[:, :K_iter]
+            eig_iter = mf_iter.eigenvalues[:K_iter]
+            mf_k = ModalFrame(basis=U_iter, eigenvalues=eig_iter, method=mf_iter.method)
+
+            # Quick Kalman filter on training data
+            kf_iter = KalmanFilter()
+            state_iter = kf_iter.em_estimate(obs_train, mf_k, max_iter=20)
+
+            # Compute synergy from training states
+            alpha_iter = state_iter.alpha_filtered  # (T_train, K)
+            recon = alpha_iter @ U_iter.T
+            gaps_iter = (obs_train - recon).T  # (N, T_train)
+            try:
+                syn = compute_synergy_matrix(alpha_iter, gaps_iter, K_iter)
+            except Exception:
+                break  # can't compute synergy, stop refining
+
+            # Synergy-weighted actor coupling: actors that load heavily on
+            # high-synergy mode pairs should be more connected.
+            # coupling[i,j] = Σ_{m,n: m<n} |U[i,m] * U[j,n]| * S[m,n]
+            coupling = np.zeros((N, N))
+            for m in range(K_iter):
+                for n in range(m + 1, K_iter):
+                    s_mn = abs(syn[m, n])
+                    if s_mn < 1e-6:
+                        continue
+                    outer = np.abs(np.outer(U_iter[:, m], U_iter[:, n]))
+                    coupling += outer * s_mn
+
+            coupling = (coupling + coupling.T) / 2
+            np.fill_diagonal(coupling, 0.0)
+
+            # Blend: keep base correlation structure + add synergy coupling
+            blend = 0.3  # how much synergy influences the operator
+            op_current = (1 - blend) * corr_matrix + blend * coupling
+            # Re-threshold
+            threshold = np.percentile(np.abs(op_current[op_current != 0]), 40) if np.any(op_current != 0) else 0.05
+            op_current[np.abs(op_current) < threshold] = 0.0
+
+        sparse_op = sp.csr_matrix(op_current)
+
+    # --- Spectral decomposition (on refined operator) -------------------------
     op_dense = sparse_op.toarray()[:N, :N]
     K_cand = min(K_MAX_CANDIDATES, N)
 
@@ -457,7 +484,6 @@ def run_window(
         # MDL at T/N < 1 is too conservative (always K=1).  Apply K_min floor
         # to capture cross-sectional structure (sector, geography effects).
         if modal_frame.K < K_MIN and modal_frame_cand.K >= K_MIN:
-            from quantdsl_backtest.smim.interfaces import ModalFrame
             modal_frame = ModalFrame(
                 basis=modal_frame_cand.basis[:, :K_MIN],
                 eigenvalues=modal_frame_cand.eigenvalues[:K_MIN],

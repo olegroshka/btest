@@ -1,5 +1,5 @@
 experiment_id: A1-MVP-FULL
-timestamp: '2026-03-29 23:01:09'
+timestamp: '2026-03-29 23:04:09'
 registry: data\smim\registries\experiment_a1_registry.json
 intensities: data\smim\intensities\experiment_a1_intensities.parquet
 n_actors_registry: 93
@@ -14,7 +14,7 @@ regimes_tested:
 windows: 10
 falsification: false
 decision_gate: PASS
-mean_oos_r2: 0.280867
+mean_oos_r2: 0.305496
 per_window:
 - window_id: W2015
   best_M: 2
@@ -23,17 +23,17 @@ per_window:
   oos_r2_pred: 0.286484
   oos_r2_modal: 0.286484
 - window_id: W2016
-  best_M: 2
+  best_M: 1
   K: 3
   N: 92
-  oos_r2_pred: 0.140521
-  oos_r2_modal: 0.140521
+  oos_r2_pred: 0.19854
+  oos_r2_modal: 0.244032
 - window_id: W2017
-  best_M: 2
+  best_M: 1
   K: 3
   N: 92
-  oos_r2_pred: 0.116957
-  oos_r2_modal: 0.116957
+  oos_r2_pred: 0.188136
+  oos_r2_modal: 0.252757
 - window_id: W2018
   best_M: 2
   K: 3
@@ -41,11 +41,11 @@ per_window:
   oos_r2_pred: 0.293315
   oos_r2_modal: 0.293315
 - window_id: W2019
-  best_M: 2
+  best_M: 1
   K: 3
   N: 92
-  oos_r2_pred: 0.330724
-  oos_r2_modal: 0.330724
+  oos_r2_pred: 0.379808
+  oos_r2_modal: 0.411075
 - window_id: W2020
   best_M: 2
   K: 3
@@ -59,20 +59,20 @@ per_window:
   oos_r2_pred: 0.274326
   oos_r2_modal: 0.274326
 - window_id: W2022
-  best_M: 2
+  best_M: 1
   K: 3
   N: 93
-  oos_r2_pred: 0.273341
-  oos_r2_modal: 0.273341
+  oos_r2_pred: 0.314958
+  oos_r2_modal: 0.345016
 - window_id: W2023
-  best_M: 2
+  best_M: 1
   K: 3
   N: 93
-  oos_r2_pred: 0.324269
-  oos_r2_modal: 0.324269
+  oos_r2_pred: 0.345807
+  oos_r2_modal: 0.328686
 - window_id: W2024
-  best_M: 2
+  best_M: 1
   K: 3
   N: 93
-  oos_r2_pred: 0.363113
-  oos_r2_modal: 0.363113
+  oos_r2_pred: 0.367971
+  oos_r2_modal: 0.384789
