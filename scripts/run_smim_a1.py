@@ -82,6 +82,7 @@ OHLCV_PATHS = {
 FRED_PATH = PROJECT_ROOT / "data" / "smim" / "processed" / "fred_signals.parquet"
 
 K_MAX_CANDIDATES = 15
+K_MIN = 3                # MDL floor: at T/N < 1, MDL always picks K=1; force minimum
 TARGET_DENSITY = 0.15
 MAX_GRANGER_LAG = 2
 FALSIFICATION_B = 100
@@ -375,9 +376,18 @@ def run_window(
     with timed("spectral_decomposition", timings):
         modal_frame_cand = SchurDecomposer().decompose(op_dense, k=K_cand)
 
-    # --- Mode selection ------------------------------------------------------
+    # --- Mode selection (with K_min floor) ------------------------------------
     with timed("mode_selection", timings):
         modal_frame, _ = MDLModeSelector().select(modal_frame_cand, obs_train)
+        # MDL at T/N < 1 is too conservative (always K=1).  Apply K_min floor
+        # to capture cross-sectional structure (sector, geography effects).
+        if modal_frame.K < K_MIN and modal_frame_cand.K >= K_MIN:
+            from quantdsl_backtest.smim.interfaces import ModalFrame
+            modal_frame = ModalFrame(
+                basis=modal_frame_cand.basis[:, :K_MIN],
+                eigenvalues=modal_frame_cand.eigenvalues[:K_MIN],
+                method=modal_frame_cand.method,
+            )
 
     K = modal_frame.K
 
