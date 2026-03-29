@@ -82,7 +82,14 @@ class EmergenceAwareBenchmark:
                     interaction = alpha_p[:, j] * alpha_p[:, k] * S[j, k]
                     synergy_correction[:, j] += interaction * 0.5
                     synergy_correction[:, k] += interaction * 0.5
-            benchmarks_TN = benchmarks_TN + synergy_correction @ U.T
+            correction_obs = synergy_correction @ U.T  # (T, N)
+            # Damp: limit correction magnitude to 5% of base prediction RMS.
+            # Synergy estimation from T=40 is noisy; large corrections overshoot.
+            base_rms = max(np.sqrt(np.mean(benchmarks_TN ** 2)), 1e-8)
+            corr_rms = np.sqrt(np.mean(correction_obs ** 2))
+            if corr_rms > 0.05 * base_rms:
+                correction_obs *= (0.05 * base_rms) / corr_rms
+            benchmarks_TN = benchmarks_TN + correction_obs
 
         # Criticality scaling
         if self.criticality is not None:
