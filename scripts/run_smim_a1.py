@@ -622,9 +622,48 @@ def compute_emergence(
         crit_last = crit_train[-1] if len(crit_train) > 0 else 1.0
         crit_test = np.full(T_test, crit_last)
 
-        # --- Fix 3: Emergence-aware benchmark with reliable inputs -----------
+        # --- Fix 3: Cross-validated synergy weight ------------------------------
+        # Instead of fixed damping, find the optimal correction weight by
+        # splitting training into sub-train (first 80%) / sub-val (last 20%).
+        T_tr = obs_train.shape[0]
+        t_split = int(T_tr * 0.8)
+        if t_split >= 8 and T_tr - t_split >= 2:
+            obs_sub_val = obs_train[t_split:]
+            # Get filtered states for sub-val period
+            kf_cv = KalmanFilter(
+                F=state_train.params.get("F"),
+                Q=state_train.params.get("Q"),
+                R=state_train.params.get("R"),
+            )
+            state_cv = kf_cv.filter(obs_sub_val, modal_frame)
+            # Compute base prediction on sub-val
+            base_cv = state_cv.alpha_predicted @ U.T  # (T_sv, N)
+            actual_cv = obs_sub_val
+            # Compute synergy correction on sub-val
+            syn_corr_cv = np.zeros_like(base_cv)
+            for j_cv in range(K):
+                for k_cv in range(j_cv + 1, K):
+                    inter = state_cv.alpha_predicted[:, j_cv] * state_cv.alpha_predicted[:, k_cv] * synergy[j_cv, k_cv]
+                    mode_corr = np.zeros((base_cv.shape[0], K))
+                    mode_corr[:, j_cv] += inter * 0.5
+                    mode_corr[:, k_cv] += inter * 0.5
+                    syn_corr_cv += mode_corr @ U.T
+            # Grid search for best weight
+            best_w, best_r2_cv = 0.0, -1e10
+            for w in [0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5]:
+                combined_cv = base_cv + w * syn_corr_cv
+                r2_cv = float(oos_r_squared(combined_cv.T.ravel(), actual_cv.T.ravel()))
+                if r2_cv > best_r2_cv:
+                    best_r2_cv = r2_cv
+                    best_w = w
+        else:
+            best_w = 0.0  # fallback: no correction
+
+        # --- Apply CV-tuned weight to emergence benchmark ---------------------
+        # Scale synergy matrix by the CV-optimal weight before passing
+        synergy_scaled = synergy * best_w
         ea_bench = EmergenceAwareBenchmark(
-            synergy_matrix=synergy,
+            synergy_matrix=synergy_scaled,
             criticality=crit_test,
         )
         gap_ea = ea_bench.compute(obs_test, state_test, modal_frame, bench_registry)

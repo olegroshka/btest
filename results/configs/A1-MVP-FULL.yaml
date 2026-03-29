@@ -1,5 +1,5 @@
 experiment_id: A1-MVP-FULL
-timestamp: '2026-03-29 23:12:59'
+timestamp: '2026-03-29 23:14:14'
 registry: data\smim\registries\experiment_a1_registry.json
 intensities: data\smim\intensities\experiment_a1_intensities.parquet
 n_actors_registry: 93
