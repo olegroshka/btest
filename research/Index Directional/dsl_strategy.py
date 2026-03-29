@@ -28,8 +28,8 @@ import pandas as pd
 _HERE       = pathlib.Path(__file__).resolve().parent          # …/Index Directional/
 _BTEST_ROOT = _HERE.parents[1]                                  # btest/
 _WS_ROOT    = _BTEST_ROOT.parent                                # workspace root
-_TKAN_V3    = _HERE / "tkan" / "v3"
-_WEIGHTS    = _TKAN_V3 / "weights"
+_TKAN_VERSIONS = _HERE / "signals" / "tkan" / "versions"
+_WEIGHTS    = _TKAN_VERSIONS / "v3" / "weights"
 _OUTPUT     = _BTEST_ROOT / "outputs" / "idx_directional"
 _OUTPUT.mkdir(parents=True, exist_ok=True)
 
