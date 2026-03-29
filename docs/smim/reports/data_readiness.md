@@ -1,6 +1,6 @@
 # SMIM Data Readiness Report
 
-> Generated: 2026-03-28 (RP1 complete: BankCreditMapper cross-section rank fix; RP2 complete: dual-window ρ gate)
+> Generated: 2026-03-29 (RP1–RP3 complete)
 
 ## Experiment Readiness Matrix
 
@@ -15,17 +15,18 @@
 
 ## Intensity Quality Checks
 
-### experiment_a1 (N=23, 1,445 obs)
+### experiment_a1 (N=70, 4,492 obs)
 - Range [0,1]: PASS
-- Rank stability (mean Spearman rho): 0.844 | recent (2020–): 0.839 (PASS)
+- Rank stability (mean Spearman rho): 0.792 | recent (2020–): 0.820 (PASS)
 - High-missing actors (>50%): 1
 
 | ActorType | N | Mean | Std | Skew | NaN% |
 |-----------|---|------|-----|------|------|
+| bank | 620 | 0.550 | 0.287 | 0.000 | 0.00% |
 | central_bank | 88 | 0.414 | 0.282 | 0.689 | 0.00% |
 | global_shock | 584 | 0.349 | 0.288 | 0.693 | 0.00% |
 | intl_org | 44 | 0.106 | 0.203 | 2.866 | 0.00% |
-| large_firm | 685 | 0.548 | 0.288 | -0.001 | 0.00% |
+| large_firm | 3,112 | 0.511 | 0.289 | 0.000 | 0.00% |
 | regulator | 44 | 0.220 | 0.267 | 1.422 | 0.00% |
 
 ### experiment_fast (N=179, 10,413 obs)
@@ -57,14 +58,16 @@
 | regulator | 44 | 0.220 | 0.267 | 1.422 | 0.00% |
 | sector_leader | 521 | 0.440 | 0.309 | 0.218 | 0.00% |
 
-### MIXED-200 (N=12, 685 obs)
+### MIXED-200 (N=66, 4,316 obs)
 - Range [0,1]: PASS
-- Rank stability (mean Spearman rho): 0.759 | recent (2020–): 0.722 (PASS)
+- Rank stability (mean Spearman rho): 0.789 | recent (2020–): 0.811 (PASS)
 - High-missing actors (>50%): 1
 
 | ActorType | N | Mean | Std | Skew | NaN% |
 |-----------|---|------|-----|------|------|
-| large_firm | 685 | 0.548 | 0.288 | -0.001 | 0.00% |
+| bank | 620 | 0.550 | 0.287 | 0.000 | 0.00% |
+| global_shock | 584 | 0.349 | 0.288 | 0.693 | 0.00% |
+| large_firm | 3,112 | 0.511 | 0.289 | 0.000 | 0.00% |
 
 ### UK-LC (N=97, 7,237 obs)
 - Range [0,1]: PASS
@@ -132,7 +135,7 @@
 - Range [0,1]: PASS
 - Rank stability (mean Spearman rho): 0.653 | recent (2020–): 0.750 (PASS (recent))
 - High-missing actors (>50%): 11
-- **Note:** Full-period ρ=0.653 reflects tech sector structural transformation 2010–2020 (capital-light software → cloud/semiconductor capex). Trimming sparse actors or substituting R&D metrics makes ρ worse. Recent-period (2020–2025) ρ=0.750 PASS — sector has stabilised. Gate passes on recent window.
+- **Note:** Full-period ρ=0.653 reflects tech sector structural transformation 2010–2020 (capital-light software → cloud/semiconductor capex). Recent-period (2020–2025) ρ=0.750 PASS. Gate passes on recent window.
 
 | ActorType | N | Mean | Std | Skew | NaN% |
 |-----------|---|------|-----|------|------|
@@ -180,10 +183,12 @@
 
 ### Overall: DATA READY FOR EXPERIMENTS
 
-**Remediation summary (R1–R6 + RP1 + dual-window gate complete 2026-03-28):**
+**Remediation summary (R1–R6 + RP1–RP3 complete 2026-03-29):**
 - R1 ✅ FRED CPIMEDSL — 28/28 signals in PIT
 - R2 ✅ OECD explicit key fix — 1,922 rows
 - R3 ✅ Sector_leader degeneracy fixed; RP1 resolves bank ρ
 - R4 ✅ UK intensities — return_12m_xsrank; UK-LC ρ=0.732, UK-MC ρ=0.720
 - RP1 ✅ BankCreditMapper cross-section rank — US-LC-FINS ρ: -0.003 → 0.769
-- RP2 ✅ Dual-window ρ gate — US-LC-TECH: ρ_full=0.653, ρ_recent=0.750 PASS (recent)
+- RP1.5 ✅ Dual-window ρ gate — US-LC-TECH: ρ_full=0.653, ρ_recent=0.750 PASS
+- RP2 ✅ return_12m_xsrank for all universes; US-LC median ρ(capex,return)=-0.003 → C4 uses homogeneous methodology
+- RP3 ✅ MIXED-200 expanded: 38 → 103 actors (91 equity, 6 sectors, US+UK)

@@ -1,28 +1,92 @@
 ticker,name,sector,gics_code
-APA,APA Corporation,Energy,10.0
-BKR,Baker Hughes,Energy,10.0
-CVX,Chevron Corporation,Energy,10.0
-COP,ConocoPhillips,Energy,10.0
-CTRA,Coterra,Energy,10.0
-DVN,Devon Energy,Energy,10.0
-FANG,Diamondback Energy,Energy,10.0
-EOG,EOG Resources,Energy,10.0
-EQT,EQT Corporation,Energy,10.0
-EXE,Expand Energy,Energy,10.0
-XOM,ExxonMobil,Energy,10.0
-HAL,Halliburton,Energy,10.0
-KMI,Kinder Morgan,Energy,10.0
-MPC,Marathon Petroleum,Energy,10.0
-OXY,Occidental Petroleum,Energy,10.0
-OKE,Oneok,Energy,10.0
-PSX,Phillips 66,Energy,10.0
-SLB,Schlumberger,Energy,10.0
-TRGP,Targa Resources,Energy,10.0
-TPL,Texas Pacific Land Corporation,Energy,10.0
-VLO,Valero Energy,Energy,10.0
-WMB,Williams Companies,Energy,10.0
-BP.L,BP,,
-CNA.L,Centrica,,
-NG.L,National Grid plc,,
-SHEL.L,Shell plc,,
-SSE.L,SSE plc,,
+APA,APA Corporation,energy,
+BKR,Baker Hughes,energy,
+CVX,Chevron Corporation,energy,
+COP,ConocoPhillips,energy,
+CTRA,Coterra,energy,
+DVN,Devon Energy,energy,
+FANG,Diamondback Energy,energy,
+EOG,EOG Resources,energy,
+EQT,EQT Corporation,energy,
+XOM,ExxonMobil,energy,
+HAL,Halliburton,energy,
+KMI,Kinder Morgan,energy,
+MPC,Marathon Petroleum,energy,
+OXY,Occidental Petroleum,energy,
+OKE,Oneok,energy,
+PSX,Phillips 66,energy,
+SLB,Schlumberger,energy,
+TRGP,Targa Resources,energy,
+TPL,Texas Pacific Land Corporation,energy,
+VLO,Valero Energy,energy,
+WMB,Williams Companies,energy,
+BP.L,BP,diversified,
+CNA.L,Centrica,diversified,
+NG.L,National Grid plc,diversified,
+SHEL.L,Shell plc,diversified,
+SSE.L,SSE plc,diversified,
+ADI,Analog Devices,technology,
+CTSH,Cognizant,technology,
+FSLR,First Solar,technology,
+CRM,Salesforce,technology,
+TEL,TE Connectivity,technology,
+TXN,Texas Instruments,technology,
+VRSN,Verisign,technology,
+CSCO,Cisco,technology,
+INTU,Intuit,technology,
+MSFT,Microsoft,technology,
+AKAM,Akamai Technologies,technology,
+APH,Amphenol,technology,
+FFIV,"F5, Inc.",technology,
+MU,Micron Technology,technology,
+SNPS,Synopsys,technology,
+FITB,Fifth Third Bancorp,financials,
+PGR,Progressive Corporation,financials,
+RF,Regions Financial Corporation,financials,
+SPGI,S&P Global,financials,
+KEY,KeyCorp,financials,
+AMP,Ameriprise Financial,financials,
+AON,Aon plc,financials,
+AIZ,Assurant,financials,
+BAC,Bank of America,financials,
+BK,BNY Mellon,financials,
+BDX,Becton Dickinson,healthcare,
+BIIB,Biogen,healthcare,
+BSX,Boston Scientific,healthcare,
+BMY,Bristol Myers Squibb,healthcare,
+COR,Cencora,healthcare,
+CVS,CVS Health,healthcare,
+DVA,DaVita,healthcare,
+ELV,Elevance Health,healthcare,
+HUM,Humana,healthcare,
+MCK,McKesson Corporation,healthcare,
+AME,Ametek,industrials,
+BA,Boeing,industrials,
+CHRW,C.H. Robinson,industrials,
+CSX,CSX Corporation,industrials,
+DE,Deere & Company,industrials,
+DOV,Dover Corporation,industrials,
+FAST,Fastenal,industrials,
+HWM,Howmet Aerospace,industrials,
+ITW,Illinois Tool Works,industrials,
+NOC,Northrop Grumman,industrials,
+PWR,Quanta Services,industrials,
+RSG,Republic Services,industrials,
+ALW.L,Alliance Witan,diversified,
+AAL.L,Anglo American plc,diversified,
+ANTO.L,Antofagasta plc,diversified,
+ABF.L,Associated British Foods,diversified,
+AZN.L,AstraZeneca,diversified,
+AV.L,Aviva,diversified,
+BAB.L,Babcock International,diversified,
+BA.L,BAE Systems,diversified,
+BARC.L,Barclays,diversified,
+BTRW.L,Barratt Redrow,diversified,
+BEZ.L,Beazley,diversified,
+BKG.L,Berkeley Group Holdings,diversified,
+BATS.L,British American Tobacco,diversified,
+BLND.L,British Land,diversified,
+BNZL.L,Bunzl,diversified,
+BRBY.L,Burberry Group,diversified,
+CPG.L,Compass Group,diversified,
+CRDA.L,Croda International,diversified,

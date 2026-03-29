@@ -316,5 +316,5 @@ intensity) to C3/C4 experiment configs.
 | RP1: Fix BankCreditMapper | ✅ Complete | 2026-03-28 | Cross-section rank YoY asset growth; US-LC-FINS ρ: -0.003 → 0.769; US-LC ρ: 0.660 → 0.761 |
 | RP1.5: Dual-window ρ gate (US-LC-TECH) | ✅ Complete | 2026-03-28 | `quality_check_intensities()` now computes rho_full + rho_recent (2020–); gate passes if either ≥ 0.7; US-LC-TECH: ρ_full=0.653, ρ_recent=0.750 PASS |
 | RP2: Dual intensity (US return) | ✅ Complete | 2026-03-28 | return_12m_xsrank computed for 11 universes; US-LC median ρ(capex,return)=-0.003 → C4 requires homogeneous methodology (C4a: return vs return only) |
-| RP3: Expand MIXED-200 | ⬜ Pending | — | Depends on RP1 |
+| RP3: Expand MIXED-200 | ✅ Complete | 2026-03-29 | 38 → 103 actors (91 equity: energy+tech+fins+health+indus+UK, 12 institutional); experiment_a1 ρ=0.792 PASS |
 | RP4: Trim US-SC + robustness | ⬜ Pending | — | Depends on RP2 |

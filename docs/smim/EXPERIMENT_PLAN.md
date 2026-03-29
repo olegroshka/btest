@@ -47,7 +47,7 @@ btest parquet pipeline for OHLCV.
 | `US-LC-FINS` | US large cap, financials | 74 | S&P 500 Financials (GICS 40) — actual count | Gold | 2005–2025 |
 | `US-LC-HEALTH` | US large cap, healthcare | 60 | S&P 500 Health Care (GICS 35) — actual count | Gold | 2005–2025 |
 | `US-LC-INDUS` | US large cap, industrials | 78 | S&P 500 Industrials (GICS 20) — actual count | Gold | 2005–2025 |
-| `MIXED-200` | MVP experiment: mixed energy US+UK | ~27 equity + institutional | US+UK energy equity actors from MIXED-200 registry; N=200 was aspirational | Gold/Silver mix | 2005–2025 |
+| `MIXED-200` | Multi-sector, cross-geography MVP universe | 103 (91 equity, 12 institutional) | 6 sectors (energy, tech, fins, health, industrials, diversified), US+UK, all layers (L0–L2); expanded 2026-03-29 via RP3 | Gold/Silver mix | 2005–2025 |
 
 ### Institutional Actor Sets (Layers 0–1)
 
