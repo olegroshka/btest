@@ -510,8 +510,10 @@ Output:
 
 ### Session B6 — Robustness: Actor Count Sweep
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** Graph-factor OLS (L1) R2=0.70-0.82 across N=20-125, massively outperforming random
+walk (0.55-0.80). Kalman (L2) underperforms L1 at all N (overfit). Performance degrades gracefully
+with N (no cliff). DMD competitive with Schur. Runner: `scripts/run_smim_b6.py`.
 
 **Prompt:**
 ```

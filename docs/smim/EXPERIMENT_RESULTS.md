@@ -19,6 +19,7 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 | A2 | A | COMPLETE | 8 baselines; RW=0.305, AR1=0.425; SMIM matches RW | 2026-03-29 |
 | B1 | B | COMPLETE | Graph-factor OLS (0.328) > Kalman (0.291) > full (0.305) | 2026-03-29 |
 | B2 | B | COMPLETE | DMD wins (0.359); H2a supported (+0.020 vs PCA) | 2026-03-30 |
+| B6 | B | COMPLETE | L1 OLS R2=0.70-0.82 >> RW (0.55-0.80); graceful N degradation | 2026-03-30 |
 
 ---
 
