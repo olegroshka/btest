@@ -97,8 +97,9 @@ experiment_id: A1-MVP-FULL
 description: >
   Full pipeline on multi-sector MVP domain — the reference benchmark.
   Universe: MIXED-200 (RP3 expansion: 103 actors in registry, 91 equity across 6 sectors US+UK,
-  12 institutional; however experiment_a1_intensities.parquet covers 70 actors with computed
-  intensities — N_registry=103, N_intensity=70; see G-12 in data_audit.md).
+  12 institutional; experiment_a1_intensities.parquet covers 93 actors with computed
+  intensities — N_registry=103, N_intensity=93 (10 signal-only nodes: 9 US energy
+  actors no CapEx EDGAR tag G-13 + 1 institutional edge case; see DATA_STATUS.md §4.4).
   NOTE: signals=FULL excludes BIS cross-border banking edges (adapter not built; see G-11).
 universe: MIXED-200
 institutions: INST-US + INST-UK
