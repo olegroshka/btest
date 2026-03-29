@@ -8,22 +8,23 @@ from .requests import DataRequest
 from .sources.cache import SafeArcticCacheStore
 from .sources.registry import DataSourceRegistry
 from .sources.parquet import ParquetMarketBarsSource
+from .sources.csv_source import CsvMarketBarsSource
 from .sources.yahoo import YahooMarketBarsSource
 from .sources.fred import FredMarketBarsSource, FredTimeSeriesSource
-from .sources.sfera import SferaMarketBarsSource, SferaTimeSeriesSource
+from .sources.sfera import SferaSource
 
 
 def default_registry() -> DataSourceRegistry:
     reg = DataSourceRegistry()
     reg.register(ParquetMarketBarsSource())
+    reg.register(CsvMarketBarsSource())
     reg.register(YahooMarketBarsSource())
     reg.register(FredMarketBarsSource())
     reg.register(FredTimeSeriesSource())
-    # Sfera PostgreSQL — primary internal data store
-    # sfera-bars://schema/table  → MarketBarsBundle (OHLCV)
-    # sfera://schema/table       → TimeSeriesBundle (any other data)
-    reg.register(SferaMarketBarsSource())
-    reg.register(SferaTimeSeriesSource())
+    # Sfera PostgreSQL — single adapter handles sfera:// for both OHLCV and
+    # time-series data; return type is driven by DataConfig kind="market_bars"
+    # or kind="timeseries".  sfera-bars:// still accepted as a backward-compat alias.
+    reg.register(SferaSource())
     return reg
 
 
@@ -44,6 +45,10 @@ def default_cache_for_request(request: DataRequest):
         provider = "YF"
     if request.source.lower().startswith("parquet://"):
         provider = "PARQUET"
+    if request.source.lower().startswith("csv://"):
+        provider = "CSV"
+    if request.source.lower().startswith("sfera://") or request.source.lower().startswith("sfera-bars://"):
+        provider = "SFERA"
 
     return SafeArcticCacheStore(provider=provider, frequency=request.frequency)
 

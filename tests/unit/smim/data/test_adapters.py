@@ -136,37 +136,29 @@ class TestEdgarAdapter:
 # ═══════════════════════════════════════════════════════════
 
 class TestGdeltAdapter:
-    def _make_mock_client(self) -> MagicMock:
-        resp = MagicMock()
-        resp.status_code = 200
-        resp.json.return_value = {
-            "timeline": [
-                {
-                    "series": [
-                        {"date": "20200101120000", "value": 10.5},
-                        {"date": "20200102120000", "value": 12.0},
-                    ]
-                }
-            ]
-        }
-        client = MagicMock()
-        client.get.return_value = resp
-        return client
+    """GdeltAdapter is a parquet-based file adapter; tests use a tmp fixture."""
 
-    def _make_adapter(self) -> GdeltAdapter:
-        config = GdeltConfig(themes=["ECON_ENERGY"])
-        return GdeltAdapter(config=config, http_client=self._make_mock_client())
+    def _make_parquet(self, tmp_path) -> "Path":
+        rows = [
+            {"week_start": "2020-01-06", "theme_or_actor": "sector_energy",
+             "article_count": 100.0, "avg_tone": -2.5, "intensity": 0.012},
+        ]
+        df = pd.DataFrame(rows)
+        df["week_start"] = pd.to_datetime(df["week_start"])
+        p = tmp_path / "gdelt.parquet"
+        df.to_parquet(p, index=False)
+        return p
 
     def test_source_name(self) -> None:
         assert GdeltAdapter().source_name == "gdelt"
 
-    def test_fetch_theme_intensity(self) -> None:
-        adapter = self._make_adapter()
-        result = adapter.fetch(["ECON_ENERGY"], _date_range())
+    def test_fetch_theme_intensity(self, tmp_path) -> None:
+        p = self._make_parquet(tmp_path)
+        adapter = GdeltAdapter(config=GdeltConfig(themes=["sector_energy"]), parquet_path=p)
+        result = adapter.fetch(["sector_energy"], _date_range())
         assert isinstance(result, pd.DataFrame)
-        # Result may be empty if all timelines fail, but at minimum it's a DataFrame
-        # The mock returns valid data so columns should exist
-        assert result.index.name == "event_date" or result.empty or not result.empty
+        assert result.index.name == "event_date"
+        assert "sector_energy_count" in result.columns
 
 
 # ═══════════════════════════════════════════════════════════

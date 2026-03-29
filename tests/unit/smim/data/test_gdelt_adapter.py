@@ -1,8 +1,14 @@
-"""Tests for smim/data/adapters/gdelt.py."""
+"""Tests for smim/data/adapters/gdelt.py (parquet-based file adapter).
+
+The adapter was rewritten from an HTTP DOC-API client to a file-based parquet
+reader (scripts/smim_fetch_gdelt.py produces the canonical parquets).
+Tests use a temporary parquet fixture to stay self-contained.
+"""
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+import tempfile
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -19,170 +25,106 @@ def _date_range() -> DateRange:
     )
 
 
-def _make_timeline_response(dates_values: list[tuple[str, float]]) -> dict:
-    """Build a mock GDELT timeline API response (nested series format)."""
-    return {
-        "timeline": [
-            {
-                "series": [
-                    {"date": dt, "value": val} for dt, val in dates_values
-                ]
-            }
-        ]
-    }
+def _make_weekly_parquet(rows: list[dict], path: Path) -> Path:
+    """Write a minimal weekly-format parquet to *path* and return it."""
+    df = pd.DataFrame(rows)
+    df["week_start"] = pd.to_datetime(df["week_start"])
+    df.to_parquet(path, index=False)
+    return path
 
 
-def _make_flat_timeline_response(dates_values: list[tuple[str, float]]) -> dict:
-    """Build a mock GDELT timeline API response (flat format)."""
-    return {
-        "timeline": [{"date": dt, "value": val} for dt, val in dates_values]
-    }
-
-
-def _make_mock_client(vol_data: dict, tone_data: dict) -> object:
-    """Return a mock client that routes timelinevol vs timelinecovtone."""
-    client = MagicMock()
-
-    def _get(url: str, **kwargs):
-        resp = MagicMock()
-        resp.status_code = 200
-        if "timelinevol" in url:
-            resp.json.return_value = vol_data
-        else:
-            resp.json.return_value = tone_data
-        return resp
-
-    client.get.side_effect = _get
-    return client
+@pytest.fixture
+def tmp_parquet(tmp_path: Path) -> Path:
+    """Parquet with two signals across two weeks."""
+    rows = [
+        {"week_start": "2020-01-06", "theme_or_actor": "sector_energy",
+         "article_count": 100.0, "avg_tone": -2.5, "intensity": 0.012},
+        {"week_start": "2020-01-06", "theme_or_actor": "sector_tech",
+         "article_count": 80.0, "avg_tone": 1.0, "intensity": 0.008},
+        {"week_start": "2020-01-13", "theme_or_actor": "sector_energy",
+         "article_count": 120.0, "avg_tone": -3.0, "intensity": 0.015},
+    ]
+    p = tmp_path / "gdelt_narrative.parquet"
+    return _make_weekly_parquet(rows, p)
 
 
 # ── GdeltAdapter ──────────────────────────────────────────────────────────────
 
 class TestGdeltAdapter:
-    def _make_adapter(self, http_client=None) -> GdeltAdapter:
-        config = GdeltConfig(themes=["ECON_ENERGY"])
-        return GdeltAdapter(config=config, http_client=http_client or MagicMock())
+    def _make_adapter(self, parquet_path: Path | None = None) -> GdeltAdapter:
+        config = GdeltConfig(themes=["sector_energy"])
+        return GdeltAdapter(config=config, parquet_path=parquet_path)
 
     def test_source_name(self) -> None:
         assert self._make_adapter().source_name == "gdelt"
 
-    def test_returns_count_and_tone_columns(self) -> None:
-        vol = _make_timeline_response([("20200101000000", 10.0), ("20200102000000", 12.0)])
-        tone = _make_timeline_response([("20200101000000", -2.5), ("20200102000000", -3.0)])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
+    def test_returns_count_and_tone_columns(self, tmp_parquet: Path) -> None:
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], _date_range())
+        assert "sector_energy_count" in df.columns
+        assert "sector_energy_tone" in df.columns
+        assert "sector_energy_intensity" in df.columns
 
-        df = adapter.fetch(["ECON_ENERGY"], _date_range())
-        assert "ECON_ENERGY_count" in df.columns
-        assert "ECON_ENERGY_tone" in df.columns
-
-    def test_index_is_event_date(self) -> None:
-        vol = _make_timeline_response([("20200101000000", 10.0)])
-        tone = _make_timeline_response([("20200101000000", -1.0)])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
-
-        df = adapter.fetch(["ECON_ENERGY"], _date_range())
+    def test_index_is_event_date(self, tmp_parquet: Path) -> None:
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], _date_range())
         assert df.index.name == "event_date"
         assert isinstance(df.index, pd.DatetimeIndex)
 
-    def test_volume_is_daily_sum(self) -> None:
-        """Multiple intra-day rows for same date should be summed."""
-        vol = _make_timeline_response([
-            ("20200101000000", 5.0),
-            ("20200101060000", 3.0),  # same day
-        ])
-        tone = _make_timeline_response([("20200101000000", -1.0)])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
+    def test_volume_is_correct(self, tmp_parquet: Path) -> None:
+        """article_count for a given week should match the parquet value."""
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], _date_range())
+        val = df.loc[pd.Timestamp("2020-01-06"), "sector_energy_count"]
+        assert val == pytest.approx(100.0)
 
-        df = adapter.fetch(["ECON_ENERGY"], _date_range())
-        day_val = df.loc[pd.Timestamp("2020-01-01"), "ECON_ENERGY_count"]
-        assert day_val == pytest.approx(8.0)
+    def test_tone_is_correct(self, tmp_parquet: Path) -> None:
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], _date_range())
+        val = df.loc[pd.Timestamp("2020-01-06"), "sector_energy_tone"]
+        assert val == pytest.approx(-2.5)
 
-    def test_tone_is_daily_mean(self) -> None:
-        """Multiple tone observations per day should be averaged."""
-        vol = _make_timeline_response([("20200101000000", 10.0)])
-        tone = _make_timeline_response([
-            ("20200101000000", -2.0),
-            ("20200101120000", -4.0),  # same day
-        ])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
+    def test_as_of_restricts_rows(self, tmp_parquet: Path) -> None:
+        """as_of cuts off rows with week_start > as_of."""
+        as_of = pd.Timestamp("2020-01-10")
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], _date_range(), as_of=as_of)
+        assert pd.Timestamp("2020-01-13") not in df.index
+        assert pd.Timestamp("2020-01-06") in df.index
 
-        df = adapter.fetch(["ECON_ENERGY"], _date_range())
-        day_val = df.loc[pd.Timestamp("2020-01-01"), "ECON_ENERGY_tone"]
-        assert day_val == pytest.approx(-3.0)
+    def test_flat_timeline_format_parsed(self, tmp_parquet: Path) -> None:
+        """Rows within the date_range window appear in the output."""
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], _date_range())
+        assert pd.Timestamp("2020-01-13") in df.index
 
-    def test_as_of_restricts_url_end_datetime(self) -> None:
-        """as_of is applied as enddatetime in the GDELT API request URL."""
-        vol = _make_timeline_response([("20200101000000", 5.0)])
-        tone = _make_timeline_response([("20200101000000", -1.0)])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
-
-        as_of = pd.Timestamp("2020-01-15")
-        adapter.fetch(["ECON_ENERGY"], _date_range(), as_of=as_of)
-
-        # GDELT enddatetime should reflect as_of (YYYYMMDDHHMMSS format)
-        url = client.get.call_args_list[0][0][0]
-        assert "20200115" in url
-
-    def test_flat_timeline_format_parsed(self) -> None:
-        """GDELT can return flat list (not nested series)."""
-        vol = _make_flat_timeline_response([("20200103000000", 8.0)])
-        tone = _make_flat_timeline_response([("20200103000000", -0.5)])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
-
-        df = adapter.fetch(["ECON_ENERGY"], _date_range())
-        assert pd.Timestamp("2020-01-03") in df.index
-
-    def test_empty_timeline_returns_empty_dataframe(self) -> None:
-        client = MagicMock()
-        resp = MagicMock()
-        resp.status_code = 200
-        resp.json.return_value = {"timeline": []}
-        client.get.return_value = resp
-
-        adapter = self._make_adapter(http_client=client)
-        df = adapter.fetch(["ECON_ENERGY"], _date_range())
+    def test_empty_result_when_no_matching_rows(self, tmp_parquet: Path) -> None:
+        narrow = DateRange(
+            start=pd.Timestamp("2019-01-01"),
+            end=pd.Timestamp("2019-12-31"),
+        )
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], narrow)
         assert df.empty
 
-    def test_uses_config_themes_when_no_series_ids(self) -> None:
-        vol = _make_timeline_response([("20200101000000", 1.0)])
-        tone = _make_timeline_response([("20200101000000", -0.5)])
-        client = _make_mock_client(vol, tone)
+    def test_empty_series_ids_returns_all_signals(self, tmp_parquet: Path) -> None:
+        """fetch with empty list should return all signals in the parquet."""
+        df = self._make_adapter(tmp_parquet).fetch([], _date_range())
+        assert "sector_energy_count" in df.columns
+        assert "sector_tech_count" in df.columns
 
-        config = GdeltConfig(themes=["ECON_ENERGY", "HEALTH"])
-        adapter = GdeltAdapter(config=config, http_client=client)
+    def test_multiple_themes(self, tmp_parquet: Path) -> None:
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy", "sector_tech"], _date_range())
+        assert "sector_energy_count" in df.columns
+        assert "sector_tech_count" in df.columns
 
-        # fetch with empty list should use config themes
-        df = adapter.fetch([], _date_range())
-        assert "ECON_ENERGY_count" in df.columns
-        assert "HEALTH_count" in df.columns
+    def test_output_dtype_is_float64(self, tmp_parquet: Path) -> None:
+        df = self._make_adapter(tmp_parquet).fetch(["sector_energy"], _date_range())
+        assert df["sector_energy_count"].dtype == "float64"
+        assert df["sector_energy_tone"].dtype == "float64"
 
-    def test_multiple_themes(self) -> None:
-        vol = _make_timeline_response([("20200101000000", 5.0)])
-        tone = _make_timeline_response([("20200101000000", -1.0)])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
-
-        df = adapter.fetch(["ECON_ENERGY", "ECON_TRADE"], _date_range())
-        assert "ECON_ENERGY_count" in df.columns
-        assert "ECON_TRADE_count" in df.columns
-
-    def test_output_dtype_is_float64(self) -> None:
-        vol = _make_timeline_response([("20200101000000", 10.0)])
-        tone = _make_timeline_response([("20200101000000", -2.0)])
-        client = _make_mock_client(vol, tone)
-        adapter = self._make_adapter(http_client=client)
-
-        df = adapter.fetch(["ECON_ENERGY"], _date_range())
-        assert df["ECON_ENERGY_count"].dtype == "float64"
-        assert df["ECON_ENERGY_tone"].dtype == "float64"
-
-    def test_implements_data_adapter_protocol(self) -> None:
+    def test_implements_data_adapter_protocol(self, tmp_parquet: Path) -> None:
         from quantdsl_backtest.smim.interfaces import DataAdapter
-        adapter = self._make_adapter()
+        adapter = self._make_adapter(tmp_parquet)
         assert isinstance(adapter, DataAdapter)
+
+    def test_missing_parquet_raises_file_not_found(self) -> None:
+        adapter = GdeltAdapter(
+            config=GdeltConfig(),
+            parquet_path=Path("/nonexistent/path/gdelt.parquet"),
+        )
+        with pytest.raises(FileNotFoundError):
+            adapter.fetch(["sector_energy"], _date_range())

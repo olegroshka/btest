@@ -23,6 +23,8 @@ from ..dsl.factors import ExternalFactor, FieldFactor
 from ..dsl.portfolio import TimingPortfolio
 from ..dsl.signals import SignalNode
 from ..dsl.strategy import Strategy
+from ..models.costs import build_cost_model
+from ..models.slippage import build_slippage_model
 
 
 class SingleAssetRunner:
@@ -41,7 +43,7 @@ class SingleAssetRunner:
             price_close = df["close"],
             aux_series  = {"ivol": df["ivol"]},
         )
-        # result keys: position, entry, price, daily_ret, strat_ret, factors, signals
+        # result keys: position, entry, price, daily_ret, strat_ret, gross_ret, cost_ret, factors, signals
     """
 
     def __init__(self, strategy: Strategy, btest_root) -> None:
@@ -99,14 +101,38 @@ class SingleAssetRunner:
         )
 
         daily_ret = np.log(price_close / price_close.shift(1))
-        strat_ret = (position * daily_ret).fillna(0.0)
+        gross_ret = (position * daily_ret).fillna(0.0)
+
+        # ── Cost & slippage deduction ─────────────────────────────────────────
+        cost_model = build_cost_model(self.strategy.costs.commission)
+        slip_model = build_slippage_model(self.strategy.execution.slippage)
+
+        trades = position.diff().abs().fillna(0.0)  # 1.0 on entry/exit bars
+
+        # Commission as fraction of notional traded.
+        # commission_from_trade(qty=1, exec_price=p) / p cancels for bps_notional
+        # (→ constant bps/1e4) and gives amount/price for per_share.
+        prices_arr    = price_close.reindex(idx).values
+        comm_frac_arr = np.array([
+            cost_model.commission_from_trade(qty=1, exec_price=float(p)) / max(float(p), 1e-9)
+            for p in prices_arr
+        ])
+        comm_frac = pd.Series(comm_frac_arr, index=idx)
+
+        # Slippage: participation=0 (no volume data) → only base_bps fires
+        slip_frac = slip_model.slippage_bps_from_participation(0.0) / 1e4
+
+        cost_ret  = (trades * (comm_frac + slip_frac)).fillna(0.0)
+        strat_ret = gross_ret - cost_ret
 
         result = dict(
             position  = position,
             entry     = entry,
             price     = price_close,
             daily_ret = daily_ret.fillna(0.0),
-            strat_ret = strat_ret,
+            strat_ret = strat_ret,   # net of commission + slippage
+            gross_ret = gross_ret,   # pre-cost
+            cost_ret  = cost_ret,    # cost drag per bar (positive = drag)
             factors   = dict(self._computed),
             signals   = dict(self._signal_vals),
         )
