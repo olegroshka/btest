@@ -131,6 +131,7 @@ src/quantdsl_backtest/platform_ui/__init__.py
 src/quantdsl_backtest/smim/__init__.py
 src/quantdsl_backtest/smim/config.py
 src/quantdsl_backtest/smim/interfaces.py
+src/quantdsl_backtest/smim/profiling.py
 src/quantdsl_backtest/smim/data/__init__.py
 src/quantdsl_backtest/smim/data/actor_registry.py
 src/quantdsl_backtest/smim/data/coverage_report.py
