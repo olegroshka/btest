@@ -17,6 +17,7 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 | A4 | A | COMPLETE (v2) | scaling gate PASS; all OOS R² finite after NaN data fix | 2026-03-29 |
 | A1 | A | COMPLETE (v3) -- PASS gate | pred R2=0.305, modal R2=0.327 (best: 0.427) | 2026-03-29 |
 | A2 | A | COMPLETE | 8 baselines; RW=0.305, AR1=0.425; SMIM matches RW | 2026-03-29 |
+| B1 | B | COMPLETE | Graph-factor OLS (0.328) > Kalman (0.291) > full (0.305) | 2026-03-29 |
 
 ---
 
@@ -428,6 +429,67 @@ prediction power is in actor-specific persistence, not sector membership.
 
 - `results/metrics/level1_A2-BASELINES.parquet` (80 rows: 8 models x 10 windows)
 - `results/configs/A2-BASELINES.yaml`
+
+---
+
+## B1-COMPONENT-ABLATION
+
+**Date:** 2026-03-29
+**Status:** COMPLETE
+**Runner:** `scripts/run_smim_b1.py`
+
+### Component Value Table (mean across 10 windows)
+
+| Depth | Description | Mean R2 | Delta vs prev | Verdict |
+|-------|-------------|---------|---------------|---------|
+| L1 | Graph factors (PCA + OLS) | **0.328** | BASE | Strongest standalone |
+| L2 | + Kalman M=1 | 0.291 | -0.036 | HURTS (overfit at K=3, T=40) |
+| L3 | + Regime switching M=2 | 0.281 | -0.011 | HURTS more |
+| L4 | + Emergence (PID + crit) | 0.281 | +0.000 | MARGINAL |
+| L5 | Full pipeline (A1 ref) | 0.305 | +0.024 | Partially recovers |
+
+### Findings
+
+**1. Graph-factor OLS (L1) is the best standalone model (R2=0.328).**
+Projecting onto the top-K=3 eigenvectors of the optimised operator and
+forecasting via AR(1) on factors outperforms the full Kalman pipeline.
+The PCA+OLS approach has fewer parameters and doesn't overfit.
+
+**2. Kalman filter hurts at K=3, T=40 (L1 -> L2: -0.036).**
+The Kalman EM estimates F (K x K), Q (K x K), R (N x N) from 40
+observations on 92 actors. At K=3 this is 9+9+4278 parameters for
+40 time steps -- severely overparameterised. The Kalman prediction
+is worse than simple OLS because it overfits to training noise.
+
+**3. Regime switching adds further overfitting (L2 -> L3: -0.011).**
+KimFilter M=2 doubles the F/Q parameters (18 + 18 per regime) without
+enough data to identify distinct regimes. The symmetric initialization
+limitation prevents meaningful regime separation.
+
+**4. Emergence is marginal (L3 -> L4: 0.000).**
+PID synergy correction has negligible effect, consistent with the
+E2 finding that CV selects weight=0.
+
+**5. End-to-end optimization (L5) partially recovers.**
+The A1 pipeline with optimised operator weights recovers +0.024 over
+L3, reaching 0.305. This is because the operator optimization
+implicitly regularises the Kalman filter by shaping the spectral basis.
+
+### Implications
+
+- The Kalman filter is the bottleneck: it overfits at current T/N ratio.
+- **Recommended depth for MIXED-200/Gold/FULL-ROLL: L1 (graph factors)**
+  until T/N improves (needs T >= 120 for K=3 to add value).
+- If state-space filtering is desired, reduce K to 1 or add explicit
+  regularisation (shrinkage on R, constrained F).
+- The end-to-end operator optimisation is valuable as an implicit
+  regulariser even when the Kalman filter itself overfits.
+
+### Outputs
+
+- `results/metrics/level1_B1-COMPONENT-ABLATION.parquet` (50 rows: 5 depths x 10 windows)
+- `results/metrics/level2_B1-COMPONENT-ABLATION.parquet` (40 rows: 4 deltas x 10 windows)
+- `results/configs/B1-COMPONENT-ABLATION.yaml`
 
 ---
 

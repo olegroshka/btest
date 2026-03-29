@@ -1,0 +1,9 @@
+experiment_id: B1-COMPONENT-ABLATION
+timestamp: '2026-03-29 23:35:42'
+depths:
+- L1_graph
+- L2_kalman
+- L3_regime
+- L4_emergence
+- L5_full
+n_windows: 10

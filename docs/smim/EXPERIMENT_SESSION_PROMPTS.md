@@ -262,8 +262,11 @@ if SMIM (directed) > symmetric, that is the first evidence for H2a.
 
 ### Session B1 — Component Layer Ablation *(most critical B experiment)*
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-29`
+**Outcome:** Graph-factor OLS (L1, R2=0.328) outperforms Kalman (L2, 0.291) and full pipeline
+(L5, 0.305). Kalman overfits at K=3, T=40 (too many params for too little data). Regime switching
+and emergence are marginal/negative. End-to-end operator optimisation partially recovers via
+implicit regularisation. Recommended depth: L1 until T/N improves. Runner: `scripts/run_smim_b1.py`.
 
 **Prompt:**
 ```
