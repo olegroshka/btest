@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal, Optional
+from dataclasses import dataclass, field
+from typing import Any, Callable, Literal, Optional
 
 
 # Factor method literals
@@ -116,3 +116,57 @@ class RatioFactor(FactorNode):
 
     numerator: FactorNode
     denominator: FactorNode
+
+
+@dataclass(slots=True)
+class ExternalFactor(FactorNode):
+    """
+    Load pre-computed factor values from a file (pickle, parquet, or CSV).
+
+    The file must contain either:
+      - a ``pd.Series`` with a ``DatetimeIndex`` (values are the factor scores), or
+      - a ``pd.DataFrame`` with a ``DatetimeIndex`` and a column named ``column``.
+
+    The loaded series is broadcast across all instruments in the universe so it
+    can be used in comparisons and boolean signals like any other factor.
+
+    Primary use-case: ML model outputs (e.g. TKAN predictions) that are computed
+    offline and stored on disk.
+
+    Example::
+
+        tkan_pred = ExternalFactor(
+            name="tkan_pred",
+            path="research/Index Directional/tkan/v3/weights/pred_cache.pkl",
+            column=None,       # file is a plain Series
+        )
+    """
+
+    path: str
+    column: Optional[str] = None
+    # Optional callable: loader(obj: Any) -> pd.Series
+    # Where obj is the raw deserialized object from disk.
+    # Use this for non-standard formats (TKAN prediction tuples, HDF5
+    # compound objects, custom NN output structures, etc.).
+    # If None, the engine applies standard rules:
+    #   pd.Series                → used directly
+    #   pd.DataFrame             → column `column` or first column
+    #   anything else            → TypeError (register a loader)
+    loader: Optional[Callable[[Any], "pd.Series"]] = field(default=None, compare=False, repr=False)
+
+
+@dataclass(slots=True)
+class FieldFactor(FactorNode):
+    """
+    Extract a non-standard field from the loaded data as a factor.
+
+    Used to expose auxiliary columns that are loaded alongside OHLCV but are
+    not covered by any of the purpose-built factor types (e.g. implied volatility,
+    fundamental ratios, macro time-series already joined into the price DataFrame).
+
+    Example::
+
+        ivol = FieldFactor(name="ivol_3m", field="3m_50d_ivol")
+    """
+
+    field: str

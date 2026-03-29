@@ -47,6 +47,11 @@ uv.lock
 .DS_Store
 Thumbs.db
 
+# Credentials / secrets — never commit these
+.env
+*.env
+secrets.toml
+
 # SMIM OHLCV data (large binary, not committed)
 equities/smim/
 

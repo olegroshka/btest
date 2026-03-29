@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Dict
+import pathlib
+import pickle
+from typing import Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -16,6 +18,8 @@ from ..dsl.factors import (
     IntradayReturnFactor,
     WinsorizedFactor,
     RatioFactor,
+    ExternalFactor,
+    FieldFactor,
 )
 from ..data.schema import MarketData
 from ..utils.logging import get_logger
@@ -29,12 +33,18 @@ class FactorEngine:
     Evaluate factor DSL nodes into wide DataFrames [datetime x instrument].
     """
 
-    def __init__(self, market_data: MarketData, close: pd.DataFrame):
+    def __init__(
+        self,
+        market_data: MarketData,
+        close: pd.DataFrame,
+        btest_root: Optional[pathlib.Path] = None,
+    ):
         self.market_data = market_data
         self.close = close
         self.index = close.index
         self.instruments = close.columns
         self._cache: Dict[str, pd.DataFrame] = {}
+        self.btest_root = pathlib.Path(btest_root) if btest_root else pathlib.Path.cwd()
 
     def compute_all(self, factors: Dict[str, FactorNode]) -> Dict[str, pd.DataFrame]:
         out: Dict[str, pd.DataFrame] = {}
@@ -64,6 +74,10 @@ class FactorEngine:
             den = self._dispatch_compute_node(node.denominator)
             with np.errstate(divide="ignore", invalid="ignore"):
                 df = num / den
+        elif isinstance(node, ExternalFactor):
+            df = self._compute_external(node)
+        elif isinstance(node, FieldFactor):
+            df = self._field_panel(node.field)
         else:
             raise TypeError(f"Unsupported factor node type: {type(node)}")
 
@@ -199,7 +213,79 @@ class FactorEngine:
         if isinstance(node, RatioFactor):
             with np.errstate(divide="ignore", invalid="ignore"):
                 return self._dispatch_compute_node(node.numerator) / self._dispatch_compute_node(node.denominator)
+        if isinstance(node, ExternalFactor):
+            return self._compute_external(node)
+        if isinstance(node, FieldFactor):
+            return self._field_panel(node.field)
         raise TypeError(f"Unsupported factor node type: {type(node)}")
+
+    def _compute_external(self, node: ExternalFactor) -> pd.DataFrame:
+        """
+        Load a pre-computed factor from disk and broadcast across all instruments.
+
+        Standard formats (no loader required):
+        - pickle / parquet / CSV of ``pd.Series``       → used directly
+        - pickle / parquet / CSV of ``pd.DataFrame``    → column ``node.column`` or first column
+
+        Non-standard formats (ML model outputs, compound objects, etc.):
+        - Set ``node.loader = lambda obj: <pd.Series>`` to handle any custom structure.
+          The loader receives the raw deserialized object and must return a pd.Series
+          with a DatetimeIndex.  This keeps format-specific logic out of the engine.
+
+        Example (TKAN pred_cache tuple)::
+
+            def _tkan_loader(obj):
+                pred_df = obj[0]          # (pred_df, retrain_dates, fingerprint)
+                return pred_df.sum(axis=1)  # cumulative 5d return prediction
+
+            tkan_pred = ExternalFactor(
+                name="tkan_pred",
+                path="research/Index Directional/tkan/v3/weights/pred_cache.pkl",
+                loader=_tkan_loader,
+            )
+        """
+        path = pathlib.Path(node.path)
+        if not path.is_absolute():
+            path = self.btest_root / path
+        if not path.exists():
+            raise FileNotFoundError(
+                f"ExternalFactor '{node.name}': file not found: {path}"
+            )
+
+        suffix = path.suffix.lower()
+        if suffix in (".pkl", ".pickle"):
+            with open(path, "rb") as f:
+                obj = pickle.load(f)
+        elif suffix in (".parquet", ".pq"):
+            obj = pd.read_parquet(path)
+        elif suffix in (".csv",):
+            obj = pd.read_csv(path, index_col=0, parse_dates=True)
+        else:
+            # Fallback: try pickle
+            with open(path, "rb") as f:
+                obj = pickle.load(f)
+
+        # Custom loader: handles any non-standard format (TKAN tuples, etc.)
+        if node.loader is not None:
+            series = node.loader(obj)
+        elif isinstance(obj, pd.Series):
+            series = obj
+        elif isinstance(obj, pd.DataFrame):
+            col = node.column or obj.columns[0]
+            series = obj[col]
+        else:
+            raise TypeError(
+                f"ExternalFactor '{node.name}': unsupported type '{type(obj).__name__}'. "
+                f"Set node.loader=<callable> to handle custom formats."
+            )
+
+        series = series.copy()
+        series.index = pd.DatetimeIndex(series.index)
+        aligned = series.reindex(self.index)
+        return pd.DataFrame(
+            {instr: aligned for instr in self.instruments},
+            index=self.index,
+        )
 
     def _winsorize_cross_section(self, df: pd.DataFrame, z: float) -> pd.DataFrame:
         """Clip values per date across instruments to mean±z*std (symmetric).
