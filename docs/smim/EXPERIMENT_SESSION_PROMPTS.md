@@ -141,8 +141,12 @@ raise with user before launching B-series (those run N=200+ repeatedly).
 
 ### Session A1 — MVP Full Pipeline *(after A3 passes)*
 
-**Status:** `[ ] not started — UNBLOCKED (A3 passed 2026-03-29)`
-**Outcome:** —
+**Status:** `[x] COMPLETE (v2) -- 2026-03-29 -- PASS gate (mean R2=+0.283)`
+**Outcome:** v1 STOP (R2=-2.44) caused by missing observation demeaning -- state-space model assumes
+zero-mean but intensities centered at 0.5. Fix: subtract per-actor training mean before Kalman,
+restore for R2. v2 PASS: mean OOS R2=+0.283 across 10 windows (all positive, range 0.12-0.41).
+K*=1 all windows. M=1/M=2 near-identical. Emergence adds nothing at K=1. B-series unblocked.
+Runner: `scripts/run_smim_a1.py`. Full findings: `EXPERIMENT_RESULTS.md` section A1.
 
 **Prompt:**
 ```
