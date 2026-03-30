@@ -31,6 +31,7 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 | D4 | D | COMPLETE | 0/8 events aligned (rank normalisation absorbs spikes) | 2026-03-30 |
 | D5 | D | COMPLETE | H6c SUPPORTED: pred-modal diverge (0.016, 4/10 windows) | 2026-03-30 |
 | D6 | D | COMPLETE | Gap dispersion leads VIX by 1-4Q (corr=-0.39) | 2026-03-30 |
+| DD | Drill | PHASE 1 COMPLETE | T=5yr K=5 EWM: R2=0.392 (BRONZE, 58% gap closed) | 2026-03-30 |
 
 ---
 
