@@ -247,19 +247,27 @@ Algorithm~\ref{alg:pipeline} summarises the complete procedure.
 
 \subsection{Actor Universe}
 
-We use the \texttt{experiment\_a1} registry comprising 103 actors: 91 equity actors (US and UK, spanning energy, technology, financials, healthcare, industrials, and diversified sectors) and 12 institutional actors (central banks, regulators, international organisations, and global shock proxies). Of these, 93 have computed investment intensity values.
+Our sample comprises 103 actors: 91 equity actors (US and UK, spanning energy, technology, financials, healthcare, industrials, and diversified sectors) and 12 institutional actors (central banks, regulators, international organisations, and global shock proxies). Of these, 93 have computed investment intensity values.
 
 \subsection{Investment Intensity}
 
-The primary intensity measure is \texttt{capex\_assets\_xsrank}: each actor's CapEx-to-Assets ratio, sourced from SEC EDGAR quarterly filings, transformed to a within-quarter cross-sectional percentile rank in $[0,1]$. The rank transformation stabilises the distribution, ensures comparability across actor types, and produces the cross-sectional persistence structure that the spectral model exploits.
+We construct three intensity measures, each mapped to a cross-sectional percentile rank in $[0,1]$ per quarter:
 
-For UK equities (lacking EDGAR coverage), we use \texttt{return\_12m\_xsrank} (trailing 12-month equity return, cross-sectional rank). For institutional actors, we use FRED-based normalised indices. The intensity method choice is consequential: we find that \texttt{capex\_assets\_xsrank} produces $R^2 = 0.52$ while \texttt{return\_12m\_xsrank} produces $R^2 = -0.15$ on the same US actors (Section~\ref{sec:transfer}), establishing the intensity construction as the primary driver of model performance.
+\begin{itemize}[nosep]
+\item \textbf{CapEx intensity} (primary): the ratio of capital expenditures to total assets, sourced from SEC EDGAR quarterly filings (XBRL tags \texttt{PaymentsToAcquirePropertyPlantAndEquipment} / \texttt{Assets}), ranked cross-sectionally within each quarter. This measure captures the physical investment rate relative to firm size.
+
+\item \textbf{Return intensity} (alternative): trailing 12-month equity total return, ranked cross-sectionally. Used for UK equities, which lack EDGAR coverage.
+
+\item \textbf{Institutional intensity}: FRED-based macro indices (e.g., policy rates, commodity prices), min-max normalised within actor type.
+\end{itemize}
+
+The rank transformation stabilises the distribution, ensures comparability across actor types, and produces the cross-sectional persistence structure that the spectral model exploits. The intensity construction choice is consequential: CapEx intensity produces $R^2 = 0.52$ while return intensity produces $R^2 = -0.15$ on the same US actors (Section~\ref{sec:transfer}), establishing the measurement input as the primary driver of model performance.
 
 \subsection{Evaluation Protocol}
 
 We use a FULL-ROLL design: 10 non-overlapping annual test windows (2015--2024), each with a 5-year rolling training window. The training window length was selected by sweeping $T \in \{3, 5, 8, 10, 15\}$ years; $T = 5$ years (20 quarters) yielded the best out-of-sample performance (Section~\ref{sec:robustness}). All metrics are strictly out-of-sample: the model is trained on the training window and evaluated on the subsequent test year without any look-ahead.
 
-\textbf{Scope condition.} The framework's performance depends critically on the intensity construction method. The \texttt{capex\_assets\_xsrank} method produces rich cross-sectional dynamics that the spectral model can exploit ($R^2 = 0.52$), while the \texttt{return\_12m\_xsrank} method produces $R^2 = -0.15$ on the same actors (Section~\ref{sec:transfer}). All results reported below use the capex-based intensity unless otherwise noted. Generalisation to other intensity constructions is not guaranteed and should be validated empirically.
+\textbf{Scope condition.} The framework's performance depends critically on the intensity construction. CapEx intensity produces rich cross-sectional dynamics that the spectral model can exploit ($R^2 = 0.52$), while return intensity produces $R^2 = -0.15$ on the same actors (Section~\ref{sec:transfer}). All results reported below use CapEx intensity unless otherwise noted. Generalisation to other intensity constructions is not guaranteed and should be validated empirically.
 
 
 % ══════════════════════════════════════════════════════════
@@ -431,7 +439,7 @@ The framework is robust across four dimensions (Figure~\ref{fig:robustness}): \e
 
 We test whether the estimated dynamics $(F, Q)$ are window-specific or universal by freezing them from window $W_t$ and applying the Kalman filter on window $W_{t+1}$ with a freshly estimated spectral basis $U$. Figure~\ref{fig:transfer} shows that frozen dynamics achieve 103\% of full-retrain $R^2$ on average (106\% with online $Q$ adaptation), demonstrating that the temporal modal structure is universal. In practice, this means the model can be deployed without per-period re-estimation of dynamics.
 
-Cross-sector transfer is strong for sectors using the capex-based intensity method (technology $R^2 = 0.82$, healthcare $R^2 = 0.78$, industrials $R^2 = 0.77$) but weak for financials ($R^2 = 0.06$), which uses a different normalisation method (\texttt{asset\_growth\_yoy\_xsrank}) producing highly persistent ranks (median $\rho = 0.70$ vs technology $\rho = 0.25$). Cross-period transfer across structural breaks (GFC, COVID) retains $R^2 = 0.50$--$0.59$.
+Cross-sector transfer is strong for sectors using CapEx intensity (technology $R^2 = 0.82$, healthcare $R^2 = 0.78$, industrials $R^2 = 0.77$) but weak for financials ($R^2 = 0.06$). Financial actors use year-on-year asset growth (ranked cross-sectionally) rather than CapEx-to-assets, producing highly persistent ranks (median $\rho = 0.70$ vs technology $\rho = 0.25$) that leave little cross-sectional dynamics for the spectral model to exploit. Cross-period transfer across structural breaks (GFC, COVID) retains $R^2 = 0.50$--$0.59$.
 
 
 % ══════════════════════════════════════════════════════════
@@ -490,7 +498,7 @@ Gap cross-sectional dispersion correlates negatively with VIX at leads of 1--4 q
 
 \textbf{Event-level alignment.} Gap magnitudes do not spike significantly around eight known misallocation episodes (0/8 aligned). The cross-sectional rank normalisation stabilises the distribution by construction, absorbing event-driven variation. The framework captures structural positioning, not event anomalies.
 
-\textbf{Return-based intensity.} The \texttt{return\_12m\_xsrank} method produces $R^2 = -0.15$ on US actors (vs $R^2 = 0.52$ for \texttt{capex\_assets\_xsrank}). The intensity construction method is the primary driver of model performance---more important than any pipeline component.
+\textbf{Return-based intensity.} Return intensity produces $R^2 = -0.15$ on the same US actors where CapEx intensity achieves $R^2 = 0.52$. The intensity construction is the primary driver of model performance---more important than any pipeline component. CapEx-to-assets captures a physical investment decision with structural persistence; trailing equity returns reflect market pricing dynamics that the spectral model cannot exploit.
 
 \subsection{Limitations}
 
