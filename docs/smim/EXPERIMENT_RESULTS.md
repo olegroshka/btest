@@ -21,6 +21,10 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 | B2 | B | COMPLETE | DMD wins (0.359); H2a supported (+0.020 vs PCA) | 2026-03-30 |
 | B6 | B | COMPLETE | L1 OLS R2=0.70-0.82 >> RW (0.55-0.80); graceful N degradation | 2026-03-30 |
 | B7 | B | COMPLETE | L1 OLS stable (0.34-0.40); Kalman erratic; Kim robust | 2026-03-30 |
+| B3 | B | COMPLETE | All signals dispensable at L1 (intensity corr is sufficient) | 2026-03-30 |
+| B5 | B | COMPLETE | M=2 >> M=1 at Kalman depth; emergence negative | 2026-03-30 |
+| B8 | B | COMPLETE | 95% retention at sigma=1.0 noise; highly robust | 2026-03-30 |
+| B9 | B | COMPLETE | 100% retention at all corruption levels; operator symmetric | 2026-03-30 |
 
 ---
 

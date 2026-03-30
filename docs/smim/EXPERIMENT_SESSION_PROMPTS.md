@@ -367,8 +367,10 @@ The winning method from B2 becomes the default for all subsequent experiments.
 
 ### Session B3 — Signal Family Leave-One-Out
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** All signal families dispensable at L1 depth (delta R2 = 0.000 for all). Intensity
+cross-correlation operator captures all structure. External signals (OHLCV, FRED, EDGAR) only
+matter via Granger edges, which are not used at L1. Runner: `scripts/run_smim_b3.py`.
 
 **Prompt:**
 ```
@@ -460,8 +462,10 @@ compensate when it is present). Note any such substitution patterns.
 
 ### Session B5 — Signal × Component Interaction
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** 2x2 factorial (M x emergence) at Kalman depth. M=2 massively better than M=1 (+1.51).
+Emergence net negative (-0.95, driven by M=1 blowups). M=2 unaffected by emergence.
+H1c/H4a: not supported at current T/N. Runner: `scripts/run_smim_b5.py`.
 
 **Prompt:**
 ```
@@ -603,8 +607,9 @@ Output:
 
 ### Session B8 — Robustness: Noise Injection
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** 95-101% R2 retention at sigma=0.1-1.0. Intensity cross-correlation operator is
+inherently robust (averages over T time steps). No cliff detected. Runner: `scripts/run_smim_b8_b9.py`.
 
 **Prompt:**
 ```
@@ -644,8 +649,10 @@ Output:
 
 ### Session B9 — Robustness: Edge Degradation
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** 100% retention at ALL corruption levels (0-100%). Operator is symmetric (built from
+intensity correlation), so edge direction flipping has zero effect. Robustness criterion PASS.
+Runner: `scripts/run_smim_b8_b9.py`.
 
 **Prompt:**
 ```
