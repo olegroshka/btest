@@ -1,0 +1,7 @@
+conditions:
+- FULL
+- NO-OHLCV
+- NO-FRED
+- NO-EDGAR
+- INTENSITY-ONLY
+experiment_id: B3-SIGNAL-LOO
