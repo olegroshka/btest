@@ -98,6 +98,13 @@ This paper addresses all three gaps. We develop a spectral state-space framework
 
 \subsection{Preview of Results}
 
+Throughout, we measure predictive accuracy by the out-of-sample coefficient of determination,
+\begin{equation}
+R^2 = 1 - \frac{\sum_{i,t}(y_{i,t} - \hat{y}_{i,t})^2}{\sum_{i,t}(y_{i,t} - \bar{y})^2},
+\label{eq:r2}
+\end{equation}
+where $\hat{y}_{i,t}$ is the model's prediction and $\bar{y}$ is the test-period grand mean. $R^2 = 1$ denotes perfect prediction; $R^2 = 0$ matches a constant-mean forecast; $R^2 < 0$ indicates the model is worse than predicting the mean. The summation runs over all actor--quarter pairs in each test window.
+
 Our main findings, established through 24 systematic experiments across four phases, are:
 
 \begin{enumerate}[nosep]
