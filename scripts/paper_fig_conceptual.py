@@ -142,7 +142,7 @@ def main():
     # ═══════════════════════════════════════════════════════════════════════
     ax2 = ax_right
     ax2.set_xlim(-0.5, 5.5)
-    ax2.set_ylim(-1.5, 5.7)
+    ax2.set_ylim(-1.8, 5.7)
     ax2.axis("off")
     ax2.text(2.5, 5.5, "(b) Processing Pipeline",
              ha="center", fontsize=11, fontweight="bold", color=ACCENT)
