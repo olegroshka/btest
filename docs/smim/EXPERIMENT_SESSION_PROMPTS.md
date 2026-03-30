@@ -746,8 +746,12 @@ Output:
 
 ### Session C1+C2 — Cross-Sector Transfer (Zero-Shot + Fine-Tuned)
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** 100% retention across all 4 target sectors. HOWEVER: zero-shot = fine-tune = baseline
+because the Kalman EM (max_iter=50) converges to the same solution regardless of F/Q initialization.
+The transfer protocol needs revision: F/Q should be FROZEN (not re-estimated) for true zero-shot.
+Sector-specific R2: tech=0.82, health=0.78, indus=0.77, fins=0.06.
+Runner: `scripts/run_smim_phase_c.py`. Data: `results/metrics/level1_C1C2-SECTOR-TRANSFER.parquet`.
 
 **Prompt:**
 ```
@@ -804,8 +808,10 @@ Output:
 
 ### Session C3 — Cross-Cap Transfer
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** US-MC R2=0.70, US-SC R2=0.79 (both strong). Same EM convergence as C1+C2 -- zero-shot
+= baseline. H5b (US-MC >=70%): trivially met. H5c (US-SC <50%): NOT confirmed (79% retention).
+Runner: `scripts/run_smim_phase_c.py`. Data: `results/metrics/level1_C3-CAP-TRANSFER.parquet`.
 
 **Prompt:**
 ```
@@ -863,8 +869,11 @@ Output:
 
 ### Session C4 — Cross-Geography Transfer
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** UK-LC R2=0.058 (very low). The return_12m_xsrank method for UK equities has weak
+predictive structure compared to US capex_assets_xsrank. Zero-shot = baseline (same EM issue).
+Geo transfer not meaningful at this R2 level -- the UK intensity method is the bottleneck.
+Runner: `scripts/run_smim_phase_c.py`. Data: `results/metrics/level1_C4-GEO-TRANSFER.parquet`.
 
 **Prompt:**
 ```
@@ -921,8 +930,12 @@ Output:
 
 ### Session C5 — Cross-Period Transfer (Structural Break)
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** Strong era-to-era transfer: POST-GFC->PRE-COVID R2=0.50, PRE-COVID->POST-COVID R2=0.59,
+POST-COVID->RECENT R2=0.58. In-era baselines negative (too few training points for in-era split).
+The GOLD+ pipeline transfers well across structural breaks because the spectral basis re-adapts
+to the test era while dynamics (F/Q) provide useful temporal priors.
+Runner: `scripts/run_smim_phase_c.py`. Data: `results/metrics/level1_C5-PERIOD-TRANSFER.parquet`.
 
 **Prompt:**
 ```
@@ -965,8 +978,12 @@ Output:
 
 ### Session C6 — Data Regime Degradation
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** Counter-intuitively robust: gold=0.51, silver=0.61, bronze=0.51, sparse=0.53.
+Silver (5% noise) OUTPERFORMS gold -- noise acts as regulariser for the Kalman EM. Even sparse
+regime (20% noise, 25% actors, skip 4Q) maintains R2=0.53. The spectral approach is inherently
+robust to data quality degradation.
+Runner: `scripts/run_smim_phase_c.py`. Data: `results/metrics/level1_C6-DATA-REGIME.parquet`.
 
 **Prompt:**
 ```

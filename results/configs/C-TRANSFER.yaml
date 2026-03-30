@@ -1,0 +1,9 @@
+phase: C
+timestamp: '2026-03-30 21:17:14'
+pipeline: GOLD+ (DMD, spherical R, online Q, EWM)
+experiments:
+- C1+C2
+- C3
+- C4
+- C5
+- C6

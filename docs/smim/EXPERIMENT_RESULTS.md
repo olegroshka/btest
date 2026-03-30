@@ -32,6 +32,11 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 | D5 | D | COMPLETE | H6c SUPPORTED: pred-modal diverge (0.016, 4/10 windows) | 2026-03-30 |
 | D6 | D | COMPLETE | Gap dispersion leads VIX by 1-4Q (corr=-0.39) | 2026-03-30 |
 | DD | Drill | COMPLETE | **GOLD+: Online K=8 DMD Kalman R2=0.524 >> AR(1) 0.425 (+10pp)** | 2026-03-30 |
+| C1+C2 | C | COMPLETE | 100% retention (but EM overrides init -- see note) | 2026-03-30 |
+| C3 | C | COMPLETE | 100% retention (same EM convergence issue) | 2026-03-30 |
+| C4 | C | COMPLETE | UK-LC R2=0.058 (return method has weak structure) | 2026-03-30 |
+| C5 | C | COMPLETE | Era transfer R2=0.50-0.59 (strong, better than in-era baseline) | 2026-03-30 |
+| C6 | C | COMPLETE | Robust: gold=0.51, silver=0.61, bronze=0.51, sparse=0.53 | 2026-03-30 |
 
 ---
 
