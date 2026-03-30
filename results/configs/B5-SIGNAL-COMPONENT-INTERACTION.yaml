@@ -1,0 +1,6 @@
+cells:
+- M1/no-emerg
+- M1/emerg
+- M2/no-emerg
+- M2/emerg
+experiment_id: B5-SIGNAL-COMPONENT-INTERACTION
