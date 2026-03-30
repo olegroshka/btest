@@ -1,29 +1,32 @@
 #!/usr/bin/env python
-"""Generate the conceptual architecture figure (new Figure 1)."""
+"""Generate the conceptual architecture figure (Figure 1) — clean version."""
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+from matplotlib.patches import FancyBboxPatch
 import numpy as np
 from pathlib import Path
 
 IMG_DIR = Path(__file__).resolve().parent.parent / "docs" / "smim" / "paper" / "img"
+IMG_DIR.mkdir(parents=True, exist_ok=True)
 
+# Colors
 ACCENT = "#133D7A"
-ACCENT_LIGHT = "#4A7FBF"
 GOLD = "#C4960C"
 GREEN = "#2A8636"
 RED = "#B8352A"
 ORANGE = "#D4770B"
 PURPLE = "#6B3FA0"
-GREY = "#888888"
-LIGHT_BLUE = "#D6E4F5"
-LIGHT_GREEN = "#D6F0DC"
-LIGHT_ORANGE = "#FAEBD7"
-LIGHT_RED = "#FDE8E8"
-LIGHT_PURPLE = "#EDE4F7"
+GREY = "#666666"
+LIGHT_GREY = "#999999"
+
+L0_BG = "#FFF3E0"
+L1_BG = "#F3E5F5"
+L2_BG = "#E3F2FD"
+PIPE_GREENBG = "#E8F5E9"
+PIPE_ORANGEBG = "#FFF8E1"
+GAP_BG = "#FFEBEE"
 
 plt.rcParams.update({
     "font.family": "serif",
@@ -31,167 +34,157 @@ plt.rcParams.update({
     "font.size": 9,
     "savefig.dpi": 300,
     "savefig.bbox": "tight",
-    "savefig.pad_inches": 0.2,
+    "savefig.pad_inches": 0.15,
+    "figure.facecolor": "white",
 })
 
 
-def draw_actor_box(ax, x, y, w, h, label, sublabel, color, text_color=ACCENT):
+def rounded_box(ax, x, y, w, h, text, bg, ec, fontsize=7.5, fw="bold", tc=None):
+    tc = tc or ec
     box = FancyBboxPatch((x - w/2, y - h/2), w, h,
-                          boxstyle="round,pad=0.05", linewidth=1.2,
-                          edgecolor=text_color, facecolor=color, zorder=3)
+                          boxstyle="round,pad=0.06", lw=1.3,
+                          edgecolor=ec, facecolor=bg, zorder=3)
     ax.add_patch(box)
-    ax.text(x, y + 0.12, label, ha="center", va="center", fontsize=7.5,
-            fontweight="bold", color=text_color, zorder=4)
-    if sublabel:
-        ax.text(x, y - 0.15, sublabel, ha="center", va="center", fontsize=6,
-                color=GREY, zorder=4, fontstyle="italic")
+    ax.text(x, y, text, ha="center", va="center", fontsize=fontsize,
+            fontweight=fw, color=tc, zorder=4, linespacing=1.25)
 
 
-def draw_layer_band(ax, y, label, color, alpha=0.12):
-    ax.axhspan(y - 0.55, y + 0.55, color=color, alpha=alpha, zorder=0)
-    ax.text(-0.3, y, label, ha="right", va="center", fontsize=9,
-            fontweight="bold", color=GREY, rotation=0)
-
-
-def draw_arrow(ax, x1, y1, x2, y2, color=GREY, style="-|>", lw=1.0):
+def arrow(ax, x1, y1, x2, y2, color=GREY, lw=1.0, style="-|>"):
     ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
-                arrowprops=dict(arrowstyle=style, color=color, lw=lw),
-                zorder=2)
+                arrowprops=dict(arrowstyle=style, color=color, lw=lw), zorder=2)
+
+
+def layer_stripe(ax, y, h, color, label):
+    ax.axhspan(y - h/2, y + h/2, color=color, alpha=0.25, zorder=0)
+    ax.text(0.15, y, label, ha="left", va="center", fontsize=8,
+            fontweight="bold", color=GREY, zorder=1)
 
 
 def main():
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6.5),
-                              gridspec_kw={"width_ratios": [3, 2], "wspace": 0.08})
+    fig = plt.figure(figsize=(13.5, 6))
 
-    # ── LEFT PANEL: Multilayer Actor Structure ──────────────────────────────
-    ax = axes[0]
-    ax.set_xlim(-0.5, 8.5)
-    ax.set_ylim(-1.8, 4.5)
+    # Two panels with controlled spacing
+    ax_left = fig.add_axes([0.02, 0.05, 0.58, 0.88])   # wider left
+    ax_right = fig.add_axes([0.63, 0.05, 0.35, 0.88])   # narrower right
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # PANEL (a): Multilayer Actor Structure
+    # ═══════════════════════════════════════════════════════════════════════
+    ax = ax_left
+    ax.set_xlim(0, 10.5)
+    ax.set_ylim(-1.2, 5.2)
     ax.axis("off")
-    ax.set_title("(a) Multilayer Actor Structure", fontweight="bold",
-                  color=ACCENT, fontsize=11, pad=10)
+    ax.text(5.0, 5.05, "(a) Multilayer Actor Hierarchy",
+            ha="center", fontsize=11, fontweight="bold", color=ACCENT)
 
-    # Layer bands
-    draw_layer_band(ax, 3.5, "Layer 0\nExogenous", ORANGE)
-    draw_layer_band(ax, 1.8, "Layer 1\nInstitutional", PURPLE)
-    draw_layer_band(ax, 0.0, "Layer 2\nFirms", ACCENT)
+    # Layer stripes
+    layer_stripe(ax, 4.0, 1.0, ORANGE, "Layer 0\nExogenous")
+    layer_stripe(ax, 2.4, 1.0, PURPLE, "Layer 1\nInstitutional")
+    layer_stripe(ax, 0.7, 1.2, ACCENT, "Layer 2\nFirms")
 
-    # Layer 0: Shocks
-    shocks = [
-        (1.0, "Oil price", "Brent/WTI"),
-        (3.0, "Fed funds", "FEDFUNDS"),
-        (5.0, "VIX", "Volatility"),
-        (7.0, "USD index", "DTWEXBGS"),
-    ]
-    for x, label, sub in shocks:
-        draw_actor_box(ax, x, 3.5, 1.5, 0.7, label, sub, LIGHT_ORANGE, ORANGE)
+    # Layer 0 actors
+    l0_x = [2.0, 4.0, 6.0, 8.0]
+    l0_labels = ["Oil price\n(Brent)", "Fed funds\nrate", "VIX", "USD\nindex"]
+    for x, label in zip(l0_x, l0_labels):
+        rounded_box(ax, x, 4.0, 1.5, 0.7, label, L0_BG, ORANGE, fontsize=7, tc=ORANGE)
 
-    # Layer 1: Institutions
-    institutions = [
-        (1.5, "Federal\nReserve", "Central bank"),
-        (4.0, "SEC", "Regulator"),
-        (6.5, "Bank of\nEngland", "Central bank"),
-    ]
-    for x, label, sub in institutions:
-        draw_actor_box(ax, x, 1.8, 1.5, 0.7, label, sub, LIGHT_PURPLE, PURPLE)
+    # Layer 1 actors
+    l1_x = [2.5, 5.0, 7.5]
+    l1_labels = ["Federal\nReserve", "SEC", "Bank of\nEngland"]
+    for x, label in zip(l1_x, l1_labels):
+        rounded_box(ax, x, 2.4, 1.4, 0.7, label, L1_BG, PURPLE, fontsize=7, tc=PURPLE)
 
-    # Layer 2: Firms (grouped by sector)
+    # Layer 2: sector clusters
     sectors = [
-        (0.8, "Energy\n(12)", "CVX, COP...", LIGHT_ORANGE),
-        (2.5, "Tech\n(15)", "AAPL, MSFT...", LIGHT_BLUE),
-        (4.2, "Financials\n(12)", "BAC, JPM...", LIGHT_GREEN),
-        (5.9, "Healthcare\n(10)", "JNJ, PFE...", LIGHT_RED),
-        (7.6, "Industrials\n(12)", "BA, GE...", "#F0F0F0"),
+        (1.3, "Energy\n(12)", L0_BG),
+        (3.1, "Tech\n(15)", L2_BG),
+        (4.9, "Financials\n(12)", PIPE_GREENBG),
+        (6.7, "Healthcare\n(10)", GAP_BG),
+        (8.5, "Industrials\n(12)", "#F5F5F5"),
     ]
-    for x, label, sub, color in sectors:
-        draw_actor_box(ax, x, 0.0, 1.3, 0.8, label, sub, color, ACCENT)
+    for x, label, bg in sectors:
+        rounded_box(ax, x, 0.7, 1.4, 0.85, label, bg, ACCENT, fontsize=7, tc=ACCENT)
 
-    # Propagation arrows (Layer 0 -> Layer 1)
-    for sx in [1.0, 3.0, 5.0, 7.0]:
-        for ix in [1.5, 4.0, 6.5]:
-            if abs(sx - ix) < 3:
-                draw_arrow(ax, sx, 3.1, ix, 2.2, ORANGE, lw=0.6)
+    # Strong arrows: L0 -> L2 (direct transmission — the D3 finding)
+    for sx in [2.0, 4.0, 6.0]:
+        targets = [x for x, _, _ in sectors if abs(sx - x) < 2.5]
+        for tx in targets[:2]:
+            arrow(ax, sx, 3.6, tx, 1.2, RED, lw=1.8)
 
-    # Propagation arrows (Layer 0 -> Layer 2, direct)
-    draw_arrow(ax, 1.0, 3.1, 0.8, 0.45, RED, lw=1.5)
-    draw_arrow(ax, 3.0, 3.1, 2.5, 0.45, RED, lw=1.5)
-    draw_arrow(ax, 5.0, 3.1, 5.9, 0.45, RED, lw=1.0)
-    ax.text(0.3, 1.6, "Direct\ntransmission\n(D3: r=0.86)", fontsize=6,
-            color=RED, fontstyle="italic", ha="center")
+    # Weak arrows: L0 -> L1
+    for sx in l0_x:
+        for ix in l1_x:
+            if abs(sx - ix) < 2.5:
+                arrow(ax, sx, 3.6, ix, 2.8, LIGHT_GREY, lw=0.6)
 
-    # Propagation arrows (Layer 1 -> Layer 2, weak)
-    for ix in [1.5, 4.0, 6.5]:
-        for fx in [0.8, 2.5, 4.2, 5.9, 7.6]:
-            if abs(ix - fx) < 2.5:
-                draw_arrow(ax, ix, 1.4, fx, 0.45, PURPLE, style="-|>", lw=0.4)
+    # Very weak arrows: L1 -> L2 (insignificant in D3)
+    arrow(ax, 2.5, 2.0, 1.3, 1.2, LIGHT_GREY, lw=0.4)
+    arrow(ax, 5.0, 2.0, 4.9, 1.2, LIGHT_GREY, lw=0.4)
+    arrow(ax, 7.5, 2.0, 6.7, 1.2, LIGHT_GREY, lw=0.4)
 
-    # Gap annotation
-    ax.annotate("", xy=(7.6, -0.8), xytext=(7.6, -0.5),
-                arrowprops=dict(arrowstyle="-|>", color=RED, lw=2))
-    ax.text(7.6, -1.2, r"$\Delta_{i,t} = y_{i,t} - y^*_{i,t}$",
-            ha="center", fontsize=10, color=RED, fontweight="bold",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor=LIGHT_RED, edgecolor=RED))
-    ax.text(7.6, -1.65, "Investment Gap", ha="center", fontsize=8, color=RED)
+    # Annotations
+    ax.text(9.5, 3.2, "Direct L0$\\to$L2\n$r = 0.86$\n($p < 0.001$)",
+            fontsize=7, color=RED, fontstyle="italic", ha="center",
+            bbox=dict(boxstyle="round,pad=0.25", facecolor="white",
+                      edgecolor=RED, alpha=0.95, lw=0.8))
 
-    # N=93 annotation
-    ax.text(4.0, -1.5, "N = 93 actors with intensity\n84 quarters (2005-2025)",
+    ax.text(9.5, 1.8, "L1$\\to$L2 weak\n$r = 0.03$, n.s.",
+            fontsize=6, color=LIGHT_GREY, fontstyle="italic", ha="center")
+
+    # Bottom: summary
+    ax.text(5.0, -0.4, "$N = 93$ actors  |  6 sectors  |  84 quarters (2005\u20132025)",
+            ha="center", fontsize=8, color=GREY, fontstyle="italic")
+    ax.text(5.0, -0.8, "Intensity: CapEx/Assets cross-sectional rank $\\in [0, 1]$",
             ha="center", fontsize=8, color=GREY, fontstyle="italic")
 
-    # ── RIGHT PANEL: Pipeline Flow ──────────────────────────────────────────
-    ax2 = axes[1]
-    ax2.set_xlim(-0.5, 4.5)
-    ax2.set_ylim(-2.0, 6.5)
+    # ═══════════════════════════════════════════════════════════════════════
+    # PANEL (b): Processing Pipeline
+    # ═══════════════════════════════════════════════════════════════════════
+    ax2 = ax_right
+    ax2.set_xlim(-0.5, 5.5)
+    ax2.set_ylim(-1.5, 5.7)
     ax2.axis("off")
-    ax2.set_title("(b) Processing Pipeline", fontweight="bold",
-                   color=ACCENT, fontsize=11, pad=10)
+    ax2.text(2.5, 5.5, "(b) Processing Pipeline",
+             ha="center", fontsize=11, fontweight="bold", color=ACCENT)
 
     stages = [
-        (2.0, 5.5, "Intensity Panel\n$y_{i,t} \\in [0,1]$\n$N \\times T$", LIGHT_BLUE, ACCENT),
-        (2.0, 4.0, "EWM Demeaning\n$\\tilde{y} = y - \\hat{\\mu}$\n$\\tau = 8Q$", LIGHT_GREEN, GREEN),
-        (2.0, 2.5, "DMD Decomposition\n$Y' \\approx AU$\n$K = 8$ modes", LIGHT_ORANGE, ORANGE),
-        (2.0, 1.0, "Kalman Filter\n$R = cI$ (spherical)\n$\\alpha_t | \\tilde{y}_{1:t}$", LIGHT_BLUE, ACCENT),
-        (2.0, -0.5, "Online $Q$ Adapt\n$Q_{t+1} = 0.7Q_t + 0.3\\eta\\eta'$", LIGHT_ORANGE, ORANGE),
+        (2.0, 4.6, "Intensity Panel\n$y_{i,t} \\in [0,1]$, $N \\times T$", L2_BG, ACCENT),
+        (2.0, 3.4, "EWM Demeaning\n$\\tilde{y} = y - \\hat{\\mu}$, $\\tau\\!=\\!8$Q", PIPE_GREENBG, GREEN),
+        (2.0, 2.2, "DMD Decomposition\n$Y' \\approx AU$, $K\\!=\\!8$", PIPE_ORANGEBG, ORANGE),
+        (2.0, 1.0, "Kalman Filter\n$R = cI$ (spherical)", L2_BG, ACCENT),
+        (2.0, -0.2, "Online $Q$ Adaptation\n$\\lambda = 0.3$", PIPE_ORANGEBG, ORANGE),
     ]
 
+    bw, bh = 3.4, 0.82
     for x, y, text, bg, ec in stages:
-        box = FancyBboxPatch((x - 1.5, y - 0.55), 3.0, 1.1,
-                              boxstyle="round,pad=0.08", linewidth=1.5,
-                              edgecolor=ec, facecolor=bg, zorder=3)
-        ax2.add_patch(box)
-        ax2.text(x, y, text, ha="center", va="center", fontsize=7.5,
-                color=ec, zorder=4, linespacing=1.3)
+        rounded_box(ax2, x, y, bw, bh, text, bg, ec, fontsize=8, fw="normal", tc=ec)
 
     # Arrows between stages
     for i in range(len(stages) - 1):
-        y1 = stages[i][1] - 0.55
-        y2 = stages[i + 1][1] + 0.55
-        ax2.annotate("", xy=(2.0, y2), xytext=(2.0, y1),
-                     arrowprops=dict(arrowstyle="-|>", color=ACCENT, lw=2))
+        y1 = stages[i][1] - bh/2
+        y2 = stages[i + 1][1] + bh/2
+        arrow(ax2, 2.0, y1, 2.0, y2, ACCENT, lw=1.8)
 
-    # R² annotations on the right
-    r2_vals = [
-        (5.5, "Start", "0.339"),
-        (4.0, "+4.2pp", "0.381"),
-        (2.5, "+1.1pp", "0.392"),
-        (1.0, "+4.2pp", "0.434"),
-        (-0.5, "+5.7pp", "0.524"),
+    # R² and delta annotations
+    annotations = [
+        (4.6, "$R^2\\!=\\!0.339$", ""),
+        (3.4, "$R^2\\!=\\!0.381$", "+4.2pp"),
+        (2.2, "$R^2\\!=\\!0.392$", "+1.1pp"),
+        (1.0, "$R^2\\!=\\!0.434$", "+4.2pp"),
+        (-0.2, "$R^2\\!=\\!0.524$", "+5.7pp"),
     ]
-    for y, delta, r2 in r2_vals:
-        ax2.text(3.8, y + 0.15, f"$R^2$={r2}", fontsize=7, color=GREY,
+    for y, r2_text, delta in annotations:
+        ax2.text(4.1, y + 0.08, r2_text, fontsize=7.5, color=GREY,
                 ha="left", fontstyle="italic")
-        if delta != "Start":
-            ax2.text(3.8, y - 0.15, delta, fontsize=7.5, color=GREEN,
+        if delta:
+            ax2.text(4.1, y - 0.2, delta, fontsize=8, color=GREEN,
                     ha="left", fontweight="bold")
 
-    # Output arrow
-    ax2.annotate("", xy=(2.0, -1.5), xytext=(2.0, -1.05),
-                 arrowprops=dict(arrowstyle="-|>", color=RED, lw=2))
-    gap_box = FancyBboxPatch((0.3, -2.0), 3.4, 0.8,
-                              boxstyle="round,pad=0.08", linewidth=2,
-                              edgecolor=RED, facecolor=LIGHT_RED, zorder=3)
-    ax2.add_patch(gap_box)
-    ax2.text(2.0, -1.6, "Investment Gap\n$\\Delta_{i,t} = y_{i,t} - (\\hat{\\mu}_i + U\\alpha_t)$",
-            ha="center", va="center", fontsize=8, color=RED, fontweight="bold", zorder=4)
+    # Output: gap box
+    arrow(ax2, 2.0, -0.2 - bh/2, 2.0, -1.05, RED, lw=2.0)
+    rounded_box(ax2, 2.0, -1.3, 3.4, 0.45,
+                "$\\Delta_{i,t} = y_{i,t} - (\\hat{\\mu}_i + U\\alpha_t)$",
+                GAP_BG, RED, fontsize=8, fw="bold", tc=RED)
 
     fig.savefig(IMG_DIR / "fig1_conceptual.pdf")
     fig.savefig(IMG_DIR / "fig1_conceptual.png")
