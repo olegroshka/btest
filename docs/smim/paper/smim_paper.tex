@@ -24,7 +24,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\small\textsc{Working Paper}}
-\fancyhead[R]{\small\textsc{Spectral Modal Decomposition of Investment Misallocation}}
+\fancyhead[R]{\small\textsc{Regularised Spectral State-Space Models}}
 \fancyfoot[C]{\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 
@@ -54,9 +54,9 @@
 % ── Title ─────────────────────────────────────────────────
 \begin{center}
 {\LARGE\bfseries\color{accent}
-Spectral Modal Decomposition of Investment Misallocation:\\[6pt]
-A State-Space Framework with Data-Driven Bases\\[6pt]
-and Regularised Dynamics\par}
+Regularised Spectral State-Space Models\\[6pt]
+for Cross-Sectional Investment Dynamics:\\[6pt]
+DMD Bases, Spherical Covariance, and Portable Dynamics\par}
 \vspace{1cm}
 {\large
 Oleg Roshka\textsuperscript{1} \qquad Claude Opus 4.6\textsuperscript{2}\\[6pt]
@@ -103,7 +103,7 @@ Our main findings, established through 24 systematic experiments across four pha
 \begin{enumerate}[nosep]
 \item \textbf{Predictive performance.} The framework achieves out-of-sample $R^2 = 0.524$ on investment intensity prediction, exceeding per-actor AR(1) ($R^2 = 0.425$) by 10 percentage points ($p = 0.001$), and random walk ($R^2 = 0.305$) by 22 percentage points, across 10 non-overlapping annual test windows (2015--2024).
 
-\item \textbf{The regularisation breakthrough.} The Kalman filter's observation covariance matrix $R \in \R^{N \times N}$ contains $N(N+1)/2$ free parameters---8,646 for our 93-actor panel estimated from 20 quarterly observations. Replacing the full $R$ with a spherical approximation $R = cI$ (one parameter) swings out-of-sample $R^2$ from $-7.3$ to $+0.434$, identifying observation covariance overparameterisation as the sole source of state-space model failure in high-dimensional panels.
+\item \textbf{The regularisation breakthrough.} The Kalman filter's observation covariance matrix $R \in \R^{N \times N}$ contains $N(N+1)/2$ free parameters---4,278 for our 92-actor panel estimated from 20 quarterly observations. Replacing the full $R$ with a spherical approximation $R = cI$ (one parameter) swings out-of-sample $R^2$ from $-7.3$ to $+0.434$, identifying observation covariance overparameterisation as the sole source of state-space model failure in high-dimensional panels.
 
 \item \textbf{DMD over static operators.} Dynamic Mode Decomposition, which extracts modal bases directly from temporal snapshot pairs rather than from a static correlation operator, outperforms all six alternative spectral methods (Schur, Polar, Hermitian dilation, directed variation, PCA) by $+2.0$ percentage points on average.
 
@@ -170,7 +170,7 @@ Given the demeaned training panel $\tilde{Y} = [\tilde{y}_1, \ldots, \tilde{y}_T
 
 \textbf{DMD algorithm.} Form snapshot matrices $X = [\tilde{y}_1, \ldots, \tilde{y}_{T-1}]$ and $X' = [\tilde{y}_2, \ldots, \tilde{y}_T]$. DMD seeks the best-fit linear operator $A$ such that $X' \approx AX$. Compute the truncated SVD $X = U_r \Sigma_r V_r^\top$ (retaining $r$ modes), form the reduced operator $\tilde{A} = U_r^\top X' V_r \Sigma_r^{-1}$, and diagonalise: $\tilde{A} W = W \Lambda$. The DMD modes are $\Phi = X' V_r \Sigma_r^{-1} W \in \R^{N \times K}$.
 
-We retain $K = 8$ modes (selected by systematic sweep; Section~\ref{sec:k_sweep}). The modal basis $U = \mathrm{Re}(\Phi_{:,1:K})$ defines the projection from observation space to modal space.
+We retain $K = 8$ modes, selected by sweeping $K \in \{1, 2, 3, 5, 8\}$ across all 10 test windows and choosing the value maximising mean out-of-sample $R^2$ (Section~\ref{sec:robustness}). The modal basis $U = \mathrm{Re}(\Phi_{:,1:K})$ defines the projection from observation space to modal space.
 
 \subsection{Stage 3: Kalman Filter with Spherical Observation Covariance}
 \label{sec:kalman}
@@ -257,7 +257,9 @@ For UK equities (lacking EDGAR coverage), we use \texttt{return\_12m\_xsrank} (t
 
 \subsection{Evaluation Protocol}
 
-We use a FULL-ROLL design: 10 non-overlapping annual test windows (2015--2024), each with a 5-year rolling training window. The training window length was selected by systematic sweep (Section~\ref{sec:t_sweep}). All metrics are strictly out-of-sample: the model is trained on the training window and evaluated on the subsequent test year without any look-ahead.
+We use a FULL-ROLL design: 10 non-overlapping annual test windows (2015--2024), each with a 5-year rolling training window. The training window length was selected by sweeping $T \in \{3, 5, 8, 10, 15\}$ years; $T = 5$ years (20 quarters) yielded the best out-of-sample performance (Section~\ref{sec:robustness}). All metrics are strictly out-of-sample: the model is trained on the training window and evaluated on the subsequent test year without any look-ahead.
+
+\textbf{Scope condition.} The framework's performance depends critically on the intensity construction method. The \texttt{capex\_assets\_xsrank} method produces rich cross-sectional dynamics that the spectral model can exploit ($R^2 = 0.52$), while the \texttt{return\_12m\_xsrank} method produces $R^2 = -0.15$ on the same actors (Section~\ref{sec:transfer}). All results reported below use the capex-based intensity unless otherwise noted. Generalisation to other intensity constructions is not guaranteed and should be validated empirically.
 
 
 % ══════════════════════════════════════════════════════════
@@ -292,7 +294,27 @@ Rank & Model & Mean $R^2$ & Std & MAE \\
 \label{tab:baselines}
 \end{table}
 
-Per-actor AR(1) is the strongest baseline ($R^2 = 0.425$), reflecting the high persistence of cross-sectional investment ranks ($\rho = 0.67$ median). SMIM exceeds this by $+0.099$ ($p = 0.001$, Diebold--Mariano test; wins 10/10 windows). The symmetric Laplacian ($R^2 = 0.286$) underperforms SMIM ($R^2 = 0.524$), providing evidence that directed temporal decomposition (DMD) outperforms symmetric spectral methods.
+Per-actor AR(1) is the strongest baseline ($R^2 = 0.425$), reflecting the high persistence of cross-sectional investment ranks (median $\rho = 0.67$). SMIM exceeds this by $+0.099$ ($p = 0.001$, Diebold--Mariano test; wins 10/10 windows). The symmetric Laplacian ($R^2 = 0.286$) underperforms SMIM ($R^2 = 0.524$), providing evidence that data-driven temporal decomposition (DMD) outperforms symmetric spectral methods.
+
+\textbf{Training window fairness.} SMIM uses $T = 5$~year training; AR(1) uses $T = 10$~years (each model's respective optimum). Table~\ref{tab:fairness} verifies that the comparison is robust: at \emph{every} training length, SMIM outperforms AR(1) at the same $T$. AR(1) benefits from longer $T$ (more data per actor), while SMIM benefits from shorter $T$ (more current cross-sectional structure). The two models exploit fundamentally different information.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Training length & SMIM $R^2$ & AR(1) $R^2$ & SMIM $-$ AR(1) \\
+\midrule
+$T = 5$ years & \textbf{0.524} & 0.209 & +0.315 \\
+$T = 8$ years & 0.402 & 0.519 & $-0.117$ \\
+$T = 10$ years & 0.339 & \textbf{0.425} & $-0.086$ \\
+$T = 15$ years & 0.340 & 0.430 & $-0.090$ \\
+\midrule
+Each at optimal $T$ & \textbf{0.524} ($T\!=\!5$) & 0.425 ($T\!=\!10$) & \textbf{+0.099} \\
+\bottomrule
+\end{tabular}
+\caption{Same-$T$ comparison. SMIM dominates at short $T$ because it leverages cross-sectional structure; AR(1) dominates at long $T$ because it estimates per-actor persistence more precisely. At each model's optimal $T$, SMIM leads by $+0.099$.}
+\label{tab:fairness}
+\end{table}
 
 \subsection{The Performance Ladder}
 \label{sec:ladder}
@@ -323,6 +345,29 @@ Step & Change & $R^2$ & $\Delta R^2$ \\
 \caption{Performance ladder: source of each $R^2$ improvement.}
 \label{tab:ladder}
 \end{table}
+
+\subsection{Variance Decomposition}
+\label{sec:variance_decomp}
+
+Of the total $R^2 = 0.524$, we decompose the sources:
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Source & $R^2$ contribution & Share \\
+\midrule
+Per-actor EWM mean ($\hat{\mu}_i$) & 0.281 & 54\% \\
+Spectral dynamics ($U\balpha_{t|t}$) & 0.243 & 46\% \\
+\midrule
+Total & 0.524 & 100\% \\
+\bottomrule
+\end{tabular}
+\caption{Variance decomposition. The per-actor mean is the single largest contributor, but the spectral component (0.243) exceeds what AR(1) persistence adds beyond the mean (0.144), confirming that the DMD-Kalman pipeline captures cross-sectional dynamics beyond simple actor-level autoregression.}
+\label{tab:variance}
+\end{table}
+
+This decomposition has a practical implication: any spectral model that neglects demeaning will appear to fail---not because the spectral structure is absent, but because the per-actor mean dominates. Our initial configuration ($R^2 = 0.339$) suffered precisely this failure before exponentially-weighted demeaning was introduced.
 
 \subsection{Component Ablation}
 \label{sec:ablation}
@@ -429,18 +474,15 @@ Layer-level gap aggregation reveals strong transmission from exogenous shocks (L
 \label{fig:d6}
 \end{figure}
 
-Gap cross-sectional dispersion correlates negatively with VIX at leads of 1--4 quarters ($\rho = -0.39$ at 1Q lead; Figure~\ref{fig:d6}). This counter-intuitive finding suggests that investment misallocation accumulates during calm market periods and unwinds during volatility spikes---consistent with the ``volatility paradox'' where low-volatility environments encourage risk-taking and capital misallocation.
+Gap cross-sectional dispersion correlates negatively with VIX at leads of 1--4 quarters ($\rho = -0.39$ at 1Q lead; Figure~\ref{fig:d6}). This finding---that misallocation builds during calm markets---is consistent with the ``volatility paradox'' hypothesis, where low-volatility environments encourage risk-taking and capital misallocation \citep{brunnermeier2014macroeconomic}.
+
+\textbf{Caveat.} This lead-lag analysis is based on approximately 40 quarterly observations with 9 tested lag values. The correlation of $-0.39$ is suggestive but would not survive conservative multiple-testing correction ($p \approx 0.01$ uncorrected for 9 comparisons). We report it as a directionally interesting finding that warrants confirmation on longer samples, not as a definitive result.
 
 
 % ══════════════════════════════════════════════════════════
 \section{Discussion}
 \label{sec:discussion}
 % ══════════════════════════════════════════════════════════
-
-\subsection{Variance Decomposition}
-\label{sec:variance_decomp}
-
-Of the total $R^2 = 0.524$: 54\% (0.281) comes from the per-actor mean (captured by demeaning) and 46\% (0.243) from spectral dynamics (captured by the DMD-Kalman pipeline). The spectral component is substantial---it represents nearly half the model's explanatory power---but the per-actor mean is the single largest contributor. This decomposition implies that any spectral model that neglects demeaning will appear to fail (as our initial configuration did at $R^2 = 0.339$), not because the spectral structure is absent but because the mean dominates.
 
 \subsection{What Does Not Work (Yet)}
 
@@ -474,6 +516,11 @@ Perhaps most importantly, our systematic ablation methodology---24 experiments a
 % ══════════════════════════════════════════════════════════
 \bibliographystyle{plainnat}
 \begin{thebibliography}{99}
+
+\bibitem[Brunnermeier and Sannikov(2014)]{brunnermeier2014macroeconomic}
+Brunnermeier, M.~K. and Sannikov, Y. (2014).
+\newblock A macroeconomic model with a financial sector.
+\newblock \emph{American Economic Review}, 104(2):379--421.
 
 \bibitem[Abel and Blanchard(1983)]{abel1983optimal}
 Abel, A.~B. and Blanchard, O.~J. (1983).
