@@ -1,0 +1,1364 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\usepackage{graphicx}
+\usepackage{booktabs,array,tabularx,longtable}
+\usepackage{enumitem}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,decorations.pathmorphing,fit,backgrounds}
+\usepackage[colorlinks=true,linkcolor=blue!60!black,citecolor=blue!60!black,urlcolor=blue!60!black]{hyperref}
+\usepackage{natbib}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tcolorbox}
+\usepackage{float}
+\usepackage{appendix}
+\usepackage{lastpage}
+
+% ── Page style ────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textsc{Research Proposal}}
+\fancyhead[R]{\small\textsc{Spectral Multi-Layer Investment Misallocation}}
+\fancyfoot[C]{\small\thepage\ of \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Colors ────────────────────────────────────────────────
+\definecolor{accent}{RGB}{19,61,122}
+\definecolor{lightaccent}{RGB}{236,243,252}
+\definecolor{softgreen}{RGB}{236,247,240}
+\definecolor{softorange}{RGB}{252,245,235}
+\definecolor{softred}{RGB}{252,239,239}
+\definecolor{softpurple}{RGB}{243,236,252}
+
+% ── Section formatting ────────────────────────────────────
+\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{1em}{}
+\titleformat{\subsection}{\large\bfseries\color{accent!80}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{accent!60}}{\thesubsubsection}{1em}{}
+
+% ── Colored box environments ──────────────────────────────
+\newtcolorbox{keybox}[1][]{colback=lightaccent,colframe=accent!75,
+  fonttitle=\bfseries,title={#1},boxrule=0.5pt,arc=2pt,
+  left=8pt,right=8pt,top=7pt,bottom=7pt}
+\newtcolorbox{greenbox}[1][]{colback=softgreen,colframe=green!50!black,
+  fonttitle=\bfseries,title={#1},boxrule=0.5pt,arc=2pt,
+  left=8pt,right=8pt,top=7pt,bottom=7pt}
+\newtcolorbox{orangebox}[1][]{colback=softorange,colframe=orange!60!black,
+  fonttitle=\bfseries,title={#1},boxrule=0.5pt,arc=2pt,
+  left=8pt,right=8pt,top=7pt,bottom=7pt}
+\newtcolorbox{redbox}[1][]{colback=softred,colframe=red!60!black,
+  fonttitle=\bfseries,title={#1},boxrule=0.5pt,arc=2pt,
+  left=8pt,right=8pt,top=7pt,bottom=7pt}
+\newtcolorbox{purplebox}[1][]{colback=softpurple,colframe=purple!60!black,
+  fonttitle=\bfseries,title={#1},boxrule=0.5pt,arc=2pt,
+  left=8pt,right=8pt,top=7pt,bottom=7pt}
+
+% ── Theorem-like environments ─────────────────────────────
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{assumption}{Assumption}[section]
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem{remark}{Remark}[section]
+
+% ── Custom commands ───────────────────────────────────────
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\tr}{\mathrm{tr}}
+\newcommand{\diag}{\mathrm{diag}}
+\newcommand{\bx}{\bm{x}}
+\newcommand{\by}{\bm{y}}
+\newcommand{\bs}{\bm{s}}
+\newcommand{\bff}{\bm{f}}
+\newcommand{\bc}{\bm{c}}
+\newcommand{\bu}{\bm{u}}
+\newcommand{\balpha}{\bm{\alpha}}
+\newcommand{\bpsi}{\bm{\psi}}
+\newcommand{\bbeta}{\bm{\beta}}
+\newcommand{\bPhi}{\bm{\Phi}}
+\newcommand{\bSigma}{\bm{\Sigma}}
+\newcommand{\bLambda}{\bm{\Lambda}}
+
+\setlength{\parskip}{0.4em}
+\setlength{\parindent}{0em}
+
+% ══════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Title Page ────────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+{\Large\bfseries\color{accent} Research Proposal\par}
+\vspace{0.6cm}
+{\LARGE\bfseries
+  A Spectral Multi-Layer Dynamic Framework\\[6pt]
+  for Estimating Systemic Investment Misallocation\\[6pt]
+  Across Heterogeneous Economic Actors\par}
+\vspace{0.8cm}
+{\large A staged research programme with mathematical foundations,\\
+actionable work packages, and decision gates\par}
+\vspace{1.2cm}
+\begin{keybox}
+\textbf{Purpose.} This document is a \emph{research map with mathematical foundations}, not a finished model. It defines the target quantity, specifies the mathematical architecture with full rigour, identifies public data required for empirical implementation, and sequences the research into falsifiable work packages with explicit decision gates. Mathematical appendices provide self-contained treatments of each foundational component.
+\end{keybox}
+\vfill
+\begin{tabular}{>{\bfseries}p{0.32\textwidth}p{0.58\textwidth}}
+Document type: & Research proposal / programme blueprint \\
+Core architecture: & Dynamic directed multilayer graph with spectral modal compression, regime-switching state-space dynamics, emergence-aware diagnostics \\
+Mathematical scope: & Directed GSP, supra-Laplacian theory, Koopman/DMD, phase-transition dynamics, PID/transfer entropy, information geometry, TDA, MDL \\
+Date: & March 2026 \\
+Status: & Version 5.0 --- final integrated synthesis
+\end{tabular}
+\vspace*{1cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ── Abstract ──────────────────────────────────────────────
+\begin{abstract}
+\noindent
+We propose a research programme to develop and validate a mathematically rigorous framework for estimating over- and under-investment across heterogeneous economic actors---from supranational policy bodies and think tanks to small businesses and individual participants. The framework rests on four pillars: (i)~a \emph{directed multilayer network} with spectral decomposition adapted for non-symmetric operators; (ii)~\emph{spectral-domain state-space dynamics} with regime switching, where mode selection is guided by minimum description length and compressibility criteria; (iii)~\emph{phase-transition dynamics} modelling regime shifts as bifurcations in a free-energy landscape over spectral order parameters, providing early-warning signals via critical slowing down; and (iv)~an \emph{emergence detection layer} using causal emergence theory, partial information decomposition, transfer entropy, information geometry, and persistent homology to identify system-level phenomena irreducible to single-layer analysis. The core output is an actor-specific, time-varying, emergence-aware \emph{investment gap} $\Delta_{i,t}^{\mathrm{em}}$.
+
+The proposal is structured as an actionable programme of seven work packages (WP0--WP6) with explicit decision gates and five parallel research trajectories, backed by ten mathematical appendices providing self-contained treatments of each foundational component. A formal problem statement with standing assumptions, notation register, and observability propositions anchors the mathematical architecture. The document is designed to serve as the basis for a subsequent detailed implementation plan with quality gates and milestone specifications.
+\end{abstract}
+
+\newpage
+
+% ══════════════════════════════════════════════════════════
+\section{Executive Summary}
+\label{sec:execsum}
+% ══════════════════════════════════════════════════════════
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{3.1cm}X@{}}
+\toprule
+Primary target & Actor-specific investment gap $\Delta_{i,t} = y_{i,t} - y^*_{i,t}$, always indexed by benchmark class. \\
+Core state variable & Regime-dependent latent modal state $\balpha_t$ from a directed multilayer operator, evolved via a switching state-space model. \\
+Core empirical challenge & Separate structural propagation from transient distortion while preserving point-in-time discipline and avoiding look-ahead bias. \\
+Minimum viable benchmark & Predictive + structural benchmark pair, plus modal attribution. \\
+Mathematical backbone & Typed multilayer graph operators, directed spectral decompositions, switching Kalman filtering, MDL-guided model selection, Ginzburg--Landau phase-transition dynamics. \\
+Emergence layer & Causal emergence, PID synergy, transfer entropy, information geometry, persistent homology---integrated from Phase~I, not bolted on. \\
+Operational philosophy & Parallel workstreams (measurement, graph, modal, dynamics, validation) with synchronisation gates. \\
+\bottomrule
+\end{tabularx}
+\caption{Proposal at a glance.}
+\label{tab:ataglance}
+\end{table}
+
+\begin{keybox}[What this proposal is and is not]
+This document is a \emph{research proposal and actionable map}, not a claim that the full model is already identified. Its core commitment is methodological: build the framework in layers, require each formal component to justify itself empirically, and use appendices to make mathematical assumptions explicit enough that a later implementation plan can be written with concrete quality gates.
+\end{keybox}
+
+% ══════════════════════════════════════════════════════════
+\section{Introduction and Motivation}
+\label{sec:intro}
+% ══════════════════════════════════════════════════════════
+
+Capital allocation decisions propagate through a hierarchical, networked system of institutions. A central bank's rate decision, a think tank's policy white paper, or a regulator's new disclosure rule each set off cascading adjustments that travel---with heterogeneous latency, attenuation, and distortion---through layers of institutional intermediaries before reaching small businesses and individual market participants.
+
+Despite rich literatures on asset pricing factors \citep{fama1993common}, macro-financial linkages \citep{bernanke1999monetary}, network effects in economics \citep{acemoglu2012network,elliott2014financial}, and graph signal processing \citep{ortega2018graph}, no unified framework currently exists to:
+\begin{enumerate}[label=(\roman*),nosep]
+  \item model how investment-relevant signals originate at the policy and institutional level and propagate through a \emph{directed} multilayer hierarchy;
+  \item accommodate heterogeneous actor types---firms, agencies, think tanks, regulators, municipalities---within a single formal object;
+  \item detect \emph{emergent} system-level misallocation patterns that arise from nonlinear interactions between propagation modes;
+  \item produce an actor-specific misallocation gap that is regime-conditional, structurally interpretable, and empirically testable with public data.
+\end{enumerate}
+
+This proposal addresses all four gaps through a staged research programme. Crucially, the \emph{directionality} of influence propagation is treated as a first-class mathematical concern. Economic networks are inherently asymmetric---capital flows, regulatory mandates, and narrative influence do not respect the symmetric-Laplacian assumptions of classical spectral graph theory. We therefore build on recent advances in signal processing on directed graphs \citep{marques2020signal,sandryhaila2013discrete,kwak2024polar} to ensure that the spectral decomposition preserves the very directionality it is meant to represent.
+
+\subsection{The Core Object: The Investment Gap}
+
+\begin{definition}[Investment Gap]
+\label{def:gap}
+Let actor $i$ at time $t$ have observed investment intensity $y_{i,t} \in [0,1]$ (type-specific, normalised) and regime-conditional benchmark $y^*_{i,t}$. The \emph{investment gap} is
+\begin{equation}
+  \Delta_{i,t} = y_{i,t} - y^*_{i,t},
+  \label{eq:gap}
+\end{equation}
+where $\Delta_{i,t} > 0$ indicates over-investment and $\Delta_{i,t} < 0$ indicates under-investment relative to the benchmark. The \emph{emergence-aware} gap $\Delta_{i,t}^{\mathrm{em}}$ additionally accounts for nonlinear mode interactions (Section~\ref{sec:gap_computation}).
+\end{definition}
+
+The entire research programme reduces to defining $y^*_{i,t}$ in a way that is structurally meaningful, empirically identifiable, and robust across regimes. Three nested benchmark definitions will be pursued in sequence (Section~\ref{sec:benchmark_ontology}).
+
+
+% ══════════════════════════════════════════════════════════
+\section{Research Objective, Questions, and Design Principles}
+\label{sec:objectives}
+% ══════════════════════════════════════════════════════════
+
+\begin{greenbox}[Research Objective]
+Develop and validate a multilayer dynamic framework that estimates actor-specific over- and under-investment as persistent deviations from a regime-conditional benchmark implied by propagated upstream influence, local frictions, and observable fundamentals---with the capacity to detect emergent misallocation patterns that are invisible to single-layer analysis.
+\end{greenbox}
+
+This objective decomposes into seven operational research questions:
+\begin{enumerate}[nosep]
+  \item How should actors, layers, influence channels, and investment intensities be defined so that heterogeneous institutions are representable in a common formal system?
+  \item Which benchmark definition for $y^*_{i,t}$ is most defensible at each stage: predictive, structural, or equilibrium-based?
+  \item Which representation of influence propagation is empirically most stable: directed spectral bases, SVD-based modal compression, joint time-vertex modes, dynamic mode decomposition, or a hybrid?
+  \item How should temporal dependence and regime changes be modelled: as exogenous HMM labels, or as endogenous phase transitions in the spectral order parameter?
+  \item Which signals and factors survive a disciplined convergence procedure based on interpretability, stability, compressibility, and out-of-sample value?
+  \item Do emergent properties---synergistic mode interactions, anomalous cross-layer information flows, topological signatures---carry additional predictive and explanatory power beyond the linear spectral benchmark?
+  \item Do the resulting misalignment measures predict economically meaningful downstream outcomes?
+\end{enumerate}
+
+\textbf{Design principles.}
+\begin{itemize}[nosep]
+  \item \textbf{Directionality over symmetric convenience.} Because propagation is top-down and path-dependent, directed operators are preferable to symmetric approximations whenever feasible \citep{marques2020signal}.
+  \item \textbf{Typed heterogeneity.} Different actor classes have different measurement maps and response laws.
+  \item \textbf{Compression with interpretation.} Dimensionality reduction must retain structural interpretability.
+  \item \textbf{Stagewise identification.} Empirical functionality before stronger causal or game-theoretic claims.
+  \item \textbf{Emergence as integral, not optional.} Emergent phenomena are built into the architecture from Phase~I, not bolted on later---but their contribution must be \emph{empirically justified} at each decision gate.
+\end{itemize}
+
+
+% ══════════════════════════════════════════════════════════
+\section{Formal Problem Statement, Notation, and Standing Assumptions}
+\label{sec:formalproblem}
+% ══════════════════════════════════════════════════════════
+
+We work in discrete time $t \in \{1,\ldots,T\}$. Let $V = \{1,\ldots,N\}$ index actors, $\mathcal{A}$ actor types, $\mathcal{L} = \{0,1,2,3\}$ layers, and $\mathcal{R} = \{1,\ldots,R\}$ typed relation channels. Actor $i$ has type $a(i) \in \mathcal{A}$ and layer $\ell(i) \in \mathcal{L}$. The observed investment intensity $y_{i,t}$ is a type-specific observable mapped into a comparable scale by a normalisation operator $\nu_{a(i)}$. We denote by $\bx_{i,t}$ local covariates, by $\bs_t$ the stacked observed graph signal, by $\bu_t$ exogenous global shocks, and by $z_t \in \{1,\ldots,M\}$ the latent regime.
+
+\begin{definition}[Typed dynamic investment system]
+\label{def:system}
+A typed dynamic investment system is the tuple
+\[
+  \mathfrak{S}_T = \bigl(V,\;\mathcal{A},\;\mathcal{L},\;\mathcal{R},\;\{\mathcal{G}_t\}_{t=1}^T,\;\{y_{i,t}, \bx_{i,t}\}_{i,t},\;\{z_t\}_{t=1}^T\bigr),
+\]
+where each $\mathcal{G}_t$ is a typed directed multilayer graph and the measurement maps $\nu_a$ send actor-specific raw observables into comparable intensities.
+\end{definition}
+
+\begin{definition}[Admissible benchmark functional]
+\label{def:benchmark_functional}
+A benchmark functional is a measurable map
+\[
+  \mathcal{B}: (\mathfrak{S}_t, \mathcal{I}_t) \mapsto y^*_{i,t},
+\]
+where $\mathcal{I}_t$ denotes the information set legitimately available at time $t$. A benchmark is \emph{admissible} only if it respects point-in-time availability, actor-type semantics, and the declared benchmark class.
+\end{definition}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{2.7cm}X@{}}
+\toprule
+Object & Meaning \\
+\midrule
+$A_t^{(r)}$ & Directed adjacency for relation channel $r$ at time $t$ \\
+$\mathcal{A}_t$ & Aggregate typed multilayer operator used for spectral analysis \\
+$U_t$ & Chosen modal frame (not necessarily orthogonal in the raw adjacency basis) \\
+$\balpha_t$ & Retained modal amplitude vector after compression \\
+$F^{(z)}$ & Regime-specific modal transition operator \\
+$Q^{(z)}, R^{(z)}$ & State and measurement noise covariances \\
+$\bpsi_t$ & Continuous order parameter derived from spectral modes \\
+$\mathcal{C}_t$ & Criticality index (early-warning signal for phase transitions) \\
+$\mathbf{S}$ & Synergy matrix from partial information decomposition \\
+$y^*_{i,t}$ & Benchmark intensity for actor $i$ at time $t$ \\
+$\Delta_{i,t}$ & Investment gap relative to a specified benchmark functional \\
+\bottomrule
+\end{tabularx}
+\caption{Core notation. Appendices expand each symbol with full mathematical context.}
+\label{tab:notation_main}
+\end{table}
+
+\textbf{Standing assumptions.}
+\begin{enumerate}[label=\textbf{A\arabic*:},leftmargin=2.2em]
+  \item \textbf{Point-in-time measurability.} Every feature used to build $y^*_{i,t}$ must be reconstructible from the information set available at or before time $t$. Violation produces look-ahead bias.
+  \item \textbf{Typed comparability.} For each actor type $a$, the normalisation map $\nu_a$ is stable enough that cross-time comparisons are meaningful and cross-type comparisons are at least ordinally interpretable.
+  \item \textbf{Sparse effective propagation.} Although the raw candidate graph can be dense, the effective transmission kernel after shrinkage is sparse or approximately low rank.
+  \item \textbf{Piecewise-stable modal geometry.} The chosen modal representation is either slowly varying in time or piecewise stable within regimes, so that state estimation is meaningful.
+  \item \textbf{Regime persistence.} Regimes are persistent enough that switching dynamics are statistically identifiable over rolling windows of the available sample size.
+\end{enumerate}
+
+\begin{proposition}[Observability on the retained modal subspace]
+\label{prop:observability}
+Fix a regime $z$ and retained modal dimension $K^*$. If the pair $(F^{(z)}, C^{(z)})$, where $C^{(z)}$ is the effective observation operator on the retained modal subspace, is observable, then the latent modal state is locally recoverable from the history of observations in that regime. In practice, recoverability is assessed by singular-value separation of the finite-horizon observability matrix (Eq.~\ref{eq:observability}) and by stability of filtered states under perturbation. See Section~\ref{sec:identification} and Appendix~\ref{app:regime_switching}.
+\end{proposition}
+
+\begin{proposition}[Hermitian dilation recovers directional singular modes]
+\label{prop:hermitian}
+Let $\mathcal{A}_t = U_L \Sigma U_R^T$ be the SVD of the directed operator. Then the Hermitian dilation $H(\mathcal{A}_t) = \bigl(\begin{smallmatrix} 0 & \mathcal{A}_t \\ \mathcal{A}_t^T & 0 \end{smallmatrix}\bigr)$ has eigenvalues $\pm\sigma_k$, and its eigenvectors encode both $U_L$ and $U_R$. Consequently, symmetric eigensolvers can be used without discarding directional upstream/downstream structure. See Appendix~\ref{app:directed_gsp}.
+\end{proposition}
+
+
+% ══════════════════════════════════════════════════════════
+\section{Ontological Foundations}
+\label{sec:ontology}
+% ══════════════════════════════════════════════════════════
+
+Before any mathematical formalism, five ontologies must be fixed. These are substantive research choices that constrain every subsequent modelling decision.
+
+\subsection{Actor Ontology}
+
+We define a minimum four-layer hierarchy:
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.08\textwidth}>{\bfseries}p{0.22\textwidth}X@{}}
+\toprule
+Layer & Role & Illustrative actors \\
+\midrule
+$\ell=0$ & Exogenous environment & Global liquidity, commodity shocks, geopolitical events, technology shocks \\
+$\ell=1$ & Upstream institutions / agenda setters & Central banks, regulators, IMF, OECD, think tanks, standard-setting bodies \\
+$\ell=2$ & Transmission / intermediary actors & Large firms, banks, sector leaders, regional authorities, industry associations \\
+$\ell=3$ & Downstream actors & SMEs, local businesses, municipalities, households, retail investors \\
+\bottomrule
+\end{tabularx}
+\caption{Minimum four-layer hierarchy. Two layers conflate interpretation and absorption; three conflate exogenous shocks with institutional response. Four is the minimum that separates shocks, interpretation, transmission, and absorption \citep{acemoglu2015systemic}.}
+\label{tab:layers}
+\end{table}
+
+\subsection{Investment Ontology}
+``Investment'' is an actor-type-specific commitment intensity, normalised to a common scale:
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.22\textwidth}X@{}}
+\toprule
+Actor class & Investment intensity measures \\
+\midrule
+Corporation & CapEx/assets, R\&D intensity, acquisition intensity, hiring rate \\
+Bank / intermediary & Loan growth, sectoral credit allocation, balance-sheet expansion \\
+Agency / ministry & Budget share by domain, programme intensity, grant volume \\
+Think tank / standard setter & Publication intensity, topic share, citation-weighted agenda intensity \\
+Municipality & Capital budget deployment, infrastructure project activation \\
+Household / retail & Durable spending, business formation rate, sector-specific exposure \\
+\bottomrule
+\end{tabularx}
+\caption{Actor-specific investment intensity measures.}
+\label{tab:investment}
+\end{table}
+
+All measures are normalised within actor-type distributions to $y_{i,t} \in [0,1]$ or standardised by cross-sectional rank, enabling meaningful comparison of gaps $\Delta_{i,t}$ across heterogeneous actors.
+
+\subsection{Transmission Ontology}
+
+Influence travels through multiple distinguishable channels, each with distinct propagation characteristics:
+\begin{enumerate}[label=\textbf{C\arabic*},nosep]
+  \item \textbf{Regulatory}: rule changes, compliance requirements
+  \item \textbf{Financial}: interest rates, credit conditions, funding costs
+  \item \textbf{Fiscal / grant}: budget allocation, subsidies, procurement
+  \item \textbf{Narrative}: speeches, white papers, media, agenda-setting publications
+  \item \textbf{Supply-chain / procurement}: direct economic linkages
+  \item \textbf{Imitation / diffusion}: peer effects, local spillovers
+  \item \textbf{Market-implied}: equity co-movement, credit spread transmission
+\end{enumerate}
+
+This is why the framework uses a \emph{multirelational directed graph} rather than a monolithic adjacency matrix \citep{kivela2014multilayer,boccaletti2014structure}.
+
+\subsection{Regime Ontology --- Beyond Discrete Labels}
+\label{sec:regime_ontology}
+
+A na\"ive treatment assigns a discrete label $z_t \in \{\text{expansion}, \text{crisis}, \ldots\}$ via a hidden Markov model. While useful as a starting approximation \citep{hamilton1989new}, this treats regimes as exogenous labels rather than as \emph{emergent macroscopic states} of the multilayer system.
+
+We adopt a two-level regime structure:
+\begin{enumerate}[nosep]
+  \item \textbf{Coarse-grained labels}: $z_t \in \mathcal{Z} = \{\text{normal expansion}, \text{tightening}, \text{crisis}, \text{policy activism}, \text{geopolitical fragmentation}, \text{innovation boom}\}$, for interpretability and backtesting against consensus classifications.
+  \item \textbf{Continuous order parameter}: $\bpsi_t \in \R^d$ derived from spectral mode amplitudes (Section~\ref{sec:phase_transition}), tracking the system's position in a free-energy landscape and providing early-warning signals via critical slowing down \citep{scheffer2009early,sornette2003critical}.
+\end{enumerate}
+
+\subsection{Benchmark Ontology}
+\label{sec:benchmark_ontology}
+
+Three nested benchmark definitions, pursued in sequence:
+\begin{keybox}[Benchmark Definitions]
+\begin{enumerate}[nosep]
+  \item \textbf{Phase~I --- Predictive benchmark}: $y^*_{i,t} = \E[y_{i,t} \mid \text{spectral state}, \text{local signals}, z_t]$
+  \item \textbf{Phase~II --- Structural benchmark}: $y^*_{i,t}$ is the allocation implied by stable fundamentals after removing distortionary channels
+  \item \textbf{Phase~III --- Equilibrium benchmark}: $y^*_{i,t}$ is the Nash or welfare-optimal allocation in a network game
+\end{enumerate}
+Each phase builds on the empirical infrastructure of the previous one. The first is the baseline; the second becomes relevant once the strongest channels are identified; the third is a late-stage extension for scenario analysis.
+\end{keybox}
+
+
+% ══════════════════════════════════════════════════════════
+\section{Mathematical Architecture}
+\label{sec:math}
+% ══════════════════════════════════════════════════════════
+
+This section presents the core mathematical framework. Full derivations and background are provided in Appendices~\ref{app:directed_gsp}--\ref{app:mdl}.
+
+\subsection{Directed Multilayer Network Construction}
+\label{sec:network}
+
+\subsubsection{Multirelational adjacency operator}
+
+Let the system contain $N$ actors across $L$ layers, connected by $R$ relation types. For each relation type $r \in \{1,\ldots,R\}$ at time $t$, define the adjacency matrix $A^{(r)}_t \in \R^{N \times N}$, where $[A^{(r)}_t]_{ji}$ represents the influence of actor $i$ on actor $j$ through channel $r$. The aggregate \emph{directed multilayer operator} is:
+\begin{equation}
+  \mathcal{A}_t = \sum_{r=1}^{R} \omega_{r,z_t}\, A^{(r)}_t,
+  \label{eq:multilayer_op}
+\end{equation}
+where $\omega_{r,z_t}$ are regime-dependent channel weights. This is a non-symmetric, time-varying, regime-dependent operator. The blocks of $\mathcal{A}_t$ include both within-layer (intra-layer) and cross-layer (inter-layer) interactions.
+
+\begin{remark}
+The regime-dependent weights $\omega_{r,z_t}$ encode a crucial economic insight: the same channel can have different propagation strength in different regimes. For instance, the narrative channel (C4) may dominate during policy activism, while the financial channel (C2) dominates during tightening.
+\end{remark}
+
+Edge weights are estimated from multiple public data sources:
+\begin{itemize}[nosep]
+  \item Granger-causal relationships between actor-level time series \citep{granger1969investigating};
+  \item textual influence via NLP co-reference and citation analysis on policy documents;
+  \item supply-chain and funding-flow linkages from procurement databases;
+  \item co-movement patterns in investment intensity, controlling for common factors.
+\end{itemize}
+
+\subsubsection{Directed Laplacian variants}
+
+The choice of operator for spectral decomposition is a key design decision. For directed graphs, the standard Laplacian $L = D - A$ is non-symmetric, its eigenvalues are generally complex, and its eigenvectors are non-orthogonal (Appendix~\ref{app:directed_gsp}). We consider three candidates:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Jordan/Schur decomposition of $\mathcal{A}_t$}: Direct spectral analysis of the adjacency operator. For non-normal $\mathcal{A}_t$, use the Schur decomposition $\mathcal{A}_t = Q T Q^H$ ($Q$ unitary, $T$ upper triangular) for numerical stability \citep{sandryhaila2013discrete,sandryhaila2014discrete}.
+  \item \textbf{Directed variation optimised basis}: Solve for an orthonormal basis $U^*$ that minimises spectral dispersion subject to directed variation ordering \citep{marques2020signal}:
+  \begin{equation}
+    U^* = \arg\min_{U^T U = I} \frac{1}{N-1}\sum_{i=1}^{N-2}\left(\mathrm{DV}(u_{i+1}) - \mathrm{DV}(u_i)\right)^2, \quad \mathrm{DV}(\bx) = \sum_{(i,j)\in E} A_{ji}[x_i - x_j]_+^2.
+    \label{eq:directed_variation}
+  \end{equation}
+  \item \textbf{Polar decomposition}: Decompose $\mathcal{A}_t = UP$ where $U$ is orthogonal (rotation) and $P$ is symmetric positive semidefinite (scaling). Both factors are normal, admitting standard eigendecompositions, and the extended GFT satisfies Parseval's identity \citep{kwak2024polar} (Appendix~\ref{app:directed_gsp}).
+  \item \textbf{Hermitian dilation}: Embed $\mathcal{A}_t$ into the Hermitian matrix $H(\mathcal{A}_t) = \bigl(\begin{smallmatrix} 0 & \mathcal{A}_t \\ \mathcal{A}_t^T & 0 \end{smallmatrix}\bigr)$. The eigenstructure of $H$ corresponds to the singular structure of $\mathcal{A}_t$, providing real orthogonal embeddings while preserving directionality---the left singular vectors (upstream influence patterns) and right singular vectors (downstream response patterns) are recovered from the eigenvectors of $H$ (Appendix~\ref{app:directed_gsp}).
+\end{enumerate}
+
+The choice between these will be resolved empirically in WP3 (Section~\ref{sec:wp}).
+
+\subsection{Modal Representation and Spectral Factor Extraction}
+\label{sec:spectral_factors}
+
+Let $U_t \in \R^{N \times K}$ denote the chosen modal frame ($K \ll N$) obtained from the directed spectral decomposition of $\mathcal{A}_t$. The observed investment intensity vector $\by_t \in \R^N$ is represented as:
+\begin{equation}
+  \by_t = U_t \bc_t + \bm{\varepsilon}_t,
+  \label{eq:modal_rep}
+\end{equation}
+where $\bc_t \in \R^K$ is the vector of modal amplitudes and $\bm{\varepsilon}_t$ is the residual. The modal amplitudes $\bc_t$ separate the signal into structurally interpretable components: slow global propagation modes (low frequency), intermediate sectoral/regional waves, and fast localised deviations.
+
+For a signal-covariance-weighted projection (marrying network structure with statistical structure):
+\begin{equation}
+  \bc_t = (U_t^T \bSigma_s^{-1} U_t)^{-1} U_t^T \bSigma_s^{-1} \bs_t,
+  \label{eq:weighted_projection}
+\end{equation}
+where $\bs_t$ is the full signal vector and $\bSigma_s$ is the signal covariance matrix.
+
+\subsubsection{Joint time-vertex representation}
+
+When temporal and graph structure must be treated jointly, we employ the \emph{Joint Fourier Transform} \citep{grassi2018time}:
+\begin{equation}
+  \hat{X} = U_G^* X U_T, \qquad \hat{\bx} = (U_T \otimes U_G)^* \bx,
+  \label{eq:jft}
+\end{equation}
+where $U_G$ diagonalises the graph operator and $U_T$ is the DFT matrix. The \emph{joint Laplacian} $L_J = L_T \otimes I_G + I_T \otimes L_G$ has eigenvalues $\lambda_\ell + \mu_k$, enabling frequency-selective processing in both domains simultaneously. Joint filtering operates via a bivariate kernel $h(\lambda, \omega)$ (Appendix~\ref{app:time_vertex}).
+
+\subsubsection{Dynamic Mode Decomposition alternative}
+
+As an alternative to graph-spectral methods, \emph{Dynamic Mode Decomposition} \citep{tu2014dynamic} extracts dominant spatiotemporal modes directly from data. Given snapshot matrices $X = [\by_0, \ldots, \by_{m-1}]$ and $Y = [\by_1, \ldots, \by_m]$, DMD computes modes $\phi_i$ and eigenvalues $\lambda_i$ such that $\by_k \approx \sum_i \phi_i \lambda_i^k b_i$. The connection to Koopman operator theory provides theoretical grounding for nonlinear systems (Appendix~\ref{app:dmd}).
+
+\subsection{Mode Selection: MDL, Compressibility, and RG Relevance}
+\label{sec:mode_selection}
+
+Not all spectral modes carry genuine structural information. We propose a three-criteria selection procedure:
+
+\begin{definition}[Mode Selection Criteria]
+\label{def:mode_selection}
+Retain mode $k$ if and only if it satisfies all three:
+\begin{enumerate}[nosep]
+  \item \textbf{MDL criterion}: Including mode $k$ reduces the total description length $L(\text{data}|\text{model}) + L(\text{model})$ \citep{rissanen1978modeling,grunwald2007minimum}.
+  \item \textbf{Compressibility criterion}: The mode's temporal amplitude series $c_k^{(1:T)}$ has normalised Lempel--Ziv compressibility $\rho_k = 1 - C(c_k^{(1:T)})/|c_k^{(1:T)}| > \rho_{\min}$, indicating genuine temporal structure rather than noise \citep{lempel1976complexity}.
+  \item \textbf{RG relevance criterion}: The mode's contribution grows (or remains stable) under coarse-graining from Layer~3 to Layer~0, indicating it is ``relevant'' in the renormalisation-group sense \citep{wilson1971renormalization}.
+\end{enumerate}
+\end{definition}
+
+Let $K^*$ denote the number of retained modes. The compressibility criterion is the practical proxy for Kolmogorov complexity---modes with incompressible dynamics are algorithmically random and therefore noise. The MDL criterion provides joint model selection (Appendix~\ref{app:mdl}). The RG criterion ensures that retained modes capture genuine cross-scale structure rather than layer-specific fluctuations.
+
+\subsection{Regime-Switching State-Space Dynamics in Modal Space}
+\label{sec:kalman}
+
+The retained modal amplitudes $\balpha_t = (c_1(t), \ldots, c_{K^*}(t))^T$ evolve via a regime-switching state-space model:
+\begin{align}
+  \balpha_t &= F^{(z_t)} \balpha_{t-1} + G^{(z_t)} \bu_t + H^{(z_t)} \bm{w}_t + \bm{\eta}_t,
+  & \bm{\eta}_t &\sim \mathcal{N}(\bm{0}, Q^{(z_t)}),
+  \label{eq:state}\\[4pt]
+  \bs_t &= U_{K^*} \balpha_t + B^{(z_t)} \bx_t + \bm{\varepsilon}_t,
+  & \bm{\varepsilon}_t &\sim \mathcal{N}(\bm{0}, R),
+  \label{eq:obs}
+\end{align}
+where:
+\begin{itemize}[nosep]
+  \item $F^{(z_t)}$ is the regime-dependent transition matrix in modal space. For graph-spectral modes, $F^{(z_t)}$ is \emph{approximately diagonal} because the spectral decomposition decouples the dynamics---the key computational advantage.
+  \item $G^{(z_t)} \bu_t$ captures exogenous global shocks (Layer~0 signals).
+  \item $H^{(z_t)} \bm{w}_t$ captures additional regime-specific controls.
+  \item $B^{(z_t)} \bx_t$ captures local actor-level covariates in the observation equation.
+  \item $z_t \in \{1, \ldots, M\}$ follows a Markov chain with transition matrix $P = [p_{ij}]$.
+\end{itemize}
+
+Filtering proceeds via the \emph{Kim filter} \citep{kim1999state}: run $M^2$ parallel Kalman filters (one per regime pair $(z_{t-1}, z_t)$), then collapse to $M$ via moment-matching approximation (Appendix~\ref{app:regime_switching}). The EM algorithm estimates all parameters, with regime count controlled by MDL/BIC.
+
+\begin{keybox}[Why Modal-Space Kalman Is Computationally Tractable]
+The spectral projection achieves three things simultaneously:
+(i)~dimensionality reduction from $N$ actors to $K^*$ modes;
+(ii)~approximate diagonalisation of the transition dynamics, making the Kalman filter tractable even for large $N$;
+(iii)~multi-scale temporal separation---low-frequency modes capture slow macro dynamics, high-frequency modes capture fast local adjustments, each tracked with appropriate smoothing \citep{durbin2012time}.
+\end{keybox}
+
+\subsection{Actor-Level Latent State Formulation}
+\label{sec:actor_level}
+
+The modal state-space model (Eqs.~\ref{eq:state}--\ref{eq:obs}) operates in compressed mode space. A richer \emph{actor-level} extension models each actor's latent state directly, with cross-actor influence mediated by the typed multilayer graph:
+\begin{align}
+  h_{i,t} &= M_{a(i),z_t}\, h_{i,t-1} + \sum_{r=1}^{R}\sum_{j=1}^{N} A^{(r)}_{ji,t}\, W_{r,a(i),a(j),z_t}\, h_{j,t-1} + C_{a(i),z_t}\,\bm{\xi}_t + \nu_{i,t},
+  \label{eq:actor_state}\\[4pt]
+  y_{i,t} &= g_{a(i),z_t}(h_{i,t},\, \bx_{i,t}) + e_{i,t},
+  \label{eq:actor_obs}
+\end{align}
+where $h_{i,t} \in \R^d$ is actor $i$'s latent state, $M_{a(i),z_t}$ is the type- and regime-specific autoregressive matrix, $W_{r,a(i),a(j),z_t}$ is the regime-dependent influence kernel for channel $r$ between actor types $a(i)$ and $a(j)$, and $\bm{\xi}_t$ are global shocks.
+
+The modal model (Eqs.~\ref{eq:state}--\ref{eq:obs}) is a \emph{compressed approximation} of this system: if $h_{i,t} \approx \sum_k [U_{K^*}]_{ik}\alpha_k(t)$, the actor-level dynamics project onto the modal dynamics. The proposal treats the modal system as the baseline (WP3--WP5) and the actor-level system as a structural extension (WP6), to be activated only when modal compression is demonstrably inadequate.
+
+\subsection{Identification, Observability, and Estimation}
+\label{sec:identification}
+
+The project adopts a \emph{nested identification} philosophy, progressing through four levels:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Measurement identification}: Can the chosen observables consistently represent actor-specific investment intensity? (Validated in WP0--WP1.)
+  \item \textbf{State identification}: Can modal states $\balpha_t$ be stably estimated from observed graph signals? (Validated in WP3--WP4.)
+  \item \textbf{Regime identification}: Can changes in transmission dynamics be distinguished from noise? (Validated in WP4--WP5.)
+  \item \textbf{Structural identification}: Can stable transmission parameters be separated from temporary distortions? (Validated in WP6.)
+\end{enumerate}
+
+\subsubsection{Observability requirements}
+
+For the linearised system (Eqs.~\ref{eq:state}--\ref{eq:obs}) in a fixed regime $z$, a necessary condition for local observability is that the observability matrix:
+\begin{equation}
+  \mathcal{O}_z = \begin{pmatrix} U_{K^*} \\ U_{K^*} F^{(z)} \\ U_{K^*} (F^{(z)})^2 \\ \vdots \\ U_{K^*} (F^{(z)})^{K^*-1} \end{pmatrix}
+  \label{eq:observability}
+\end{equation}
+has full column rank on the retained modal subspace. In practice, exact rank conditions may fail under noise and basis drift. The empirical focus is therefore on \emph{effective observability}: singular-value separation of $\mathcal{O}_z$, estimation stability across rolling windows, and robustness of filtered states to perturbation. If the smallest singular value of $\mathcal{O}_z$ falls below a threshold (calibrated via simulation), the modal subspace should be reduced.
+
+\subsubsection{Complexity control}
+
+The proposal enforces a three-level complexity discipline:
+\begin{enumerate}[nosep]
+  \item \textbf{Structural sparsity}: Enforce sparsity or group sparsity over edge families, lag structure, and actor-type interaction terms via $\ell_1$ or group-lasso penalties.
+  \item \textbf{Modal compression}: Retain only modes that materially reduce out-of-sample loss \emph{and} improve description length (Definition~\ref{def:mode_selection}).
+  \item \textbf{MDL model-comparison score}: For candidate model $\mathcal{M}$:
+  \begin{equation}
+    \mathrm{Score}(\mathcal{M}) = -\log p(D|\hat{\theta}_\mathcal{M}, \mathcal{M}) + \lambda_1 k_\mathcal{M} + \lambda_2 r_\mathcal{M} + \lambda_3 s_\mathcal{M},
+    \label{eq:mdl_score}
+  \end{equation}
+  where $k_\mathcal{M}$ is parameter count, $r_\mathcal{M}$ is modal rank, and $s_\mathcal{M}$ is regime complexity. This operationalises the MDL principle for our setting.
+\end{enumerate}
+
+\subsubsection{Estimation roadmap}
+
+The estimation stack is incremental---each step validated before the next begins:
+\begin{enumerate}[nosep]
+  \item Estimate signal normalisation and actor-level investment-intensity measures.
+  \item Build typed graph operators; benchmark alternative operator families.
+  \item Estimate static or slowly-varying modal basis candidates.
+  \item Fit linear Gaussian state-space models in modal space (no switching).
+  \item Extend to switching Kalman filtering (Kim filter / IMM).
+  \item Compare with dynamic factor and DMD-style baselines.
+  \item Only then extend toward structural or equilibrium layers.
+\end{enumerate}
+
+\subsection{Phase-Transition Dynamics and Order Parameters}
+\label{sec:phase_transition}
+
+The regime variable $z_t$ should not be treated as a simple exogenous HMM label. We model regime transitions as \emph{phase transitions} emerging from the dynamics of the spectral mode amplitudes.
+
+\subsubsection{Order parameters from spectral modes}
+
+Define the order parameter as a low-dimensional summary of the spectral state:
+\begin{equation}
+  \bpsi_t = \Gamma(\balpha_t) \in \R^d, \qquad d \ll K^*,
+  \label{eq:order_param}
+\end{equation}
+where $\Gamma$ may include: (i)~the amplitude of the first $d$ modes; (ii)~quadratic interactions $\psi_t^{(jk)} = \alpha_j(t)\alpha_k(t)$; (iii)~entropy of the mode amplitude distribution.
+
+\subsubsection{Ginzburg--Landau free-energy landscape}
+
+Following the Landau theory of phase transitions \citep{landau1937theory} adapted to economic systems \citep{sornette2003critical}, the order parameter evolves in a free-energy landscape:
+\begin{equation}
+  \mathcal{F}(\bpsi; \bm{\theta}_t) = \sum_{k=1}^{d}\left[\frac{a_k(\bm{\theta}_t)}{2}\psi_k^2 + \frac{b_k}{4}\psi_k^4\right] + \sum_{k < j} c_{kj}(\bm{\theta}_t)\psi_k\psi_j - \sum_k h_k(t)\psi_k,
+  \label{eq:free_energy}
+\end{equation}
+where $\bm{\theta}_t$ encodes slowly-varying external conditions (global liquidity, geopolitical stress, etc.) and $h_k(t)$ are external ``fields'' (policy shocks). The order parameter evolves as a stochastic gradient flow (Appendix~\ref{app:phase_transitions}):
+\begin{equation}
+  d\bpsi_t = -\nabla_\psi \mathcal{F}(\bpsi_t; \bm{\theta}_t)\,dt + \sigma\,dW_t.
+  \label{eq:gradient_flow}
+\end{equation}
+
+Phase transitions occur when $\bm{\theta}_t$ crosses a critical surface, causing the landscape to bifurcate. This model supports hysteresis (the system can persist in a regime after conditions reverse) and provides early-warning signals via critical slowing down.
+
+\subsubsection{Criticality index}
+
+Near a phase transition, the dominant eigenvalue of the Hessian $\partial^2\mathcal{F}/\partial\bpsi^2$ approaches zero, manifesting as rising autocorrelation and variance. We track:
+\begin{equation}
+  \mathcal{C}_t = \frac{\Var(\bpsi_{[t-w,t]})}{\Var(\bpsi_{[t-2w,t-w]})} \cdot \frac{\mathrm{ACF}_1(\bpsi_{[t-w,t]})}{\mathrm{ACF}_1(\bpsi_{[t-2w,t-w]})}.
+  \label{eq:criticality}
+\end{equation}
+Rising $\mathcal{C}_t$ signals approach to a phase boundary \citep{scheffer2009early,dakos2012methods}.
+
+\subsection{Investment-Gap Benchmark Functionals}
+\label{sec:gap_computation}
+
+Four benchmark functionals are maintained and evaluated comparatively. This is a core contribution: over- and under-investment are meaningless without specifying which benchmark is in use.
+
+\subsubsection{Predictive benchmark}
+The one-step conditional expectation:
+\begin{equation}
+  y^{\mathrm{pred}}_{i,t|t-1} = \E[y_{i,t} \mid \mathcal{F}_{t-1}], \qquad \Delta^{\mathrm{pred}}_{i,t} = y_{i,t} - y^{\mathrm{pred}}_{i,t|t-1}.
+  \label{eq:pred_bench}
+\end{equation}
+Operationally convenient but conceptually weak: it is only as normative as the predictive model.
+
+\subsubsection{Structural benchmark}
+Let $\theta^\star$ denote parameters associated with stable transmission channels and fundamentals, excluding temporary distortions and transitory narrative overshoot:
+\begin{equation}
+  y^{\mathrm{str}}_{i,t} = \Psi_{\theta^\star}(\mathcal{G}_t, z_t, \bx_{i,t}, \bu_t), \qquad \Delta^{\mathrm{str}}_{i,t} = y_{i,t} - y^{\mathrm{str}}_{i,t}.
+  \label{eq:str_bench}
+\end{equation}
+This is the preferred benchmark because it allows policy-relevant decomposition of the gap.
+
+\subsubsection{Modal benchmark}
+Decompose the gap into contributions from individual propagation modes:
+\begin{equation}
+  \Delta^{\mathrm{mode}}_{i,t} = \sum_{k=1}^{K^*} [U_{K^*}]_{ik}\!\left(\alpha_k^{\mathrm{obs}}(t) - \alpha_k^{\mathrm{bench}}(t)\right) + \varepsilon_{i,t}^{\mathrm{local}},
+  \label{eq:mode_bench}
+\end{equation}
+where $\alpha_k^{\mathrm{bench}}(t)$ is the Kalman-filtered modal amplitude. This identifies \emph{which propagation mode drives the gap}---global macro, sectoral, or localised.
+
+\subsubsection{Equilibrium benchmark}
+For strategic settings, actor $i$'s allocation solves:
+\begin{equation}
+  y^{\mathrm{eq}}_{i,t} \in \arg\min_{y \in \mathcal{Y}_i} J_i(y, y_{-i,t}, \bx_{i,t}, b_{i,t}, z_t), \qquad \Delta^{\mathrm{eq}}_{i,t} = y_{i,t} - y^{\mathrm{eq}}_{i,t},
+  \label{eq:eq_bench}
+\end{equation}
+where $b_{i,t}$ denotes beliefs/narratives and $y_{-i,t}$ denotes others' actions. Theoretically richest but identification-demanding; proposed as a Phase~III extension.
+
+\subsubsection{Emergence-aware benchmark}
+The enhanced benchmark incorporates nonlinear mode interactions and emergence indicators:
+\begin{equation}
+  \hat{y}_{i,t}^{\mathrm{em}} = g_{a(i),z_t}\!\left(
+    \underbrace{\textstyle\sum_k [U_{K^*}]_{ik}\hat{\alpha}_k(t)}_{\text{linear spectral}}
+    + \underbrace{\textstyle\sum_{j<k} S_{jk}\hat{\alpha}_j(t)\hat{\alpha}_k(t)}_{\text{synergistic correction}},\;
+    \bx_{i,t}^{\mathrm{local}},\;
+    \underbrace{\mathcal{C}_t,\, \mathcal{T}_t}_{\text{emergence indicators}}
+  \right).
+  \label{eq:emergence_benchmark}
+\end{equation}
+
+\begin{orangebox}[Benchmark Discipline]
+The project should \textbf{never report ``over-investment'' without labelling the benchmark class}. Predictive, structural, modal, equilibrium, and emergence-aware gaps are related but not interchangeable quantities. All results must specify which $\Delta$ is being reported.
+\end{orangebox}
+
+
+% ══════════════════════════════════════════════════════════
+\section{Emergent Properties and Information Recovery}
+\label{sec:emergence}
+% ══════════════════════════════════════════════════════════
+
+The most consequential misallocation phenomena---bubbles, contagion cascades, coordinated regime shifts---are \emph{emergent}: they arise from interactions between components and are invisible to single-layer or single-mode analysis. This section formalises emergence detection within the spectral framework. Full mathematical background is in Appendices~\ref{app:info_theory} and~\ref{app:tda}.
+
+\subsection{Causal Emergence}
+\label{sec:causal_emergence}
+
+\begin{definition}[Causal Emergence, after \citealt{hoel2013quantifying}]
+A macro-level description $\bpsi_t = \Gamma(\balpha_t)$ exhibits \emph{causal emergence} over the micro-level description $\balpha_t$ if the macro description has higher effective information (EI) about its own future:
+\begin{equation}
+  \mathrm{EI}(\bpsi_t \to \bpsi_{t+1}) > \mathrm{EI}(\balpha_t \to \balpha_{t+1}),
+  \label{eq:causal_emergence}
+\end{equation}
+where $\mathrm{EI} = \log_2 N - (1/N)\sum_i H(\mathrm{row}_i(T))$ for transition matrix $T$, decomposing as $\mathrm{EI} = \mathrm{Determinism} - \mathrm{Degeneracy}$.
+\end{definition}
+
+Causal emergence means the system is more deterministic and less degenerate when described at the macro level. We search for coarse-grainings $\Gamma$ that maximise $\mathrm{CE} = \mathrm{EI}_{\mathrm{macro}} - \mathrm{EI}_{\mathrm{micro}}$ \citep{hoel2017map,rosas2020reconciling}.
+
+\subsection{Synergistic Information via Partial Information Decomposition}
+\label{sec:pid}
+
+Given two spectral modes $\alpha_j(t)$ and $\alpha_k(t)$ and target $\Delta_{i,t+h}$, the \emph{partial information decomposition} \citep{williams2010nonnegative} decomposes:
+\begin{equation}
+  I(\alpha_j, \alpha_k; \Delta_{i,t+h}) = \underbrace{R}_{\text{redundancy}} + \underbrace{U_j + U_k}_{\text{unique}} + \underbrace{S}_{\text{synergy}}.
+  \label{eq:pid}
+\end{equation}
+
+\textbf{Synergy} $S$ is the formal signature of emergence: information about future misallocation available \emph{only} from the joint observation of both modes, not from either alone. The synergy matrix $\mathbf{S} \in \R^{K^* \times K^*}$, where $S_{jk}$ is the pairwise synergy, reveals which mode interactions drive emergent misallocation patterns.
+
+For jointly Gaussian systems, the MMI measure gives closed-form computation via covariance matrices (Appendix~\ref{app:info_theory}). For non-Gaussian cases, we use the BROJA measure via convex optimisation \citep{bertschinger2014quantifying} or nearest-neighbour estimation \citep{ehrlich2024pid}.
+
+\subsection{Transfer Entropy Across Layers}
+\label{sec:transfer_entropy}
+
+Transfer entropy \citep{schreiber2000measuring} measures directed information flow between layers:
+\begin{equation}
+  \mathrm{TE}_{\ell \to m}(t) = I\!\left(\bff^{(m)}_{t+1};\; \bff^{(\ell)}_t \;\middle|\; \bff^{(m)}_t\right) = H\!\left(\bff^{(m)}_{t+1} | \bff^{(m)}_t\right) - H\!\left(\bff^{(m)}_{t+1} | \bff^{(m)}_t, \bff^{(\ell)}_t\right),
+  \label{eq:te}
+\end{equation}
+where $\bff^{(\ell)}_t$ is the spectral mode amplitude vector restricted to modes with dominant support on layer $\ell$. The \emph{conditional} transfer entropy $\mathrm{TE}_{\ell \to m | \mathrm{rest}}$ controls for intermediate layers, decomposing influence into mediated and direct components (Appendix~\ref{app:info_theory}).
+
+Anomalous direct transfer entropy across non-adjacent layers (e.g., Layer~1 $\to$ Layer~3, bypassing intermediaries) signals emergent phenomena such as narrative contagion that circumvents institutional transmission.
+
+\subsection{Information-Geometric Regime Detection}
+\label{sec:info_geometry}
+
+Model the distribution of modal amplitudes as an exponential family $p(\balpha_t; \bm{\xi}_t)$. The \emph{Fisher information metric} $g_{ij}(\bm{\xi}) = \E[\partial_i \ln p \cdot \partial_j \ln p]$ defines a Riemannian geometry on the parameter space \citep{amari2016information}. The geodesic distance:
+\begin{equation}
+  d_{\mathrm{Fisher}}(\bm{\xi}_t, \bm{\xi}_{t-1}) = \sqrt{(\bm{\xi}_t - \bm{\xi}_{t-1})^T g(\bm{\xi}_{t-1})(\bm{\xi}_t - \bm{\xi}_{t-1})}
+  \label{eq:fisher_dist}
+\end{equation}
+measures distributional surprise in a parameterisation-invariant way. Spikes signal emergent regime transitions. Crucially, for AR(1) models the Fisher information diverges as $\rho \to 1$, directly linking information geometry to critical slowing down (Appendix~\ref{app:info_theory}).
+
+\subsection{Topological Signatures via Persistent Homology}
+\label{sec:topology}
+
+Construct a point cloud from sliding windows of modal amplitude vectors $\{\balpha_{t-w}, \ldots, \balpha_t\}$. Compute the persistence diagram via the Vietoris--Rips complex \citep{carlsson2009topology,edelsbrunner2010computational}. Define the topological complexity:
+\begin{equation}
+  \mathcal{T}_t = \sum_k k \cdot \int_0^\infty \beta_k^{(w)}(\epsilon)\,d\epsilon,
+  \label{eq:topo}
+\end{equation}
+where $\beta_k^{(w)}$ is the $k$-th Betti number at filtration scale $\epsilon$. Rapid changes in $\mathcal{T}_t$ indicate structural reorganisation invisible to metric-based measures. Wasserstein distances between successive persistence diagrams provide a stability-guaranteed similarity metric (Appendix~\ref{app:tda}).
+
+\subsection{Integration with Benchmark Functionals}
+\label{sec:emergence_integration}
+
+The emergence diagnostics feed into the benchmark computation in three ways: (i)~synergy-weighted interaction terms $S_{jk}\hat{\alpha}_j\hat{\alpha}_k$ enter the emergence-aware benchmark (Eq.~\ref{eq:emergence_benchmark}); (ii)~the criticality index $\mathcal{C}_t$ and topological complexity $\mathcal{T}_t$ serve as regime-proximity indicators in the link function $g$; (iii)~transfer entropy anomalies flag channels where the estimated graph structure may be inadequate.
+
+
+% ══════════════════════════════════════════════════════════
+\section{Signal Taxonomy and Selection Methodology}
+\label{sec:signals}
+% ══════════════════════════════════════════════════════════
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{2.5cm}Xp{4.8cm}@{}}
+\toprule
+Signal family & Example variables & Public data sources \\
+\midrule
+Macro / fundamental & GDP, industrial production, PMI, trade, credit & FRED, World Bank, OECD, BIS APIs \\
+Policy / institutional & Rate decisions, regulatory output, fiscal releases & Central bank APIs, Federal Register, EUR-Lex \\
+Market pricing & Yield curves, spreads, equity factors, volatility, flows & FRED, Yahoo Finance, exchange feeds \\
+Balance sheet / budget & CapEx, leverage, budget allocations, grant data & SEC EDGAR, USASPENDING, EU budget \\
+Narrative / text & Speeches, white papers, media intensity, sentiment & GDELT, central bank corpora, think tank RSS \\
+Network position & Centrality, supply-chain position, citation influence & BEA I/O tables, patent/policy citations \\
+\bottomrule
+\end{tabularx}
+\caption{Mechanism-aligned signal taxonomy with public data sources.}
+\label{tab:signals}
+\end{table}
+
+\textbf{Five-stage convergence funnel:}
+\begin{enumerate}[label=\textbf{Stage~\arabic*},nosep]
+  \item \textbf{Taxonomy}: every signal must map to a mechanism block.
+  \item \textbf{Screening}: remove signals with $>30\%$ missing, high revision volatility, excessive lag, or frequency incompatibility.
+  \item \textbf{Block representation}: compress within-block via sparse PCA or blockwise spectral extraction.
+  \item \textbf{Stability selection}: retain only factors stable across rolling windows and geographies \citep{meinshausen2010stability}.
+  \item \textbf{Regime-conditional refinement}: allow signal importance to differ by $z_t$, penalised by group lasso \citep{yuan2006model}.
+\end{enumerate}
+
+
+% ══════════════════════════════════════════════════════════
+\section{Data Strategy and Public Sources}
+\label{sec:data}
+% ══════════════════════════════════════════════════════════
+
+\begin{greenbox}[Minimum Viable Empirical Scope]
+The first implementation targets one geography (or two comparable), one or two sectors, and a manageable actor universe. The point is not universal coverage but verification that typed investment intensities, multilayer edges, and regime-sensitive benchmarks can be estimated consistently with public data.
+\end{greenbox}
+
+Core sources: FRED/ALFRED for macroeconomic series and real-time vintages \citep{fredapi2026}; IMF and OECD SDMX APIs for international and structural statistics \citep{imfapi2026,oecdapi2025}; BIS statistics and SDMX services for global banking, credit, and liquidity \citep{bisapi2026}; SEC EDGAR and XBRL data interfaces for US public-firm filings \citep{secapi2024}; Companies House for UK corporate records \citep{companieshouse2026}; together with GDELT (narrative/media), USASPENDING (federal budget), BEA I/O tables (supply-chain structure), and central bank speech corpora.
+
+The data pipeline must track publication dates, revision history, missingness, frequency harmonisation, and actor identifiers---essential because many policy and narrative signals have ambiguous timing relative to downstream responses.
+
+\subsection{Point-in-Time Discipline}
+
+Backtesting requires a strict distinction between information available at time $t$ and revisions observed later. The architecture must maintain a \emph{point-in-time store} when revision data are available (e.g., via FRED's ALFRED vintage database) and otherwise apply conservative release-calendar lagging. Without this discipline, the framework risks severe \emph{look-ahead bias}: signals constructed with revised data systematically outperform those using real-time vintages, creating illusory predictive power. Every backtest must specify whether it uses real-time or revised data, and sensitivity to this choice must be reported.
+
+
+% ══════════════════════════════════════════════════════════
+\section{Research Programme: Work Packages and Decision Gates}
+\label{sec:wp}
+% ══════════════════════════════════════════════════════════
+
+The programme is structured into seven work packages (WP0--WP6), each ending with an explicit decision gate. The key discipline: \emph{no work package begins until the previous gate is passed}.
+
+\subsection{Parallel Research Trajectories and Synchronisation Logic}
+\label{sec:trajectories}
+
+The programme is sequential in its \emph{gates} but parallel in its \emph{workstreams}. Five trajectories run concurrently wherever dependencies allow:
+\begin{enumerate}[label=\textbf{T\arabic*:},leftmargin=2.2em,nosep]
+  \item \textbf{Measurement trajectory}: actor ontology, investment-intensity mapping, point-in-time timestamping, and entity resolution.
+  \item \textbf{Graph trajectory}: typed edge construction, sparsification, null-model comparison, and channel semantics.
+  \item \textbf{Modal trajectory}: directed spectral basis comparison, DMD/Koopman baseline, and compression diagnostics.
+  \item \textbf{Dynamics trajectory}: no-regime and switching-regime state-space estimation, filtering stability, and benchmark construction.
+  \item \textbf{Validation trajectory}: rolling out-of-sample tests, event studies, falsification, and regime-stability checks.
+\end{enumerate}
+
+A synchronisation gate is passed only when the downstream trajectory can consume the output without redefining the upstream object. This prevents a common failure mode in ambitious system projects: changing the target variable, graph semantics, and benchmark definition simultaneously.
+
+\subsection{Work Package Summary}
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{0.65cm}>{\bfseries}p{2.8cm}Xp{4cm}@{}}
+\toprule
+WP & Main question & Primary methods & Decision gate \\
+\midrule
+0 & What exactly is being estimated? & Ontologies, typed measurement, normalisation & Coherent target variable and notation sheet \\
+1 & Can we measure it with public data? & API mapping, schema design, frequency alignment & Reproducible data inventory with adequate coverage \\
+2 & How should influence be represented? & Multi-channel directed graph estimation, ablation & At least one stable, interpretable graph family \\
+3 & Which modal basis is best? & Directed spectral methods, DMD, time-vertex transforms, polar decomposition & Stable compressed representation OOS \\
+4 & Dynamics, regimes, and emergence? & State-space filtering, switching dynamics, phase-transition calibration, PID/TE & Plausible regimes; emergence indicators add value \\
+5 & Does the gap predict? & Rolling OOS tests, event studies, ranking metrics & Gap predicts meaningful downstream outcomes \\
+6 & Which extensions are justified? & Causal overlays, strategic simulation, topological diagnostics & Added structure improves concrete metrics \\
+\bottomrule
+\end{tabularx}
+\caption{Decision-oriented roadmap. Each WP has an explicit gate.}
+\label{tab:roadmap}
+\end{table}
+
+\subsection{WP0: Formal Scoping and Target-Variable Design}
+\textbf{Deliverable}: A data dictionary, notation sheet, typed investment intensity definitions, and normalisation rules. Actor taxonomy with layer assignments. Benchmark candidates formally specified.
+
+\subsection{WP1: Public-Data Inventory and Ingestion Layer}
+\textbf{Deliverable}: A versioned, reproducible dataset with harmonised timestamps and typed actor identifiers. Coverage assessment. Publication-lag documentation.
+
+\subsection{WP2: Influence Graph Construction}
+Estimate edge classes separately (regulatory, financial, narrative, supply-chain, etc.) rather than collapsing immediately. Key experiments: (a) Granger-causal vs.\ NLP-derived vs.\ structural edges; (b) sensitivity of downstream results to edge estimation method; (c) comparison against graph-free baselines.
+
+\textbf{Deliverable}: At least one stable graph family with interpretable channels and sensitivity diagnostics.
+
+\textbf{Gate}: The graph must outperform graph-free benchmarks on at least one diagnostic (spectral stability, predictive accuracy, or interpretability).
+
+\subsection{WP3: Modal Representation Experiments}
+Compare at least four representations: (a)~directed spectral basis (Schur/Jordan); (b)~directed-variation-optimised orthogonal basis; (c)~polar decomposition; (d)~DMD/Koopman modes; (e)~joint time-vertex. Evaluation: interpretability, compression ratio, out-of-sample stability, computational cost.
+
+\textbf{Deliverable}: Ranked shortlist with quantitative comparison. Selected representation for WP4.
+
+\textbf{Gate}: At least one representation must achieve OOS $R^2 > 0$ for actor-level investment intensity prediction against na\"ive baselines.
+
+\subsection{WP4: Regime-Switching Benchmark Model and Emergence Infrastructure}
+\label{sec:wp4}
+Fit the modal state-space model (Eqs.~\ref{eq:state}--\ref{eq:obs}) with Kim filter. Introduce regime switching. Calibrate the Ginzburg--Landau landscape (Eq.~\ref{eq:free_energy}). Compute the synergy matrix, transfer entropy profiles, criticality index, and topological complexity.
+
+\textbf{Deliverable}: Actor-level benchmarks $\hat{y}_{i,t}$ and $\hat{y}_{i,t}^{\mathrm{em}}$, investment gaps $\Delta_{i,t}$ and $\Delta_{i,t}^{\mathrm{em}}$, modal decompositions, regime classifications, and emergence diagnostics.
+
+\textbf{Gate}: (a) Regime count justified by MDL/BIC. (b) Basic gap $\Delta_{i,t}$ has statistically significant out-of-sample predictive value. (c) At least one emergence diagnostic (synergy, criticality, or TE) provides \emph{incremental} predictive value beyond the linear gap.
+
+\subsection{WP5: Backtesting and Falsification}
+Full backtesting protocol (Section~\ref{sec:backtest}). Rolling OOS tests, event studies, persistence analysis, cross-sectional transfer, model-comparison tests.
+
+\textbf{Deliverable}: Evidence report on empirical value of the framework.
+
+\textbf{Gate}: Gap must predict at least one economically meaningful outcome (correction, repricing, policy response, or diffusion to connected actors) with statistical significance.
+
+\subsection{WP6: Structured Extensions}
+Only after WP5 passes. Add selective causal structure (Phase~II benchmark), strategic simulation (Phase~III benchmark), or additional topological diagnostics. Each extension must justify itself against a concrete evaluation metric.
+
+\textbf{Deliverable}: Justified extensions with quantified improvement.
+
+
+% ══════════════════════════════════════════════════════════
+\section{Backtesting and Evaluation Design}
+\label{sec:backtest}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Level 1: Predictive and Ranking Performance}
+OOS prediction of actor-level allocation intensity on rolling windows. Ranking metrics (Spearman $\rho$, NDCG) for most over-/under-invested actors. Comparison against baselines: historical mean, sector mean, random walk, graph-free factor model.
+
+\subsection{Level 2: Event-Response Validation}
+Event studies around historical policy shocks (rate decisions, regulatory changes, subsidy launches). Test: did $\Delta_{i,t}$ shift in the predicted direction? Did the modal decomposition identify the relevant channels?
+
+\subsection{Level 3: Regime Classification Accuracy}
+Regime labels $z_t$ vs.\ consensus (NBER cycles, financial stress indices). Criticality index $\mathcal{C}_t$ lead time vs.\ simple volatility measures.
+
+\subsection{Level 4: Persistence and Correction}
+Do large gaps mean-revert? Do they precede repricing, disclosure changes, or diffusion to connected actors?
+
+\subsection{Level 5: Cross-Sectional Transfer}
+Test across sectors, countries, and time periods. A useful framework should not require complete retraining.
+
+\subsection{Level 6: Emergence-Specific Validation}
+\begin{itemize}[nosep]
+  \item Does $\Delta_{i,t}^{\mathrm{em}}$ outperform $\Delta_{i,t}$ on any Level 1--5 metric?
+  \item Do synergy spikes precede misallocation clusters that single-mode models miss?
+  \item Does $\mathcal{C}_t$ provide lead time beyond volatility-based early-warning signals?
+  \item Do TE anomalies (direct cross-layer flows) precede systematic misallocation?
+  \item Does topological complexity $\mathcal{T}_t$ anticipate structural breaks that metric-based indicators miss?
+\end{itemize}
+
+\subsection{Level 7: Model Comparison}
+Compare the spectral multilayer baseline against: (a) historical mean / random walk; (b) hierarchical factor model (no graph structure); (c) graph-free predictive benchmark; (d) symmetric-Laplacian spectral model (to test whether directionality matters).
+
+\subsection{Level 8: Falsification and Negative Controls}
+\label{sec:falsification}
+
+The proposal \emph{explicitly requires} the following negative tests. A model that looks strong only in flexible settings but collapses under these controls should be rejected or downgraded:
+\begin{itemize}[nosep]
+  \item \textbf{Shuffled-edge placebos}: Randomly rewire graph edges while preserving degree distributions. If the gap signal survives edge shuffling, it does not depend on the estimated propagation structure.
+  \item \textbf{Lag-destroyed histories}: Randomly permute the temporal ordering of signals. If predictive power survives, it reflects static cross-sectional patterns rather than dynamic propagation.
+  \item \textbf{Randomised actor-type assignments}: Reassign actor-type labels randomly. If type-specific parameters matter, performance should degrade.
+  \item \textbf{Frozen-regime baselines}: Compare the switching model against a single-regime model. Regime switching is justified only if it materially improves OOS performance.
+  \item \textbf{Symmetric-operator baselines}: Replace directed operators with symmetrised versions. Directionality is justified only if it provides incremental value.
+  \item \textbf{Block-preserving rewiring}: Rewire edges within each layer block separately, testing whether cross-layer structure (not just within-layer) drives the signal.
+  \item \textbf{No-network dynamic factor baselines}: Estimate standard dynamic factor models \citep{stock2002macroeconomic,forni2000generalized} without any graph structure. The multilayer spectral framework earns its complexity only if it outperforms these.
+\end{itemize}
+
+\begin{keybox}[Graph Null Models]
+For each falsification test involving graph manipulation, generate $B \geq 100$ null-model instances and report the empirical $p$-value of the observed test statistic against the null distribution. This prevents cherry-picking of edge-estimation methods.
+\end{keybox}
+
+
+% ══════════════════════════════════════════════════════════
+\section{Technical Risks and Mitigations}
+\label{sec:risks}
+% ══════════════════════════════════════════════════════════
+
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\textwidth}{@{}>{\bfseries}p{3.2cm}p{3.5cm}X@{}}
+\toprule
+Risk & Consequence & Mitigation \\
+\midrule
+Graph misspecification & Unreliable spectral modes & Build edge classes separately; ablation; compare graph-free baselines \\
+Non-normality of $\mathcal{A}_t$ & Ill-conditioned eigenvectors; Parseval failure & Use polar decomposition or dispersion-optimised basis; track pseudospectral radii \\
+Network non-stationarity & Spectral basis drift & Rolling re-estimation; track eigenmode evolution \\
+Regime over-proliferation & Overfitting & MDL/BIC penalisation; OOS regime prediction \\
+Data harmonisation & Incomparable intensities & Within-type normalisation; rank transforms \\
+Spurious emergence & False PID synergy from finite samples & Bootstrap CIs on synergy; require persistence across windows \\
+Phase-transition overfitting & Over-parameterised GL landscape & Constrain order-parameter dimension; OOS criticality tests \\
+Computational scaling & $O(N^3)$ eigendecomposition & Sparse/Lanczos approximations \citep{lehoucq1998arpack}; partial decomposition \\
+Causal overclaiming & Spurious structural interpretation & Reserve causal overlays for high-evidence channels only (WP6) \\
+\bottomrule
+\end{tabularx}
+\caption{Technical risks and mitigations.}
+\label{tab:risks}
+\end{table}
+
+
+% ══════════════════════════════════════════════════════════
+\section{Connections to Existing Literature}
+\label{sec:literature}
+% ══════════════════════════════════════════════════════════
+
+\textbf{Network economics and systemic risk.} The multilayer formulation builds on \citet{acemoglu2012network} and \citet{elliott2014financial,acemoglu2015systemic}. Our contribution: modelling \emph{investment allocation} propagation across a heterogeneous directed hierarchy.
+
+\textbf{Graph signal processing.} We build on the GSP foundations of \citet{ortega2018graph} and \citet{sandryhaila2013discrete}, extending to directed multilayer settings via \citet{marques2020signal} and the polar decomposition of \citet{kwak2024polar}.
+
+\textbf{Dynamic factor models.} The spectral factor extraction generalises \citet{stock2002macroeconomic,forni2000generalized} by replacing variance-maximising extraction with topology-aware extraction.
+
+\textbf{Time-vertex signal processing.} Joint spectral representations draw on \citet{grassi2018time,perraudin2017stationary,loukas2019stationary}.
+
+\textbf{DMD and Koopman theory.} Modal decomposition from data follows \citet{tu2014dynamic} and the Koopman framework \citep{brunton2022modern}.
+
+\textbf{Regime-switching models.} Extends \citet{hamilton1989new} and \citet{kim1999state} by operating in spectral space with phase-transition dynamics.
+
+\textbf{Phase transitions in finance.} Draws on \citet{sornette2003critical} and critical slowing down \citep{scheffer2009early,dakos2012methods}.
+
+\textbf{Causal emergence.} Formalises emergence detection via \citet{hoel2013quantifying,hoel2017map,rosas2020reconciling}.
+
+\textbf{Information theory.} PID \citep{williams2010nonnegative,lizier2018information}, transfer entropy \citep{schreiber2000measuring}, information geometry \citep{amari2016information}.
+
+\textbf{Topological data analysis.} Persistent homology for financial crash detection \citep{carlsson2009topology,edelsbrunner2010computational}.
+
+\textbf{MDL and complexity.} Model selection via \citet{rissanen1978modeling,grunwald2007minimum}, compressibility via \citet{lempel1976complexity,li2008introduction}.
+
+
+% ══════════════════════════════════════════════════════════
+\section{Concluding Remarks and Next Steps}
+\label{sec:conclusion}
+% ══════════════════════════════════════════════════════════
+
+This document is a map, not a destination. The research programme produces useful intermediate outputs at each work package---a working statistical engine with emergence monitoring, a causal decomposition of the most important channels, and eventually a strategic simulation laboratory---while maintaining a coherent mathematical spine: directed spectral decomposition of the multilayer influence network.
+
+The central bets are: (i)~the right coordinate system for investment misallocation is \emph{spectral mode space}---the eigenbasis of the directed influence network; (ii)~the most consequential misallocation is \emph{emergent}---arising from nonlinear mode interactions and detectable only through information-theoretic tools; (iii)~regime shifts are \emph{phase transitions}---endogenous, potentially abrupt, and preceded by computable early-warning signals.
+
+\begin{redbox}[Immediate Next Steps]
+\begin{enumerate}[nosep]
+  \item Complete WP0: notation sheet, data dictionary, typed intensity definitions, normalisation rules.
+  \item Complete WP1: public-data inventory for one sector, two countries.
+  \item Pilot WP2: construct first-pass multilayer directed graph with $\geq 3$ edge classes.
+  \item This proposal $\to$ \textbf{detailed implementation plan} with quality gates, milestone specifications, computational resource estimates, and team structure.
+\end{enumerate}
+\end{redbox}
+
+
+% ══════════════════════════════════════════════════════════
+\newpage
+\begin{appendices}
+\renewcommand{\thesection}{\Alph{section}}
+\titleformat{\section}{\Large\bfseries\color{accent}}{Appendix~\thesection}{1em}{}
+
+% ── Appendix A ────────────────────────────────────────────
+\section{Directed Graph Signal Processing}
+\label{app:directed_gsp}
+
+\textbf{Why this formalism.} Economic networks are inherently directed---capital flows from lenders to borrowers, policy mandates flow from regulators to regulated entities, narrative influence flows from agenda-setters to downstream actors. Classical spectral graph theory assumes symmetric operators with orthogonal eigenbases, discarding precisely the directional information that drives top-down propagation. Directed GSP provides the mathematical tools to define, filter, and compress signals on asymmetric networks while preserving the directionality essential to our problem.
+
+\subsection{The adjacency-based GFT}
+
+For a directed graph with adjacency matrix $A \in \C^{N \times N}$, the graph shift is $\tilde{s} = As$. Linear shift-invariant filters: $H = \sum_{\ell=0}^L h_\ell A^\ell$. If $A = VJV^{-1}$ (Jordan decomposition), the GFT and its inverse are $\hat{s} = V^{-1}s$, $s = V\hat{s}$. Filtering: $\widehat{Hs} = h(J)\hat{s}$, where $h(J)$ is block-diagonal with blocks $h(J_k) = \sum_\ell h_\ell J_k^\ell$ \citep{sandryhaila2014discrete}.
+
+\subsection{Non-normality and transient amplification}
+
+When $A^H A \neq AA^H$, eigenvectors are non-orthogonal, Parseval's identity fails, and eigenvalues are perturbation-sensitive. The \emph{pseudospectrum} $\Lambda_\varepsilon(A) = \{z \in \C : \|(zI-A)^{-1}\| \geq 1/\varepsilon\}$ characterises stability robustly. \textbf{Economic interpretation}: transient amplification can arise even when all eigenvalues are inside the unit circle (all modes eventually decay), corresponding to temporary narrative-driven overshoot---invisible to eigenvalue analysis alone. The \textbf{Schur decomposition} $A = QTQ^H$ ($Q$ unitary, $T$ upper triangular) provides numerically stable access to eigenvalues while preserving basis orthogonality.
+
+\subsection{Directed variation and optimised GFT}
+Directed total variation \citep{marques2020signal}: $\mathrm{DV}(\bx) = \sum_{(i,j) \in E} A_{ji}[x_i - x_j]_+^2$ with $[x]_+ = \max(x,0)$. Orthonormal GFT via Stiefel-manifold optimisation:
+$U^* = \arg\min_{U^TU=I} (N{-}1)^{-1}\sum_{i=1}^{N-2}(\mathrm{DV}(u_{i+1}) - \mathrm{DV}(u_i))^2$ subject to monotone DV ordering. Yields orthogonality and equidistributed frequencies.
+
+\subsection{Polar decomposition GFT}
+$S = UP$ where $U$ is orthogonal, $P = (S^TS)^{1/2}$ is symmetric PSD \citep{kwak2024polar}. Both are normal with eigendecompositions $U = V_1\Lambda_1 V_1^H$, $P = V_2\Lambda_2 V_2^T$. Extended GFT: $\mathcal{F}_S(f)_{i,j} = \langle v_{2,i}, f\rangle\langle v_{1,j}, v_{2,i}\rangle$, satisfying Parseval's identity. Separates scaling (from $P$) and rotational (from $U$) variation.
+
+\subsection{Hermitian dilation}
+Embed $A$ into $H(A) = \bigl(\begin{smallmatrix} 0 & A \\ A^T & 0 \end{smallmatrix}\bigr)$. If $A = U_L \Sigma U_R^T$ (SVD), then $H(A)$ has eigenvalues $\pm\sigma_i$ with eigenvectors $(u_{L,i} \pm u_{R,i})/\sqrt{2}$. Left singular vectors ($U_L$) capture upstream influence patterns; right ($U_R$) capture downstream responses---directionality is preserved through the block structure. Useful when spectral ordering and stability from symmetric settings are needed.
+
+\subsection{Bibliographic notes}
+Foundational directed GSP: \citet{sandryhaila2013discrete,sandryhaila2014discrete}. Directed variation: Shafipour et al.\ (IEEE TSP, 2019), survey in \citet{marques2020signal}. Polar decomposition: Ji (arXiv:2401.00133, 2024), \citet{kwak2024polar}. Biorthogonal Laplacian calculus: arXiv:2601.00464 (2025). Pseudospectra: Trefethen \& Embree, \emph{Spectra and Pseudospectra} (Princeton, 2005). GSP overview: \citet{ortega2018graph}. Hermitian random-walk GFT: Ye et al.\ (DSPKM, 2024).
+
+
+% ── Appendix B ────────────────────────────────────────────
+\section{Supra-Laplacian Theory and Structural Transitions}
+\label{app:supra_laplacian}
+
+\textbf{Why this formalism.} Economic systems are not monolayer networks---regulatory, financial, narrative, and supply-chain relationships form distinct layers with different semantics. The supra-Laplacian provides a unified mathematical framework for diffusion and propagation across multilayer systems, with a critical coupling threshold that detects when layers begin functioning as a coupled whole.
+
+For a multiplex with $N$ nodes, $M$ layers, the supra-Laplacian is \citep{gomez2013diffusion,de2013mathematical}:
+$\mathcal{L} = \bigoplus_{\alpha=1}^M L^{(\alpha)} + D_x(L_M \otimes I_N)$,
+where $L^{(\alpha)}$ is intra-layer Laplacian, $L_M$ is inter-layer Laplacian, $D_x$ coupling strength. Duplex ($M=2$):
+$\mathcal{L} = \bigl(\begin{smallmatrix} L^{(1)} + D_x I & -D_x I \\ -D_x I & L^{(2)} + D_x I \end{smallmatrix}\bigr)$.
+Diffusion: $d\bx/dt = -\mathcal{L}\bx$, solution $\bx(t) = \sum_i \langle \bm{v}_i, \bx(0)\rangle e^{-\lambda_i t}\bm{v}_i$, timescale $\tau \propto 1/\lambda_2$.
+
+\textbf{Radicchi--Arenas transition} \citep{radicchi2013abrupt}: Algebraic connectivity $\lambda_2(\mathcal{L})$ undergoes an abrupt structural transition at $D_x^* = \mu_2/M^2$ ($\mu_2 = \lambda_2(L_{\mathrm{agg}})$). Below $D_x^*$: Fiedler vector partitions across layers; above: within layers. The eigenvector transition is discontinuous in its derivative.
+
+\textbf{Null models.} Diagnostics require comparison against null operators preserving selected marginals: (i)~degree-preserving rewiring; (ii)~block-preserving rewiring by layer; (iii)~type-preserving rewiring by actor class; (iv)~temporal block shuffles. These distinguish meaningful propagation structure from density/sparsity artefacts.
+
+\textbf{Bibliographic notes.} Mathematical formulation: \citet{de2013mathematical}. Diffusion dynamics: \citet{gomez2013diffusion}. Structural transitions: \citet{radicchi2013abrupt}. Comprehensive survey: \citet{kivela2014multilayer,boccaletti2014structure}. Layer degradation transitions: Radicchi \& Bianconi (Phys.\ Rev.\ X, 2017).
+
+
+% ── Appendix C ────────────────────────────────────────────
+\section{Joint Time-Vertex Signal Processing}
+\label{app:time_vertex}
+
+\textbf{Why this formalism.} Investment signals vary simultaneously across network structure \emph{and} time. The joint time-vertex framework provides a single spectral representation capturing both dimensions, enabling frequency-selective filtering that distinguishes (e.g.) slow global propagation from fast local noise in both the graph and temporal domains.
+
+\textbf{Joint Fourier Transform} \citep{grassi2018time}: $\hat{X} = U_G^* X U_T$, vectorised $\hat{\bx} = (U_T \otimes U_G)^*\bx$. Joint Laplacian $L_J = L_T \otimes I_G + I_T \otimes L_G$, eigenvalues $\lambda_\ell + \mu_k$.
+
+\textbf{Graph Wide-Sense Stationarity} \citep{perraudin2017stationary}: $\bx$ is GWSS if $\Sigma_{\bx} = U\,\mathrm{diag}(\gamma_x(\lambda_0), \ldots, \gamma_x(\lambda_{N-1}))\,U^*$. Graph PSD: $\gamma_x(\lambda_\ell) = [U^*\Sigma_{\bx} U]_{\ell\ell}$. Graph Wiener filter: $h_W(\lambda) = \gamma_x(\lambda)/[\gamma_x(\lambda) + \sigma^2]$.
+
+\textbf{Joint Wide-Sense Stationarity (JWSS)} \citep{loukas2019stationary}: JWSS holds if $\Sigma = h(L_G, L_T)$ for non-negative bivariate $h$, with joint PSD $h(\lambda_n, \omega_\tau) = \E[\lvert\hat{X}[n,\tau]\rvert^2] \geq 0$. Strictly more general than independent stationarity in each domain.
+
+\textbf{Bibliographic notes.} Time-vertex framework: \citet{grassi2018time}. Graph stationarity: \citet{perraudin2017stationary}. Joint stationarity: \citet{loukas2019stationary}. Sampling on graphs: Chen et al.\ (IEEE TSP, 2015). Graph wavelets: Hammond et al.\ (ACHA, 2011).
+
+
+% ── Appendix D ────────────────────────────────────────────
+\section{Dynamic Mode Decomposition and Koopman Theory}
+\label{app:dmd}
+
+\textbf{Why this formalism.} DMD/Koopman provides a data-driven, model-free alternative to graph-spectral methods. Rather than imposing a graph structure, DMD extracts dominant spatiotemporal modes directly from observed data, connecting to the powerful theoretical framework of Koopman operator theory for nonlinear dynamical systems. This serves as both an alternative modal basis and a validation benchmark for graph-spectral modes.
+
+\textbf{Exact DMD} \citep{tu2014dynamic}: Given $X = [\by_0, \ldots, \by_{m-1}]$, $Y = [\by_1, \ldots, \by_m]$. SVD: $X = U\Sigma V^*$. Reduced operator: $\tilde{A} = U^*YV\Sigma^{-1}$, $\tilde{A}W = W\Lambda$. Exact modes: $\phi_i = (1/\lambda_i)YV\Sigma^{-1}w_i$. Reconstruction: $\by_k \approx \sum_i \phi_i\lambda_i^k b_i$. In continuous time: $\lambda_i = e^{\omega_i\Delta t}$ with $\mathrm{Re}(\omega_i)$ giving growth/decay and $\mathrm{Im}(\omega_i)$ giving oscillation frequency.
+
+\textbf{Koopman operator}: $[\mathcal{K}g](x) = g(f(x))$ for $x_{k+1} = f(x_k)$. Linear but infinite-dimensional. Eigenpairs: $\mathcal{K}\varphi_i = \lambda_i\varphi_i$, meaning $\varphi_i(f(x)) = \lambda_i\varphi_i(x)$. DMD approximates Koopman eigenvalues when observables span a Koopman-invariant subspace.
+
+\textbf{Extended DMD} \citep{williams2015data}: Lifts to dictionary $\Psi(x) = [\psi_1(x),\ldots,\psi_p(x)]^T$ with $K = G^{-1}A$ where $G = (1/m)\Theta_X\Theta_X^*$, $A = (1/m)\Theta_X\Theta_Y^*$. Converges to Koopman operator as dictionary and data grow.
+
+\textbf{Multiresolution DMD}: Recursive DMD for multiscale dynamics---directly relevant for separating fast trading from slow structural misallocation. \textbf{Graph-embedded DMD}: Yip et al.\ (Algorithmic Finance, 2023) incorporate directed stock-relevance graphs for model reduction.
+
+\textbf{Bibliographic notes.} Foundational DMD: \citet{tu2014dynamic}. Modern Koopman theory: \citet{brunton2022modern}. Extended DMD: \citet{williams2015data}. DMD book: Kutz et al., \emph{Dynamic Mode Decomposition} (SIAM, 2016). Koopman for finance: Brunton et al.\ (Chaos, 2017). Multiresolution: Kutz, Fu \& Brunton (SIAM JADS, 2016).
+
+
+% ── Appendix E ────────────────────────────────────────────
+\section{Regime-Switching State-Space Models}
+\label{app:regime_switching}
+
+\textbf{Why this formalism.} Investment propagation dynamics are non-stationary: the same policy signal can propagate very differently across tightening, crisis, and expansion regimes. Regime-switching state-space models provide a principled framework for jointly estimating continuous latent dynamics and discrete regime transitions, combining Kalman filtering with hidden Markov models.
+
+\textbf{Kim filter} \citep{kim1999state}: Observation $y_t = A_{s_t} + H_{s_t}\beta_t + e_t$, $e_t \sim \mathcal{N}(0, R_{s_t})$. State $\beta_{t+1} = D_{s_t} + F_{s_t}\beta_t + u_t$, $u_t \sim \mathcal{N}(0, Q_{s_t})$. Regime $s_t \in \{1,\ldots,M\}$ Markov with $p_{ij} = \Pr[s_t = j|s_{t-1}=i]$. Exact posterior: $M^T$ sequences (intractable). Kim's approximation: run $M^2$ Kalman filters per step, collapse to $M$ via moment-matching:
+\begin{equation}
+  \beta^{(j)}_{t|t} = \sum_i \Pr[s_{t-1}{=}i, s_t{=}j|Y_t] \cdot \beta^{(i,j)}_{t|t}\, /\, \Pr[s_t{=}j|Y_t],
+\end{equation}
+with analogous covariance collapse. Cost: $O(M^2)$ per step.
+
+\textbf{IMM filter} (Blom \& Bar-Shalom, 1988): Mixes \emph{before} filtering. Weights $\mu^{(j|i)}_{k-1} = p_{ji}\mu^{(j)}_{k-1}/\mu^{(i)}_{k|k-1}$, mixed initial conditions $\bar{x}^{(i)} = \sum_j \hat{x}^{(j)}\mu^{(j|i)}$, then $M$ mode-matched Kalman filters, mode probability update via likelihoods.
+
+\textbf{EM algorithm}: E-step runs Kim filter (forward) and smoother (backward) for smoothed regime probabilities. M-step: $\hat{p}_{jk} = \sum_t \Pr[s_t{=}j, s_{t+1}{=}k|Y_T]/\sum_t \Pr[s_t{=}j|Y_T]$ and system matrices via weighted regression.
+
+\textbf{Bibliographic notes.} Kim filter: \citet{kim1999state}. Hamilton filter: \citet{hamilton1989new}. Kalman foundations: \citet{durbin2012time}. IMM: Blom \& Bar-Shalom (IEEE TAC, 1988). HDP-HMMs for automatic regime count: Fox et al.\ (NIPS, 2009). Deep switching SSMs: Zhang et al.\ (ICLR, 2025).
+
+
+% ── Appendix F ────────────────────────────────────────────
+\section{Information-Theoretic Foundations}
+\label{app:info_theory}
+
+\textbf{Why these formalisms.} Standard statistical tools (correlation, regression, PCA) cannot detect emergent phenomena---system-level patterns that arise from interactions between components. Information-theoretic measures quantify directed causation (transfer entropy), emergent macro-level causal power (effective information), synergistic interactions irreducible to individual components (PID), and distributional regime shifts in a parameterisation-invariant way (Fisher information geometry).
+
+\textbf{Effective Information} \citep{hoel2013quantifying}: For transition matrix $T$ with $N$ states, $\mathrm{EI}(T) = \log_2 N - (1/N)\sum_i H(\mathrm{row}_i(T))$, decomposing as Determinism $-$ Degeneracy. Causal emergence: $\mathrm{CE} = \mathrm{EI}_{\mathrm{macro}} - \mathrm{EI}_{\mathrm{micro}} > 0$ means the macro description is causally superior \citep{hoel2017map}.
+
+\textbf{Partial Information Decomposition} \citep{williams2010nonnegative}: $I(X_1,X_2;Y) = R + U_1 + U_2 + S$ where $R$ = redundancy, $U_i$ = unique information, $S$ = synergy. Redundancy via $I_{\min}$: $I_{\min}(X_1,X_2;Y) = \sum_y p(y)\min_{X_i} D_{KL}(p(X_i|y)\|p(X_i))$. For Gaussians: $R = \min\{I(X_1;Y), I(X_2;Y)\}$ (MMI). BROJA \citep{bertschinger2014quantifying}: $U_1 = \min_{Q \in \Delta} I_Q(X_1;Y|X_2)$ (convex optimisation). For $n > 2$ sources: redundancy lattice with M\"{o}bius inversion. Continuous PID: shared-exclusion approach with nearest-neighbour estimation \citep{ehrlich2024pid}.
+
+\textbf{Transfer Entropy} \citep{schreiber2000measuring}: $T_{X \to Y} = I(Y_{t+1}; X_t^{(l)} | Y_t^{(k)}) = H(Y_{t+1}|Y_t^{(k)}) - H(Y_{t+1}|Y_t^{(k)}, X_t^{(l)})$. Asymmetric, non-negative. Conditional: $T_{X \to Y|Z} = I(Y_{t+1}; X_t^{(l)}|Y_t^{(k)}, Z_t^{(m)})$. For Gaussians, equivalent to Granger causality: $T_{X \to Y} = \frac{1}{2}\ln[\Var(\epsilon_Y)/\Var(\epsilon_{Y|X})]$. KSG nearest-neighbour estimation for non-Gaussian: $\hat{I}(X;Y) = \psi(k) - \langle\psi(n_x+1) + \psi(n_y+1)\rangle + \psi(N)$.
+
+\textbf{Fisher Information Metric} \citep{amari2016information}: $g_{ij}(\theta) = \E[\partial_i \ln p \cdot \partial_j \ln p] = -\E[\partial_i\partial_j \ln p]$. Unique Riemannian metric invariant under sufficient statistics (\v{C}encov's theorem). For $\mathcal{N}(\mu,\Sigma)$: $G_{\mu\mu} = \Sigma^{-1}$, $G_{\Sigma\Sigma} = \frac{1}{2}(\Sigma^{-1} \otimes \Sigma^{-1})$, $G_{\mu\Sigma} = 0$. KL divergence: $D_{KL}(\mathcal{N}_0\|\mathcal{N}_1) = \frac{1}{2}[\tr(\Sigma_1^{-1}\Sigma_0) + (\mu_1-\mu_0)^T\Sigma_1^{-1}(\mu_1-\mu_0) - d + \ln|\Sigma_1|/|\Sigma_0|]$. \textbf{Key connection}: Fisher information of AR(1) w.r.t.\ $\rho$ is $I(\rho) = 1/(1-\rho^2)$, diverging as $\rho \to 1$---linking information geometry to critical slowing down.
+
+\textbf{Bibliographic notes.} Causal emergence: \citet{hoel2013quantifying,hoel2017map,rosas2020reconciling}. Causal Emergence 2.0: Zhang et al.\ (arXiv:2503.13395, 2025). PID: \citet{williams2010nonnegative}, BROJA: \citet{bertschinger2014quantifying}, continuous PID: \citet{ehrlich2024pid}, \citet{lizier2018information}. Transfer entropy: \citet{schreiber2000measuring}; TE in finance: Zhao et al.\ (Entropy, 2024). Information geometry: \citet{amari2016information}; natural gradient: Amari (Neural Computation, 1998).
+
+
+% ── Appendix G ────────────────────────────────────────────
+\section{Phase Transitions and Critical Phenomena}
+\label{app:phase_transitions}
+
+\textbf{Why this formalism.} Financial crises, coordinated policy pivots, and bubble collapses are not smooth parameter drifts---they are abrupt qualitative changes in system behaviour, analogous to phase transitions in physical systems. The Landau/Ginzburg-Landau framework provides a rigorous mathematical language for modelling such transitions, while critical slowing down theory provides computable early-warning signals.
+
+\textbf{Landau theory} \citep{landau1937theory}: Free energy $F(\phi) = (a/2)\phi^2 + (b/4)\phi^4 - h\phi$, with $a = a_0(T-T_c)$ changing sign at critical point $T_c$, $b > 0$ for stability. Mean-field equilibrium: $a\phi + b\phi^3 = h$. Second-order transition at $T_c$ with critical exponents $\beta = 1/2$, $\gamma = 1$. First-order when cubic terms $c\phi^3$ are present (asymmetric potential). Stochastic gradient flow: $d\phi = -(a\phi + b\phi^3 - h)dt + \sigma\,dW$.
+
+\textbf{Critical slowing down} \citep{scheffer2009early,dakos2012methods}: Near bifurcation, dominant eigenvalue $\lambda \to 0$. Linearised dynamics $\eta_{t+1} = \rho\eta_t + \sigma_\epsilon\epsilon_t$ with $\rho = e^{\lambda\Delta t} \to 1$. Signatures: (i)~$\mathrm{ACF}(1) \to 1$; (ii)~$\Var(\eta) = \sigma_\epsilon^2/(1-\rho^2) \to \infty$; (iii)~spectral reddening: $S(f) = \sigma^2/(1+\rho^2-2\rho\cos(2\pi f))$ concentrates at $f \to 0$; (iv)~rising skewness and flickering. Detection: Kendall's $\tau$ on rolling-window estimates. Empirical evidence for CSD before Black Monday 1987 is strong; evidence for 2008 is mixed, reflecting persistent near-unit-root behaviour in financial systems (Diks, Hommes \& Wang, 2019).
+
+\textbf{LPPLS model} \citep{sornette2003critical}: $\E[\ln p(t)] = A + B(t_c-t)^m + C(t_c-t)^m\cos[\omega\ln(t_c-t)-\phi]$ with $m \in (0,1)$ (empirically $\approx 0.33$), $\omega \approx 6$--$13$, $B < 0$ for bubbles. Discrete scale invariance with scaling ratio $\lambda = e^{2\pi/\omega}$. Microscopic foundation: no-arbitrage condition $\mu(t) = \kappa h(t)$ links faster-than-exponential growth to crash hazard rate.
+
+\textbf{Ising model connection}: $E(\{s_i\}) = -(1/D)\sum_{\langle ij\rangle} s_is_j + \mu\sum_i s_i$ on investor networks, where herding produces spontaneous symmetry breaking. Schmidhuber (Physica A, 2021) demonstrates the Landau potential is directly observable in financial return data with trend persistence $b_T \to 0$ over decades (self-organised criticality).
+
+\textbf{Bibliographic notes.} Landau theory: \citet{landau1937theory}; Cross \& Hohenberg (Rev.\ Mod.\ Phys., 1993). Critical transitions: \citet{scheffer2009early,dakos2012methods}; Lenton et al.\ (PNAS, 2008). LPPLS: \citet{sornette2003critical}; Johansen, Ledoit \& Sornette (J.\ Risk, 1999). Financial phase transitions: Bornholdt (Int.\ J.\ Mod.\ Phys.\ C, 2001). CSD in finance: Diks, Hommes \& Wang (Empirical Economics, 2019).
+
+
+% ── Appendix H ────────────────────────────────────────────
+\section{Persistent Homology and Topological Data Analysis}
+\label{app:tda}
+
+\textbf{Why this formalism.} Topology detects qualitative structural changes that metric-based measures (variance, correlation) may miss entirely. A system can smoothly deform its statistical properties while undergoing a topological bifurcation. Persistent homology provides a mathematically rigorous, stable framework for tracking such structural changes in high-dimensional dynamical data.
+
+\textbf{Vietoris--Rips complex} \citep{edelsbrunner2010computational}: $\mathrm{VR}_\varepsilon(X) = \{\sigma \subseteq X : d(x_i,x_j) \leq \varepsilon\;\forall\; x_i,x_j \in \sigma\}$. Betti numbers $\beta_k = \mathrm{rank}(H_k)$: $\beta_0$ = connected components, $\beta_1$ = loops, $\beta_2$ = voids. Structure theorem: $\mathbb{V} \cong \bigoplus_j \mathbb{I}[b_j, d_j)$. Stability theorem: $d_B(\mathrm{Dgm}(f), \mathrm{Dgm}(g)) \leq \|f-g\|_\infty$.
+
+\textbf{Persistence diagrams}: Multiset of birth-death pairs $\{(b_i, d_i)\}$. Wasserstein distance: $W_p(D_1,D_2) = (\inf_\gamma \sum_x \|x-\gamma(x)\|_\infty^p)^{1/p}$. \textbf{Persistence landscapes} \citep{bubenik2015statistical}: $\Lambda_k(\varepsilon) = k\text{-th largest of } \{\min(\varepsilon-b_i, d_i-\varepsilon)^+\}$. $L^p$ norms provide vectorised summaries amenable to statistical testing.
+
+\textbf{Financial crash detection}: Gidea \& Katz (Physica A, 2018) apply Takens delay embedding, sliding-window persistent homology, and $L^p$ norms of persistence landscapes, finding strong growth \textbf{250 trading days before} dot-com and 2008 crashes. Baitinger \& Flegel (2021): persistent-homology turbulence index outperforming VIX. Ismail et al.\ (Frontiers, 2022): TDA combined with CSD indicators across multiple markets.
+
+\textbf{Bibliographic notes.} Foundations: \citet{carlsson2009topology,edelsbrunner2010computational}. Stability: Cohen-Steiner, Edelsbrunner \& Harer (Discrete Comput.\ Geom., 2007). Landscapes: \citet{bubenik2015statistical}. Financial TDA: Gidea \& Katz (Physica A, 2018); Baitinger \& Flegel (J.\ Risk Fin.\ Management, 2021).
+
+
+% ── Appendix I ────────────────────────────────────────────
+\section{MDL, Kolmogorov Complexity, and Compression}
+\label{app:mdl}
+
+\textbf{Why this formalism.} With many candidate operators, modal ranks, regime counts, and signal families, the framework faces severe model-selection risk. MDL provides a principled, information-theoretic criterion for choosing among models that balances fit against complexity---without relying on arbitrary significance thresholds or ad-hoc regularisation.
+
+\textbf{MDL principle} \citep{rissanen1978modeling}: $M^* = \arg\min_M [L(D|M) + L(M)]$. Normalised Maximum Likelihood \citep{grunwald2007minimum}: $P_{\mathrm{NML}}(x^n|\mathcal{M}) = P(x^n|\hat{\theta}(x^n))/\sum_{y^n}P(y^n|\hat{\theta}(y^n))$, achieving minimax regret optimality. Parametric complexity: $\mathrm{COMP}_n \approx (k/2)\ln(n/2\pi) + \ln\int_\Theta\sqrt{\det I(\theta)}\,d\theta$, connecting to Fisher information and hence to information geometry (Appendix~\ref{app:info_theory}).
+
+\textbf{Lempel--Ziv complexity} \citep{lempel1976complexity}: $c(s)$ counts distinct words in sequential parsing. Normalised $C_{LZ}(s) = c(s)\ln n/n \to h$ (entropy rate) for ergodic sources. Upper-bounds Kolmogorov complexity: $K(s) \leq c(s)\log_2 n + O(\log\log n)$.
+
+\textbf{Normalised Compression Distance} \citep{li2008introduction}: $\mathrm{NCD}(x,y) = [C(xy) - \min\{C(x),C(y)\}]/\max\{C(x),C(y)\}$ using practical compressor $C$, approximating the universal NID.
+
+\textbf{Bibliographic notes.} MDL: \citet{rissanen1978modeling,grunwald2007minimum}. LZ complexity: \citet{lempel1976complexity}. KC and NCD: \citet{li2008introduction}; Cilibrasi \& Vit\'{a}nyi (IEEE TIT, 2005). MDL for change-point detection: Wu et al.\ (AISTATS, 2024). Complexity in finance: Siedlecki \& Papla (Entropy, 2024).
+
+
+% ── Appendix J ────────────────────────────────────────────
+\section{Minimum Viable Empirical Specification}
+\label{app:mve}
+
+\textbf{Purpose.} This appendix defines the minimum requirements for the first empirical build---the bridge to the subsequent implementation plan with quality gates and milestones.
+
+The minimum viable build must satisfy all of the following:
+\begin{enumerate}[nosep]
+  \item One domain and one geography selected to bound scope (e.g., energy sector, US+UK).
+  \item One actor ontology with layer assignments and at least two actor types per layer.
+  \item One investment-intensity normalisation scheme defined and sensitivity-tested.
+  \item At least two edge families separately estimated (e.g., financial + narrative).
+  \item One directed operator family and one DMD-style baseline compared.
+  \item One no-regime and one switching-regime state-space specification estimated.
+  \item One predictive benchmark and one structural-style benchmark reported.
+  \item At least one emergence diagnostic (synergy or transfer entropy) computed.
+  \item Rolling out-of-sample tests, at least one placebo test, and at least one event study completed.
+  \item All results reported with benchmark labels (predictive vs.\ structural vs.\ modal).
+  \item Point-in-time data discipline verified for all backtesting.
+\end{enumerate}
+
+This specification is the correct bridge to the next deliverable: a \textbf{technical implementation plan} with milestones, quality gates, acceptance criteria, computational resource estimates, and team structure.
+
+\end{appendices}
+
+
+% ══════════════════════════════════════════════════════════
+\bibliographystyle{apalike}
+\begin{thebibliography}{99}
+
+\bibitem[Acemoglu et~al., 2012]{acemoglu2012network}
+Acemoglu, D., Carvalho, V.~M., Ozdaglar, A., and Tahbaz-Salehi, A. (2012). The network origins of aggregate fluctuations. \emph{Econometrica}, 80(5):1977--2016.
+
+\bibitem[Acemoglu et~al., 2015]{acemoglu2015systemic}
+Acemoglu, D., Ozdaglar, A., and Tahbaz-Salehi, A. (2015). Systemic risk and stability in financial networks. \emph{American Economic Review}, 105(2):564--608.
+
+\bibitem[Amari, 2016]{amari2016information}
+Amari, S.-i. (2016). \emph{Information Geometry and Its Applications}. Springer.
+
+\bibitem[Bernanke et~al., 1999]{bernanke1999monetary}
+Bernanke, B.~S., Gertler, M., and Gilchrist, S. (1999). The financial accelerator in a quantitative business cycle framework. \emph{Handbook of Macroeconomics}, 1:1341--1393.
+
+\bibitem[Bertschinger et~al., 2014]{bertschinger2014quantifying}
+Bertschinger, N., Rauh, J., Olbrich, E., Jost, J., and Ay, N. (2014). Quantifying unique information. \emph{Entropy}, 16(4):2161--2183.
+
+\bibitem[Boccaletti et~al., 2014]{boccaletti2014structure}
+Boccaletti, S., et~al. (2014). The structure and dynamics of multilayer networks. \emph{Physics Reports}, 544(1):1--122.
+
+\bibitem[Brunton et~al., 2022]{brunton2022modern}
+Brunton, S.~L., Budi\v{s}i\'{c}, M., Champion, E., and Kutz, J.~N. (2022). Modern Koopman theory for dynamical systems. \emph{SIAM Review}, 64(2):229--340.
+
+\bibitem[Bubenik, 2015]{bubenik2015statistical}
+Bubenik, P. (2015). Statistical topological data analysis using persistence landscapes. \emph{JMLR}, 16:77--102.
+
+\bibitem[Carlsson, 2009]{carlsson2009topology}
+Carlsson, G. (2009). Topology and data. \emph{Bulletin of the AMS}, 46(2):255--308.
+
+\bibitem[Dakos et~al., 2012]{dakos2012methods}
+Dakos, V., et~al. (2012). Methods for detecting early warnings of critical transitions. \emph{PLoS ONE}, 7(7):e41010.
+
+\bibitem[De~Domenico et~al., 2013]{de2013mathematical}
+De~Domenico, M., et~al. (2013). Mathematical formulation of multilayer networks. \emph{Physical Review X}, 3(4):041022.
+
+\bibitem[Durbin and Koopman, 2012]{durbin2012time}
+Durbin, J. and Koopman, S.~J. (2012). \emph{Time Series Analysis by State Space Methods}. OUP, 2nd ed.
+
+\bibitem[Edelsbrunner and Harer, 2010]{edelsbrunner2010computational}
+Edelsbrunner, H. and Harer, J.~L. (2010). \emph{Computational Topology}. AMS.
+
+\bibitem[Ehrlich et~al., 2024]{ehrlich2024pid}
+Ehrlich, D.~A., et~al. (2024). PID for continuous variables based on shared exclusions. \emph{Phys.\ Rev.\ E}, 110:014115.
+
+\bibitem[Elliott et~al., 2014]{elliott2014financial}
+Elliott, M., Golub, B., and Jackson, M.~O. (2014). Financial networks and contagion. \emph{AER}, 104(10):3115--3153.
+
+\bibitem[Fama and French, 1993]{fama1993common}
+Fama, E.~F. and French, K.~R. (1993). Common risk factors in returns on stocks and bonds. \emph{JFE}, 33(1):3--56.
+
+\bibitem[Forni et~al., 2000]{forni2000generalized}
+Forni, M., Hallin, M., Lippi, M., and Reichlin, L. (2000). The generalized dynamic-factor model. \emph{REStat}, 82(4):540--554.
+
+\bibitem[G\'{o}mez et~al., 2013]{gomez2013diffusion}
+G\'{o}mez, S., et~al. (2013). Diffusion dynamics on multiplex networks. \emph{Phys.\ Rev.\ Lett.}, 110(2):028701.
+
+\bibitem[Granger, 1969]{granger1969investigating}
+Granger, C.~W.~J. (1969). Investigating causal relations by econometric models and cross-spectral methods. \emph{Econometrica}, 37(3):424--438.
+
+\bibitem[Grassi et~al., 2018]{grassi2018time}
+Grassi, F., et~al. (2018). A time-vertex signal processing framework. \emph{IEEE TSP}, 66(3):817--829.
+
+\bibitem[Gr\"{u}nwald, 2007]{grunwald2007minimum}
+Gr\"{u}nwald, P.~D. (2007). \emph{The Minimum Description Length Principle}. MIT Press.
+
+\bibitem[Hamilton, 1989]{hamilton1989new}
+Hamilton, J.~D. (1989). A new approach to the economic analysis of nonstationary time series. \emph{Econometrica}, 57(2):357--384.
+
+\bibitem[Hamilton, 2005]{hamilton2005regime}
+Hamilton, J.~D. (2005). Regime-switching models. In \emph{The New Palgrave Dictionary of Economics}. Palgrave Macmillan.
+
+\bibitem[Hoel et~al., 2013]{hoel2013quantifying}
+Hoel, E.~P., Albantakis, L., and Tononi, G. (2013). Quantifying causal emergence shows that macro can beat micro. \emph{PNAS}, 110(49):19790--19795.
+
+\bibitem[Hoel, 2017]{hoel2017map}
+Hoel, E.~P. (2017). When the map is better than the territory. \emph{Entropy}, 19(5):188.
+
+\bibitem[Kim and Nelson, 1999]{kim1999state}
+Kim, C.-J. and Nelson, C.~R. (1999). \emph{State-Space Models with Regime Switching}. MIT Press.
+
+\bibitem[Kivel\"{a} et~al., 2014]{kivela2014multilayer}
+Kivel\"{a}, M., et~al. (2014). Multilayer networks. \emph{J.\ Complex Networks}, 2(3):203--271.
+
+\bibitem[Kwak et~al., 2024]{kwak2024polar}
+Kwak, S., Shimabukuro, L., and Ortega, A. (2024). Frequency analysis and filter design for directed graphs with polar decomposition. \emph{Proc.\ ICASSP}.
+
+\bibitem[Landau, 1937]{landau1937theory}
+Landau, L.~D. (1937). On the theory of phase transitions. \emph{Zh.\ Eksp.\ Teor.\ Fiz.}, 7:19--32.
+
+\bibitem[Lehoucq et~al., 1998]{lehoucq1998arpack}
+Lehoucq, R.~B., Sorensen, D.~C., and Yang, C. (1998). \emph{ARPACK Users' Guide}. SIAM.
+
+\bibitem[Lempel and Ziv, 1976]{lempel1976complexity}
+Lempel, A. and Ziv, J. (1976). On the complexity of finite sequences. \emph{IEEE TIT}, 22(1):75--81.
+
+\bibitem[Li and Vit\'{a}nyi, 2008]{li2008introduction}
+Li, M. and Vit\'{a}nyi, P. (2008). \emph{An Introduction to Kolmogorov Complexity}. Springer, 3rd ed.
+
+\bibitem[Lizier et~al., 2018]{lizier2018information}
+Lizier, J.~T., et~al. (2018). Information decomposition of target effects from multi-source interactions. \emph{Entropy}, 20(4):307.
+
+\bibitem[Loukas and Perraudin, 2019]{loukas2019stationary}
+Loukas, A. and Perraudin, N. (2019). Stationary time-vertex signal processing. \emph{EURASIP JASP}, 2019:59.
+
+\bibitem[Marques et~al., 2020]{marques2020signal}
+Marques, A.~G., Segarra, S., and Mateos, G. (2020). Signal processing on directed graphs. \emph{IEEE SPM}, 37(6):99--112.
+
+\bibitem[Meinshausen and B\"{u}hlmann, 2010]{meinshausen2010stability}
+Meinshausen, N. and B\"{u}hlmann, P. (2010). Stability selection. \emph{JRSSB}, 72(4):417--473.
+
+\bibitem[Ortega et~al., 2018]{ortega2018graph}
+Ortega, A., et~al. (2018). Graph signal processing: overview, challenges, and applications. \emph{Proc.\ IEEE}, 106(5):808--828.
+
+\bibitem[Perraudin and Vandergheynst, 2017]{perraudin2017stationary}
+Perraudin, N. and Vandergheynst, P. (2017). Stationary signal processing on graphs. \emph{IEEE TSP}, 65(13):3462--3477.
+
+\bibitem[Radicchi and Arenas, 2013]{radicchi2013abrupt}
+Radicchi, F. and Arenas, A. (2013). Abrupt transition in the structural formation of interconnected networks. \emph{Nature Physics}, 9(11):717--720.
+
+\bibitem[Rissanen, 1978]{rissanen1978modeling}
+Rissanen, J. (1978). Modeling by shortest data description. \emph{Automatica}, 14(5):465--471.
+
+\bibitem[Rosas et~al., 2020]{rosas2020reconciling}
+Rosas, F.~E., et~al. (2020). Reconciling emergences: an information-theoretic approach. \emph{PLoS Comput.\ Biol.}, 16(12):e1008289.
+
+\bibitem[Sandryhaila and Moura, 2013]{sandryhaila2013discrete}
+Sandryhaila, A. and Moura, J.~M.~F. (2013). Discrete signal processing on graphs. \emph{IEEE TSP}, 61(7):1644--1656.
+
+\bibitem[Sandryhaila and Moura, 2014]{sandryhaila2014discrete}
+Sandryhaila, A. and Moura, J.~M.~F. (2014). Discrete signal processing on graphs: frequency analysis. \emph{IEEE TSP}, 62(12):3042--3054.
+
+\bibitem[Scheffer et~al., 2009]{scheffer2009early}
+Scheffer, M., et~al. (2009). Early-warning signals for critical transitions. \emph{Nature}, 461:53--59.
+
+\bibitem[Schreiber, 2000]{schreiber2000measuring}
+Schreiber, T. (2000). Measuring information transfer. \emph{Phys.\ Rev.\ Lett.}, 85(2):461--464.
+
+\bibitem[Sornette, 2003]{sornette2003critical}
+Sornette, D. (2003). \emph{Why Stock Markets Crash}. Princeton University Press.
+
+\bibitem[Stock and Watson, 2002]{stock2002macroeconomic}
+Stock, J.~H. and Watson, M.~W. (2002). Macroeconomic forecasting using diffusion indexes. \emph{JBES}, 20(2):147--162.
+
+\bibitem[Tu et~al., 2014]{tu2014dynamic}
+Tu, J.~H., et~al. (2014). On dynamic mode decomposition: theory and applications. \emph{J.\ Comput.\ Dynamics}, 1(2):391--421.
+
+\bibitem[Williams and Beer, 2010]{williams2010nonnegative}
+Williams, P.~L. and Beer, R.~D. (2010). Nonnegative decomposition of multivariate information. \emph{arXiv:1004.2515}.
+
+\bibitem[Williams et~al., 2015]{williams2015data}
+Williams, M.~O., Kevrekidis, I.~G., and Rowley, C.~W. (2015). A data-driven approximation of the Koopman operator. \emph{J.\ Nonlinear Sci.}, 25(6):1307--1346.
+
+\bibitem[Wilson, 1971]{wilson1971renormalization}
+Wilson, K.~G. (1971). Renormalization group and critical phenomena. \emph{Phys.\ Rev.\ B}, 4(9):3174--3183.
+
+\bibitem[Yuan and Lin, 2006]{yuan2006model}
+Yuan, M. and Lin, Y. (2006). Model selection and estimation in regression with grouped variables. \emph{JRSSB}, 68(1):49--67.
+
+\bibitem[FRED, 2026]{fredapi2026}
+Federal Reserve Bank of St.\ Louis (2026). \emph{FRED/ALFRED Web Services Documentation}. Official API documentation including real-time periods and vintage retrieval.
+
+\bibitem[IMF, 2026]{imfapi2026}
+International Monetary Fund (2026). \emph{IMF Data APIs}. Official data portal documentation for SDMX 2.1 and 3.0 access.
+
+\bibitem[OECD, 2025]{oecdapi2025}
+OECD (2025). \emph{OECD Data via API}. Official OECD Data Explorer API documentation.
+
+\bibitem[BIS, 2026]{bisapi2026}
+Bank for International Settlements (2026). \emph{BIS Data Portal and SDMX API Documentation}. Official portal and API guidance for BIS statistics.
+
+\bibitem[SEC, 2024]{secapi2024}
+U.S. Securities and Exchange Commission (2024). \emph{EDGAR Application Programming Interfaces (APIs)}. Official public-data API documentation for company submissions and extracted XBRL data.
+
+\bibitem[Companies House, 2026]{companieshouse2026}
+Companies House (2026). \emph{Companies House API Overview, Authentication, and Developer Guidelines}. Official developer documentation for the Companies House REST API.
+
+\end{thebibliography}
+
+\end{document}
