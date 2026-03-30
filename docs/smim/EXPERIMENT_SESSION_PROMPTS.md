@@ -1014,8 +1014,11 @@ Output:
 
 ### Session D1 — Gap Persistence Analysis
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** Median half-life 1.7Q (H6a NOT SUPPORTED at aggregate). By actor type: global_shock
+4.7Q (in range), sector_leader 3.1Q, bank 2.1Q, large_firm 1.3Q. Quintile persistence 49.1%.
+Top decile decays from 0.39 to 0.26 over 6Q. Runner: `scripts/run_smim_d1.py`.
+Data: `results/metrics/level4_D1-PERSISTENCE.parquet`, `results/configs/D1-PERSISTENCE.yaml`.
 
 **Prompt:**
 ```
@@ -1057,8 +1060,11 @@ Output:
 
 ### Session D2 — Correction Prediction
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** H6b SUPPORTED. beta=-0.54, t=-34.7, N=3691. Large positive gaps predict negative
+next-4Q intensity revision. Q5-Q1 spread = -0.39. Gaps have genuine predictive content beyond
+noise. Runner: `scripts/run_smim_d2_d3_d5_d6.py`.
+Data: `results/metrics/level4_D2-CORRECTION.parquet`.
 
 **Prompt:**
 ```
@@ -1099,8 +1105,11 @@ Output:
 
 ### Session D3 — Graph Diffusion Prediction
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** L0->L2 strong transmission (corr=0.86 at 1Q). L0->L1 grows with lag (0.35 at 2Q,
+0.60 at 4Q). L1->L2 insignificant. Shocks transmit directly from exogenous to firms, bypassing
+institutional layer. Runner: `scripts/run_smim_d2_d3_d5_d6.py`.
+Data: `results/metrics/level4_D3-DIFFUSION.parquet`.
 
 **Prompt:**
 ```
@@ -1140,8 +1149,11 @@ Output:
 
 ### Session D4 — Historical Event Alignment
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** 0/8 events aligned (target NOT MET). Cross-sectional rank normalisation absorbs
+event-driven spikes. |gap| ratios 0.88-1.01x (event = control). Framework captures structural
+positioning, not event anomalies. Runner: `scripts/run_smim_d4.py`.
+Data: `results/metrics/level4_D4-EVENTS.parquet`, `results/configs/D4-EVENTS.yaml`.
 
 **Prompt:**
 ```
@@ -1185,8 +1197,11 @@ Output:
 
 ### Session D5 — Benchmark Divergence
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** H6c SUPPORTED. Pred-modal mean divergence=0.016, corr=0.97. Diverge meaningfully
+in 4/10 windows (W2016/W2019/W2022: >0.04). Modal outperforms predictive (0.319 vs 0.305).
+KimFilter alpha_pred approx alpha_filt limits divergence. Runner: `scripts/run_smim_d2_d3_d5_d6.py`.
+Data: `results/metrics/level4_D5-BENCHMARK-DIVERGENCE.parquet`.
 
 **Prompt:**
 ```
@@ -1227,8 +1242,11 @@ Output:
 
 ### Session D6 — Emergence Timing
 
-**Status:** `[ ] not started`
-**Outcome:** —
+**Status:** `[x] COMPLETE -- 2026-03-30`
+**Outcome:** Gap dispersion negatively correlates with VIX (corr=-0.39 at 1Q lead). Gaps emerge
+during CALM periods, not crises. Dispersion leads VIX decline by 1-4Q. This is a counter-intuitive
+finding: misallocation builds during low-volatility regimes and unwinds during stress.
+Runner: `scripts/run_smim_d2_d3_d5_d6.py`. Data: `results/metrics/level4_D6-EMERGENCE-TIMING.parquet`.
 
 **Prompt:**
 ```

@@ -25,6 +25,12 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 | B5 | B | COMPLETE | M=2 >> M=1 at Kalman depth; emergence negative | 2026-03-30 |
 | B8 | B | COMPLETE | 95% retention at sigma=1.0 noise; highly robust | 2026-03-30 |
 | B9 | B | COMPLETE | 100% retention at all corruption levels; operator symmetric | 2026-03-30 |
+| D1 | D | COMPLETE | Half-life 1.7Q (H6a not supported aggregate; 4.7Q for shocks) | 2026-03-30 |
+| D2 | D | COMPLETE | H6b SUPPORTED: beta=-0.54, t=-34.7; gaps predict revision | 2026-03-30 |
+| D3 | D | COMPLETE | L0->L2 strong (r=0.86); L1->L2 insignificant | 2026-03-30 |
+| D4 | D | COMPLETE | 0/8 events aligned (rank normalisation absorbs spikes) | 2026-03-30 |
+| D5 | D | COMPLETE | H6c SUPPORTED: pred-modal diverge (0.016, 4/10 windows) | 2026-03-30 |
+| D6 | D | COMPLETE | Gap dispersion leads VIX by 1-4Q (corr=-0.39) | 2026-03-30 |
 
 ---
 
