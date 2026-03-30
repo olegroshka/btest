@@ -354,3 +354,34 @@ without overfitting because it extracts modes from temporal dynamics (snapshot
 pairs), not from a static N x N correlation matrix. The Schur basis at K=8
 also improves significantly (+2.5pp over K=5), confirming DD-1 finding that
 K=3 was too conservative.
+
+## 13. Phase C Drill-Down (completed 2026-03-30)
+
+Three critical findings from Phase C diagnostics:
+
+**1. Financials failure is METHOD-driven, not sector-driven.**
+98.4% of financial actor observations use `asset_growth_yoy_xsrank`, which
+produces highly persistent ranks (median AR(1) rho=0.70 vs tech rho=0.25).
+High persistence means the cross-sectional structure barely changes --
+easy for AR(1), hard for spectral models that need temporal variation.
+
+**2. Noise augmentation adds +1.3pp to GOLD+.**
+Adding 5-10% Gaussian noise to training data regularises the Kalman EM,
+pushing R2 from 0.524 to 0.537. Optimal noise sigma=0.10. This is
+data augmentation for state-space models -- a novel finding.
+
+Updated performance ladder:
+```
+  GOLD+ (K=8 DMD online):    0.524
+  + noise augmentation:       0.537  (+1.3pp)
+  AR(1) baseline:             0.425
+```
+
+**3. The intensity method is the primary driver of predictive power.**
+US-LC with return_12m_xsrank gives R2=-0.15 (negative!). UK-LC at 0.058
+is actually BETTER. C4's low R2 is not geography -- it's the return method.
+`capex_assets_xsrank` has rich cross-sectional dynamics that spectral
+models can exploit. `return_12m_xsrank` does not.
+
+This reframes the transfer story: what "transfers" across sectors and
+geographies is the INTENSITY METHOD choice, not the pipeline parameters.
