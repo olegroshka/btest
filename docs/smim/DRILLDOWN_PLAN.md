@@ -329,8 +329,28 @@ Original A1 (T=10yr, K=3, Schur, full demean):       0.339
   + shorter T=5yr + K=5:                              0.392  (+1.1pp)
   + spherical R Kalman:                               0.434  (+4.2pp)
   + DMD basis:                                        0.467  (+3.3pp)
-  + online Q adaptation (estimated):                 ~0.480  (+1.3pp est)
+  + online Q adaptation:                              0.474  (+0.7pp)
+  + K=8 (from K=5):                                   0.524  (+5.0pp)
                                                      ------
-  Total improvement:                                 ~14.1pp
-  AR(1) baseline:                                     0.425
+  Total improvement:                                 +18.5pp
+  AR(1) baseline (T=10yr):                            0.425
+
+  FINAL BEST: Online K=8 DMD + spherical R + T=5yr + EWM = 0.524
+  vs AR(1): +9.9pp, wins 10/10 windows
+  Peak: W2020 R2=0.650
 ```
+
+### Unrealised Potential Items (resolved 2026-03-30)
+
+| Item | Config | R2 | Delta vs GOLD K=5 |
+|------|--------|-----|-------------------|
+| Online Q (K=5 DMD) | adapt_rate=0.3 | 0.475 | +0.008 |
+| K=8 DMD (fixed Q) | GOLD with K=8 | 0.514 | +0.047 |
+| **K=8 DMD + online Q** | **combined** | **0.524** | **+0.057** |
+| K=8 Schur + online Q | combined | 0.507 | +0.040 |
+
+**K=8 with DMD is the biggest single gain (+4.7pp).** DMD handles higher K
+without overfitting because it extracts modes from temporal dynamics (snapshot
+pairs), not from a static N x N correlation matrix. The Schur basis at K=8
+also improves significantly (+2.5pp over K=5), confirming DD-1 finding that
+K=3 was too conservative.
