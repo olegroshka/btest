@@ -145,7 +145,14 @@ The investment gap for actor $i$ at time $t$ relative to a benchmark functional 
 where $\Delta_{i,t} > 0$ indicates over-investment and $\Delta_{i,t} < 0$ indicates under-investment relative to the benchmark, and $Y_{1:t}$ denotes the information set available at time $t$.
 \end{definition}
 
-The framework constructs $y^*_{i,t}$ through five sequential stages, each justified by ablation (Section~\ref{sec:ablation}).
+The framework constructs $y^*_{i,t}$ through five sequential stages, each justified by ablation (Section~\ref{sec:ablation}). Figure~\ref{fig:schematic} provides an overview with the out-of-sample $R^2$ contribution of each stage.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{img/fig1_schematic.pdf}
+\caption{Pipeline architecture. Each box represents one processing stage; annotations above show the cumulative $R^2$ and the marginal contribution (in percentage points) of each stage.}
+\label{fig:schematic}
+\end{figure}
 
 \subsection{Stage 1: Exponentially-Weighted Demeaning}
 \label{sec:demean}
@@ -247,7 +254,31 @@ Algorithm~\ref{alg:pipeline} summarises the complete procedure.
 
 \subsection{Actor Universe}
 
-Our sample comprises 103 actors: 91 equity actors (US and UK, spanning energy, technology, financials, healthcare, industrials, and diversified sectors) and 12 institutional actors (central banks, regulators, international organisations, and global shock proxies). Of these, 93 have computed investment intensity values.
+Our sample comprises 103 actors across three hierarchical layers (Table~\ref{tab:actors}). Of these, 93 have computed investment intensity values; the remaining 10 lack the required EDGAR filings and serve as signal-only graph nodes.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}llllr@{}}
+\toprule
+Layer & Actor Type & Geography & Intensity Method & $N$ \\
+\midrule
+0 (Exogenous) & Global shocks & Global & FRED min-max & 7 \\
+\multirow{3}{*}{1 (Institutional)} & Central banks & US, UK & FRED min-max & 2 \\
+ & Regulators & US, UK & FRED min-max & 2 \\
+ & International orgs & Global & FRED min-max & 1 \\
+\midrule
+\multirow{5}{*}{2 (Firms)} & Large firms & US & CapEx intensity & 49 \\
+ & Large firms & UK & Return intensity & 23 \\
+ & Banks & US, UK & Asset growth (ranked) & 10 \\
+ & Sector leaders & US & CapEx intensity & 4 \\
+ & \emph{Signal-only (no intensity)} & US & --- & 5 \\
+\midrule
+& & & \textbf{Total} & \textbf{103} \\
+\bottomrule
+\end{tabular}
+\caption{Actor universe. Layer 0 actors represent exogenous macroeconomic shocks; Layer 1 actors are institutional intermediaries; Layer 2 actors are firms and banks whose investment behaviour is the prediction target.}
+\label{tab:actors}
+\end{table}
 
 \subsection{Investment Intensity}
 
@@ -262,6 +293,25 @@ We construct three intensity measures, each mapped to a cross-sectional percenti
 \end{itemize}
 
 The rank transformation stabilises the distribution, ensures comparability across actor types, and produces the cross-sectional persistence structure that the spectral model exploits. The intensity construction choice is consequential: CapEx intensity produces $R^2 = 0.52$ while return intensity produces $R^2 = -0.15$ on the same US actors (Section~\ref{sec:transfer}), establishing the measurement input as the primary driver of model performance.
+
+Table~\ref{tab:sources} summarises the data sources. Notably, the pipeline uses \emph{only the intensity panel} for operator construction and prediction. External signal sources (OHLCV, FRED, EDGAR balance sheet) were tested as Granger-edge inputs but found dispensable (Section~\ref{sec:robustness}): the intensity cross-correlation captures all exploitable structure.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+Source & Data & Frequency & Role in Pipeline \\
+\midrule
+SEC EDGAR & CapEx, Assets (XBRL) & Quarterly & Intensity construction (primary) \\
+Yahoo Finance & Equity total returns & Daily $\to$ quarterly & Intensity construction (UK alternative) \\
+FRED & 28 macro series & Mixed $\to$ quarterly & Institutional intensity; tested as signal \\
+BEA & Input-output tables & Annual & Tested as supply-chain edges (dispensable) \\
+GDELT & Narrative sentiment & Weekly & Tested as narrative signal (dispensable) \\
+\bottomrule
+\end{tabular}
+\caption{Data sources. Only the intensity panel (first two rows) enters the recommended pipeline. The remaining sources were evaluated as supplementary signals but found dispensable at the graph-factor depth (Section~\ref{sec:robustness}).}
+\label{tab:sources}
+\end{table}
 
 \subsection{Evaluation Protocol}
 
