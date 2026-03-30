@@ -277,3 +277,60 @@ docs/smim/DRILLDOWN_RESULTS.md              findings narrative
 7. **K sweep may reveal that FULL-ROLL with large K overfits but RECENT with large K
    works.** This would confirm that the issue is T/K ratio, not K per se. DD-1 should
    include both FULL-ROLL and RECENT periods for comparison.
+
+---
+
+## 12. Drill-Down Results (completed 2026-03-30)
+
+### Phase 1 (DD-1 through DD-6): Quick Diagnostics
+
+| DD | Finding | Impact |
+|----|---------|--------|
+| DD-1 K sweep | K=8 best (0.354) but K=5 more robust | +1.5pp |
+| DD-2 T sweep | **T=3yr K=5 hits 0.547 on one window** | T=5yr best stable |
+| DD-3 DMD | DMD +0.020 over Schur (confirmed B2) | +2.0pp |
+| DD-4 Lag-1 | Marginal (+0.5pp with combined operator) | Minor |
+| DD-5 Demeaning | **EWM_8Q best (0.381 vs 0.339)** | +4.2pp |
+| DD-6 Actor-type | Per-actor R2 unreliable (near-zero var actors) | Diagnostic |
+
+### Phase 2 (DD-7 through DD-9): Model Architecture
+
+| DD | Finding | Impact |
+|----|---------|--------|
+| DD-7 FA-AR(1) | K=5 ridge=10: R2=0.405 | +1.3pp vs L1 |
+| DD-8 Ensemble | alpha=0.2 (80% L1 + 20% AR1): R2=0.413 | L1 dominates |
+| DD-9 Shrinkage | **Spherical R rescues Kalman: modal R2=0.434** | +4.2pp |
+
+### DD-10 Final: Combined Best
+
+| Config | Mean R2 | vs AR(1) | DM p | Wins |
+|--------|---------|----------|------|------|
+| **DMD + spherical Kalman** | **0.467** | **+0.042** | **0.001** | **8/10** |
+| Schur + spherical Kalman | 0.434 | +0.010 | 0.446 | 5/10 |
+| L1 OLS (Phase 1 best) | 0.392 | -0.033 | 0.010 | 4/10 |
+| AR(1) T=10yr | 0.425 | -- | -- | -- |
+
+**GOLD criterion achieved: R2=0.467, DM p=0.001.**
+
+### Remaining Items (completed)
+
+| Item | Finding |
+|------|---------|
+| AR(1) residual | K=5 DMD modes explain 11.6% of AR(1) errors. Complementary. |
+| Correlation threshold | Robust (0.37-0.40 across 0.00-0.30). Higher slightly better. |
+| Online Kalman | +0.4 to +3.4pp in 5/6 windows. Q adaptation helps. |
+| D2 control | Gap survives level control (t=-6.95, p<0.001). Genuine structure. |
+
+### Performance Ladder (final)
+
+```
+Original A1 (T=10yr, K=3, Schur, full demean):       0.339
+  + EWM demeaning:                                    0.381  (+4.2pp)
+  + shorter T=5yr + K=5:                              0.392  (+1.1pp)
+  + spherical R Kalman:                               0.434  (+4.2pp)
+  + DMD basis:                                        0.467  (+3.3pp)
+  + online Q adaptation (estimated):                 ~0.480  (+1.3pp est)
+                                                     ------
+  Total improvement:                                 ~14.1pp
+  AR(1) baseline:                                     0.425
+```
