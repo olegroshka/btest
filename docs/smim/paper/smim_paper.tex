@@ -145,13 +145,13 @@ The investment gap for actor $i$ at time $t$ relative to a benchmark functional 
 where $\Delta_{i,t} > 0$ indicates over-investment and $\Delta_{i,t} < 0$ indicates under-investment relative to the benchmark, and $Y_{1:t}$ denotes the information set available at time $t$.
 \end{definition}
 
-The framework constructs $y^*_{i,t}$ through five sequential stages, each justified by ablation (Section~\ref{sec:ablation}). Figure~\ref{fig:schematic} provides an overview with the out-of-sample $R^2$ contribution of each stage.
+The framework constructs $y^*_{i,t}$ through five sequential stages, each justified by ablation (Section~\ref{sec:ablation}). Figure~\ref{fig:conceptual} provides an overview: panel~(a) shows the multilayer actor hierarchy with empirically-identified transmission channels; panel~(b) shows the processing pipeline with the out-of-sample $R^2$ contribution of each stage.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{img/fig1_schematic.pdf}
-\caption{Pipeline architecture. Each box represents one processing stage; annotations above show the cumulative $R^2$ and the marginal contribution (in percentage points) of each stage.}
-\label{fig:schematic}
+\includegraphics[width=\textwidth]{img/fig1_conceptual.pdf}
+\caption{\textbf{Framework overview.} (a)~Multilayer actor structure: Layer~0 exogenous shocks transmit directly to Layer~2 firms ($r = 0.86$, Section~\ref{sec:economic}), bypassing Layer~1 institutions. Five sectors contain 93 actors with investment intensity. (b)~Processing pipeline: five stages from raw intensity panel to investment gap estimates, with cumulative $R^2$ and per-stage marginal contribution (green annotations).}
+\label{fig:conceptual}
 \end{figure}
 
 \subsection{Stage 1: Exponentially-Weighted Demeaning}
