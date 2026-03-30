@@ -401,7 +401,9 @@ The ablation reveals a non-monotonic pattern: L1 (graph-factor OLS, $R^2 = 0.328
 \label{fig:spectral}
 \end{figure}
 
-DMD ($R^2 = 0.359$) outperforms all five static-operator methods, which cluster at $R^2 = 0.339$. The static methods (Schur, Polar, Hermitian dilation, directed variation) produce identical results because the intensity cross-correlation operator is nearly symmetric, collapsing all directed decompositions to standard PCA. DMD avoids this by working with temporal snapshot pairs directly, capturing predictive rather than contemporaneous structure.
+DMD ($R^2 = 0.359$) outperforms all five static-operator methods, which produce \emph{identical} results at $R^2 = 0.339$. This identity is not a coincidence: the operator is built from the Pearson cross-correlation matrix, which is \emph{exactly} symmetric by construction. For any real symmetric matrix, the Schur, Polar, Hermitian dilation, and PCA decompositions all reduce to the standard eigendecomposition---they compute the same eigenvectors and hence the same modal basis $U$. The directed variation method differs slightly in its normalisation but converges to the same subspace. This result has a clear implication: \emph{to benefit from directed spectral methods, the operator itself must be asymmetric} (e.g., from Granger causality or supply-chain linkages). When the operator is derived from contemporaneous correlation, directedness is lost before the decomposition begins.
+
+DMD sidesteps this entirely. Rather than decomposing a static operator, it extracts modes from temporal snapshot pairs $X' \approx AX$, where the implicit operator $A$ captures \emph{lagged} cross-sectional dynamics. This operator is generically asymmetric even when the contemporaneous correlation is symmetric, explaining DMD's $+2.0$ percentage point advantage.
 
 \subsection{The Regularisation Path}
 \label{sec:reg_path}
