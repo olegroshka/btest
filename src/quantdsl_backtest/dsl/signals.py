@@ -378,3 +378,161 @@ class RiskMultiplierFromZ(SignalNode):
 
     def evaluate(self, engine: Any) -> Any:
         return engine._eval_risk_multiplier_from_z(self)
+
+
+# ---------------------------------------------------------------------------
+# Arithmetic operators (element-wise on aligned panels)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class Add(SignalNode):
+    """
+    Element-wise addition: left + right.
+
+    Both operands are resolved with _resolve_expr, so either can be a factor
+    name, another SignalNode, or a numeric constant.
+
+    Example — spread minus index basis:
+        Add(left="issuer_spread", right=EWMMean(base="cdx_spread", span=60))
+    """
+
+    left: Expr
+    right: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_add(self)
+
+
+@dataclass(slots=True)
+class Sub(SignalNode):
+    """
+    Element-wise subtraction: left - right.
+
+    Example — cash-index basis:
+        Sub(left="issuer_spread", right="cdx_spread")
+    """
+
+    left: Expr
+    right: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_sub(self)
+
+
+@dataclass(slots=True)
+class Mul(SignalNode):
+    """
+    Element-wise multiplication: left * right.
+
+    Useful for sign-flipping a signal by a constant or another series:
+        Mul(left="my_signal", right=-1.0)
+    """
+
+    left: Expr
+    right: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_mul(self)
+
+
+# ---------------------------------------------------------------------------
+# Univariate transforms
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class Sign(SignalNode):
+    """
+    Element-wise sign: +1 / 0 / -1 (NaN-preserving).
+
+    Example — credit-quality signal from spread direction:
+        Sign(base="spread_diff")
+    """
+
+    base: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_sign(self)
+
+
+@dataclass(slots=True)
+class Clip(SignalNode):
+    """
+    Element-wise clip to [lower, upper].
+
+    Example:
+        Clip(base="zscore", lower=-3.0, upper=3.0)
+    """
+
+    base: Expr
+    lower: float = -3.0
+    upper: float = 3.0
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_clip(self)
+
+
+@dataclass(slots=True)
+class Abs(SignalNode):
+    """
+    Element-wise absolute value.
+    """
+
+    base: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_abs(self)
+
+
+# ---------------------------------------------------------------------------
+# Rolling quantile (time-series, per-instrument)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class RollingQuantile(SignalNode):
+    """
+    Per-instrument rolling quantile over a look-back window.
+
+    This is the **time-series** (per-row) analog of the cross-sectional
+    ``Quantile`` node.  It answers: "what is the q-th percentile of this
+    instrument's own history over the last `window` bars?"
+
+    Typical uses
+    ------------
+    * VIX term-structure threshold  (S11):
+        RollingQuantile(base="vix_slope", window=252, q=0.5)
+    * Cash-dispersion quantile filter (S3):
+        RollingQuantile(base="cdr_slow", window=504, q=0.05)
+    * Cash-synthetic basis suppression (S9):
+        RollingQuantile(base="basis", window=252, q=0.95)
+
+    Parameters
+    ----------
+    base : Expr
+        Input series / factor name.
+    window : int
+        Rolling window length in bars.
+    q : float
+        Quantile level in [0, 1].  0.5 = median.
+    min_periods : int
+        Minimum non-NaN observations required; defaults to ``window``.
+    name : Optional[str]
+        Optional cache key.
+    """
+
+    base: Expr
+    window: int
+    q: float
+    min_periods: Optional[int] = None
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_rolling_quantile(self)

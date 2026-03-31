@@ -34,6 +34,13 @@ from ..dsl.signals import (
     PctChange,
     ZScoreRolling,
     RiskMultiplierFromZ,
+    Add,
+    Sub,
+    Mul,
+    Sign,
+    Clip,
+    Abs,
+    RollingQuantile,
 )
 from ..utils.logging import get_logger
 
@@ -142,6 +149,20 @@ class SignalEngine:
             return self._eval_zscore_rolling(node)
         if isinstance(node, RiskMultiplierFromZ):
             return self._eval_risk_multiplier_from_z(node)
+        if isinstance(node, Add):
+            return self._eval_add(node)
+        if isinstance(node, Sub):
+            return self._eval_sub(node)
+        if isinstance(node, Mul):
+            return self._eval_mul(node)
+        if isinstance(node, Sign):
+            return self._eval_sign(node)
+        if isinstance(node, Clip):
+            return self._eval_clip(node)
+        if isinstance(node, Abs):
+            return self._eval_abs(node)
+        if isinstance(node, RollingQuantile):
+            return self._eval_rolling_quantile(node)
         raise TypeError(f"Unsupported SignalNode type: {type(node)}")
 
     # ------------------------------------------------------------------ #
@@ -459,6 +480,50 @@ class SignalEngine:
         clipped = z.clip(lower=0.0, upper=float(node.max_z)) / float(node.max_z)
         mult = 1.0 - clipped
         return mult.clip(lower=0.0, upper=1.0)
+
+    # ---- Arithmetic operators ------------------------------------------ #
+
+    def _eval_add(self, node: Add) -> pd.DataFrame:
+        left = self._resolve_expr(node.left)
+        right = self._resolve_expr(node.right)
+        return left + right
+
+    def _eval_sub(self, node: Sub) -> pd.DataFrame:
+        left = self._resolve_expr(node.left)
+        right = self._resolve_expr(node.right)
+        return left - right
+
+    def _eval_mul(self, node: Mul) -> pd.DataFrame:
+        left = self._resolve_expr(node.left)
+        right = self._resolve_expr(node.right)
+        return left * right
+
+    # ---- Univariate transforms ----------------------------------------- #
+
+    def _eval_sign(self, node: Sign) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        # np.sign preserves NaN via where
+        result = base.copy()
+        result[:] = np.where(base.isna(), np.nan, np.sign(base.values))
+        return result.astype("float64")
+
+    def _eval_clip(self, node: Clip) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.clip(lower=node.lower, upper=node.upper)
+
+    def _eval_abs(self, node: Abs) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.abs()
+
+    # ---- Rolling quantile (time-series, per-instrument) ---------------- #
+
+    def _eval_rolling_quantile(self, node: RollingQuantile) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        min_p = node.min_periods if node.min_periods is not None else node.window
+        # pandas rolling().quantile() uses linear interpolation by default
+        return base.rolling(window=node.window, min_periods=min_p).quantile(
+            node.q, interpolation="linear"
+        )
 
     def _eval_cross_section_aggregate(self, node: CrossSectionAggregate) -> pd.DataFrame:
         # Source can be a factor or a previously computed signal

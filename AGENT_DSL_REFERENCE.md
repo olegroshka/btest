@@ -24,6 +24,12 @@ from quantdsl_backtest.dsl.signals import (
     NotNull,
     EWMMean, RollingMean, RollingStd, Diff, PctChange, ZScoreRolling,
     RiskMultiplierFromZ, TimeSeries,
+    # Arithmetic
+    Add, Sub, Mul,
+    # Univariate transforms
+    Sign, Clip, Abs,
+    # Time-series quantile
+    RollingQuantile,
 )
 from quantdsl_backtest.dsl.portfolio import (
     LongShortPortfolio, Book, TopN, BottomN, MaskSelector, EqualWeight,
@@ -112,8 +118,23 @@ All signal nodes accept an optional `name: str`.
 | `Diff` | `base: Expr, periods=1` |
 | `PctChange` | `base: Expr, periods=1` |
 | `ZScoreRolling` | `base: Expr, window: int, min_periods=1` |
+| `RollingQuantile` | `base: Expr, window: int, q: float, min_periods=None` — per-instrument rolling q-th percentile |
 | `RiskMultiplierFromZ` | `z: Expr, max_z=2.5` → maps z-score to [0,1] scalar |
 | `TimeSeries` | `source: str (e.g. "fred://BAMLH0A0HYM2"), field="close"` |
+
+### Arithmetic operators (element-wise)
+| Class | Key Fields | Notes |
+|-------|-----------|-------|
+| `Add` | `left: Expr, right: Expr` | `left + right` — works with factors, signals, or scalars |
+| `Sub` | `left: Expr, right: Expr` | `left - right` — e.g. cash-index basis |
+| `Mul` | `left: Expr, right: Expr` | `left * right` — e.g. `Mul(left="signal", right=-1.0)` to invert |
+
+### Univariate transforms
+| Class | Key Fields | Notes |
+|-------|-----------|-------|
+| `Sign` | `base: Expr` | +1 / 0 / -1 (NaN-preserving) |
+| `Clip` | `base: Expr, lower=-3.0, upper=3.0` | Clamp to bounds |
+| `Abs` | `base: Expr` | Absolute value |
 
 **Example — composite long signal with regime filter:**
 ```python

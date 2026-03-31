@@ -33,8 +33,18 @@ class SingleAssetRunner:
 
     Parameters
     ----------
-    strategy   : Strategy with ``portfolio`` of type :class:`TimingPortfolio`
-    btest_root : root directory used to resolve relative ExternalFactor paths
+    strategy      : Strategy with ``portfolio`` of type :class:`TimingPortfolio`
+    btest_root    : root directory used to resolve relative ExternalFactor paths
+    rate_registry : optional dict mapping rate-curve names to CSV file paths.
+                    CSV must have columns ``date`` and ``rate_pct``.
+                    Built-in keys: ``"ESTR"`` (auto-detected from known location).
+                    Example::
+
+                        SingleAssetRunner(
+                            strategy,
+                            btest_root,
+                            rate_registry={"ESTR": "/path/to/eur_overnight_rate.csv"},
+                        )
 
     Usage::
 
@@ -43,17 +53,24 @@ class SingleAssetRunner:
             price_close = df["close"],
             aux_series  = {"ivol": df["ivol"]},
         )
-        # result keys: position, entry, price, daily_ret, strat_ret, gross_ret, cost_ret, factors, signals
+        # result keys: position, entry, price, daily_ret, strat_ret, gross_ret,
+        #              cost_ret, financing_ret, factors, signals
     """
 
-    def __init__(self, strategy: Strategy, btest_root) -> None:
+    # Well-known rate-curve CSV paths (override via rate_registry kwarg)
+    _DEFAULT_RATE_REGISTRY: dict = {
+        "ESTR": r"C:\Personal\Business & Investments\Trading portfolio\ForgeFolio\data\eur_overnight_rate.csv",
+    }
+
+    def __init__(self, strategy: Strategy, btest_root, rate_registry: dict | None = None) -> None:
         if not isinstance(strategy.portfolio, TimingPortfolio):
             raise TypeError(
                 f"SingleAssetRunner only handles TimingPortfolio, "
                 f"got {type(strategy.portfolio).__name__}"
             )
-        self.strategy   = strategy
-        self.btest_root = pathlib.Path(btest_root)
+        self.strategy      = strategy
+        self.btest_root    = pathlib.Path(btest_root)
+        self._rate_registry = {**self._DEFAULT_RATE_REGISTRY, **(rate_registry or {})}
         # Per-run context — populated in run(), cleared after
         self._computed:    dict[str, pd.Series] = {}
         self._signal_vals: dict[str, pd.Series] = {}
@@ -100,8 +117,9 @@ class SingleAssetRunner:
             .astype(int)
         )
 
+        lev       = port.target_leverage          # 1.0 = unlevered, 2.0 = 2x, etc.
         daily_ret = np.log(price_close / price_close.shift(1))
-        gross_ret = (position * daily_ret).fillna(0.0)
+        gross_ret = (position * lev * daily_ret).fillna(0.0)
 
         # ── Cost & slippage deduction ─────────────────────────────────────────
         cost_model = build_cost_model(self.strategy.costs.commission)
@@ -109,9 +127,7 @@ class SingleAssetRunner:
 
         trades = position.diff().abs().fillna(0.0)  # 1.0 on entry/exit bars
 
-        # Commission as fraction of notional traded.
-        # commission_from_trade(qty=1, exec_price=p) / p cancels for bps_notional
-        # (→ constant bps/1e4) and gives amount/price for per_share.
+        # Commission on lev × notional traded
         prices_arr    = price_close.reindex(idx).values
         comm_frac_arr = np.array([
             cost_model.commission_from_trade(qty=1, exec_price=float(p)) / max(float(p), 1e-9)
@@ -122,19 +138,30 @@ class SingleAssetRunner:
         # Slippage: participation=0 (no volume data) → only base_bps fires
         slip_frac = slip_model.slippage_bps_from_participation(0.0) / 1e4
 
-        cost_ret  = (trades * (comm_frac + slip_frac)).fillna(0.0)
-        strat_ret = gross_ret - cost_ret
+        cost_ret  = (trades * lev * (comm_frac + slip_frac)).fillna(0.0)
+
+        # ── Financing drag on borrowed portion ───────────────────────────────
+        # Only applies when lev > 1.0. Charged daily on (lev-1) × position.
+        fin_cfg = self.strategy.costs.financing if self.strategy.costs is not None else None
+        if fin_cfg is not None and lev > 1.0:
+            daily_fin_rate  = self._load_rate_curve(fin_cfg, idx)
+            financing_ret   = ((lev - 1) * position * daily_fin_rate).fillna(0.0)
+        else:
+            financing_ret = pd.Series(0.0, index=idx)
+
+        strat_ret = gross_ret - cost_ret - financing_ret
 
         result = dict(
-            position  = position,
-            entry     = entry,
-            price     = price_close,
-            daily_ret = daily_ret.fillna(0.0),
-            strat_ret = strat_ret,   # net of commission + slippage
-            gross_ret = gross_ret,   # pre-cost
-            cost_ret  = cost_ret,    # cost drag per bar (positive = drag)
-            factors   = dict(self._computed),
-            signals   = dict(self._signal_vals),
+            position      = position,
+            entry         = entry,
+            price         = price_close,
+            daily_ret     = daily_ret.fillna(0.0),
+            strat_ret     = strat_ret,       # net of commission + slippage + financing
+            gross_ret     = gross_ret,       # pre-cost, leveraged
+            cost_ret      = cost_ret,        # commission + slippage drag per bar
+            financing_ret = financing_ret,   # financing cost on borrowed portion
+            factors       = dict(self._computed),
+            signals       = dict(self._signal_vals),
         )
         self._computed = {}
         self._signal_vals = {}
@@ -173,6 +200,35 @@ class SingleAssetRunner:
                 )
             return aux_series[fnode.field].reindex(idx)
         raise NotImplementedError(f"_eval_factor: unsupported {type(fnode).__name__}")
+
+    def _load_rate_curve(self, fin_cfg, idx) -> pd.Series:
+        """
+        Load a daily financing rate series aligned to ``idx``.
+
+        Resolution order:
+        1. ``fin_cfg.rate_csv_path`` — explicit CSV path on ``FinancingCost``
+        2. ``self._rate_registry[fin_cfg.base_rate_curve]`` — named registry lookup
+        3. Flat series of ``spread_bps / 1e4 / 252`` (spread-only, no base rate)
+
+        CSV format: two columns — ``date`` (parseable) and ``rate_pct``
+        (annual rate as a percentage, e.g. 2.50 for 2.50%/yr).
+        """
+        path = getattr(fin_cfg, "rate_csv_path", None) or \
+               self._rate_registry.get(fin_cfg.base_rate_curve)
+
+        if path and pathlib.Path(path).exists():
+            rates = pd.read_csv(path, parse_dates=["date"], index_col="date")["rate_pct"]
+            daily = (rates.reindex(idx, method="ffill") / 100 + fin_cfg.spread_bps / 1e4) / 252
+            return daily.fillna(fin_cfg.spread_bps / 1e4 / 252)
+
+        # No file available — use spread only (logs warning)
+        import warnings
+        warnings.warn(
+            f"FinancingCost: rate curve '{fin_cfg.base_rate_curve}' not found in registry "
+            f"and no rate_csv_path provided. Using spread_bps={fin_cfg.spread_bps} only.",
+            stacklevel=3,
+        )
+        return pd.Series(fin_cfg.spread_bps / 1e4 / 252, index=idx)
 
     def _load_external(self, fnode: ExternalFactor, idx) -> pd.Series:
         path = pathlib.Path(fnode.path)

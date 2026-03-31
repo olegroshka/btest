@@ -30,10 +30,27 @@ class BorrowCost:
 class FinancingCost:
     """
     Cash financing rate specification.
+
+    Parameters
+    ----------
+    base_rate_curve : str
+        Named rate curve (e.g. ``"SOFR"``, ``"ESTR"``).  Used as a fallback
+        key when no explicit ``rate_csv_path`` is provided.
+    spread_bps : float
+        Lender spread over the base rate, in basis points (e.g. 150 for IBKR
+        EUR Pro tier = €STR + 1.50 %).
+    rate_csv_path : str or None
+        Optional path to a CSV file with columns ``date`` and ``rate_pct``
+        (rate expressed as percentage, e.g. 2.50 for 2.50 %).  When provided,
+        ``SingleAssetRunner`` loads this file directly instead of looking up
+        ``base_rate_curve`` in its registry.  Leave as ``None`` and register
+        well-known curve paths via ``SingleAssetRunner(rate_registry={...})``
+        for portable strategies.
     """
 
     base_rate_curve: str = "SOFR"       # name of rate curve
-    spread_bps: float = 0.0             # spread in basis points
+    spread_bps: float = 0.0             # spread over base rate in bps
+    rate_csv_path: Optional[str] = None # direct path to rate CSV (overrides registry)
 
 
 @dataclass(slots=True)
