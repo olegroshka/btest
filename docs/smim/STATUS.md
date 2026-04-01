@@ -1,14 +1,15 @@
 # SMIM Project Status
 
-> Last updated: 2026-04-01
+> Last updated: 2026-04-01 (Iteration 2 complete)
 > This is the single source of truth for current project status.
 > For detailed experiment findings: EXPERIMENT_RESULTS.md
 > For drill-down methodology and results: DRILLDOWN_PLAN.md
+> For iteration 2 plan and findings: ITERATION_2_PLAN.md
 > For paper draft: paper/smim_paper.tex
 
 ---
 
-## 1. Best Model Configuration (GOLD+)
+## 1. Best Model Configuration (PLATINUM)
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
@@ -16,35 +17,46 @@
 | Modes | K = 8 | DD-1, unrealised items |
 | Demeaning | Exponentially-weighted, halflife = 8Q | DD-5 |
 | Training window | T = 5 years (20 quarters) | DD-2 |
-| State estimation | Kalman filter, EM initialised | DD-9 |
+| State estimation | Kalman filter, **no EM for F/Q** | **E2-5b** |
+| Transition matrix | **F = 0.99 * I (regularised, not EM)** | **E2-5b** |
+| Initial state noise | **Q = 0.5 * I (larger initial Q)** | **E2-6** |
 | Observation covariance | Spherical: R = (tr(R_hat)/N) * I | DD-9 |
 | State noise adaptation | Online Q, lambda = 0.3 | DD remaining items |
 | Benchmark | Modal (alpha_filtered, not alpha_predicted) | A1 |
 
-**Performance: R² = 0.524** (mean across 10 FULL-ROLL windows, 2015-2024)
-- vs AR(1) T=10yr: +0.099, DM p=0.001, wins 10/10 windows
-- vs Random walk: +0.219
-- Peak window: W2020 R² = 0.650
+**Performance: R² = 0.543** (mean across 10 FULL-ROLL windows, 2015-2024)
+- vs AR(1) T=10yr: +0.118, wins 10/10 windows
+- vs GOLD+ (EM F): +0.019, wins 10/10 windows
+- vs Random walk: +0.238
+- Peak window: W2020 R² = 0.659
 
-**Variance decomposition**: 54% of R²=0.524 comes from per-actor mean (captured by
-EWM demeaning); 46% from spectral dynamics (DMD-Kalman). The spectral component
-(0.243) exceeds what AR(1) persistence adds beyond the mean (0.144).
+**Key insight (Iteration 2)**: EM estimation of F is counterproductive. F near-identity
+(0.99*I) with higher initial Q (0.5*I) outperforms EM-estimated F by +1.9pp across all
+10 windows. The online Q adaptation does all the temporal adaptation work; EM F estimation
+overfits to training noise. This simplifies the pipeline (no EM for F/Q needed) AND
+improves performance.
+
+**Variance decomposition**: 52% of R²=0.543 comes from per-actor mean (captured by
+EWM demeaning); 48% from spectral dynamics (DMD-Kalman). The spectral component
+(0.262) exceeds what AR(1) persistence adds beyond the mean (0.144).
 
 **Training window insight**: SMIM benefits from SHORT T (current regime structure),
-while AR(1) benefits from LONG T (more data per actor). At T=5yr: SMIM=0.524 vs
+while AR(1) benefits from LONG T (more data per actor). At T=5yr: SMIM=0.543 vs
 AR(1)=0.209. At T=10yr: SMIM=0.339 vs AR(1)=0.425. Each model at its optimal T:
-SMIM wins by +0.099.
+SMIM wins by +0.118.
 
-## 2. Performance Ladder (how we got to 0.524)
+## 2. Performance Ladder (how we got to 0.543)
 
 | Step | R² | Delta | Innovation |
 |------|-----|-------|-----------|
-| Original (T=10yr, K=3, Schur, full demean) | 0.339 | — | Baseline |
+| Original (T=10yr, K=3, Schur, full demean) | 0.339 | -- | Baseline |
 | + EWM demeaning (tau=8Q) | 0.381 | +4.2pp | Adapts to non-stationary levels |
 | + Shorter T=5yr + K=5 | 0.392 | +1.1pp | Current regime, more modes |
-| + Spherical R Kalman | 0.434 | +4.2pp | Eliminates N² overparameterisation |
+| + Spherical R Kalman | 0.434 | +4.2pp | Eliminates N^2 overparameterisation |
 | + DMD basis | 0.467 | +3.3pp | Temporal dynamics > static correlation |
 | + Online Q + K=8 | 0.524 | +5.7pp | Regime-adaptive state dynamics |
+| **+ F regularisation (F=0.99*I, no EM)** | **0.538** | **+1.4pp** | **Eliminates K^2 overparameterisation** |
+| **+ Q=0.5*I (higher initial Q)** | **0.543** | **+0.5pp** | **More room for online Q adaptation** |
 
 ## 3. Key Findings by Phase
 
@@ -85,15 +97,32 @@ SMIM wins by +0.099.
 - True zero-shot: frozen F/Q retains 103-106% of full retrain
 - D2 control test: gap survives level control (genuine structure)
 
+### Iteration 2 (Emergence & Directed Operators)
+- **F regularisation (+1.9pp)**: EM estimation of F overfits. F=0.99*I + Q=0.5*I
+  with online Q adaptation gives R²=0.543, beating GOLD+ (0.524) in all 10 windows.
+  This extends the spherical-R regularisation insight to the transition matrix.
+- **TE operator IS asymmetric** (mean 1.17) but TE-derived spectral basis is too noisy
+  for Kalman filtering. K=8 diverges; K=3 gives R²=0.36 vs GOLD+ 0.52.
+- **Granger on intensity** produces directed edges (asymmetry 1.3, density 12%)
+  but same Kalman instability at K>=5. Blended operator reaches 0.50.
+- **Economic emergence features** (dispersion, rotation, concentration) are redundant
+  with the DMD-Kalman pipeline. Best delta=-0.003. BRONZE criterion FAILS.
+- **Actor-specific loadings** hurt (-0.5pp). DMD provides sufficient loading structure.
+- **Kim filter K-means init** gives +1.4pp but from F=0.9*I effect, not regime switching.
+
 ## 4. What Does NOT Work
 
 | Component | Finding | Root Cause |
 |-----------|---------|-----------|
 | PID synergy (emergence) | CV selects weight=0 | T=20 too short for reliable PID at K=8 |
 | TDA complexity | No meaningful contribution | Same data volume limitation |
+| **Economic emergence** | **Delta=-0.003** | **Redundant with DMD-Kalman (E2-4)** |
 | Event alignment | 0/8 events | Rank normalisation absorbs event spikes |
 | Return-based intensity | R²=-0.15 | No cross-sectional dynamics to exploit |
-| Directed operators | Identical to PCA | Correlation operator is exactly symmetric |
+| **TE operator as basis** | **R²=0.36 at K=3** | **KSG TE too noisy at T=40 for spectral basis (E2-1)** |
+| **Granger intensity basis** | **Diverges at K>=5** | **Same noisy-basis Kalman instability (E2-2)** |
+| **Actor-specific loadings** | **Delta=-0.005** | **DMD basis already optimal (E2-3)** |
+| **EM estimation of F** | **Overfits by -1.9pp** | **F near-identity + online Q is strictly better (E2-5b)** |
 | Kim filter M>1 | M=2=M=3 | Symmetric EM initialisation |
 | Financials sector | R²=0.06 | asset_growth method too persistent (rho=0.70) |
 
@@ -122,6 +151,9 @@ results/
     drilldown_DD-{1..9}.parquet         drill-down experiments
     drilldown_GOLD_PP.parquet           noise augmentation
     drilldown_TRUE_ZERO_SHOT.parquet    dynamics portability
+    iter2_E2-{1..6}.parquet             iteration 2 experiments
+    iter2_E2-4b.parquet                 dispersion weighting
+    iter2_E2-5b.parquet                 F regularisation sweep
   configs/
     *.yaml                              per-experiment configs
 ```
@@ -137,9 +169,10 @@ results/
 ### Active (current, maintained)
 | File | Purpose |
 |------|---------|
-| STATUS.md | This file — single source of truth |
+| STATUS.md | This file -- single source of truth |
 | EXPERIMENT_RESULTS.md | Detailed per-experiment findings |
 | DRILLDOWN_PLAN.md | Drill-down methodology and results |
+| ITERATION_2_PLAN.md | Iteration 2 plan and findings |
 | CLAUDE.md | SMIM-specific development context |
 | DECISIONS.md | Architectural decision log |
 | paper/smim_paper.tex | Research paper draft |
