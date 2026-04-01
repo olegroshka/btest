@@ -26,6 +26,15 @@
 - vs Random walk: +0.219
 - Peak window: W2020 R² = 0.650
 
+**Variance decomposition**: 54% of R²=0.524 comes from per-actor mean (captured by
+EWM demeaning); 46% from spectral dynamics (DMD-Kalman). The spectral component
+(0.243) exceeds what AR(1) persistence adds beyond the mean (0.144).
+
+**Training window insight**: SMIM benefits from SHORT T (current regime structure),
+while AR(1) benefits from LONG T (more data per actor). At T=5yr: SMIM=0.524 vs
+AR(1)=0.209. At T=10yr: SMIM=0.339 vs AR(1)=0.425. Each model at its optimal T:
+SMIM wins by +0.099.
+
 ## 2. Performance Ladder (how we got to 0.524)
 
 | Step | R² | Delta | Innovation |
