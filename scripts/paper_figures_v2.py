@@ -194,12 +194,14 @@ def fig_basis_rotation():
 
     fig, ax1 = plt.subplots(figsize=(10, 4.5))
 
-    # Rotation bars — red bars scaled to 80% height to distinguish from data bars
+    # Rotation bars — all bars at full height, uniform colour
+    ax1.bar(dates, rotation, width=80, color=ACCENT, alpha=0.8, zorder=3, edgecolor="none")
+
+    # Red vertical event lines at 80% of bar height for high-rotation quarters
     threshold = 32
-    is_high = rotation > threshold
-    colors = [RED if h else ACCENT for h in is_high]
-    display_heights = np.where(is_high, rotation * 0.80, rotation)
-    ax1.bar(dates, display_heights, width=80, color=colors, alpha=0.8, zorder=3, edgecolor="none")
+    for i, (d, r) in enumerate(zip(dates, rotation)):
+        if r > threshold:
+            ax1.plot([d, d], [0, r * 0.80], color=RED, linewidth=2.5, zorder=4, solid_capstyle="round")
 
     # Mean line
     mean_rot = rotation.mean()
