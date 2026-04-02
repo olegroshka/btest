@@ -376,19 +376,19 @@ Per-actor AR(1) is the strongest naive baseline ($R^2 = 0.425$), reflecting the 
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lcccc@{}}
 \toprule
-Training length & SMIM $R^2$ & AR(1) $R^2$ & SMIM $-$ AR(1) \\
+Training length & SMIM frozen $R^2$ & SMIM rolling $R^2$ & AR(1) $R^2$ & Best SMIM $-$ AR(1) \\
 \midrule
-$T = 5$ years & \textbf{0.543} & 0.209 & +0.334 \\
-$T = 8$ years & 0.402 & 0.519 & $-0.117$ \\
-$T = 10$ years & 0.339 & \textbf{0.425} & $-0.086$ \\
-$T = 15$ years & 0.340 & 0.430 & $-0.090$ \\
+$T = 5$ years & 0.543 & \textbf{0.691} & 0.209 & +0.482 \\
+$T = 8$ years & 0.402 & --- & 0.519 & $-0.117$ \\
+$T = 10$ years & 0.339 & --- & \textbf{0.425} & $-0.086$ \\
+$T = 15$ years & 0.340 & --- & 0.430 & $-0.090$ \\
 \midrule
-Each at optimal $T$ & \textbf{0.543} ($T\!=\!5$) & 0.425 ($T\!=\!10$) & \textbf{+0.118} \\
+Each at optimal $T$ & 0.543 ($T\!=\!5$) & \textbf{0.691} ($T\!=\!5$) & 0.425 ($T\!=\!10$) & \textbf{+0.266} \\
 \bottomrule
 \end{tabular}
-\caption{Same-$T$ comparison (frozen-basis SMIM). SMIM dominates at short $T$; AR(1) at long $T$. At each model's optimal $T$, SMIM leads by $+0.118$.}
+\caption{Same-$T$ comparison. Frozen SMIM dominates at short $T$; AR(1) at long $T$. Rolling SMIM at $T\!=\!5$ exceeds AR(1) at any $T$ by $+0.266$---the quarterly basis update exploits the same ``short $T$ advantage'' while continuously refreshing the spectral structure.}
 \label{tab:fairness}
 \end{table}
 
