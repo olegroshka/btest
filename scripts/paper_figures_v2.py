@@ -359,13 +359,94 @@ def fig_schematic():
 # ── Regenerate unchanged figures from original script ─────────────────────────
 # Import and call original functions for unchanged figures
 
+def fig_ablation_extended():
+    """Extended ablation heatmap: original depths + regularised + rolling."""
+    windows = [f"W{ty}" for ty in range(2015, 2025)]
+
+    # Original B1 ablation (pre-regularisation)
+    l1 = [0.326, 0.348, 0.129, 0.410, 0.425, 0.435, 0.215, 0.315, 0.266, 0.408]
+    l2 = [0.283, 0.292, 0.088, 0.253, 0.387, 0.353, 0.286, 0.276, 0.341, 0.355]
+    l3 = [0.286, 0.141, 0.117, 0.293, 0.331, 0.406, 0.274, 0.273, 0.324, 0.363]
+    l5 = [0.286, 0.279, 0.117, 0.293, 0.385, 0.406, 0.284, 0.282, 0.341, 0.376]
+
+    # Baselines and improved configs
+    ar1 = [0.335, 0.295, 0.335, 0.489, 0.472, 0.541, 0.309, 0.472, 0.482, 0.516]
+    plat = [0.521, 0.409, 0.433, 0.633, 0.532, 0.650, 0.414, 0.572, 0.481, 0.589]
+    rolling = [0.667, 0.611, 0.664, 0.689, 0.682, 0.764, 0.645, 0.752, 0.688, 0.750]
+
+    row_labels = [
+        "L1: Graph factors\n(no Kalman)",
+        "L2: + Kalman\n(unregularised R)",
+        "L3: + Regime\nswitching",
+        "L5: Full original\npipeline",
+        "AR(1) per actor\n(T=10yr baseline)",
+        "PLATINUM\n(dual reg, frozen)",
+        "Rolling DMD\n(quarterly update)",
+    ]
+    data = np.array([l1, l2, l3, l5, ar1, plat, rolling])
+    n_rows, n_cols = data.shape
+
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+
+    # Custom diverging colormap: red (bad) -> white (AR1 level) -> green (good)
+    from matplotlib.colors import LinearSegmentedColormap
+    cmap = LinearSegmentedColormap.from_list("ablation",
+        [(0.0, "#CC3333"), (0.35, "#FFCC66"), (0.55, "#FFFFCC"), (0.75, "#99CC99"), (1.0, "#1A7A6D")])
+
+    im = ax.imshow(data, cmap=cmap, aspect="auto", vmin=0.0, vmax=0.80)
+
+    # Horizontal divider between diagnosis (rows 0-3) and solution (rows 4-6)
+    ax.axhline(3.5, color="black", linewidth=2.5, zorder=5)
+
+    # Grid lines between all rows
+    for i in range(n_rows - 1):
+        if i != 3:
+            ax.axhline(i + 0.5, color="white", linewidth=1.5, zorder=5)
+
+    ax.set_xticks(range(n_cols))
+    ax.set_xticklabels(windows, fontsize=8)
+    ax.set_yticks(range(n_rows))
+    ax.set_yticklabels(row_labels, fontsize=8)
+
+    # Value annotations
+    for i in range(n_rows):
+        for j in range(n_cols):
+            val = data[i, j]
+            # Use white text on dark cells, black on light
+            color = "white" if val < 0.20 or val > 0.60 else "black"
+            fontweight = "bold" if i >= 5 else "normal"
+            ax.text(j, i, f"{val:.2f}", ha="center", va="center",
+                    fontsize=7, color=color, fontweight=fontweight)
+
+    # Mean column on right
+    for i in range(n_rows):
+        mean_val = data[i].mean()
+        fontweight = "bold" if i >= 5 else "normal"
+        ax.text(n_cols + 0.3, i, f"{mean_val:.3f}", ha="left", va="center",
+                fontsize=8, fontweight=fontweight, color=ACCENT if i >= 5 else GREY)
+
+    ax.text(n_cols + 0.3, -0.7, "Mean", ha="left", fontsize=8, fontweight="bold", color=ACCENT)
+
+    # Phase labels
+    ax.text(-0.5, 1.5, "Problem\ndiagnosis", ha="right", va="center", fontsize=8,
+            color=RED, fontweight="bold", rotation=90, transform=ax.transData)
+    ax.text(-0.5, 5.0, "Solution", ha="right", va="center", fontsize=8,
+            color=TEAL, fontweight="bold", rotation=90, transform=ax.transData)
+
+    cbar = fig.colorbar(im, ax=ax, shrink=0.8, pad=0.12)
+    cbar.set_label("OOS R$^2$", fontsize=9)
+
+    ax.set_title("Component Ablation: From Unregularised Kalman to Rolling DMD",
+                 fontweight="bold", color=ACCENT, fontsize=11)
+    fig.tight_layout()
+    save(fig, "fig4_ablation")
+
+
 def regenerate_unchanged():
-    """Regenerate figures that don't change (4, 5, 6, 7, 8, 9, 10)."""
-    # Add project root to path and import original
+    """Regenerate figures that don't change (5, 6, 7, 8, 9, 10)."""
     sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
     try:
         import paper_figures as pf_orig
-        pf_orig.fig_ablation()
         pf_orig.fig_spectral()
         pf_orig.fig_regularisation()
         pf_orig.fig_robustness()
@@ -384,6 +465,7 @@ def main():
     fig_schematic()
     fig_ladder()
     fig_per_window()
+    fig_ablation_extended()
     fig_variance()
     fig_basis_rotation()
 

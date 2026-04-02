@@ -464,12 +464,12 @@ We evaluate five pipeline depths to determine which components justify their com
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{img/fig4_ablation.pdf}
-\caption{Component ablation heatmap. Each cell shows out-of-sample $R^2$ for a given depth (row) and test window (column). L1 (graph factors only) outperforms L2--L4 on average.}
+\includegraphics[width=\textwidth]{img/fig4_ablation.pdf}
+\caption{Extended component ablation heatmap. Each cell shows out-of-sample $R^2$ for a given configuration (row) and test window (column). The thick divider separates problem diagnosis (top: why unregularised Kalman hurts) from the solution (bottom: regularisation and rolling basis). Bold mean values on the right show the progression from L1 (0.328) through the AR(1) baseline (0.425) to rolling DMD (0.691).}
 \label{fig:ablation}
 \end{figure}
 
-The ablation reveals a non-monotonic pattern: L1 (graph-factor OLS, $R^2 = 0.328$) outperforms L2 (+ Kalman, $R^2 = 0.291$) and L3 (+ regime switching, $R^2 = 0.281$). The Kalman filter \emph{hurts} at these parameter settings because the unregularised $R$ overfits. Only with dual regularisation does the Kalman filter add value, reaching $R^2 = 0.543$ (frozen basis) or $R^2 = 0.691$ (rolling basis). This finding motivated the regularisation investigation that produced the paper's core technical contribution.
+The ablation reveals a non-monotonic pattern in the upper block: L1 (graph-factor OLS, $R^2 = 0.328$) outperforms L2 (+ Kalman, $R^2 = 0.291$) and L3 (+ regime switching, $R^2 = 0.281$). The Kalman filter \emph{hurts} because the unregularised $R$ overfits. The lower block shows the resolution: dual regularisation rescues the Kalman filter (PLATINUM, $R^2 = 0.523$), and rolling basis update captures the structural evolution that the frozen basis misses ($R^2 = 0.691$).
 
 \subsection{Spectral Method Comparison}
 \label{sec:spectral}
