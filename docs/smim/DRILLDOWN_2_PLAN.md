@@ -366,7 +366,84 @@ on daily, the conclusion is definitive: cross-sectional investment dynamics
 are fundamentally linear with 8 modes, dual regularisation is optimal, and
 emergence is not a feature of this system. This IS a publishable finding.
 
-## 11. What We Do NOT Attempt
+## 11. Sprint 1 Results (2026-04-02)
+
+### V1: Extended DMD (Koopman on Alpha) -- NEGATIVE
+
+All EDMD configurations are WORSE than PLATINUM:
+
+| Config | P | T/P | Mean R^2 | Delta vs PLATINUM |
+|--------|---|-----|----------|-------------------|
+| PLATINUM (baseline) | -- | -- | 0.543 | -- |
+| EDMD degree 2 full | 44 | 0.45 | 0.192 | -0.351 |
+| EDMD degree 3 full | 164 | 0.12 | 0.302 | -0.241 |
+| EDMD degree 2 diag | 16 | 1.25 | -2.114 | -2.657 |
+
+Even 70/30 blends with PLATINUM degrade performance (0.51 vs 0.54).
+
+**Root cause**: T=20 quarterly observations is too few for stable Koopman
+operator estimation, even at P=16. Multi-step prediction (4 quarters)
+compounds small estimation errors exponentially. The quadratic terms
+alpha_j * alpha_k are noise-dominated at this sample size.
+
+**Interpretation**: STRONG evidence for H1. Nonlinear mode coupling is
+not detectable at quarterly frequency because the estimation problem is
+underdetermined. This does NOT mean nonlinear structure is absent -- it
+means T=20 cannot support its estimation. At daily T=1260, T/P=28.6
+for P=44, which is well-conditioned.
+
+### V3: Multi-Resolution DMD Divergence -- MIXED (informative null)
+
+Subspace angles between fast (2yr) and slow (5yr) DMD bases:
+
+| Fast window | K | Mean angle | Std | Range |
+|-------------|---|-----------|-----|-------|
+| 1yr | 5 | 45.4 deg | 8.1 | 31-55 |
+| 2yr | 5 | 47.5 deg | 11.5 | 23-61 |
+| 3yr | 5 | 47.5 deg | 9.3 | 33-62 |
+
+The bases ARE substantially different across timescales (47 degrees is
+more than halfway to orthogonal). However:
+
+- V3-2: Angle does NOT predict R^2 (Spearman r=0.19, p=0.60)
+- V3-2 lag: Angle(t) does NOT predict R^2(t+1) (r=0.07, p=0.87)
+- V3-3: Angle-weighted prediction HURTS in all configurations
+
+**Interpretation**: The 47-degree angle is close to the RANDOM expectation
+for subspace angle between two independently estimated K=5 bases from
+T=8 and T=20 observations respectively. With such short samples, DMD
+estimation noise dominates genuine structural change. The angles likely
+reflect estimation uncertainty, not multi-scale emergence.
+
+**To resolve**: at daily frequency, the 2yr window has T=504 (not 8Q=8).
+DMD estimation is much more stable. Any remaining angle > 15 degrees
+would be genuine structural change, not estimation noise.
+
+### Sprint 1 Verdict
+
+Both venues produce NEGATIVE results on quarterly data, but for the
+SAME reason: T=20 is too few for ANY method that needs to estimate
+structure beyond simple linear regression. This is H1 confirmed:
+**the data is too sparse for nonlinear/emergence detection.**
+
+The results STRENGTHEN the case for Venue 4 (daily frequency). The
+PLATINUM linear pipeline is at the ceiling of what quarterly data can
+support. To go further, we need more temporal resolution.
+
+### Key numbers for the paper
+
+1. EDMD(deg2, P=44) at quarterly: R^2=0.19 vs linear DMD: 0.54.
+   **Nonlinear lifting hurts by -35pp at T=20.**
+2. Subspace angle between 2yr/5yr DMD: mean 47.5 degrees.
+   **Consistent with estimation noise, not structural emergence.**
+3. Angle-R^2 correlation: r=0.19, p=0.60.
+   **No predictive relationship between scale divergence and accuracy.**
+
+These support the paper's narrative: "quarterly investment intensity
+dynamics are well-described by a linear 8-mode spectral model with
+dual regularisation. Nonlinear extensions are data-starved at T=20."
+
+## 12. What We Do NOT Attempt
 
 - Do NOT skip Venues 1-3 for Venue 4. Quick experiments first.
 - Do NOT use pure return-based intensity (proven dead end).
