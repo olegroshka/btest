@@ -351,7 +351,7 @@ def fig_schematic():
         ax.text(bx, pipeline_y - bh/2 - 0.2, label, ha="center", fontsize=7,
                 color=GREY, fontstyle="italic", va="top")
 
-    ax.set_title("DMD-Kalman Pipeline with Dual Regularisation and Rolling Spectral Basis",
+    ax.set_title("SMIM Pipeline: Dual Regularisation with Rolling Spectral Basis",
                   fontweight="bold", color=ACCENT, fontsize=12, pad=15)
     fig.tight_layout()
     save(fig, "fig1_schematic")
@@ -381,7 +381,7 @@ def fig_ablation_extended():
         "L3: + Regime\nswitching",
         "L5: Full original\npipeline",
         "AR(1) per actor\n(T=10yr baseline)",
-        "DMD-Kalman\n(dual reg., static basis)",
+        "SMIM\n(dual reg., static basis)",
         "Rolling DMD\n(quarterly update)",
     ]
     data = np.array([l1, l2, l3, l5, ar1, plat, rolling])

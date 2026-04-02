@@ -362,8 +362,8 @@ Rank & Model & Mean $R^2$ & Std & MAE \\
 7 & DFM $K\!=\!10$ & 0.249 & 0.172 & 0.185 \\
 8 & Sector mean & 0.094 & 0.040 & 0.236 \\
 \midrule
-& \textbf{DMD-Kalman, static basis} & \textbf{0.543} & \textbf{0.075} & --- \\
-& \textbf{DMD-Kalman, rolling basis} & \textbf{0.691} & \textbf{0.050} & --- \\
+& \textbf{SMIM (static basis)} & \textbf{0.543} & \textbf{0.075} & --- \\
+& \textbf{SMIM (rolling basis)} & \textbf{0.691} & \textbf{0.050} & --- \\
 \bottomrule
 \end{tabular}
 \caption{Baseline comparison. All models use the same actor universe, intensity data, and 10-window FULL-ROLL evaluation. SMIM uses $T\!=\!5$yr, $K\!=\!8$, DMD, dual regularisation, online $Q$. The rolling variant recomputes the DMD basis each quarter.}
@@ -469,7 +469,7 @@ We evaluate five pipeline depths to determine which components justify their com
 \label{fig:ablation}
 \end{figure}
 
-The ablation reveals a non-monotonic pattern in the upper block: L1 (graph-factor OLS, $R^2 = 0.328$) outperforms L2 (+ Kalman, $R^2 = 0.291$) and L3 (+ regime switching, $R^2 = 0.281$). The Kalman filter \emph{hurts} because the unregularised $R$ overfits. The lower block shows the resolution: dual regularisation rescues the Kalman filter (DMD-Kalman with static basis, $R^2 = 0.523$), and rolling basis update captures the structural evolution that the static basis misses ($R^2 = 0.691$).
+The ablation reveals a non-monotonic pattern in the upper block: L1 (graph-factor OLS, $R^2 = 0.328$) outperforms L2 (+ Kalman, $R^2 = 0.291$) and L3 (+ regime switching, $R^2 = 0.281$). The Kalman filter \emph{hurts} because the unregularised $R$ overfits. The lower block shows the resolution: dual regularisation rescues the Kalman filter (SMIM with static basis, $R^2 = 0.523$), and rolling basis update captures the structural evolution that the static basis misses ($R^2 = 0.691$).
 
 \subsection{Spectral Method Comparison}
 \label{sec:spectral}
@@ -554,8 +554,8 @@ An ablation confirms that the improvement is from basis update, not from resetti
 \toprule
 Configuration & Mean $R^2$ & Std & vs AR(1) & Wins \\
 \midrule
-DMD-Kalman, rolling basis & \textbf{0.691} & 0.050 & +0.266 & 10/10 \\
-DMD-Kalman, static basis & 0.543 & 0.075 & +0.118 & 10/10 \\
+SMIM (rolling basis) & \textbf{0.691} & 0.050 & +0.266 & 10/10 \\
+SMIM (static basis) & 0.543 & 0.075 & +0.118 & 10/10 \\
 AR(1) per actor ($T\!=\!10$yr) & 0.425 & 0.094 & --- & --- \\
 \bottomrule
 \end{tabular}
