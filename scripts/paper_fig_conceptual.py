@@ -180,17 +180,19 @@ def main():
             ax2.text(4.3, y - 0.17, delta, fontsize=8, color=GREEN,
                      ha="left", fontweight="bold")
 
-    # Rolling basis update loop (curved arrow from bottom back to DMD)
+    # Rolling basis update loop (curved arrow from Online Q centre-left back to DMD centre-left)
+    # Start: left side of Online Q box (x = 2.0 - bw/2, y = -0.4)
+    # End:   left side of DMD box      (x = 2.0 - bw/2, y = 2.2)
+    loop_x = 2.0 - bw / 2  # left edge of boxes
     ax2.annotate(
-        "", xy=(0.0, 2.2 + bh / 2 + 0.05),
-        xytext=(0.0, -0.4 - bh / 2 - 0.05),
+        "", xy=(loop_x, 2.2),
+        xytext=(loop_x, -0.4),
         arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=2.2,
-                         connectionstyle="arc3,rad=-0.6"),
+                         connectionstyle="arc3,rad=-0.5"),
         zorder=5,
     )
-    ax2.text(-0.5, 0.9, "Rolling\nbasis\nupdate",
-             ha="center", fontsize=7.5, color=TEAL, fontweight="bold",
-             rotation=0)
+    ax2.text(loop_x - 0.7, 0.9, "Rolling\nbasis\nupdate",
+             ha="center", fontsize=7.5, color=TEAL, fontweight="bold")
 
     # Output gap box — positioned with enough clearance
     gap_y = -1.6
