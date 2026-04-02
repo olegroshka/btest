@@ -1,51 +1,54 @@
 # SMIM Project Status
 
-> Last updated: 2026-04-01 (Iteration 2 complete)
+> Last updated: 2026-04-02 (Drilldown #2 V2 complete)
 > This is the single source of truth for current project status.
 > For detailed experiment findings: EXPERIMENT_RESULTS.md
-> For drill-down methodology and results: DRILLDOWN_PLAN.md
+> For drill-down methodology and results: DRILLDOWN_PLAN.md, DRILLDOWN_2_PLAN.md
 > For iteration 2 plan and findings: ITERATION_2_PLAN.md
 > For paper draft: paper/smim_paper.tex
 
 ---
 
-## 1. Best Model Configuration (PLATINUM)
+## 1. Best Model Configuration (DIAMOND -- rolling basis)
 
 | Parameter | Value | Source |
 |-----------|-------|--------|
 | Decomposition | Dynamic Mode Decomposition (DMD) | DD-3, B2 |
 | Modes | K = 8 | DD-1, unrealised items |
 | Demeaning | Exponentially-weighted, halflife = 8Q | DD-5 |
-| Training window | T = 5 years (20 quarters) | DD-2 |
-| State estimation | Kalman filter, **no EM for F/Q** | **E2-5b** |
-| Transition matrix | **F = 0.99 * I (regularised, not EM)** | **E2-5b** |
-| Initial state noise | **Q = 0.5 * I (larger initial Q)** | **E2-6** |
+| Training window | T = 5 years (20 quarters), **rolling 1Q** | **V2-1** |
+| Basis update | **Recompute DMD each quarter with latest data** | **V2-1** |
+| Transition matrix | F = 0.99 * I (regularised, not EM) | E2-5b |
+| Initial state noise | Q = 0.5 * I (larger initial Q) | E2-6 |
 | Observation covariance | Spherical: R = (tr(R_hat)/N) * I | DD-9 |
 | State noise adaptation | Online Q, lambda = 0.3 | DD remaining items |
 | Benchmark | Modal (alpha_filtered, not alpha_predicted) | A1 |
 
-**Performance: R² = 0.543** (mean across 10 FULL-ROLL windows, 2015-2024)
-- vs AR(1) T=10yr: +0.118, wins 10/10 windows
-- vs GOLD+ (EM F): +0.019, wins 10/10 windows
-- vs Random walk: +0.238
-- Peak window: W2020 R² = 0.659
+**Performance: R² = 0.691** (mean across 10 FULL-ROLL windows, 2015-2024)
+- vs PLATINUM (frozen basis): +0.143, wins 10/10 windows
+- vs AR(1) T=10yr: +0.266, wins 10/10 windows
+- vs Random walk: +0.386
+- Peak window: W2020 R² = 0.764
 
-**Key insight (Iteration 2)**: EM estimation of F is counterproductive. F near-identity
-(0.99*I) with higher initial Q (0.5*I) outperforms EM-estimated F by +1.9pp across all
-10 windows. The online Q adaptation does all the temporal adaptation work; EM F estimation
-overfits to training noise. This simplifies the pipeline (no EM for F/Q needed) AND
-improves performance.
+**Key insight (Drilldown 2)**: The spectral basis rotates 26 deg/quarter continuously.
+A frozen basis misses this rotation. Quarterly basis reestimation (rolling DMD) captures
+the structural evolution and provides +14.3pp improvement. Ablation confirms this is
+from the basis update, not from state reset (which hurts by -3pp).
 
-**Variance decomposition**: 52% of R²=0.543 comes from per-actor mean (captured by
-EWM demeaning); 48% from spectral dynamics (DMD-Kalman). The spectral component
-(0.262) exceeds what AR(1) persistence adds beyond the mean (0.144).
+**Structural finding**: The cross-sectional investment structure is consistently
+8-dimensional across 60 quarterly windows (2010-2024) but the spectral directions
+continuously rotate. No mode births or deaths occur. High-rotation quarters align with
+macro events: Euro crisis (2012-Q3, 41 deg), tariff war (2018-Q2, 37 deg), Fed
+tightening (2022-Q3, 38 deg).
 
-**Training window insight**: SMIM benefits from SHORT T (current regime structure),
-while AR(1) benefits from LONG T (more data per actor). At T=5yr: SMIM=0.543 vs
-AR(1)=0.209. At T=10yr: SMIM=0.339 vs AR(1)=0.425. Each model at its optimal T:
-SMIM wins by +0.118.
+### Static (frozen) configuration (PLATINUM)
 
-## 2. Performance Ladder (how we got to 0.543)
+For reference, the static configuration with frozen basis:
+
+**R² = 0.543** (mean across 10 FULL-ROLL windows)
+- vs AR(1) T=10yr: +0.118
+
+## 2. Performance Ladder (how we got to 0.691)
 
 | Step | R² | Delta | Innovation |
 |------|-----|-------|-----------|
@@ -55,8 +58,9 @@ SMIM wins by +0.118.
 | + Spherical R Kalman | 0.434 | +4.2pp | Eliminates N^2 overparameterisation |
 | + DMD basis | 0.467 | +3.3pp | Temporal dynamics > static correlation |
 | + Online Q + K=8 | 0.524 | +5.7pp | Regime-adaptive state dynamics |
-| **+ F regularisation (F=0.99*I, no EM)** | **0.538** | **+1.4pp** | **Eliminates K^2 overparameterisation** |
-| **+ Q=0.5*I (higher initial Q)** | **0.543** | **+0.5pp** | **More room for online Q adaptation** |
+| + F regularisation (F=0.99*I, no EM) | 0.538 | +1.4pp | Eliminates K^2 overparameterisation |
+| + Q=0.5*I (higher initial Q) | 0.543 | +0.5pp | More room for online Q adaptation |
+| **+ Rolling basis (recompute DMD each Q)** | **0.691** | **+14.8pp** | **Tracks 26 deg/Q basis rotation** |
 
 ## 3. Key Findings by Phase
 

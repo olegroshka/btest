@@ -419,29 +419,79 @@ reflect estimation uncertainty, not multi-scale emergence.
 DMD estimation is much more stable. Any remaining angle > 15 degrees
 would be genuine structural change, not estimation noise.
 
+### V2: Recursive / Streaming DMD -- MAJOR POSITIVE RESULT
+
+**V2-1: Rolling DMD beats frozen by +14.3pp, wins 10/10 windows.**
+
+| Window | Frozen R^2 | Rolling R^2 | Delta |
+|--------|-----------|------------|-------|
+| W2015 | 0.561 | 0.667 | +10.6pp |
+| W2016 | 0.432 | 0.611 | +17.8pp |
+| W2017 | 0.478 | 0.664 | +18.5pp |
+| W2018 | 0.652 | 0.689 | +3.7pp |
+| W2019 | 0.559 | 0.682 | +12.4pp |
+| W2020 | 0.659 | 0.764 | +10.5pp |
+| W2021 | 0.439 | 0.645 | +20.5pp |
+| W2022 | 0.601 | 0.752 | +15.1pp |
+| W2023 | 0.493 | 0.688 | +19.5pp |
+| W2024 | 0.611 | 0.750 | +13.9pp |
+| **MEAN** | **0.549** | **0.691** | **+14.3pp** |
+
+**Ablation**: State reset alone HURTS (-1.8 to -4.3pp). The improvement
+comes entirely from the BASIS UPDATE. The Kalman filter's accumulated
+state is valuable; the basis rotation (26 deg/Q) is what it cannot track.
+
+**V2-2: K_effective is ALWAYS 8.** Zero mode birth/death across all 60
+rolling quarters (2010-2024). The spectral structure is fixed-dimensional.
+
+**V2-3: Basis rotation 25.8 deg/Q mean (range 9-41 deg).** The 8 modes
+continuously reorient. High-rotation quarters align with macro events:
+2012-Q3 (41 deg, Euro crisis), 2018-Q2 (37 deg, tariffs), 2022-Q3
+(38 deg, Fed tightening).
+
+**V2-4: Zero emergence events.** No mode births, no mode deaths. The
+structure rotates but doesn't grow or shrink.
+
+**Interpretation**: The cross-sectional investment structure is
+consistently 8-dimensional but the spectral directions continuously
+rotate (~26 deg/Q). The Kalman filter tracks state WITHIN the basis
+but cannot track the basis itself. Quarterly basis reestimation
+captures this rotation and provides +14.3pp improvement.
+
+This is NOT emergence (no new modes appear), but it IS structural
+evolution that matters enormously for prediction.
+
 ### Sprint 1 Verdict
 
-Both venues produce NEGATIVE results on quarterly data, but for the
-SAME reason: T=20 is too few for ANY method that needs to estimate
-structure beyond simple linear regression. This is H1 confirmed:
-**the data is too sparse for nonlinear/emergence detection.**
+V1 and V3 are NEGATIVE on quarterly data — nonlinear lifting and
+multi-resolution divergence fail because T=20 is too few. But V2
+reveals a massive positive finding: **rolling basis update gives
+R^2=0.691, the highest OOS R^2 we've ever achieved.**
 
-The results STRENGTHEN the case for Venue 4 (daily frequency). The
-PLATINUM linear pipeline is at the ceiling of what quarterly data can
-support. To go further, we need more temporal resolution.
+This changes the picture fundamentally. The ceiling is not at 0.543
+(PLATINUM frozen) but at least 0.691 (PLATINUM rolling). The remaining
+30.9% unexplained variance is the new target.
 
 ### Key numbers for the paper
 
-1. EDMD(deg2, P=44) at quarterly: R^2=0.19 vs linear DMD: 0.54.
-   **Nonlinear lifting hurts by -35pp at T=20.**
-2. Subspace angle between 2yr/5yr DMD: mean 47.5 degrees.
-   **Consistent with estimation noise, not structural emergence.**
-3. Angle-R^2 correlation: r=0.19, p=0.60.
-   **No predictive relationship between scale divergence and accuracy.**
+1. **Rolling DMD R^2=0.691, +14.3pp over frozen, 10/10 wins.**
+   Basis rotation (26 deg/Q) carries exploitable information.
+   Quarterly reestimation is essential. (V2-1)
 
-These support the paper's narrative: "quarterly investment intensity
-dynamics are well-described by a linear 8-mode spectral model with
-dual regularisation. Nonlinear extensions are data-starved at T=20."
+2. **Spectral structure is fixed 8-dimensional but rotating.**
+   K_effective=8 in all 60 quarters. No mode birth/death.
+   High rotation aligns with macro events. (V2-2/V2-3/V2-4)
+
+3. EDMD(deg2, P=44) at quarterly: R^2=0.19 vs linear DMD: 0.54.
+   **Nonlinear lifting hurts by -35pp at T=20.** (V1)
+
+4. Subspace angle between 2yr/5yr DMD: mean 47.5 degrees.
+   **Consistent with estimation noise at T=8.** (V3)
+
+5. **Emergence absent**: no mode birth/death (V2-4), no nonlinear
+   mode coupling (V1), no predictive scale divergence (V3).
+   Cross-sectional dynamics are well-described by a LINEAR 8-mode
+   model that ROTATES continuously.
 
 ## 12. What We Do NOT Attempt
 
