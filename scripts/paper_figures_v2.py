@@ -285,9 +285,9 @@ def fig_variance():
 # ── Figure 1: Pipeline Schematic (updated) ──────────────────────────────────
 
 def fig_schematic():
-    fig, ax = plt.subplots(figsize=(12, 5.5))
+    fig, ax = plt.subplots(figsize=(12, 6.0))
     ax.set_xlim(-0.5, 12)
-    ax.set_ylim(-1.0, 4.2)
+    ax.set_ylim(-1.5, 4.5)
     ax.axis("off")
 
     boxes = [
