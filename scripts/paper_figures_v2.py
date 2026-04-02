@@ -202,7 +202,8 @@ def fig_basis_rotation():
     mean_rot = rotation.mean()
     ax1.axhline(mean_rot, color=GREY, linestyle="--", linewidth=1.2, zorder=2)
     ax1.text(dates.iloc[-1] + pd.Timedelta(days=60), mean_rot,
-             f"mean={mean_rot:.0f} deg", fontsize=8, color=GREY, va="center")
+             f" mean={mean_rot:.0f} deg", fontsize=8, color=GREY, va="center",
+             bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.9))
 
     # Event annotations
     events = {
