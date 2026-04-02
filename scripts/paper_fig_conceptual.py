@@ -132,61 +132,76 @@ def main():
             ha="center", fontsize=8.5, color=GREY, fontstyle="italic")
 
     # ══════════════════════════════════════════════════════════════════════
-    # PANEL (b) — Processing Pipeline
+    # PANEL (b) — Processing Pipeline (updated for dual reg + rolling DMD)
     # ══════════════════════════════════════════════════════════════════════
     ax2 = ax_r
     ax2.set_xlim(-0.5, 6.0)
-    ax2.set_ylim(-2.2, 6.0)
+    ax2.set_ylim(-3.5, 6.0)
     ax2.axis("off")
     ax2.text(2.2, 5.7, "(b)  Processing Pipeline",
              ha="center", fontsize=12, fontweight="bold", color=ACCENT)
 
+    TEAL = "#1A7A6D"
+
     stages = [
         (2.0, 4.8, "Intensity Panel\n$y_{i,t} \\in [0,1]$,  $N \\times T$",
          L2_BG, ACCENT),
-        (2.0, 3.4, "EWM Demeaning\n$\\tilde{y} = y - \\hat{\\mu}$,  $\\tau = 8$Q",
+        (2.0, 3.5, "EWM Demeaning\n$\\tilde{y} = y - \\hat{\\mu}$,  $\\tau = 8$Q",
          PIPE_GREEN, GREEN),
-        (2.0, 2.0, "DMD Decomposition\n$Y' \\approx AU$,  $K = 8$ modes",
+        (2.0, 2.2, "DMD Decomposition\n$Y' \\approx AU$,  $K = 8$ modes",
          PIPE_ORANGE, ORANGE),
-        (2.0, 0.6, "Kalman Filter\n$R = cI$  (spherical)",
+        (2.0, 0.9, "Kalman Filter (dual reg.)\n$R = cI$,  $F = 0.99I$,  $Q_0 = 0.5I$",
          L2_BG, ACCENT),
-        (2.0, -0.8, "Online $Q$ Adaptation\n$\\lambda = 0.3$",
+        (2.0, -0.4, "Online $Q$ Adaptation\n$\\lambda = 0.3$",
          PIPE_ORANGE, ORANGE),
     ]
 
-    bw, bh = 3.6, 0.9
+    bw, bh = 3.8, 0.85
     for x, y, text, bg, ec in stages:
-        box(ax2, x, y, bw, bh, text, bg, ec, fs=8.5, bold=False)
+        box(ax2, x, y, bw, bh, text, bg, ec, fs=8, bold=False)
 
     for i in range(len(stages) - 1):
         y1 = stages[i][1] - bh / 2
         y2 = stages[i + 1][1] + bh / 2
         arrow(ax2, 2.0, y1, 2.0, y2, ACCENT, lw=1.8)
 
-    # R² annotations
+    # R^2 annotations (updated for dual reg + rolling)
     r2_data = [
         (4.8, "0.339", ""),
-        (3.4, "0.381", "+4.2pp"),
-        (2.0, "0.392", "+1.1pp"),
-        (0.6, "0.434", "+4.2pp"),
-        (-0.8, "0.524", "+5.7pp"),
+        (3.5, "0.381", "+4.2pp"),
+        (2.2, "0.392", "+1.1pp"),
+        (0.9, "0.543", "+15.1pp"),
+        (-0.4, "0.691", "+14.8pp"),
     ]
     for y, r2, delta in r2_data:
-        ax2.text(4.2, y + 0.12, f"$R^2 = {r2}$", fontsize=8, color=GREY,
+        ax2.text(4.3, y + 0.1, f"$R^2 = {r2}$", fontsize=7.5, color=GREY,
                  ha="left", fontstyle="italic")
         if delta:
-            ax2.text(4.2, y - 0.18, delta, fontsize=8.5, color=GREEN,
+            ax2.text(4.3, y - 0.17, delta, fontsize=8, color=GREEN,
                      ha="left", fontweight="bold")
 
-    # Output gap box
-    arrow(ax2, 2.0, -0.8 - bh / 2, 2.0, -1.65, RED, lw=2.2)
-    box(ax2, 2.0, -1.9, 3.8, 0.5,
-        "$\\Delta_{i,t} = y_{i,t} - (\\hat{\\mu}_i + U\\alpha_t)$",
-        GAP_BG, RED, fs=9.5, bold=True)
+    # Rolling basis update loop (curved arrow from bottom back to DMD)
+    ax2.annotate(
+        "", xy=(0.0, 2.2 + bh / 2 + 0.05),
+        xytext=(0.0, -0.4 - bh / 2 - 0.05),
+        arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=2.2,
+                         connectionstyle="arc3,rad=-0.6"),
+        zorder=5,
+    )
+    ax2.text(-0.5, 0.9, "Rolling\nbasis\nupdate",
+             ha="center", fontsize=7.5, color=TEAL, fontweight="bold",
+             rotation=0)
 
-    # Save
-    fig.savefig(IMG_DIR / "fig1_conceptual.pdf")
-    fig.savefig(IMG_DIR / "fig1_conceptual.png")
+    # Output gap box — positioned with enough clearance
+    gap_y = -1.6
+    arrow(ax2, 2.0, -0.4 - bh / 2, 2.0, gap_y + 0.35, RED, lw=2.2)
+    box(ax2, 2.0, gap_y, 3.8, 0.6,
+        "$\\Delta_{i,t} = y_{i,t} - (\\hat{\\mu}_i + U\\alpha_t)$",
+        GAP_BG, RED, fs=9, bold=True)
+
+    # Save with explicit padding to prevent bottom clipping
+    fig.savefig(IMG_DIR / "fig1_conceptual.pdf", pad_inches=0.25)
+    fig.savefig(IMG_DIR / "fig1_conceptual.png", pad_inches=0.25)
     plt.close(fig)
     print("  fig1_conceptual.pdf/png")
 
