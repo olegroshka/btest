@@ -180,17 +180,17 @@ def main():
             ax2.text(4.3, y - 0.17, delta, fontsize=8, color=GREEN,
                      ha="left", fontweight="bold")
 
-    # Rolling basis update loop — offset left so it doesn't overlap boxes
-    loop_x = 2.0 - bw / 2 - 0.3  # slightly outside the left edge
+    # Rolling basis update loop — just outside the left box edge
+    loop_x = 2.0 - bw / 2 - 0.1  # just outside the left edge
     ax2.annotate(
         "", xy=(loop_x, 2.2),
         xytext=(loop_x, -0.4),
         arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=2.2,
-                         connectionstyle="arc3,rad=-0.45"),
+                         connectionstyle="arc3,rad=-0.35"),
         zorder=5,
     )
-    ax2.text(loop_x - 0.8, 0.9, "Rolling\nbasis\nupdate",
-             ha="center", fontsize=7.5, color=TEAL, fontweight="bold")
+    ax2.text(loop_x - 0.55, 0.9, "Rolling\nbasis\nupdate",
+             ha="center", fontsize=7, color=TEAL, fontweight="bold")
 
     # Output gap box — positioned with enough clearance
     gap_y = -1.6
