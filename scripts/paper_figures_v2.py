@@ -387,8 +387,8 @@ def fig_ablation_extended():
         "L3: + Regime\nswitching",
         "L5: Full original\npipeline",
         "AR(1) per actor\n(T=10yr baseline)",
-        "SMIM\n(dual reg., static basis)",
-        "Rolling DMD\n(quarterly update)",
+        "SMIM\n(static basis)",
+        "SMIM\n(rolling basis)",
     ]
     data = np.array([l1, l2, l3, l5, ar1, plat, rolling])
     n_rows, n_cols = data.shape
@@ -443,7 +443,7 @@ def fig_ablation_extended():
     cbar = fig.colorbar(im, ax=ax, shrink=0.8, pad=0.12)
     cbar.set_label("OOS R$^2$", fontsize=9)
 
-    ax.set_title("Component Ablation: From Unregularised Kalman to Rolling DMD",
+    ax.set_title("Component Ablation: From Unregularised Kalman to SMIM (Rolling Basis)",
                  fontweight="bold", color=ACCENT, fontsize=11)
     fig.tight_layout()
     save(fig, "fig4_ablation")
