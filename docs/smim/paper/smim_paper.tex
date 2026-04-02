@@ -112,7 +112,7 @@ Our main findings, established through 32 systematic experiments across six phas
 
 \item \textbf{Dual regularisation.} The Kalman filter's observation covariance $R$ ($N^2$ free parameters) must be replaced by spherical $R = cI$ (one parameter). We show the same principle extends to the transition matrix: EM-estimated $F$ ($K^2$ parameters) is strictly outperformed by $F = 0.99I$ (one parameter) in all 10 windows. Online state-noise adaptation ($Q$) handles all temporal dynamics. Together, this \emph{dual regularisation} reduces the state-space model from $N^2 + K^2$ free parameters to 2 scalars.
 
-\item \textbf{Structural evolution.} The spectral basis rotates continuously at $26^\circ$ per quarter (range $9^\circ$--$41^\circ$) while maintaining a fixed 8-mode dimensionality (zero mode births or deaths across 60 rolling quarters). The standard Kalman filter tracks states \emph{within} the basis but is blind to basis rotation. Rolling basis update captures this rotation, yielding $+14.8$ percentage points over the frozen-basis pipeline.
+\item \textbf{Structural evolution.} The spectral basis rotates continuously at $26^\circ$ per quarter (range $9^\circ$--$41^\circ$) while maintaining a fixed 8-mode dimensionality (zero mode births or deaths across 60 rolling quarters). The standard Kalman filter tracks states \emph{within} the basis but is blind to basis rotation. Rolling basis update captures this rotation, yielding $+14.8$ percentage points over the static-basis pipeline.
 
 \item \textbf{DMD over static operators.} Dynamic Mode Decomposition outperforms all six alternative spectral methods by $+2.0$ percentage points on average. Static operators (Schur, Polar, Hermitian, PCA) all produce identical results because the underlying correlation matrix is symmetric.
 
@@ -166,7 +166,7 @@ The framework constructs $y^*_{i,t}$ through five sequential stages plus a rolli
 \subsection{Stage 1: Exponentially-Weighted Demeaning}
 \label{sec:demean}
 
-Investment intensity ranks exhibit strong cross-sectional persistence: an actor's mean rank is the single largest source of variance (52\% of total $R^2$ in the frozen-basis configuration; Section~\ref{sec:variance_decomp}). The state-space model $\tilde{y}_t = U\balpha_t + \varepsilon_t$ assumes zero-mean observations. Without demeaning, the modal states $\balpha_t$ must absorb the $O(0.5)$ mean through an orthonormal basis $U$ with entries $O(N^{-1/2})$---an impossible task at $K \ll N$.
+Investment intensity ranks exhibit strong cross-sectional persistence: an actor's mean rank is the single largest source of variance (52\% of total $R^2$ in the static-basis configuration; Section~\ref{sec:variance_decomp}). The state-space model $\tilde{y}_t = U\balpha_t + \varepsilon_t$ assumes zero-mean observations. Without demeaning, the modal states $\balpha_t$ must absorb the $O(0.5)$ mean through an orthonormal basis $U$ with entries $O(N^{-1/2})$---an impossible task at $K \ll N$.
 
 We subtract an exponentially-weighted per-actor mean:
 \begin{equation}
@@ -362,15 +362,15 @@ Rank & Model & Mean $R^2$ & Std & MAE \\
 7 & DFM $K\!=\!10$ & 0.249 & 0.172 & 0.185 \\
 8 & Sector mean & 0.094 & 0.040 & 0.236 \\
 \midrule
-& \textbf{SMIM frozen basis} & \textbf{0.543} & \textbf{0.075} & --- \\
-& \textbf{SMIM rolling basis} & \textbf{0.691} & \textbf{0.050} & --- \\
+& \textbf{DMD-Kalman, static basis} & \textbf{0.543} & \textbf{0.075} & --- \\
+& \textbf{DMD-Kalman, rolling basis} & \textbf{0.691} & \textbf{0.050} & --- \\
 \bottomrule
 \end{tabular}
 \caption{Baseline comparison. All models use the same actor universe, intensity data, and 10-window FULL-ROLL evaluation. SMIM uses $T\!=\!5$yr, $K\!=\!8$, DMD, dual regularisation, online $Q$. The rolling variant recomputes the DMD basis each quarter.}
 \label{tab:baselines}
 \end{table}
 
-Per-actor AR(1) is the strongest naive baseline ($R^2 = 0.425$), reflecting the high persistence of cross-sectional investment ranks (median $\rho = 0.67$). SMIM with a frozen basis exceeds this by $+0.118$ (wins 10/10 windows). The rolling-basis variant further improves to $R^2 = 0.691$---a $+0.266$ advantage over AR(1)---by tracking the continuous rotation of the spectral structure.
+Per-actor AR(1) is the strongest naive baseline ($R^2 = 0.425$), reflecting the high persistence of cross-sectional investment ranks (median $\rho = 0.67$). The static-basis configuration exceeds this by $+0.118$ (wins 10/10 windows). The rolling-basis variant further improves to $R^2 = 0.691$---a $+0.266$ advantage over AR(1)---by tracking the continuous rotation of the spectral structure.
 
 \textbf{Training window fairness.} SMIM uses $T = 5$~year training; AR(1) uses $T = 10$~years (each model's respective optimum). Table~\ref{tab:fairness} verifies that the comparison is robust. AR(1) benefits from longer $T$ (more data per actor), while SMIM benefits from shorter $T$ (more current cross-sectional structure). The two models exploit fundamentally different information.
 
@@ -378,7 +378,7 @@ Per-actor AR(1) is the strongest naive baseline ($R^2 = 0.425$), reflecting the 
 \centering\small
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-Training length & SMIM frozen $R^2$ & SMIM rolling $R^2$ & AR(1) $R^2$ & Best SMIM $-$ AR(1) \\
+Training length & Static $R^2$ & Rolling $R^2$ & AR(1) $R^2$ & Best $-$ AR(1) \\
 \midrule
 $T = 5$ years & 0.543 & \textbf{0.691} & 0.209 & +0.482 \\
 $T = 8$ years & 0.402 & --- & 0.519 & $-0.117$ \\
@@ -434,7 +434,7 @@ We decompose $R^2$ into the per-actor mean contribution and the spectral dynamic
 \centering\small
 \begin{tabular}{@{}lccccc@{}}
 \toprule
-Source & \multicolumn{2}{c}{Frozen basis} & \multicolumn{2}{c}{Rolling basis} \\
+Source & \multicolumn{2}{c}{Static basis} & \multicolumn{2}{c}{Rolling basis} \\
 \cmidrule(lr){2-3} \cmidrule(lr){4-5}
 & $R^2$ & Share & $R^2$ & Share \\
 \midrule
@@ -455,7 +455,7 @@ Total & 0.543 & 100\% & 0.691 & 100\% \\
 \label{fig:variance}
 \end{figure}
 
-The decomposition reveals that rolling basis update captures spectral structure that the frozen basis misses entirely---the $+14.8$pp improvement is purely a spectral dynamics gain.
+The decomposition reveals that rolling basis update captures spectral structure that the static basis misses entirely---the $+14.8$pp improvement is purely a spectral dynamics gain.
 
 \subsection{Component Ablation}
 \label{sec:ablation}
@@ -469,7 +469,7 @@ We evaluate five pipeline depths to determine which components justify their com
 \label{fig:ablation}
 \end{figure}
 
-The ablation reveals a non-monotonic pattern in the upper block: L1 (graph-factor OLS, $R^2 = 0.328$) outperforms L2 (+ Kalman, $R^2 = 0.291$) and L3 (+ regime switching, $R^2 = 0.281$). The Kalman filter \emph{hurts} because the unregularised $R$ overfits. The lower block shows the resolution: dual regularisation rescues the Kalman filter (PLATINUM, $R^2 = 0.523$), and rolling basis update captures the structural evolution that the frozen basis misses ($R^2 = 0.691$).
+The ablation reveals a non-monotonic pattern in the upper block: L1 (graph-factor OLS, $R^2 = 0.328$) outperforms L2 (+ Kalman, $R^2 = 0.291$) and L3 (+ regime switching, $R^2 = 0.281$). The Kalman filter \emph{hurts} because the unregularised $R$ overfits. The lower block shows the resolution: dual regularisation rescues the Kalman filter (DMD-Kalman with static basis, $R^2 = 0.523$), and rolling basis update captures the structural evolution that the static basis misses ($R^2 = 0.691$).
 
 \subsection{Spectral Method Comparison}
 \label{sec:spectral}
@@ -529,7 +529,7 @@ Cross-sector transfer is strong for sectors using CapEx intensity (technology $R
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig3_per_window.pdf}
-\caption{Per-window out-of-sample $R^2$: rolling DMD (teal), frozen basis (dark blue), and AR(1) (gold). Rolling DMD wins all 10 windows, with the largest gains in windows where the frozen basis underperforms (W2016, W2017, W2021, W2023---low-volatility periods where the cross-sectional structure shifts most from the training period).}
+\caption{Per-window out-of-sample $R^2$: rolling DMD (teal), static basis (dark blue), and AR(1) (gold). Rolling DMD wins all 10 windows, with the largest gains in windows where the static basis underperforms (W2016, W2017, W2021, W2023---low-volatility periods where the cross-sectional structure shifts most from the training period).}
 \label{fig:per_window}
 \end{figure}
 
@@ -544,7 +544,7 @@ Crucially, the \emph{dimensionality} of the spectral structure is constant: $K_{
 \label{fig:rotation}
 \end{figure}
 
-The standard Kalman filter, operating in a fixed basis $U$, tracks the modal states $\balpha_t$ but is blind to this basis rotation. Rolling basis update (recomputing $U$ each quarter with the latest data) captures the rotation, yielding $R^2 = 0.691$---a $+14.8$ percentage point improvement over the frozen-basis pipeline ($R^2 = 0.543$) and winning all 10 test windows (Table~\ref{tab:rolling}).
+The standard Kalman filter, operating in a fixed basis $U$, tracks the modal states $\balpha_t$ but is blind to this basis rotation. Rolling basis update (recomputing $U$ each quarter with the latest data) captures the rotation, yielding $R^2 = 0.691$---a $+14.8$ percentage point improvement over the static-basis pipeline ($R^2 = 0.543$) and winning all 10 test windows (Table~\ref{tab:rolling}).
 
 An ablation confirms that the improvement is from basis update, not from resetting the Kalman state: resetting the state without updating the basis \emph{hurts} by $-3$ percentage points, because the accumulated Kalman state carries valuable information that the reset discards.
 
@@ -554,12 +554,12 @@ An ablation confirms that the improvement is from basis update, not from resetti
 \toprule
 Configuration & Mean $R^2$ & Std & vs AR(1) & Wins \\
 \midrule
-Rolling DMD basis (quarterly update) & \textbf{0.691} & 0.050 & +0.266 & 10/10 \\
-Frozen basis (PLATINUM) & 0.543 & 0.075 & +0.118 & 10/10 \\
+DMD-Kalman, rolling basis & \textbf{0.691} & 0.050 & +0.266 & 10/10 \\
+DMD-Kalman, static basis & 0.543 & 0.075 & +0.118 & 10/10 \\
 AR(1) per actor ($T\!=\!10$yr) & 0.425 & 0.094 & --- & --- \\
 \bottomrule
 \end{tabular}
-\caption{Rolling vs frozen basis comparison across 10 annual windows.}
+\caption{Rolling vs static basis comparison across 10 annual windows.}
 \label{tab:rolling}
 \end{table}
 
@@ -637,11 +637,11 @@ The intensity rank normalisation, while stabilising the panel, absorbs event-lev
 \label{sec:conclusion}
 % ══════════════════════════════════════════════════════════
 
-We present a spectral state-space framework for investment misallocation estimation that achieves $R^2 = 0.691$ out-of-sample with quarterly rolling basis updates ($R^2 = 0.543$ with a frozen basis), exceeding per-actor AR(1) by 27 percentage points. The result rests on three principles:
+We present a spectral state-space framework for investment misallocation estimation that achieves $R^2 = 0.691$ out-of-sample with quarterly rolling basis updates ($R^2 = 0.543$ with a static basis), exceeding per-actor AR(1) by 27 percentage points. The result rests on three principles:
 
 \emph{Dual regularisation}: both the observation covariance ($R = cI$, replacing $N^2$ parameters) and the transition matrix ($F = 0.99I$, replacing $K^2$ parameters) must be aggressively regularised. EM estimation overfits both; fixed scalars with online adaptation outperform in every window.
 
-\emph{Temporal basis tracking}: the cross-sectional spectral structure rotates at $26^\circ$ per quarter with fixed dimensionality (8 modes). This structural evolution, invisible to a frozen basis, accounts for the single largest performance gain ($+14.8$pp). Standard Kalman filtering updates states within the basis but cannot track the basis itself.
+\emph{Temporal basis tracking}: the cross-sectional spectral structure rotates at $26^\circ$ per quarter with fixed dimensionality (8 modes). This structural evolution, invisible to a static basis, accounts for the single largest performance gain ($+14.8$pp). Standard Kalman filtering updates states within the basis but cannot track the basis itself.
 
 \emph{Systematic ablation}: 32 experiments across six phases decompose the $R^2$ improvement into seven additive components. The largest gains come not from architectural complexity but from eliminating failure modes: spherical $R$ ($+4.2$pp), transition regularisation ($+1.9$pp), and basis tracking ($+14.8$pp).
 

@@ -157,7 +157,7 @@ def fig_per_window():
 
     ax.bar(x - w, rolling, w, color=TEAL, label=f"Rolling DMD (mean={np.mean(rolling):.3f})",
            zorder=3, edgecolor="white")
-    ax.bar(x, frozen, w, color=ACCENT, label=f"Frozen basis (mean={np.mean(frozen):.3f})",
+    ax.bar(x, frozen, w, color=ACCENT, label=f"Static basis (mean={np.mean(frozen):.3f})",
            zorder=3, edgecolor="white")
     ax.bar(x + w, ar1_t10, w, color=GOLD_COLOR, label=f"AR(1) T=10yr (mean={np.mean(ar1_t10):.3f})",
            zorder=3, edgecolor="white", alpha=0.8)
@@ -171,7 +171,7 @@ def fig_per_window():
     ax.set_xticks(x)
     ax.set_xticklabels(windows, fontsize=8)
     ax.set_ylabel("Out-of-Sample R$^2$")
-    ax.set_title("Per-Window Performance: Rolling DMD vs Frozen vs AR(1)",
+    ax.set_title("Per-Window Performance: Rolling vs Static Basis vs AR(1)",
                  fontweight="bold", color=ACCENT)
     ax.legend(loc="upper left", framealpha=0.9, fontsize=8)
     ax.set_ylim(0, 0.85)
@@ -242,7 +242,7 @@ def fig_basis_rotation():
 def fig_variance():
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
 
-    # Panel (a): Frozen PLATINUM = 0.543
+    # Panel (a): Static basis = 0.543
     total_frozen = 0.543
     mean_frozen = 0.281
     spectral_frozen = total_frozen - mean_frozen
@@ -257,7 +257,7 @@ def fig_variance():
     ax.add_patch(circle)
     ax.text(0, 0, f"R$^2$\n{total_frozen:.3f}", ha="center", va="center",
             fontsize=12, fontweight="bold", color=ACCENT, zorder=6)
-    ax.set_title("(a) Frozen Basis", fontweight="bold", fontsize=10, color=ACCENT)
+    ax.set_title("(a) Static Basis", fontweight="bold", fontsize=10, color=ACCENT)
 
     # Panel (b): Rolling DMD = 0.691
     total_rolling = 0.691
@@ -276,7 +276,7 @@ def fig_variance():
             fontsize=12, fontweight="bold", color=TEAL, zorder=6)
     ax.set_title("(b) Rolling DMD Basis", fontweight="bold", fontsize=10, color=TEAL)
 
-    fig.suptitle("Variance Decomposition: Frozen vs Rolling Basis",
+    fig.suptitle("Variance Decomposition: Static vs Rolling Basis",
                  fontweight="bold", color=ACCENT, fontsize=12, y=1.02)
     fig.tight_layout()
     save(fig, "fig11_variance")
@@ -285,20 +285,21 @@ def fig_variance():
 # ── Figure 1: Pipeline Schematic (updated) ──────────────────────────────────
 
 def fig_schematic():
-    fig, ax = plt.subplots(figsize=(12, 6.0))
+    fig, ax = plt.subplots(figsize=(12, 7.0))
     ax.set_xlim(-0.5, 12)
-    ax.set_ylim(-1.5, 4.5)
+    ax.set_ylim(-2.5, 4.8)
     ax.axis("off")
 
+    pipeline_y = 2.5
     boxes = [
-        (0.8, 2.2, "Intensity\nPanel\n$y_{i,t} \\in [0,1]$\n$N \\times T$", "#E8EEF5"),
-        (3.0, 2.2, "EWM\nDemeaning\n$\\tilde{y} = y - \\hat{\\mu}$\n$\\tau=8$Q", "#E8F5E9"),
-        (5.2, 2.2, "DMD\n$Y' \\approx AX$\n$K=8$ modes\n$U \\in \\mathbb{R}^{N\\times K}$", "#FFF3E0"),
-        (7.6, 2.2, "Kalman Filter\n$R = cI$ (spherical)\n$F = 0.99 I$ (reg.)\n$Q_0 = 0.5 I$", "#E8EEF5"),
-        (10.0, 2.2, "Online $Q$\nAdaptation\n$Q_{t+1} = 0.7Q_t$\n$+\\, 0.3\\eta\\eta'$", "#FFF3E0"),
+        (0.8, pipeline_y, "Intensity\nPanel\n$y_{i,t} \\in [0,1]$\n$N \\times T$", "#E8EEF5"),
+        (3.0, pipeline_y, "EWM\nDemeaning\n$\\tilde{y} = y - \\hat{\\mu}$\n$\\tau=8$Q", "#E8F5E9"),
+        (5.2, pipeline_y, "DMD\n$Y' \\approx AX$\n$K=8$ modes\n$U \\in \\mathbb{R}^{N\\times K}$", "#FFF3E0"),
+        (7.6, pipeline_y, "Kalman Filter\n$R = cI$ (spherical)\n$F = 0.99I$ (fixed)\n$Q_0 = 0.5I$", "#E8EEF5"),
+        (10.0, pipeline_y, "Online $Q$\nAdaptation\n$Q_{t+1} = 0.7Q_t$\n$+\\, 0.3\\eta\\eta'$", "#FFF3E0"),
     ]
 
-    gap_box = (10.0, -0.2, "Investment Gap\n$\\Delta_{i,t} = y_{i,t} - (\\hat{\\mu}_i + U\\alpha_t)$", "#FFEBEE")
+    gap_box = (10.0, -0.8, "Investment Gap\n$\\Delta_{i,t} = y_{i,t} - (\\hat{\\mu}_i + U\\alpha_t)$", "#FFEBEE")
 
     bw, bh = 1.8, 1.7
     for x, y, text, color in boxes:
@@ -318,27 +319,27 @@ def fig_schematic():
     ax.text(x, y, text, ha="center", va="center", fontsize=7.5, color=RED,
             zorder=4, fontweight="bold", linespacing=1.3)
 
-    # Horizontal arrows
+    # Horizontal arrows between pipeline boxes
     for i in range(len(boxes) - 1):
         x1 = boxes[i][0] + bw/2
         x2 = boxes[i + 1][0] - bw/2
-        ax.annotate("", xy=(x2, 2.2), xytext=(x1, 2.2),
+        ax.annotate("", xy=(x2, pipeline_y), xytext=(x1, pipeline_y),
                      arrowprops=dict(arrowstyle="-|>", color=ACCENT, lw=2))
 
-    # Arrow from Online Q down to Gap
-    ax.annotate("", xy=(10.0, -0.2 + gh/2), xytext=(10.0, 2.2 - bh/2),
+    # Arrow from Online Q down to Gap box
+    ax.annotate("", xy=(10.0, -0.8 + gh/2), xytext=(10.0, pipeline_y - bh/2),
                  arrowprops=dict(arrowstyle="-|>", color=RED, lw=2))
 
-    # Rolling update loop: curved arrow from gap back to DMD
-    from matplotlib.patches import FancyArrowPatch
-    ax.annotate("", xy=(5.2, 2.2 + bh/2 + 0.25), xytext=(10.0 + bw/2 + 0.1, 2.2 + bh/2 + 0.25),
+    # Rolling update loop: curved arrow from right side back to DMD
+    ax.annotate("", xy=(5.2, pipeline_y + bh/2 + 0.25),
+                xytext=(10.0 + bw/2 + 0.1, pipeline_y + bh/2 + 0.25),
                 arrowprops=dict(arrowstyle="-|>", color=TEAL, lw=2.5,
                                 connectionstyle="arc3,rad=0.3"))
-    ax.text(7.6, 3.85, "Rolling basis update (each quarter)",
+    ax.text(7.6, 4.15, "Rolling basis update (each quarter)",
             ha="center", fontsize=8.5, color=TEAL, fontweight="bold",
             bbox=dict(boxstyle="round,pad=0.3", facecolor="#E0F2F1", edgecolor=TEAL, linewidth=1.2))
 
-    # R^2 progression
+    # R^2 progression below boxes
     r2_labels = [
         (0.8, "0.339"),
         (3.0, "0.381\n+4.2pp"),
@@ -347,11 +348,11 @@ def fig_schematic():
         (10.0, "0.691\n+14.8pp"),
     ]
     for bx, label in r2_labels:
-        ax.text(bx, 2.2 - bh/2 - 0.25, label, ha="center", fontsize=7,
+        ax.text(bx, pipeline_y - bh/2 - 0.2, label, ha="center", fontsize=7,
                 color=GREY, fontstyle="italic", va="top")
 
-    ax.set_title("SMIM Pipeline: Dual Regularisation + Rolling Spectral Basis",
-                  fontweight="bold", color=ACCENT, fontsize=13, pad=20)
+    ax.set_title("DMD-Kalman Pipeline with Dual Regularisation and Rolling Spectral Basis",
+                  fontweight="bold", color=ACCENT, fontsize=12, pad=15)
     fig.tight_layout()
     save(fig, "fig1_schematic")
 
@@ -380,7 +381,7 @@ def fig_ablation_extended():
         "L3: + Regime\nswitching",
         "L5: Full original\npipeline",
         "AR(1) per actor\n(T=10yr baseline)",
-        "PLATINUM\n(dual reg, frozen)",
+        "DMD-Kalman\n(dual reg., static basis)",
         "Rolling DMD\n(quarterly update)",
     ]
     data = np.array([l1, l2, l3, l5, ar1, plat, rolling])
