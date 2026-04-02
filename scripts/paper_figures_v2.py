@@ -353,8 +353,14 @@ def fig_schematic():
 
     ax.set_title("SMIM Pipeline: Dual Regularisation with Rolling Spectral Basis",
                   fontweight="bold", color=ACCENT, fontsize=12, pad=15)
-    fig.tight_layout()
-    save(fig, "fig1_schematic")
+    # Don't use tight_layout — it clips patches outside axes.
+    # Use explicit subplots_adjust to guarantee margins.
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.90, bottom=0.05)
+    # Save with extra padding to prevent bbox clipping the gap box border
+    for ext in ["pdf", "png"]:
+        fig.savefig(IMG_DIR / f"fig1_schematic.{ext}", pad_inches=0.3)
+    plt.close(fig)
+    print(f"  fig1_schematic.pdf/png")
 
 
 # ── Regenerate unchanged figures from original script ─────────────────────────
