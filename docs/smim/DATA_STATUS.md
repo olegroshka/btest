@@ -307,23 +307,23 @@ Per-actor Spearman ρ between M-A and M-B intensities across shared quarters (mi
 
 **Add a new universe:**
 1. Add universe CSV to `data/smim/universes/{UNIVERSE_ID}.csv` (columns: `ticker, sector`)
-2. Run `uv run python scripts/smim_build_universes.py --universe {UNIVERSE_ID}` to fetch OHLCV
+2. Run `uv run python scripts/smim/smim_build_universes.py --universe {UNIVERSE_ID}` to fetch OHLCV
 3. For US universes: run `smim_fetch_edgar.py` with the new ticker list
 4. Run `smim_compute_intensities.py --universe {UNIVERSE_ID}` for M-A (US) or `--method return` for M-B (UK or cross-geography)
 5. Update `data/smim/universes/` registry files and this document
 
 **Add a new EDGAR tag:**
-1. Add the tag name to `XBRL_TAGS` list in `scripts/smim_fetch_edgar.py`
+1. Add the tag name to `XBRL_TAGS` list in `scripts/smim/smim_fetch_edgar.py`
 2. Re-run the script; it fetches only the new tag (CIK mapping is cached)
 3. For alternative CapEx tags (G-13 fix): add `CapitalExpenditures`, `AdditionsToPropertyPlantAndEquipmentNet`, `PurchasesOfPropertyPlantAndEquipment` to the tag list, then re-run the CorporateCapexMapper to merge tags per actor
 
 **Add a new FRED series:**
-1. Add the series ID to `MACRO_SERIES` in `scripts/smim_fetch_fred.py`
+1. Add the series ID to `MACRO_SERIES` in `scripts/smim/smim_fetch_fred.py`
 2. For ALFRED vintaging: add to `ALFRED_SERIES` list as well
 3. Re-run the script; existing series use cache, only new series are fetched
 
 **Add a new GDELT actor:**
-1. Add alias list to `ACTOR_ALIASES` dict in `scripts/smim_fetch_gdelt.py` (case-insensitive substrings matched against V2Organizations)
+1. Add alias list to `ACTOR_ALIASES` dict in `scripts/smim/smim_fetch_gdelt.py` (case-insensitive substrings matched against V2Organizations)
 2. Note: `inst_fca_uk` uses `actor_BOE` as its GDELT proxy (BoE is the UK prudential regulator in GKG news)
 3. Run `smim_fetch_gdelt.py --rebuild` to regenerate the weekly panel from existing daily cache (no re-download required)
 

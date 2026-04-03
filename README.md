@@ -598,17 +598,17 @@ All data lives in `data/smim/` (gitignored) and is queryable via a point-in-time
 
 ```bash
 # Equity universes
-uv run python scripts/smim_build_universes.py
+uv run python scripts/smim/smim_build_universes.py
 
 # FRED macro + ALFRED vintages (requires FRED_API_KEY env var)
-uv run python scripts/smim_fetch_fred.py
+uv run python scripts/smim/smim_fetch_fred.py
 
 # SEC EDGAR XBRL (no auth required)
-uv run python scripts/smim_fetch_edgar.py
+uv run python scripts/smim/smim_fetch_edgar.py
 
 # GDELT narrative signals (free, no auth)
-uv run python scripts/smim_fetch_gdelt.py                 # incremental (uses cache)
-uv run python scripts/smim_fetch_gdelt.py --force-refetch # re-download all
+uv run python scripts/smim/smim_fetch_gdelt.py                 # incremental (uses cache)
+uv run python scripts/smim/smim_fetch_gdelt.py --force-refetch # re-download all
 ```
 
 ### SMIM tests
@@ -618,11 +618,11 @@ uv run python scripts/smim_fetch_gdelt.py --force-refetch # re-download all
 uv run pytest tests/unit/smim/ -q
 
 # Acceptance suite (130/130) with gate report (~65 s)
-uv run python scripts/run_smim_acceptance.py
+uv run python scripts/smim/run_smim_acceptance.py
 
 # GPU benchmarks (requires --extra benchmarks + --extra gpu)
 uv run pytest tests/benchmarks/smim/ -v --benchmark-json=.benchmark_results.json
-uv run python scripts/gpu_speedup_report.py
+uv run python scripts/smim/gpu_speedup_report.py
 ```
 
 See `docs/smim/DATA_ACQUISITION.md` for per-source details and `docs/smim/CLAUDE.md` for the full SMIM architecture.

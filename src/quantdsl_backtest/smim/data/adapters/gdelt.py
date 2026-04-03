@@ -1,7 +1,7 @@
 """GDELT 2.0 narrative intensity adapter for SMIM.
 
 Loads pre-processed narrative signals from the canonical parquet files produced
-by scripts/smim_fetch_gdelt.py.
+by scripts/smim/smim_fetch_gdelt.py.
 
 Data pipeline:
     1. smim_fetch_gdelt.py downloads one representative GKG 2.0 CSV file per UTC
@@ -47,7 +47,7 @@ _DAILY_PARQUET  = _REPO_ROOT / "data" / "smim" / "processed" / "gdelt_narrative_
 class GdeltAdapter:
     """File-based GDELT adapter that reads from pre-processed narrative parquets.
 
-    Reads the canonical weekly parquet produced by scripts/smim_fetch_gdelt.py.
+    Reads the canonical weekly parquet produced by scripts/smim/smim_fetch_gdelt.py.
     The weekly dataset is daily-derived and uses mathematically correct aggregation:
       - article_count = sum of daily matched article counts across the week
       - avg_tone      = article-count-weighted mean of daily tone values
@@ -98,7 +98,7 @@ class GdeltAdapter:
         if not path.exists():
             raise FileNotFoundError(
                 f"GDELT processed parquet not found: {path}\n"
-                f"Run: uv run python scripts/smim_fetch_gdelt.py"
+                f"Run: uv run python scripts/smim/smim_fetch_gdelt.py"
             )
 
         df = pd.read_parquet(path)

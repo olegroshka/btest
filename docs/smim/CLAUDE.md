@@ -88,7 +88,7 @@ Do not revert them — the tests encode the **correct** behaviour.
 - `tests/acceptance/smim/conftest_report.py` — pytest plugin: auto-prints gate report
 - `tests/acceptance/smim/test_granger_batch_parity.py` — batch vs statsmodels parity
 - `tests/acceptance/smim/test_gpu_determinism.py` — 5× CUDA runs must be bitwise identical
-- `scripts/run_smim_acceptance.py` — standalone runner with `--section` support
+- `scripts/smim/run_smim_acceptance.py` — standalone runner with `--section` support
 - **130/130 tests pass** (as of 2026-03-21); includes GPU verification tests
 
 ### Running tests
@@ -98,20 +98,20 @@ Do not revert them — the tests encode the **correct** behaviour.
 uv run pytest tests/unit/smim/ -q
 
 # Acceptance suite with gate report (~65 s)
-uv run python scripts/run_smim_acceptance.py
+uv run python scripts/smim/run_smim_acceptance.py
 
 # Acceptance suite on CUDA (~65 s)
 SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
 
 # Single section
-uv run python scripts/run_smim_acceptance.py --section pipeline
+uv run python scripts/smim/run_smim_acceptance.py --section pipeline
 
 # Performance benchmarks (CPU + CUDA, ~92 s)
 uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds \
     --benchmark-json=.benchmark_results.json
 
 # Speedup report (reads .benchmark_results.json)
-uv run python scripts/gpu_speedup_report.py
+uv run python scripts/smim/gpu_speedup_report.py
 ```
 
 ### IDTxl dependency (R-TE-1)

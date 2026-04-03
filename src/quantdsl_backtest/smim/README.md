@@ -278,18 +278,18 @@ The equity universe construction and download is handled by a single script.
 
 ```bash
 # Build all universe CSVs and download OHLCV (full run, ~20 min)
-uv run python scripts/smim_build_universes.py
+uv run python scripts/smim/smim_build_universes.py
 
 # Individual steps
-uv run python scripts/smim_build_universes.py --step 1          # universe CSVs only
-uv run python scripts/smim_build_universes.py --step 2          # OHLCV download only
-uv run python scripts/smim_build_universes.py --step 3          # quality verification only
+uv run python scripts/smim/smim_build_universes.py --step 1          # universe CSVs only
+uv run python scripts/smim/smim_build_universes.py --step 2          # OHLCV download only
+uv run python scripts/smim/smim_build_universes.py --step 3          # quality verification only
 
 # Retry specific universes (useful after partial failures)
-uv run python scripts/smim_build_universes.py --step 2 3 --only US-LC MIXED-200
+uv run python scripts/smim/smim_build_universes.py --step 2 3 --only US-LC MIXED-200
 
 # Skip live market-cap fetch for US-LC (uses CSV order instead)
-uv run python scripts/smim_build_universes.py --skip-market-cap
+uv run python scripts/smim/smim_build_universes.py --skip-market-cap
 ```
 
 **Outputs:**
@@ -346,7 +346,7 @@ listing date); that approach has been replaced.
 
 ```bash
 # Requires: FRED_API_KEY environment variable
-uv run python scripts/smim_fetch_fred.py
+uv run python scripts/smim/smim_fetch_fred.py
 ```
 
 Fetches 29 macro series from FRED and full ALFRED vintage histories for the 5
@@ -372,7 +372,7 @@ Acquisition status and known failures: `docs/smim/DATA_ACQUISITION.md`.
 
 ```bash
 # No API key required — SEC only needs a User-Agent header
-uv run python scripts/smim_fetch_edgar.py
+uv run python scripts/smim/smim_fetch_edgar.py
 ```
 
 Fetches company-level XBRL facts for all US equity universes (US-LC, US-MC,
@@ -414,13 +414,13 @@ modern 10-K/10-Q filers use `PaymentsToAcquirePropertyPlantAndEquipment` instead
 
 ```bash
 # No auth required — direct GKG 2.0 CSV downloads, free
-uv run python scripts/smim_fetch_gdelt.py                  # full fetch (incremental, uses daily cache)
-uv run python scripts/smim_fetch_gdelt.py --weekly-only    # rebuild weekly from existing daily cache
-uv run python scripts/smim_fetch_gdelt.py --rebuild        # reprocess outputs from cache, no downloads
-uv run python scripts/smim_fetch_gdelt.py --force-refetch  # re-download all ~3,970 daily files
-uv run python scripts/smim_fetch_gdelt.py --validate-only  # spot-check yesterday's file
-uv run python scripts/smim_fetch_gdelt.py --workers 8      # increase parallelism
-uv run python scripts/smim_fetch_gdelt.py --daily-only     # build daily artifact only, skip weekly/PIT
+uv run python scripts/smim/smim_fetch_gdelt.py                  # full fetch (incremental, uses daily cache)
+uv run python scripts/smim/smim_fetch_gdelt.py --weekly-only    # rebuild weekly from existing daily cache
+uv run python scripts/smim/smim_fetch_gdelt.py --rebuild        # reprocess outputs from cache, no downloads
+uv run python scripts/smim/smim_fetch_gdelt.py --force-refetch  # re-download all ~3,970 daily files
+uv run python scripts/smim/smim_fetch_gdelt.py --validate-only  # spot-check yesterday's file
+uv run python scripts/smim/smim_fetch_gdelt.py --workers 8      # increase parallelism
+uv run python scripts/smim/smim_fetch_gdelt.py --daily-only     # build daily artifact only, skip weekly/PIT
 ```
 
 Fetches one representative GKG 2.0 file per **UTC calendar day** (slot nearest 12:00 UTC),
@@ -477,7 +477,7 @@ Note: GKG NLP drops "and" from org names (`"securities exchange commission"`, no
 
 ```bash
 # No API key required — uses IMF DataMapper API
-uv run python scripts/smim_fetch_imf.py
+uv run python scripts/smim/smim_fetch_imf.py
 ```
 
 Fetches international macro indicators from two IMF sources:
@@ -515,7 +515,7 @@ A1 compliance: `pub_date = event_date + 365 days` (conservative annual publicati
 
 ```bash
 # No API key required — OECD SDMX 3.0 public endpoint
-uv run python scripts/smim_fetch_oecd.py
+uv run python scripts/smim/smim_fetch_oecd.py
 ```
 
 Fetches two OECD SDMX 3.0 dataflows for US and UK, using the `all` key
@@ -546,10 +546,10 @@ A1 compliance: `pub_date = event_date + 45 days` (CLI) / `+ 75 days` (QNA).
 
 ```bash
 # With BEA API key (recommended — full industry detail):
-BEA_API_KEY=<your_key> uv run python scripts/smim_fetch_bea.py
+BEA_API_KEY=<your_key> uv run python scripts/smim/smim_fetch_bea.py
 
 # Without API key (fallback — downloads published Excel from apps.bea.gov):
-uv run python scripts/smim_fetch_bea.py
+uv run python scripts/smim/smim_fetch_bea.py
 ```
 
 Fetches the BEA "Use of Commodities by Industries, Before Redefinitions"
@@ -602,20 +602,20 @@ uv run pytest tests/unit/smim/compute/ -q
 
 ```bash
 # Full suite with gate report (CPU)
-uv run python scripts/run_smim_acceptance.py
+uv run python scripts/smim/run_smim_acceptance.py
 
 # On CUDA
 SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
 
 # Single section
-uv run python scripts/run_smim_acceptance.py --section graph_construction
-uv run python scripts/run_smim_acceptance.py --section spectral
-uv run python scripts/run_smim_acceptance.py --section kalman
-uv run python scripts/run_smim_acceptance.py --section pipeline_sanity
+uv run python scripts/smim/run_smim_acceptance.py --section graph_construction
+uv run python scripts/smim/run_smim_acceptance.py --section spectral
+uv run python scripts/smim/run_smim_acceptance.py --section kalman
+uv run python scripts/smim/run_smim_acceptance.py --section pipeline_sanity
 
 # Verbose / stop on first failure
-uv run python scripts/run_smim_acceptance.py -v
-uv run python scripts/run_smim_acceptance.py -- -x
+uv run python scripts/smim/run_smim_acceptance.py -v
+uv run python scripts/smim/run_smim_acceptance.py -- -x
 ```
 
 **Expected output:**
@@ -652,7 +652,7 @@ uv run pytest tests/benchmarks/smim/ -v \
     --benchmark-json=.benchmark_results.json
 
 # Generate speedup report
-uv run python scripts/gpu_speedup_report.py
+uv run python scripts/smim/gpu_speedup_report.py
 ```
 
 **Measured speedups (RTX 4070 Ti, T=80):**

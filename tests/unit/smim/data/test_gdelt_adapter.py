@@ -1,7 +1,7 @@
 """Tests for smim/data/adapters/gdelt.py (parquet-based file adapter).
 
 The adapter was rewritten from an HTTP DOC-API client to a file-based parquet
-reader (scripts/smim_fetch_gdelt.py produces the canonical parquets).
+reader (scripts/smim/smim_fetch_gdelt.py produces the canonical parquets).
 Tests use a temporary parquet fixture to stay self-contained.
 """
 

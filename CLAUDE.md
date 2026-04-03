@@ -164,7 +164,7 @@ Playwright tests require a running platform server and are marked `manual`. The 
 
 ```bash
 # SMIM acceptance suite (CPU, ~65 s)
-uv run python scripts/run_smim_acceptance.py
+uv run python scripts/smim/run_smim_acceptance.py
 
 # SMIM acceptance suite on CUDA
 SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
@@ -174,7 +174,7 @@ uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds \
     --benchmark-json=.benchmark_results.json
 
 # Speedup report (reads .benchmark_results.json)
-uv run python scripts/gpu_speedup_report.py
+uv run python scripts/smim/gpu_speedup_report.py
 ```
 
 ## Code Style

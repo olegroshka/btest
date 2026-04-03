@@ -44,7 +44,7 @@ Each section records: checks, key metrics, runtime, findings, and next-step impl
 
 **Date:** 2026-03-29
 **Status:** PASS (5/5 checks)
-**Runner:** `scripts/run_smim_a3.py`
+**Runner:** `scripts/smim/run_smim_a3.py`
 
 ### Config
 
@@ -146,7 +146,7 @@ The negative OOS R² is a science finding about the RECENT/MACRO+MARKET/N=50 reg
 
 **Date:** 2026-03-29 (v1), 2026-03-29 (v2 re-run)
 **Status:** COMPLETE -- decision gate PASS
-**Runner:** `scripts/run_smim_a4.py`
+**Runner:** `scripts/smim/run_smim_a4.py`
 
 ### Config
 
@@ -264,7 +264,7 @@ in the RECENT period (vs 200 target). US-LC+US-MC combined gives 270. For A1
 
 **Date:** 2026-03-29 (v1 STOP, v2 PASS, v3 iterated with learned operator)
 **Status:** COMPLETE (v3) -- decision gate PASS (mean pred R2=0.305, modal R2=0.327)
-**Runner:** `scripts/run_smim_a1.py`
+**Runner:** `scripts/smim/run_smim_a1.py`
 
 ### Config
 
@@ -372,7 +372,7 @@ have no effect with a single mode.
 
 **Date:** 2026-03-29
 **Status:** COMPLETE
-**Runner:** `scripts/run_smim_a2.py`
+**Runner:** `scripts/smim/run_smim_a2.py`
 
 ### Config
 
@@ -455,7 +455,7 @@ prediction power is in actor-specific persistence, not sector membership.
 
 **Date:** 2026-03-29
 **Status:** COMPLETE
-**Runner:** `scripts/run_smim_b1.py`
+**Runner:** `scripts/smim/run_smim_b1.py`
 
 ### Component Value Table (mean across 10 windows)
 
