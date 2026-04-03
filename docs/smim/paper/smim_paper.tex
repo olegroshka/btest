@@ -73,7 +73,7 @@ Oleg Roshka\textsuperscript{1} \qquad Claude Opus 4.6\textsuperscript{2}\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-We develop a spectral state-space framework for forecasting cross-sectional investment intensity, validated on US CapEx-intensity actors. The framework decomposes investment intensity dynamics through Dynamic Mode Decomposition (DMD) bases and filters latent modal states via a Kalman filter with dual regularisation: spherical observation covariance ($R = cI$, one parameter replacing $N^2$) and near-identity transition matrix ($F = 0.99I$, replacing EM-estimated $K^2$ parameters). Under nested rolling cross-validation with a frozen holdout era (2023--2024), a rolling-basis variant that recomputes the DMD spectral basis each quarter achieves out-of-sample $R^2 = 0.702$ on 8 validation windows and $R^2 = 0.765$ on 2 untouched holdout windows, exceeding per-actor AR(1) in all 10 windows ($\Delta R^2 = +0.093$; 95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$ on the 8 CV windows). The method exploits the observation that the cross-sectional spectral basis rotates at approximately $26^\circ$ per quarter while maintaining fixed dimensionality. A null simulation shows that finite-sample estimation noise alone would produce $75^\circ$ of apparent rotation, suggesting that the observed $26^\circ$ reflects consistently recoverable low-dimensional structure rather than noise. Systematic ablation with bootstrap confidence intervals confirms that every pipeline component contributes significantly, with rolling basis update providing the largest gain ($+14.3$pp, CI $[+11.1, +17.2]$pp, 100\% of windows). The resulting model-implied investment gaps predict subsequent capital expenditure revision ($t \approx -6.4$ to $-7.1$ with clustered standard errors, depending on specification; the effect is cross-sectional rather than within-actor, as it flips sign under actor fixed effects). These results are established on US actors with CapEx-based intensity; return-based intensity produces negative $R^2$, and generalisation beyond this domain remains to be validated.
+We develop a spectral state-space framework for forecasting cross-sectional investment intensity, validated on a US-heavy panel of 93 economic actors with strongest performance on US CapEx-intensity sectors. The framework decomposes investment intensity dynamics through Dynamic Mode Decomposition (DMD) bases and filters latent modal states via a Kalman filter with dual regularisation: spherical observation covariance ($R = cI$, one parameter replacing $N^2$) and near-identity transition matrix ($F = 0.99I$, replacing EM-estimated $K^2$ parameters). Under nested rolling cross-validation with a frozen holdout era (2023--2024), a rolling-basis variant that recomputes the DMD spectral basis each quarter achieves out-of-sample $R^2 = 0.702$ on 8 validation windows and $R^2 = 0.765$ on 2 untouched holdout windows, exceeding per-actor AR(1) in all 10 windows ($\Delta R^2 = +0.093$; 95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$ on the 8 CV windows). The method exploits the observation that the cross-sectional spectral basis rotates at approximately $26^\circ$ per quarter while maintaining fixed dimensionality. A null simulation shows that finite-sample estimation noise alone would produce $75^\circ$ of apparent rotation, suggesting that the observed $26^\circ$ reflects consistently recoverable low-dimensional structure rather than noise. Systematic ablation with bootstrap confidence intervals confirms that every pipeline component contributes significantly, with rolling basis update providing the largest gain ($+14.3$pp, CI $[+11.1, +17.2]$pp, 100\% of windows). The resulting model-implied investment gaps predict subsequent capital expenditure revision ($t \approx -6.4$ to $-7.1$ with clustered standard errors, depending on specification; the effect is cross-sectional rather than within-actor, as it flips sign under actor fixed effects). Performance is strongest on US CapEx-intensity actors; return-based intensity (UK equities) and asset-growth intensity (banks) produce weak or negative $R^2$.
 \end{abstract}
 
 \vspace{0.3cm}
@@ -281,25 +281,24 @@ Our sample comprises 103 actors across three hierarchical layers (Table~\ref{tab
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{@{}llllr@{}}
+\begin{tabular}{@{}lllrr@{}}
 \toprule
-Layer & Actor Type & Geography & Intensity Method & $N$ \\
+Layer & Actor Type & Intensity Method & Total & With intensity \\
 \midrule
-0 (Exogenous) & Global shocks & Global & FRED min-max & 7 \\
-\multirow{3}{*}{1 (Institutional)} & Central banks & US, UK & FRED min-max & 2 \\
- & Regulators & US, UK & FRED min-max & 2 \\
- & International orgs & Global & FRED min-max & 1 \\
+0 (Exogenous) & Global shocks (Global) & FRED min-max & 7 & 7 \\
+\multirow{3}{*}{1 (Institutional)} & Central banks (US, UK) & FRED min-max & 2 & 1 \\
+ & Regulators (US, UK) & FRED min-max & 2 & 2 \\
+ & International orgs (Global) & FRED min-max & 1 & 1 \\
 \midrule
-\multirow{5}{*}{2 (Firms)} & Large firms & US & CapEx intensity & 49 \\
- & Large firms & UK & Return intensity & 23 \\
- & Banks & US, UK & Asset growth (ranked) & 10 \\
- & Sector leaders & US & CapEx intensity & 4 \\
- & \emph{Signal-only (no intensity)} & US & --- & 5 \\
+\multirow{4}{*}{2 (Firms)} & Large firms (US) & CapEx intensity & 56 & 49 \\
+ & Large firms (UK) & Return intensity & 23 & 21 \\
+ & Banks (US) & Asset growth (ranked) & 10 & 10 \\
+ & Sector leaders (UK) & CapEx intensity & 2 & 2 \\
 \midrule
-& & & \textbf{Total} & \textbf{103} \\
+& & \textbf{Total} & \textbf{103} & \textbf{93} \\
 \bottomrule
 \end{tabular}
-\caption{Actor universe. Layer 0 actors represent exogenous macroeconomic shocks; Layer 1 actors are institutional intermediaries; Layer 2 actors are firms and banks whose investment behaviour is the prediction target.}
+\caption{Actor universe. Of 103 total actors, 93 have computed investment intensity and enter the prediction universe; the remaining 10 lack required data (missing EDGAR filings or insufficient time series). Layer 0 actors represent exogenous macroeconomic shocks; Layer 1 actors are institutional intermediaries; Layer 2 actors are firms and banks. The headline evaluation covers all 93 intensity actors; the strongest performance is on the 49 US large firms using CapEx-based intensity.}
 \label{tab:actors}
 \end{table}
 
@@ -348,7 +347,7 @@ We employ a \textbf{nested rolling-validation} protocol with 10 non-overlapping 
 
 Inner CV selects $K = 10$ and $T = 3$~years in the majority of outer folds, yielding nested-CV $R^2 = 0.702$ (mean across 8 CV windows) and holdout $R^2 = 0.765$ (pooled over 2023--2024 actor-quarter observations; per-window values are 0.751 and 0.779). All headline numbers in this paper are from this nested protocol; the holdout windows had zero exposure to any hyperparameter tuning.
 
-\textbf{Scope condition.} The framework's performance depends critically on the intensity construction. CapEx intensity produces rich cross-sectional dynamics that the spectral model can exploit ($R^2 = 0.70$), while return intensity produces $R^2 = -0.15$ on the same actors (Section~\ref{sec:transfer}). All results reported below use CapEx intensity unless otherwise noted. Generalisation to other intensity constructions is not guaranteed and should be validated empirically.
+\textbf{Scope condition.} The headline evaluation covers all 93 actors with computed intensity. However, performance depends critically on the intensity construction: CapEx-based sectors (US large firms, sector leaders) produce strong results, while return-based intensity (UK equities) and asset-growth-based intensity (banks) are much weaker (Section~\ref{sec:transfer}). The strongest validated domain is the 49 US large firms using CapEx intensity.
 
 
 % ══════════════════════════════════════════════════════════
@@ -359,7 +358,7 @@ Inner CV selects $K = 10$ and $T = 3$~years in the majority of outer folds, yiel
 \subsection{Baseline Comparison}
 \label{sec:baselines}
 
-Unless otherwise noted, the headline forecasting results in Sections~\ref{sec:results}--\ref{sec:economic} are reported on all actors with computed investment intensity (93 actors, predominantly US CapEx-based; see Table~\ref{tab:actors}). Fixed-configuration diagnostic tables are explicitly labeled.
+Unless otherwise noted, the headline forecasting results in Sections~\ref{sec:results}--\ref{sec:economic} are reported on all 93 actors with computed investment intensity (Table~\ref{tab:actors}). The panel is US-heavy: 49 of 93 actors are US large firms using CapEx intensity, which is the strongest-performing subset. Fixed-configuration diagnostic tables are explicitly labeled as such.
 
 Table~\ref{tab:baselines} presents the baseline comparison. All SMIM numbers are from the nested-CV protocol (Section~\ref{sec:data}).
 
@@ -694,7 +693,7 @@ The intensity rank normalisation, while stabilising the panel, absorbs event-lev
 \label{sec:conclusion}
 % ══════════════════════════════════════════════════════════
 
-We present a spectral state-space framework for forecasting cross-sectional investment intensity on US CapEx-intensity actors. Under nested cross-validation with a frozen holdout era, the rolling-basis variant achieves $R^2 = 0.702$ on validation windows and $R^2 = 0.765$ on untouched holdout, exceeding AR(1) by $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$). The result rests on three principles:
+We present a spectral state-space framework for forecasting cross-sectional investment intensity, evaluated on a US-heavy panel of 93 economic actors with strongest performance on US CapEx-intensity sectors. Under nested cross-validation with a frozen holdout era, the rolling-basis variant achieves $R^2 = 0.702$ on validation windows and $R^2 = 0.765$ on untouched holdout, exceeding AR(1) by $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$). The result rests on three principles:
 
 \emph{Dual regularisation}: both the observation covariance ($R = cI$, replacing $N^2$ parameters) and the transition matrix ($F = 0.99I$, replacing $K^2$ parameters) must be aggressively regularised. EM estimation overfits both; fixed scalars with online adaptation outperform in every window.
 
@@ -704,7 +703,7 @@ We present a spectral state-space framework for forecasting cross-sectional inve
 
 The model-implied gap estimates predict subsequent CapEx revision ($t \approx -6.4$ to $-7.1$ with clustered SEs), though this is a cross-sectional result that flips sign under actor fixed effects (Table~\ref{tab:capex_reg}). The transition dynamics use stable default scalars ($F = 0.99I$, $Q = 0.5I$) that performed consistently across all evaluation windows in this sample---only the spectral basis requires periodic re-estimation.
 
-\textbf{Scope conditions.} These results are established on US actors with CapEx-based intensity; return-based intensity and financial-sector actors produce weak or negative $R^2$. The investment gap is a model-implied deviation from a spectral benchmark, not a structural misallocation measure. Generalisation to other intensity constructions, geographies, and data frequencies requires further validation. The lesson that extends beyond this specific application is methodological: wherever high-dimensional state-space models are deployed, dual regularisation and basis tracking deserve first-order attention.
+\textbf{Scope conditions.} The headline results are on a mixed 93-actor panel; the strongest performance is on the 49 US large firms using CapEx intensity. Return-based intensity (UK equities) and asset-growth intensity (banks) produce weak or negative $R^2$. The investment gap is a model-implied deviation from a spectral benchmark, not a structural misallocation measure. Generalisation to other intensity constructions, geographies, and data frequencies requires further validation. The lesson that extends beyond this specific application is methodological: wherever high-dimensional state-space models are deployed, dual regularisation and basis tracking deserve first-order attention.
 
 \vspace{0.8cm}
 \noindent\textbf{Disclaimer.} This paper presents a research framework for academic investigation of investment dynamics. It is not investment advice. The models, gap estimates, and statistical findings described herein have not been validated for live trading or portfolio construction. Past out-of-sample performance on historical data does not guarantee future results. The authors bear no responsibility for any financial losses incurred by parties who deploy this framework or its derivatives in investment strategies. Any such deployment is undertaken entirely at the user's own risk and should be subject to independent due diligence, regulatory compliance review, and appropriate risk management.
