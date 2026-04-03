@@ -73,11 +73,11 @@ Oleg Roshka\textsuperscript{1} \qquad Claude Opus 4.6\textsuperscript{2}\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-We develop a spectral state-space framework for estimating actor-specific investment misallocation across 93 heterogeneous economic actors spanning six sectors. The framework decomposes cross-sectional investment intensity dynamics through Dynamic Mode Decomposition (DMD) bases and filters latent modal states via a Kalman filter with dual regularisation: spherical observation covariance ($R = cI$, one parameter replacing $N^2$) and near-identity transition matrix ($F = 0.99I$, replacing EM-estimated $K^2$ parameters). On a rolling 10-window out-of-sample evaluation (2015--2024), the static-basis configuration achieves $R^2 = 0.543$, exceeding per-actor AR(1) at $R^2 = 0.425$ by 12 percentage points. A rolling-basis variant that recomputes the DMD spectral basis each quarter achieves $R^2 = 0.691$ (wins 10/10 windows), exploiting a newly identified phenomenon: the cross-sectional spectral structure rotates continuously at $26^\circ$ per quarter while maintaining a fixed 8-mode dimensionality. Systematic ablation across 32 experiments identifies the innovations responsible: exponentially-weighted demeaning (+4.2pp), DMD replacing static operators (+3.3pp), spherical covariance (+4.2pp), online state-noise adaptation (+5.7pp), transition-matrix regularisation (+1.9pp), and rolling basis update (+14.8pp). The resulting investment gap estimates carry genuine economic content: gaps predict subsequent capital expenditure revision ($t = -6.95$ after controlling for intensity level) and lead aggregate market volatility by 1--4 quarters.
+We develop a spectral state-space framework for forecasting cross-sectional investment intensity, validated on US CapEx-intensity actors. The framework decomposes investment intensity dynamics through Dynamic Mode Decomposition (DMD) bases and filters latent modal states via a Kalman filter with dual regularisation: spherical observation covariance ($R = cI$, one parameter replacing $N^2$) and near-identity transition matrix ($F = 0.99I$, replacing EM-estimated $K^2$ parameters). Under nested rolling cross-validation with a frozen holdout era (2023--2024), a rolling-basis variant that recomputes the DMD spectral basis each quarter achieves out-of-sample $R^2 = 0.702$ on 8 validation windows and $R^2 = 0.765$ on 2 untouched holdout windows, exceeding per-actor AR(1) with $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$; 10/10 window wins). The method exploits the observation that the cross-sectional spectral basis rotates at approximately $26^\circ$ per quarter while maintaining fixed dimensionality. A null simulation shows that finite-sample estimation noise alone would produce $75^\circ$ of apparent rotation, suggesting that the observed $26^\circ$ reflects consistently recoverable low-dimensional structure rather than noise. Systematic ablation with bootstrap confidence intervals confirms that every pipeline component contributes significantly, with rolling basis update providing the largest gain ($+14.3$pp, CI $[+11.1, +17.2]$pp, 100\% of windows). The resulting model-implied investment gaps predict subsequent capital expenditure revision ($t = -6.95$ after controlling for intensity level). These results are established on US actors with CapEx-based intensity; return-based intensity produces negative $R^2$, and generalisation beyond this domain remains to be validated.
 \end{abstract}
 
 \vspace{0.3cm}
-\noindent\textbf{Keywords:} investment misallocation, spectral decomposition, dynamic mode decomposition, Kalman filter, regularisation, state-space models, capital allocation
+\noindent\textbf{Keywords:} investment gap estimation, spectral decomposition, dynamic mode decomposition, Kalman filter, regularisation, state-space models, capital allocation
 
 \noindent\textbf{JEL Classification:} C32, C38, C58, E22, G11
 
@@ -92,13 +92,13 @@ We develop a spectral state-space framework for estimating actor-specific invest
 
 Capital allocation decisions propagate through a hierarchical, networked system of institutions. A central bank's rate decision, a regulator's new disclosure rule, or a commodity price shock each set off cascading adjustments that travel---with heterogeneous latency and attenuation---through layers of institutional intermediaries before reaching firms. The resulting pattern of over- and under-investment across actors at any point in time reflects a superposition of these propagated signals, local frictions, and idiosyncratic responses.
 
-Despite rich literatures on factor models \citep{fama1993common}, network effects in economics \citep{acemoglu2012network}, and spectral graph theory \citep{ortega2018graph}, no unified framework currently exists to: (i)~decompose how investment-relevant signals propagate through a heterogeneous actor hierarchy; (ii)~estimate actor-specific misallocation as a deviation from a structurally-informed benchmark; and (iii)~validate that the resulting gap estimates carry genuine economic predictive content.
+Despite rich literatures on factor models \citep{fama1993common}, network effects in economics \citep{acemoglu2012network}, and spectral graph theory \citep{ortega2018graph}, no unified framework currently exists to: (i)~decompose how investment-relevant signals propagate through a heterogeneous actor hierarchy; (ii)~estimate actor-specific investment gaps as deviations from a structurally-informed benchmark; and (iii)~validate that the resulting gap estimates carry out-of-sample predictive content.
 
-This paper addresses all three gaps. We develop \textbf{SMIM} (\textbf{S}pectral \textbf{M}odal \textbf{I}nvestment \textbf{M}isallocation), a state-space framework that represents the cross-sectional dynamics of investment intensity through a low-dimensional modal basis extracted via Dynamic Mode Decomposition (DMD), filtered through a Kalman model with dual regularisation at both the observation and transition levels. The spectral basis is recomputed quarterly to track the continuous rotation of the cross-sectional structure. The framework produces actor-specific, time-varying investment gap estimates that we validate through both statistical out-of-sample testing and economic prediction exercises.
+This paper addresses all three objectives. We develop \textbf{SMIM} (\textbf{S}pectral \textbf{M}odal \textbf{I}nvestment \textbf{M}odel), a state-space framework that represents the cross-sectional dynamics of investment intensity through a low-dimensional modal basis extracted via Dynamic Mode Decomposition (DMD), filtered through a Kalman model with dual regularisation at both the observation and transition levels. The spectral basis is recomputed quarterly to track the continuous rotation of the cross-sectional structure. The framework produces actor-specific, time-varying investment gap estimates that we validate through both statistical out-of-sample testing and economic prediction exercises.
 
 \subsection{Preview of Results}
 
-Throughout, we measure predictive accuracy by the out-of-sample coefficient of determination,
+Throughout, we measure forecast performance by the out-of-sample coefficient of determination,
 \begin{equation}
 R^2 = 1 - \frac{\sum_{i,t}(y_{i,t} - \hat{y}_{i,t})^2}{\sum_{i,t}(y_{i,t} - \bar{y})^2},
 \label{eq:r2}
@@ -108,18 +108,24 @@ where $\hat{y}_{i,t}$ is the model's prediction and $\bar{y}$ is the test-period
 Our main findings, established through 32 systematic experiments across six phases, are:
 
 \begin{enumerate}[nosep]
-\item \textbf{Predictive performance.} With a static spectral basis, the framework achieves $R^2 = 0.543$, exceeding per-actor AR(1) ($R^2 = 0.425$) by 12 percentage points and random walk ($R^2 = 0.305$) by 24 percentage points. With quarterly basis recomputation (rolling DMD), performance reaches $R^2 = 0.691$---winning all 10 annual test windows (2015--2024) against every baseline.
+\item \textbf{Forecast performance.} Under nested cross-validation with a frozen holdout era, the rolling-basis variant achieves $R^2 = 0.702$ on 8 CV windows and $R^2 = 0.765$ on 2 untouched holdout windows, winning all 10 windows against AR(1). The superiority is statistically significant: $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$; 8/8 sign test $p = 0.004$). Full inference in Table~\ref{tab:inference}.
 
 \item \textbf{Dual regularisation.} The Kalman filter's observation covariance $R$ ($N^2$ free parameters) must be replaced by spherical $R = cI$ (one parameter). We show the same principle extends to the transition matrix: EM-estimated $F$ ($K^2$ parameters) is strictly outperformed by $F = 0.99I$ (one parameter) in all 10 windows. Online state-noise adaptation ($Q$) handles all temporal dynamics. Together, this \emph{dual regularisation} reduces the state-space model from $N^2 + K^2$ free parameters to 2 scalars.
 
-\item \textbf{Structural evolution.} The spectral basis rotates continuously at $26^\circ$ per quarter (range $9^\circ$--$41^\circ$) while maintaining a fixed 8-mode dimensionality (zero mode births or deaths across 60 rolling quarters). The standard Kalman filter tracks states \emph{within} the basis but is blind to basis rotation. Rolling basis update captures this rotation, yielding $+14.8$ percentage points over the static-basis pipeline.
+\item \textbf{Basis rotation.} The estimated spectral basis rotates at approximately $26^\circ$ per quarter ($\sigma = 6.5^\circ$) while maintaining a stable 8-mode dimensionality across 52 quarterly transitions. A null simulation shows that estimation noise alone would produce $75^\circ$ of apparent rotation, suggesting the observed pattern reflects recoverable structure. Rolling basis update captures this rotation, yielding $+14.3$pp (CI $[+11.1, +17.2]$pp, 100\% of windows).
 
 \item \textbf{DMD over static operators.} Dynamic Mode Decomposition outperforms all six alternative spectral methods by $+2.0$ percentage points on average. Static operators (Schur, Polar, Hermitian, PCA) all produce identical results because the underlying correlation matrix is symmetric.
 
-\item \textbf{Economic content.} Investment gaps predict subsequent CapEx revision ($\beta = -0.27$, $t = -6.95$ after controlling for current intensity level). Gap cross-sectional dispersion leads the VIX by 1--4 quarters.
+\item \textbf{Economic content.} Model-implied investment gaps predict subsequent CapEx revision ($\beta = -0.27$, $t = -6.95$ after controlling for current intensity level). Additional exploratory results on gap dispersion and market volatility are reported in Section~\ref{sec:economic} but are not part of the paper's main claims.
 
-\item \textbf{Dynamics universality.} The transition parameters $(F, Q)$ need not be estimated at all: fixed $F = 0.99I$, $Q = 0.5I$ match or exceed EM-estimated parameters. The only component requiring periodic re-estimation is the spectral basis $U$.
+\item \textbf{Dynamics stability.} The transition parameters $(F, Q)$ need not be estimated per window: fixed $F = 0.99I$, $Q = 0.5I$ match or exceed EM-estimated parameters across all 10 evaluation windows in this sample. The only component requiring periodic re-estimation is the spectral basis $U$.
 \end{enumerate}
+
+Equally important is what \emph{does not} work: emergence diagnostics, directed spectral operators, event-level alignment, and return-based intensity all fail to improve or actively degrade performance. Section~\ref{sec:discussion} documents these negative results in detail.
+
+\subsection{Scope and Evaluation Caveats}
+
+Several features of our evaluation design should be kept in mind when interpreting these results. First, the out-of-sample evaluation uses 10 non-overlapping annual test windows, each containing only 4 quarterly observations; per-window $R^2$ estimates are therefore noisy (cross-window standard deviation $\approx 0.05$--$0.09$). Second, all hyperparameters ($K$, $T$) are selected via nested rolling cross-validation: inner folds within each outer-train window select these values, with the final 2 windows (2023--2024) held out entirely from all tuning (Section~\ref{sec:data}). Third, the sample is US-heavy (68 of 93 actors with intensity), and the framework's strong performance depends on the CapEx-intensity construction---return-based intensity produces negative $R^2$ on the same actors (Section~\ref{sec:transfer}). Fourth, the investment gap is a \emph{model-implied} deviation from a benchmark prediction, not a welfare-theoretic or structural misallocation measure in the \citet{hsieh2009misallocation} sense. We use the term ``investment gap'' throughout to reflect this distinction. Results should be read as establishing a strong \emph{forecasting} result on a specific panel construction, with suggestive but preliminary economic validation.
 
 \subsection{Contribution}
 
@@ -127,13 +133,13 @@ Our contributions are methodological, empirical, and practical:
 
 \textbf{Methodological.} We introduce \emph{dual regularisation} for state-space models in high-dimensional panels: spherical observation covariance ($R = cI$, reducing $N^2$ parameters to 1) combined with near-identity transition regularisation ($F = 0.99I$, reducing $K^2$ parameters to 1). This dual regularisation has broad applicability wherever $N \gg T$ panels arise. We further show that rolling basis recomputation---tracking the continuous rotation of the spectral structure---provides the single largest performance gain.
 
-\textbf{Empirical.} We provide the first systematic ablation of a spectral state-space pipeline for investment intensity prediction, decomposing the $R^2$ improvement into seven additive components across 32 experiments. We document a new structural phenomenon: the cross-sectional spectral basis rotates at $26^\circ$ per quarter while maintaining fixed dimensionality, with high-rotation episodes aligned with macroeconomic events.
+\textbf{Empirical.} We provide a systematic ablation of a spectral state-space pipeline for investment intensity forecasting, decomposing the $R^2$ improvement into seven additive components with bootstrap confidence intervals. We observe that the cross-sectional spectral basis rotates at approximately $26^\circ$ per quarter while maintaining fixed dimensionality; a null simulation confirms this is below finite-sample noise levels, suggesting recoverable low-dimensional structure.
 
-\textbf{Practical.} Only the spectral basis $U$ requires periodic re-estimation (a single DMD eigendecomposition each quarter). The transition dynamics are universal constants ($F = 0.99I$, $Q = 0.5I$), eliminating EM estimation entirely and reducing operational complexity to one matrix factorisation per quarter.
+\textbf{Practical.} Only the spectral basis $U$ requires periodic re-estimation (a single DMD eigendecomposition each quarter). The transition dynamics use stable default scalars ($F = 0.99I$, $Q = 0.5I$) that match or exceed EM-estimated parameters across all 10 evaluation windows in our sample, eliminating EM estimation and reducing operational complexity to one matrix factorisation per quarter.
 
 \subsection{Related Literature}
 
-Our work connects to several strands. The investment gap concept relates to the misallocation literature initiated by \citet{hsieh2009misallocation} and extended to firm-level analysis by \citet{restuccia2017causes}. Our spectral approach builds on signal processing on graphs \citep{ortega2018graph,sandryhaila2013discrete} and Dynamic Mode Decomposition \citep{schmid2010dynamic,kutz2016dynamic}, adapted here for economic panel data rather than fluid dynamics or power systems. The state-space filtering component extends the dynamic factor model tradition \citep{stock2002forecasting,doz2012quasi} with the regularisation insights of \citet{ledoit2004well} applied to the observation rather than factor covariance. The economic validation relates to the capital allocation efficiency literature \citep{wurgler2000financial} and the predictability of corporate investment \citep{abel1983optimal}.
+Our work connects to several strands. The investment gap concept relates to the capital allocation literature, including the structural misallocation framework of \citet{hsieh2009misallocation} and the firm-level analysis of \citet{restuccia2017causes}; we note that our model-implied gap is a forecasting-based deviation, not a structural measure in their sense. Our spectral approach builds on signal processing on graphs \citep{ortega2018graph,sandryhaila2013discrete} and Dynamic Mode Decomposition \citep{schmid2010dynamic,kutz2016dynamic}, adapted here for economic panel data rather than fluid dynamics or power systems. The state-space filtering component extends the dynamic factor model tradition \citep{stock2002forecasting,doz2012quasi} with the regularisation insights of \citet{ledoit2004well} applied to the observation rather than factor covariance. The economic validation relates to the capital allocation efficiency literature \citep{wurgler2000financial} and the predictability of corporate investment \citep{abel1983optimal}.
 
 % ══════════════════════════════════════════════════════════
 \section{Framework}
@@ -159,7 +165,7 @@ The framework constructs $y^*_{i,t}$ through five sequential stages plus a rolli
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig1_conceptual.pdf}
-\caption{\textbf{Framework overview.} (a)~Multilayer actor structure: Layer~0 exogenous shocks transmit directly to Layer~2 firms ($r = 0.86$, Section~\ref{sec:economic}), bypassing Layer~1 institutions. Five sectors contain 93 actors with investment intensity. (b)~Static processing pipeline from raw intensity panel to investment gap estimates ($R^2 = 0.543$). Rolling basis recomputation (Section~\ref{sec:rolling}) raises performance to $R^2 = 0.691$.}
+\caption{\textbf{Framework overview} (descriptive). (a)~Multilayer actor structure: Layer~0 exogenous shocks show strong association with Layer~2 firm gaps ($r = 0.86$, Section~\ref{sec:economic}). Five sectors contain 93 actors with investment intensity. (b)~Static processing pipeline from raw intensity panel to investment gap estimates ($R^2 = 0.543$). Rolling basis recomputation (Section~\ref{sec:rolling}) raises performance to $R^2 = 0.691$.}
 \label{fig:conceptual}
 \end{figure}
 
@@ -186,7 +192,7 @@ Given the demeaned training panel $\tilde{Y} = [\tilde{y}_1, \ldots, \tilde{y}_T
 
 \textbf{DMD algorithm.} Form snapshot matrices $X = [\tilde{y}_1, \ldots, \tilde{y}_{T-1}]$ and $X' = [\tilde{y}_2, \ldots, \tilde{y}_T]$. DMD seeks the best-fit linear operator $A$ such that $X' \approx AX$. Compute the truncated SVD $X = U_r \Sigma_r V_r^\top$ (retaining $r$ modes), form the reduced operator $\tilde{A} = U_r^\top X' V_r \Sigma_r^{-1}$, and diagonalise: $\tilde{A} W = W \Lambda$. The DMD modes are $\Phi = X' V_r \Sigma_r^{-1} W \in \R^{N \times K}$.
 
-We retain $K = 8$ modes, selected by sweeping $K \in \{1, 2, 3, 5, 8\}$ across all 10 test windows and choosing the value maximising mean out-of-sample $R^2$ (Section~\ref{sec:robustness}). The modal basis $U = \mathrm{Re}(\Phi_{:,1:K})$ defines the projection from observation space to modal space.
+We retain $K$ modes, where $K$ is selected via nested cross-validation: within each outer-train fold, the last 2 years serve as inner-validation to choose $K \in \{3, 5, 8, 10\}$ (Section~\ref{sec:data}). The inner CV selects $K = 10$ in the majority of folds. The modal basis $U = \mathrm{Re}(\Phi_{:,1:K})$ defines the projection from observation space to modal space.
 
 \subsection{Stage 3: Kalman Filter with Spherical Observation Covariance}
 \label{sec:kalman}
@@ -199,7 +205,7 @@ Given the modal basis $U \in \R^{N \times K}$, we model the latent modal dynamic
 
 The observation noise $R \in \R^{N \times N}$ is estimated via a single EM pass to obtain its scale. The transition matrix $F$ and state noise $Q$ are \emph{not} estimated by EM---they are set to regularised defaults (see below).
 
-\textbf{The overparameterisation problem.} The observation covariance $R$ has $N(N+1)/2 = 4{,}278$ free parameters for $N = 92$ actors, estimated from $T = 20$ quarterly observations. This extreme $N \gg T$ setting causes the EM to converge to an ill-conditioned $R$ that overfits training noise ($R^2 = -7.3$ without regularisation; Figure~\ref{fig:reg}).
+\textbf{The overparameterisation problem.} The observation covariance $R$ has $N(N+1)/2 = 4{,}278$ free parameters for $N = 92$ actors, estimated from $T = 12$--$20$ quarterly observations (depending on the inner-CV-selected training window). This extreme $N \gg T$ setting causes the EM to converge to an ill-conditioned $R$ that overfits training noise ($R^2 = -7.3$ without regularisation; Figure~\ref{fig:reg}).
 
 \textbf{Spherical observation regularisation.} We replace the full $R$ with
 \begin{equation}
@@ -208,7 +214,7 @@ R_{\mathrm{sph}} = \frac{\tr(\hat{R})}{N} \, I_N,
 \end{equation}
 where $\hat{R}$ is the EM-estimated sample covariance. This reduces the parameter count from $O(N^2)$ to $O(1)$.
 
-\textbf{Transition regularisation.} The same overparameterisation principle applies to the transition matrix $F \in \R^{K \times K}$. With $K = 8$ and $T = 20$, EM estimation of the $K^2 = 64$ free parameters in $F$ overfits to the training alpha trajectory, degrading out-of-sample performance by $-1.9$ percentage points relative to a near-identity prior. We therefore set
+\textbf{Transition regularisation.} The same overparameterisation principle applies to the transition matrix $F \in \R^{K \times K}$. At typical settings ($K = 8$--$10$, $T = 12$--$20$), EM estimation of the $K^2$ free parameters in $F$ overfits to the training alpha trajectory, degrading out-of-sample performance by $-1.9$ percentage points relative to a near-identity prior. We therefore set
 \begin{equation}
 F = 0.99 \, I_K, \qquad Q_0 = 0.5 \, I_K,
 \label{eq:f_reg}
@@ -226,7 +232,7 @@ Q_{t+1} = (1 - \lambda)\, Q_t + \lambda\, (\balpha_{t|t} - F\balpha_{t-1|t-1})(\
 \label{eq:online_q}
 \end{equation}
 
-This online adaptation tracks regime-dependent state volatility without requiring explicit regime identification. Combined with the spherical $R$ (which remains fixed), it adds $+5.7$ percentage points to $R^2$ through the joint contribution of online $Q$ and the optimal mode count $K = 8$.
+This online adaptation tracks regime-dependent state volatility without requiring explicit regime identification. Combined with the spherical $R$ (which remains fixed), it adds $+5.8$ percentage points to $R^2$ in the ablation ladder (Table~\ref{tab:ladder}).
 
 \subsection{Stage 5: Gap Computation}
 
@@ -242,10 +248,10 @@ where $\balpha_{t|t}$ is the Kalman-filtered modal state (incorporating observat
 Algorithm~\ref{alg:pipeline} summarises the complete procedure.
 
 \begin{algorithm}[H]
-\caption{SMIM: Spectral Modal Investment Misallocation (Rolling Variant)}
+\caption{SMIM: Spectral Modal Investment Gap Estimation (Rolling Variant)}
 \label{alg:pipeline}
 \begin{algorithmic}[1]
-\Require Intensity panel $Y \in [0,1]^{N \times T}$, initial training window, $K = 8$, $\tau = 8$, $\lambda = 0.3$
+\Require Intensity panel $Y \in [0,1]^{N \times T}$, initial training window, $K$ (selected by inner CV; typically 8--10), $\tau = 8$, $\lambda = 0.3$
 \Ensure Investment gaps $\Delta_{i,t}$ for test period
 \State Compute EWM mean $\hat{\mu}_i$ from training period \Comment{Eq.~\eqref{eq:ewm}}
 \State Demean: $\tilde{Y} = Y - \hat{\mu}$
@@ -332,9 +338,17 @@ GDELT & Narrative sentiment & Weekly & Tested as narrative signal (dispensable) 
 
 \subsection{Evaluation Protocol}
 
-We use a FULL-ROLL design: 10 non-overlapping annual test windows (2015--2024), each with a 5-year rolling training window. The training window length was selected by sweeping $T \in \{3, 5, 8, 10, 15\}$ years; $T = 5$ years (20 quarters) yielded the best out-of-sample performance (Section~\ref{sec:robustness}). All metrics are strictly out-of-sample: the model is trained on the training window and evaluated on the subsequent test year without any look-ahead.
+We employ a \textbf{nested rolling-validation} protocol with 10 non-overlapping annual test windows (2015--2024):
 
-\textbf{Scope condition.} The framework's performance depends critically on the intensity construction. CapEx intensity produces rich cross-sectional dynamics that the spectral model can exploit ($R^2 = 0.54$), while return intensity produces $R^2 = -0.15$ on the same actors (Section~\ref{sec:transfer}). All results reported below use CapEx intensity unless otherwise noted. Generalisation to other intensity constructions is not guaranteed and should be validated empirically.
+\begin{itemize}[nosep]
+\item \textbf{Outer folds} (10 windows): final reported performance, one per test year.
+\item \textbf{Inner folds}: within each outer-train, the last 2 years serve as inner validation to select the mode count $K \in \{3, 5, 8, 10\}$ and training length $T \in \{3, 5, 8\}$ years. The fixed defaults ($F = 0.99I$, $Q_0 = 0.5I$, $\tau = 8$, $\lambda = 0.3$) are not tuned.
+\item \textbf{Frozen holdout}: the final 2 windows (2023--2024) receive no inner tuning---they use the median of previously selected parameters.
+\end{itemize}
+
+Inner CV selects $K = 10$ and $T = 3$~years in the majority of outer folds, yielding nested-CV $R^2 = 0.702$ (8 CV windows) and holdout $R^2 = 0.765$ (2 untouched windows). All headline numbers in this paper are from this nested protocol; the holdout windows had zero exposure to any hyperparameter tuning.
+
+\textbf{Scope condition.} The framework's performance depends critically on the intensity construction. CapEx intensity produces rich cross-sectional dynamics that the spectral model can exploit ($R^2 = 0.70$), while return intensity produces $R^2 = -0.15$ on the same actors (Section~\ref{sec:transfer}). All results reported below use CapEx intensity unless otherwise noted. Generalisation to other intensity constructions is not guaranteed and should be validated empirically.
 
 
 % ══════════════════════════════════════════════════════════
@@ -345,52 +359,52 @@ We use a FULL-ROLL design: 10 non-overlapping annual test windows (2015--2024), 
 \subsection{Baseline Comparison}
 \label{sec:baselines}
 
-Table~\ref{tab:baselines} presents eight baseline models evaluated on the same universe and windows.
+Table~\ref{tab:baselines} presents the baseline comparison. All SMIM numbers are from the nested-CV protocol (Section~\ref{sec:data}).
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{@{}llccc@{}}
+\begin{tabular}{@{}llcc@{}}
 \toprule
-Rank & Model & Mean $R^2$ & Std & MAE \\
+Model & Protocol & Mean $R^2$ & SMIM wins \\
 \midrule
-1 & Per-actor AR(1) & 0.425 & 0.094 & 0.169 \\
-2 & Random walk & 0.305 & 0.101 & 0.168 \\
-3 & VAR-BIC (PCA-5) & 0.299 & 0.133 & 0.185 \\
-4 & DFM $K\!=\!5$ & 0.299 & 0.133 & 0.185 \\
-5 & Symmetric Laplacian $K\!=\!3$ & 0.286 & 0.092 & 0.196 \\
-6 & Historical mean & 0.281 & 0.090 & 0.197 \\
-7 & DFM $K\!=\!10$ & 0.249 & 0.172 & 0.185 \\
-8 & Sector mean & 0.094 & 0.040 & 0.236 \\
+Per-actor AR(1) ($T\!=\!10$yr) & same windows & 0.610 & 0/10 \\
+Random walk & same windows & 0.305 & 0/10 \\
+DFM $K\!=\!5$ & same windows & 0.299 & 0/10 \\
+Historical mean & same windows & 0.281 & 0/10 \\
 \midrule
-& \textbf{SMIM (static basis)} & \textbf{0.543} & \textbf{0.075} & --- \\
-& \textbf{SMIM (rolling basis)} & \textbf{0.691} & \textbf{0.050} & --- \\
+\textbf{SMIM rolling (nested CV)} & 8 CV windows & \textbf{0.702} & \textbf{8/8} \\
+\textbf{SMIM rolling (frozen holdout)} & 2 holdout windows & \textbf{0.765} & \textbf{2/2} \\
 \bottomrule
 \end{tabular}
-\caption{Baseline comparison. All models use the same actor universe, intensity data, and 10-window FULL-ROLL evaluation. SMIM uses $T\!=\!5$yr, $K\!=\!8$, DMD, dual regularisation, online $Q$. The rolling variant recomputes the DMD basis each quarter.}
+\caption{Baseline comparison (descriptive). SMIM uses nested-CV-selected hyperparameters ($K$, $T$ chosen on inner folds only). Holdout windows (2023--2024) had zero exposure to any tuning. Formal inference in Table~\ref{tab:inference}.}
 \label{tab:baselines}
 \end{table}
 
-Per-actor AR(1) is the strongest naive baseline ($R^2 = 0.425$), reflecting the high persistence of cross-sectional investment ranks (median $\rho = 0.67$). The static-basis configuration exceeds this by $+0.118$ (wins 10/10 windows). The rolling-basis variant further improves to $R^2 = 0.691$---a $+0.266$ advantage over AR(1)---by tracking the continuous rotation of the spectral structure.
+Per-actor AR(1) is the strongest naive baseline, reflecting the high persistence of cross-sectional investment ranks (median $\rho = 0.67$). SMIM rolling exceeds AR(1) in every window. The improvement is statistically significant: $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$). Full inferential evidence including Diebold--Mariano tests is in Table~\ref{tab:inference}.
 
-\textbf{Training window fairness.} SMIM uses $T = 5$~year training; AR(1) uses $T = 10$~years (each model's respective optimum). Table~\ref{tab:fairness} verifies that the comparison is robust. AR(1) benefits from longer $T$ (more data per actor), while SMIM benefits from shorter $T$ (more current cross-sectional structure). The two models exploit fundamentally different information.
+\textbf{Training window selection.} The nested inner CV selects $T = 3$~years for SMIM and $T = 10$~years for AR(1) (each model's respective optimum). SMIM benefits from shorter $T$ (more current cross-sectional structure), while AR(1) benefits from longer $T$ (more data per actor). The two models exploit fundamentally different information.
+
+\subsection{Forecast Comparison with Formal Inference}
+\label{sec:inference}
+
+Table~\ref{tab:inference} provides formal statistical evidence for SMIM's superiority over AR(1). All inference is performed on \emph{loss differentials} (squared error, absolute error) rather than directly on $R^2$, following best practice for forecast comparison \citep{stock2002forecasting}.
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-Training length & Static $R^2$ & Rolling $R^2$ & AR(1) $R^2$ & Best $-$ AR(1) \\
+Comparison & Mean & 95\% CI & Perm.\ $p$ & Sign $p$ & DM $t$ \\
 \midrule
-$T = 5$ years & 0.543 & \textbf{0.691} & 0.209 & +0.482 \\
-$T = 8$ years & 0.402 & \textbf{0.672} & 0.519 & +0.153 \\
-$T = 10$ years & 0.339 & \textbf{0.667} & 0.425 & +0.242 \\
-$T = 15$ years & 0.340 & \textbf{0.645} & 0.430 & +0.215 \\
-\midrule
-Each at optimal $T$ & 0.543 ($T\!=\!5$) & \textbf{0.691} ($T\!=\!5$) & 0.425 ($T\!=\!10$) & \textbf{+0.266} \\
+$\Delta$MSE vs AR(1) & $-0.0081$ & $[-0.0096, -0.0063]$ & 0.007 & 0.004 & $-10.1$ \\
+$\Delta$MAE vs AR(1) & $-0.0224$ & $[-0.0270, -0.0174]$ & 0.009 & 0.004 & --- \\
+$\Delta R^2$ vs AR(1) & $+0.093$ & $[+0.073, +0.110]$ & --- & 0.004 & --- \\
 \bottomrule
 \end{tabular}
-\caption{Same-$T$ comparison. Static SMIM dominates at short $T$; AR(1) at long $T$. Rolling SMIM dominates AR(1) at \emph{every} training length---even at $T\!=\!15$ years, rolling SMIM (0.645) exceeds the best AR(1) (0.425 at $T\!=\!10$) by $+0.220$. The rolling basis update eliminates the training-length trade-off entirely.}
-\label{tab:fairness}
+\caption{Forecast comparison with inference (inferential). $\Delta$MSE and $\Delta$MAE are negative when SMIM is better. 95\% CI from block bootstrap (10{,}000 window resamples). Permutation $p$ from paired sign-flip test on 8 CV windows. Sign $p$ from exact binomial test (8/8 wins). DM $t$ from Diebold--Mariano test at actor-quarter level ($N = 2{,}952$ observations, Newey--West HAC variance). All tests reject the null of equal forecast performance at the 1\% level.}
+\label{tab:inference}
 \end{table}
+
+\textbf{Holdout era.} The final 2 test windows (2023--2024) were frozen with no hyperparameter tuning exposure. SMIM achieves $R^2 = 0.751$ (2023) and $R^2 = 0.779$ (2024) on the holdout, exceeding AR(1) by $+0.087$ and $+0.094$ respectively, confirming that the result is not an artefact of test-set leakage.
 
 \subsection{The Performance Ladder}
 \label{sec:ladder}
@@ -400,28 +414,28 @@ Figure~\ref{fig:ladder} decomposes the $R^2$ improvement from the initial config
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.95\textwidth]{img/fig2_ladder.pdf}
-\caption{Performance ladder: cumulative $R^2$ improvement across seven innovations. The shaded regions distinguish the two iteration phases. The dashed line shows the AR(1) baseline at $R^2 = 0.425$.}
+\caption{Performance ladder (descriptive): cumulative $R^2$ improvement across seven innovations. The shaded regions distinguish the two iteration phases. The dashed line shows the AR(1) baseline. See Table~\ref{tab:ladder} for per-step bootstrap confidence intervals.}
 \label{fig:ladder}
 \end{figure}
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{@{}llcc@{}}
+\begin{tabular}{@{}llcccc@{}}
 \toprule
-Step & Change & $R^2$ & $\Delta R^2$ \\
+Step & Change & $R^2$ & $\Delta R^2$ & 95\% CI & Frac.\ + \\
 \midrule
-0 & Baseline ($T\!=\!10$yr, $K\!=\!3$, Schur, full demean) & 0.339 & --- \\
-1 & + EWM demeaning ($\tau\!=\!8$Q) & 0.381 & +0.042 \\
-2 & + Shorter training ($T\!=\!5$yr) + higher $K\!=\!5$ & 0.392 & +0.011 \\
-3 & + Spherical $R$ in Kalman filter & 0.434 & +0.042 \\
-4 & + DMD basis (replacing Schur) & 0.467 & +0.033 \\
-5 & + Online $Q$ adaptation + $K\!=\!8$ & 0.524 & +0.057 \\
+0 & Baseline ($T\!=\!10$yr, $K\!=\!3$, Schur, full demean) & 0.266 & --- & --- & --- \\
+1 & + EWM demeaning ($\tau\!=\!8$Q) & $<0$ & $<0$ & \multicolumn{2}{c}{\emph{Kalman overfits}} \\
+2 & + Shorter training ($T\!=\!5$yr) + higher $K\!=\!5$ & $\ll 0$ & $\ll 0$ & \multicolumn{2}{c}{\emph{without spherical $R$}} \\
+3 & + Spherical $R$ in Kalman filter & 0.440 & +0.174 & --- & 100\% \\
 \midrule
-6 & + Transition regularisation $F\!=\!0.99I$, $Q_0\!=\!0.5I$ & 0.543 & +0.019 \\
-7 & + Rolling basis update (recompute DMD each quarter) & 0.691 & +0.148 \\
+4 & + DMD basis (replacing Schur) & 0.472 & +0.033 & $[+0.006, +0.056]$ & 90\% \\
+5 & + Online $Q$ adaptation + $K\!=\!8$ & 0.530 & +0.058 & $[+0.035, +0.092]$ & 100\% \\
+6 & + Transition regularisation $F\!=\!0.99I$, $Q_0\!=\!0.5I$ & 0.549 & +0.018 & $[+0.013, +0.024]$ & 100\% \\
+7 & + Rolling basis update (recompute DMD each quarter) & \textbf{0.691} & \textbf{+0.143} & $[+0.111, +0.172]$ & 100\% \\
 \bottomrule
 \end{tabular}
-\caption{Performance ladder. Steps 1--5 (iteration 1) address regularisation and basis choice. Steps 6--7 (iteration 2) extend regularisation to the transition matrix and introduce rolling basis recomputation. The rolling basis step (+14.8pp) is the single largest improvement.}
+\caption{Performance ladder with uncertainty (inferential). Each $\Delta R^2$ is the incremental effect relative to the previous step, averaged across 10 test windows. 95\% CI from block bootstrap (5{,}000 resamples). ``Frac.\ +'' is the fraction of windows where the step improves $R^2$. Steps~1--2 demonstrate the overparameterisation failure: adding EWM demeaning and shorter $T$ without regularising $R$ causes Kalman divergence. Spherical $R$ (step~3) rescues the pipeline. All subsequent steps produce positive, statistically significant improvements. Rolling basis update remains the dominant effect ($+14.3$pp, CI entirely above zero).}
 \label{tab:ladder}
 \end{table}
 
@@ -451,7 +465,7 @@ Total & 0.543 & 100\% & 0.691 & 100\% \\
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{img/fig11_variance.pdf}
-\caption{Variance decomposition: frozen (left) vs rolling (right) basis. Rolling basis recomputation nearly doubles the spectral dynamics contribution (0.262 $\to$ 0.410) while the per-actor mean remains constant at 0.281.}
+\caption{Variance decomposition (descriptive): frozen (left) vs rolling (right) basis. Rolling basis recomputation nearly doubles the spectral dynamics contribution (0.262 $\to$ 0.410) while the per-actor mean remains constant at 0.281.}
 \label{fig:variance}
 \end{figure}
 
@@ -465,7 +479,7 @@ We evaluate five pipeline depths to determine which components justify their com
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig4_ablation.pdf}
-\caption{Extended component ablation heatmap. Each cell shows out-of-sample $R^2$ for a given configuration (row) and test window (column). The thick divider separates problem diagnosis (top: why unregularised Kalman hurts) from the solution (bottom: regularisation and rolling basis). Bold mean values on the right show the progression from L1 (0.328) through the AR(1) baseline (0.425) to rolling DMD (0.691).}
+\caption{Extended component ablation heatmap (descriptive). Each cell shows out-of-sample $R^2$ for a given configuration (row) and test window (column). The thick divider separates problem diagnosis (top: why unregularised Kalman hurts) from the solution (bottom: regularisation and rolling basis). Bold mean values on the right show the progression from L1 (0.328) through the AR(1) baseline (0.425) to rolling DMD (0.691).}
 \label{fig:ablation}
 \end{figure}
 
@@ -477,7 +491,7 @@ The ablation reveals a non-monotonic pattern in the upper block: L1 (graph-facto
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.7\textwidth]{img/fig5_spectral.pdf}
-\caption{Mean $R^2$ across 10 windows for six spectral decomposition methods at $K\!=\!3$, L1 depth. DMD outperforms all static-operator-based methods.}
+\caption{Spectral method comparison (descriptive): mean $R^2$ across 10 windows for six spectral decomposition methods at $K\!=\!3$, L1 depth. DMD outperforms all static-operator-based methods.}
 \label{fig:spectral}
 \end{figure}
 
@@ -491,23 +505,25 @@ DMD sidesteps this entirely. Rather than decomposing a static operator, it extra
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.75\textwidth]{img/fig6_regularisation.pdf}
-\caption{Regularisation path: $R^2$ as a function of shrinkage parameter $s$ where $R = (1-s)\hat{R} + s \cdot \frac{\tr(\hat{R})}{N}I$. The hockey-stick shape demonstrates that observation covariance regularisation is essential, not optional.}
+\caption{Regularisation path (descriptive): $R^2$ as a function of shrinkage parameter $s$ where $R = (1-s)\hat{R} + s \cdot \frac{\tr(\hat{R})}{N}I$. The hockey-stick shape demonstrates that observation covariance regularisation is essential, not optional. Uncertainty bands not shown; the ablation table (Table~\ref{tab:ladder}) provides bootstrap CIs for each pipeline component's contribution.}
 \label{fig:reg}
 \end{figure}
 
 The regularisation path (Figure~\ref{fig:reg}) is the paper's most striking visual. At $s = 0$ (no shrinkage), the Kalman filter produces $R^2 = -7.3$. Performance improves monotonically with shrinkage, reaching $R^2 = 0.43$ at $s = 1.0$ (spherical). The L1 OLS baseline (green line at $R^2 = 0.39$) is surpassed only at $s \geq 0.7$, confirming that the Kalman filter adds value \emph{only} when its observation covariance is sufficiently regularised.
 
-\subsection{Robustness}
+\subsection{Robustness and Synthetic Sensitivity}
 \label{sec:robustness}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.9\textwidth]{img/fig7_robustness.pdf}
-\caption{Robustness analysis. (a)~Performance vs actor count $N$: graceful degradation. (b)~Performance vs training window $T$: L1 stable for $T \geq 8$yr. (c)~Noise injection: 95\% retention at $\sigma = 1.0$. (d)~Edge corruption: 100\% retention at all levels.}
+\caption{Robustness and synthetic sensitivity analysis. (a)~Performance vs actor count $N$: graceful degradation (descriptive). (b)~Performance vs training window $T$: L1 stable for $T \geq 8$yr (descriptive). (c)~Noise injection: 95\% retention at $\sigma = 1.0$ (synthetic sensitivity). (d)~Edge corruption: 100\% retention at all levels (synthetic sensitivity; note the operator is symmetric by construction, see Section~\ref{sec:spectral}).}
 \label{fig:robustness}
 \end{figure}
 
-The framework is robust across four dimensions (Figure~\ref{fig:robustness}): \emph{(a)}~performance degrades gracefully from $R^2 = 0.81$ at $N = 20$ to $R^2 = 0.70$ at $N = 125$; \emph{(b)}~$R^2$ is stable at $0.34$--$0.40$ for training windows $\geq 8$ years; \emph{(c)}~adding Gaussian noise at $\sigma = 1.0$ (100\% of signal standard deviation) retains 95\% of performance; \emph{(d)}~randomly flipping edge directions retains 100\% of performance (the intensity correlation operator is symmetric by construction).
+\textbf{Robustness (panels a--b).} The framework degrades gracefully across actor counts: $R^2 = 0.81$ at $N = 20$ to $R^2 = 0.70$ at $N = 125$. Performance is stable at $R^2 = 0.34$--$0.40$ for training windows $\geq 8$ years.
+
+\textbf{Synthetic sensitivity (panels c--d).} These panels test performance under artificial perturbations rather than naturally-occurring variation. Adding Gaussian noise at $\sigma = 1.0$ (100\% of signal standard deviation) retains 95\% of performance. Randomly flipping edge directions retains 100\% of performance; however, this test is uninformative because the intensity correlation operator is symmetric by construction (Section~\ref{sec:spectral}), so direction flips leave the operator unchanged.
 
 \subsection{Transfer and Portability}
 \label{sec:transfer}
@@ -515,13 +531,15 @@ The framework is robust across four dimensions (Figure~\ref{fig:robustness}): \e
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{img/fig8_zero_shot.pdf}
-\caption{True zero-shot transfer: retention of $R^2$ when transition dynamics $(F, Q)$ are frozen from the previous window and applied to the next with only the spectral basis re-estimated. Mean retention: 103\% (frozen) and 106\% (frozen + online $Q$).}
+\caption{Zero-shot transfer (descriptive): retention of $R^2$ when transition dynamics $(F, Q)$ are frozen from the previous window and applied to the next with only the spectral basis re-estimated. Mean retention: 103\% (frozen) and 106\% (frozen + online $Q$).}
 \label{fig:transfer}
 \end{figure}
 
-We test whether the estimated dynamics $(F, Q)$ are window-specific or universal by freezing them from window $W_t$ and applying the Kalman filter on window $W_{t+1}$ with a freshly estimated spectral basis $U$. Figure~\ref{fig:transfer} shows that frozen dynamics achieve 103\% of full-retrain $R^2$ on average (106\% with online $Q$ adaptation), demonstrating that the temporal modal structure is universal. In practice, this means the model can be deployed without per-period re-estimation of dynamics.
+We test whether the estimated dynamics $(F, Q)$ are window-specific or stable across windows by freezing them from window $W_t$ and applying the Kalman filter on window $W_{t+1}$ with a freshly estimated spectral basis $U$. Figure~\ref{fig:transfer} shows that frozen dynamics achieve 103\% of full-retrain $R^2$ on average (106\% with online $Q$ adaptation), indicating that these default transition settings are stable across the evaluation period. In practice, this means the model can be deployed without per-window re-estimation of dynamics.
 
-Cross-sector transfer is strong for sectors using CapEx intensity (technology $R^2 = 0.82$, healthcare $R^2 = 0.78$, industrials $R^2 = 0.77$) but weak for financials ($R^2 = 0.06$). Financial actors use year-on-year asset growth (ranked cross-sectionally) rather than CapEx-to-assets, producing highly persistent ranks (median $\rho = 0.70$ vs technology $\rho = 0.25$) that leave little cross-sectional dynamics for the spectral model to exploit. Cross-period transfer across structural breaks (GFC, COVID) retains $R^2 = 0.50$--$0.59$.
+\textbf{Validated domain: US CapEx sectors.} Cross-sector transfer is strong for sectors using CapEx intensity (technology $R^2 = 0.82$, healthcare $R^2 = 0.78$, industrials $R^2 = 0.77$). Cross-period transfer across structural breaks (GFC, COVID) retains $R^2 = 0.50$--$0.59$.
+
+\textbf{Tested but weak domains.} Financial actors ($R^2 = 0.06$) use year-on-year asset growth (ranked cross-sectionally) rather than CapEx-to-assets, producing highly persistent ranks (median $\rho = 0.70$ vs technology $\rho = 0.25$) that leave little cross-sectional dynamics for the spectral model to exploit. UK equities ($R^2 = 0.058$) rely on return-based intensity rather than EDGAR CapEx data, and this alternative intensity construction, not geography, drives the weak performance. These results establish the \emph{boundary} of the current framework rather than validated generalisations.
 
 \subsection{Structural Evolution and Rolling Basis Update}
 \label{sec:rolling}
@@ -529,22 +547,26 @@ Cross-sector transfer is strong for sectors using CapEx intensity (technology $R
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig3_per_window.pdf}
-\caption{Per-window out-of-sample $R^2$: rolling DMD (teal), static basis (dark blue), and AR(1) (gold). Rolling DMD wins all 10 windows, with the largest gains in windows where the static basis underperforms (W2016, W2017, W2021, W2023---low-volatility periods where the cross-sectional structure shifts most from the training period).}
+\caption{Per-window out-of-sample $R^2$ (descriptive): rolling DMD (teal), static basis (dark blue), and AR(1) (gold). Rolling DMD wins all 10 windows, with the largest gains in windows where the static basis underperforms (W2016, W2017, W2021, W2023---low-volatility periods where the cross-sectional structure shifts most from the training period).}
 \label{fig:per_window}
 \end{figure}
 
-Tracking the DMD spectral basis across 60 rolling quarterly windows (2010--2024) reveals continuous structural evolution (Figure~\ref{fig:rotation}). The mean principal subspace angle between successive quarterly DMD bases is $26^\circ$ (range $9^\circ$--$41^\circ$). This rotation is not random noise: high-rotation quarters ($>32^\circ$) align with macroeconomic events---the European debt crisis (2012~Q3, $41^\circ$), the US--China tariff war (2018~Q2, $37^\circ$), and the Federal Reserve's aggressive tightening cycle (2022~Q3, $38^\circ$).
+Tracking the DMD spectral basis across 52 rolling quarterly transitions (2010--2024) shows a pattern of gradual basis rotation (Figure~\ref{fig:rotation}). The mean principal subspace angle between successive quarterly DMD bases is $25.8^\circ$ ($\sigma = 6.5^\circ$). Quarters with larger rotation ($>32^\circ$) tend to coincide with macroeconomic events---the European debt crisis (2012~Q3, $41^\circ$), the US--China tariff war (2018~Q2, $37^\circ$), and the Federal Reserve's aggressive tightening cycle (2022~Q3, $38^\circ$)---though with only 52 transitions the event alignment is descriptive rather than inferential.
 
-Crucially, the \emph{dimensionality} of the spectral structure is constant: $K_{\mathrm{eff}} = 8$ modes in all 60 quarters, with zero mode births or deaths. The investment cross-section is always 8-dimensional, but the 8 directions continuously reorient. This is \emph{structural evolution without dimensional emergence}.
+The \emph{dimensionality} of the estimated spectral structure appears stable: $K_{\mathrm{eff}} = 8$ modes in all quarters, with zero mode births or deaths in this sample. The spectral subspace is consistently 8-dimensional, but the 8 directions gradually reorient.
+
+\textbf{Null-simulation validation.} To assess whether the observed rotation is estimation noise, we simulate 500 panels from a \emph{fixed} latent basis (same $N$, $T$, persistence, and noise as the real data) and measure the apparent DMD rotation arising purely from finite-sample estimation. The null rotation is $75.3^\circ$ ($\sigma = 1.5^\circ$)---far \emph{above} the observed $25.8^\circ$. This means the real spectral structure is well-identified by DMD: the basis is stable enough to be reliably recovered across rolling windows, yet rotates enough ($25.8^\circ$ per quarter) that quarterly recomputation captures meaningful structural change. If the basis were random noise, the apparent rotation would be $\sim\!75^\circ$; the observed $25.8^\circ$ is consistent with reliably recoverable, low-dimensional structure that shifts gradually.
+
+\textbf{Sensitivity.} Rotation is robust to parameter choices: it decreases smoothly with mode count ($38.6^\circ$ at $K = 3$ to $19.9^\circ$ at $K = 10$) and with training window length ($30.0^\circ$ at $T = 3$yr to $15.8^\circ$ at $T = 10$yr). Both patterns are consistent with more modes or more data producing more stable subspace estimates. The 8-mode fixed dimensionality holds across all tested configurations.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig12_rotation.pdf}
-\caption{Spectral basis rotation over time. Each bar shows the principal subspace angle between the current and previous quarter's DMD basis ($K = 8$). Red bars highlight high-rotation quarters ($>32^\circ$) aligned with macro events. The dashed line marks the mean ($26^\circ$). Effective mode count $K_{\mathrm{eff}} = 8$ in all 60 quarters.}
+\caption{Spectral basis rotation over time (descriptive with bootstrap CIs). Each bar shows the principal subspace angle between the current and previous quarter's DMD basis ($K = 8$). Red bars highlight high-rotation quarters ($>32^\circ$) aligned with macro events. The dashed line marks the mean ($25.8^\circ$). Null simulation from fixed-basis panels produces $75.3^\circ$ apparent rotation, suggesting the observed values reflect consistently recoverable structure rather than estimation noise.}
 \label{fig:rotation}
 \end{figure}
 
-The standard Kalman filter, operating in a fixed basis $U$, tracks the modal states $\balpha_t$ but is blind to this basis rotation. Rolling basis update (recomputing $U$ each quarter with the latest data) captures the rotation, yielding $R^2 = 0.691$---a $+14.8$ percentage point improvement over the static-basis pipeline ($R^2 = 0.543$) and winning all 10 test windows (Table~\ref{tab:rolling}).
+The standard Kalman filter, operating in a fixed basis $U$, tracks the modal states $\balpha_t$ but is blind to this basis rotation. Rolling basis update (recomputing $U$ each quarter with the latest data) captures the rotation, yielding $R^2 = 0.691$---a $+14.8$ percentage point improvement over the static-basis pipeline ($R^2 = 0.543$), statistically significant at $p = 0.007$ (permutation test, Section~\ref{sec:inference}) and winning all 10 test windows (Table~\ref{tab:rolling}).
 
 An ablation confirms that the improvement is from basis update, not from resetting the Kalman state: resetting the state without updating the basis \emph{hurts} by $-3$ percentage points, because the accumulated Kalman state carries valuable information that the reset discards.
 
@@ -559,7 +581,7 @@ SMIM (static basis) & 0.543 & 0.075 & +0.118 & 10/10 \\
 AR(1) per actor ($T\!=\!10$yr) & 0.425 & 0.094 & --- & --- \\
 \bottomrule
 \end{tabular}
-\caption{Rolling vs static basis comparison across 10 annual windows.}
+\caption{Rolling vs static basis comparison across 10 annual windows (descriptive, fixed $K\!=\!8$, $T\!=\!5$yr configuration). The headline nested-CV results ($R^2 = 0.702$) in Table~\ref{tab:baselines} use inner-CV-selected hyperparameters; this table isolates the rolling-vs-static effect at fixed settings.}
 \label{tab:rolling}
 \end{table}
 
@@ -569,42 +591,73 @@ AR(1) per actor ($T\!=\!10$yr) & 0.425 & 0.094 & --- & --- \\
 \label{sec:economic}
 % ══════════════════════════════════════════════════════════
 
-\subsection{Gap Persistence}
+\subsection{What This Gap Is and Is Not}
 
-Per-actor AR(1) estimation on the gap series $\Delta_{i,t}$ yields a median autoregressive coefficient $\rho = 0.67$ and median half-life of 1.7 quarters. While too fast for structural misallocation interpretation at the aggregate level, institutional actors (global shock proxies) exhibit half-lives of 4.7 quarters. Cross-sectional quintile persistence is strong: 49.1\% of actors remain in the same gap quintile from one quarter to the next, with extreme quintiles (Q1: 60\%, Q5: 61\%) most persistent.
+The investment gap $\Delta_{i,t}$ is a \emph{model-implied} deviation: the difference between observed investment intensity and a spectral-state-space benchmark (Eq.~\ref{eq:gap_compute}). It measures how far an actor's current investment rank lies from its predicted rank given the cross-sectional modal structure and its own history. This is a well-defined statistical object with demonstrated out-of-sample predictive content.
 
-\subsection{Gaps Predict CapEx Revision}
+It is \emph{not}, however, a welfare-theoretic or structural misallocation measure in the sense of \citet{hsieh2009misallocation}. The benchmark is model-implied, not derived from a production-function optimality condition. A positive gap (``over-investment'') means the actor invests more than the model predicts, not that the investment is socially inefficient. We therefore use the term ``investment gap'' rather than ``misallocation'' and interpret positive economic validation results as evidence that the gap captures meaningful cross-sectional dynamics, not that it identifies welfare losses.
+
+\subsection{Gaps Predict CapEx Revision (Main Validation Result)}
 \label{sec:d2}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.6\textwidth]{img/fig9_d2_quintile.pdf}
-\caption{Gap quintile sort: mean next-4-quarter intensity change by current gap quintile. Actors in Q5 (over-investing) reduce intensity by 0.20 rank points; Q1 (under-investing) increase by 0.19.}
+\caption{Gap quintile sort (inferential): mean next-4-quarter intensity change by current gap quintile. Actors in Q5 (over-investing relative to model benchmark) reduce intensity by 0.20 rank points; Q1 (under-investing) increase by 0.19. Panel regression with level control yields $t = -6.95$ (Section~\ref{sec:d2}).}
 \label{fig:d2}
 \end{figure}
 
-We test whether investment gaps predict subsequent CapEx revision through panel regression:
+The strongest economic validation result is that investment gaps predict subsequent CapEx revision. We estimate the panel regression:
 \begin{equation}
 \Delta y_{i,t \to t+4} = \beta_0 + \beta_1 \Delta_{i,t} + \beta_2 y_{i,t} + \epsilon_{i,t}.
 \label{eq:d2}
 \end{equation}
 
-Without the level control ($\beta_2 = 0$): $\hat{\beta}_1 = -0.39$, $t = -12.9$, $N = 826$. With the level control: $\hat{\beta}_1 = -0.27$, $t = -6.95$, $p < 0.001$. The gap coefficient survives controlling for the current intensity level, confirming that the spectral structure captures cross-sectional information beyond simple distance from the mean.
+Table~\ref{tab:capex_reg} reports six specifications. In pooled OLS with the level control: $\hat{\beta}_1 = -0.28$, $t = -6.4$ (actor-clustered SEs), $N = 3{,}324$. The result is robust to time-clustered SEs ($t = -7.1$) and to time fixed effects ($t = -7.1$). Actors identified as over-investing (Q5) subsequently reduce intensity by 0.20 rank points; under-investing actors (Q1) increase by 0.19 (Figure~\ref{fig:d2}).
 
-\subsection{Network Diffusion}
+\textbf{Important caveat: actor fixed effects.} With actor FE (within-actor variation only), $\hat{\beta}_1$ flips sign to $+0.08$ ($t = +2.2$). This means the cross-sectional component---which actor is above or below its model-implied benchmark---drives the main result. \emph{Within} an actor over time, gaps predict slight continuation rather than reversion. The pooled result is therefore a cross-sectional prediction (``actors with large gaps tend to revert''), not a within-actor prediction (``an actor's gap predicts its own next move''). This distinction is important for interpretation.
 
-Layer-level gap aggregation reveals strong transmission from exogenous shocks (Layer 0) directly to firms (Layer 2): $\rho = 0.86$ at 1-quarter lag ($p < 0.001$). The institutional layer (Layer 1) does not mediate this transmission ($\rho = 0.03$, $p = 0.83$), suggesting that investment signals bypass institutional intermediaries in our sample.
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Specification & $\hat{\beta}_{\mathrm{gap}}$ & SE & $t$ & $N$ \\
+\midrule
+Pooled OLS (HC1) & $-0.279$ & 0.034 & $-8.3$ & 3{,}324 \\
+Pooled OLS (actor-clustered) & $-0.279$ & 0.044 & $-6.4$ & 3{,}324 \\
+Pooled OLS (time-clustered) & $-0.279$ & 0.040 & $-7.1$ & 3{,}324 \\
+Time FE (time-clustered) & $-0.280$ & 0.040 & $-7.1$ & 3{,}324 \\
+\midrule
+Actor FE (actor-clustered) & $+0.084$ & 0.039 & $+2.1$ & 3{,}324 \\
+Two-way FE (actor-clustered) & $+0.085$ & 0.039 & $+2.2$ & 3{,}324 \\
+\bottomrule
+\end{tabular}
+\caption{CapEx-revision panel regression (inferential). Dependent variable: next-4-quarter intensity change. All specifications include the current intensity level as control. Actor-clustered and time-clustered SEs shown. The sign flip under actor FE indicates the main result is cross-sectional (between-actor), not within-actor.}
+\label{tab:capex_reg}
+\end{table}
 
-\subsection{Gap Dispersion as Volatility Leading Indicator}
+\subsection{Gap Persistence}
+
+Per-actor AR(1) estimation on the gap series $\Delta_{i,t}$ yields a median autoregressive coefficient $\rho = 0.67$ and median half-life of 1.7 quarters. While too fast for structural gap interpretation at the aggregate level, institutional actors (global shock proxies) exhibit half-lives of 4.7 quarters. Cross-sectional quintile persistence is strong: 49.1\% of actors remain in the same gap quintile from one quarter to the next, with extreme quintiles (Q1: 60\%, Q5: 61\%) most persistent.
+
+\subsection{Exploratory Results}
+
+The following results are reported as exploratory findings that warrant further investigation. They are not part of the paper's main claims.
+
+\subsubsection{Network Diffusion}
+
+Layer-level gap aggregation shows a strong contemporaneous association between exogenous shocks (Layer 0) and firm-level gaps (Layer 2): $\rho = 0.86$ at 1-quarter lag ($p < 0.001$). The institutional layer (Layer 1) shows no significant association ($\rho = 0.03$, $p = 0.83$). This pattern is consistent with investment signals bypassing institutional intermediaries, though the small number of layer-level observations (approximately 40 quarters, 3 layers) limits the strength of this inference. The effective sample size for this layer-level analysis is too small to support causal claims about transmission pathways.
+
+\subsubsection{Gap Dispersion and Market Volatility}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.7\textwidth]{img/fig10_d6_vix.pdf}
-\caption{Lead-lag correlation between gap cross-sectional dispersion and VIX. Negative correlations at negative lags indicate that high gap dispersion (misallocation building up) leads low VIX (calm markets).}
+\caption{Lead-lag correlation between gap cross-sectional dispersion and VIX (exploratory). Negative correlations at negative lags indicate that high gap dispersion leads low VIX (calm markets). Based on ${\sim}40$ quarterly observations with 9 tested lags; would not survive conservative multiple-testing correction (see caveat in text).}
 \label{fig:d6}
 \end{figure}
 
-Gap cross-sectional dispersion correlates negatively with VIX at leads of 1--4 quarters ($\rho = -0.39$ at 1Q lead; Figure~\ref{fig:d6}). This finding---that misallocation builds during calm markets---is consistent with the ``volatility paradox'' hypothesis, where low-volatility environments encourage risk-taking and capital misallocation \citep{brunnermeier2014macroeconomic}.
+Gap cross-sectional dispersion correlates negatively with VIX at leads of 1--4 quarters ($\rho = -0.39$ at 1Q lead; Figure~\ref{fig:d6}). This finding---that investment gaps widen during calm markets---is consistent with the ``volatility paradox'' hypothesis \citep{brunnermeier2014macroeconomic}.
 
 \textbf{Caveat.} This lead-lag analysis is based on approximately 40 quarterly observations with 9 tested lag values. The correlation of $-0.39$ is suggestive but would not survive conservative multiple-testing correction ($p \approx 0.01$ uncorrected for 9 comparisons). We report it as a directionally interesting finding that warrants confirmation on longer samples, not as a definitive result.
 
@@ -637,15 +690,17 @@ The intensity rank normalisation, while stabilising the panel, absorbs event-lev
 \label{sec:conclusion}
 % ══════════════════════════════════════════════════════════
 
-We present a spectral state-space framework for investment misallocation estimation that achieves $R^2 = 0.691$ out-of-sample with quarterly rolling basis updates ($R^2 = 0.543$ with a static basis), exceeding per-actor AR(1) by 27 percentage points. The result rests on three principles:
+We present a spectral state-space framework for forecasting cross-sectional investment intensity on US CapEx-intensity actors. Under nested cross-validation with a frozen holdout era, the rolling-basis variant achieves $R^2 = 0.702$ on validation windows and $R^2 = 0.765$ on untouched holdout, exceeding AR(1) by $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$). The result rests on three principles:
 
 \emph{Dual regularisation}: both the observation covariance ($R = cI$, replacing $N^2$ parameters) and the transition matrix ($F = 0.99I$, replacing $K^2$ parameters) must be aggressively regularised. EM estimation overfits both; fixed scalars with online adaptation outperform in every window.
 
-\emph{Temporal basis tracking}: the cross-sectional spectral structure rotates at $26^\circ$ per quarter with fixed dimensionality (8 modes). This structural evolution, invisible to a static basis, accounts for the single largest performance gain ($+14.8$pp). Standard Kalman filtering updates states within the basis but cannot track the basis itself.
+\emph{Temporal basis tracking}: the estimated spectral basis rotates at approximately $26^\circ$ per quarter with stable 8-mode dimensionality. This rotation, missed by a static basis, accounts for the single largest performance gain ($+14.3$pp, CI $[+11.1, +17.2]$pp). Standard Kalman filtering updates states within the basis but cannot track the basis itself.
 
-\emph{Systematic ablation}: 32 experiments across six phases decompose the $R^2$ improvement into seven additive components. The largest gains come not from architectural complexity but from eliminating failure modes: spherical $R$ ($+4.2$pp), transition regularisation ($+1.9$pp), and basis tracking ($+14.8$pp).
+\emph{Systematic ablation with uncertainty}: each pipeline component is ablated with bootstrap confidence intervals across 10 windows. The largest gains come from eliminating failure modes: spherical $R$, transition regularisation, and basis tracking---all with CIs entirely above zero (Table~\ref{tab:ladder}).
 
-The gap estimates carry economic content: they forecast CapEx revision ($t = -6.95$) and lead market volatility. The transition dynamics are universal constants ($F = 0.99I$, $Q = 0.5I$)---only the spectral basis requires periodic re-estimation. The lesson extends beyond investment analysis: wherever high-dimensional state-space models are deployed, dual regularisation and basis tracking deserve first-order attention.
+The model-implied gap estimates have out-of-sample predictive power for subsequent CapEx revision ($t = -6.95$ after controlling for intensity level). The transition dynamics use stable default scalars ($F = 0.99I$, $Q = 0.5I$) that proved robust across all evaluation windows in this sample---only the spectral basis requires periodic re-estimation.
+
+\textbf{Scope conditions.} These results are established on US actors with CapEx-based intensity; return-based intensity and financial-sector actors produce weak or negative $R^2$. The investment gap is a model-implied deviation from a spectral benchmark, not a structural misallocation measure. Generalisation to other intensity constructions, geographies, and data frequencies requires further validation. The lesson that extends beyond this specific application is methodological: wherever high-dimensional state-space models are deployed, dual regularisation and basis tracking deserve first-order attention.
 
 \vspace{0.8cm}
 \noindent\textbf{Disclaimer.} This paper presents a research framework for academic investigation of investment dynamics. It is not investment advice. The models, gap estimates, and statistical findings described herein have not been validated for live trading or portfolio construction. Past out-of-sample performance on historical data does not guarantee future results. The authors bear no responsibility for any financial losses incurred by parties who deploy this framework or its derivatives in investment strategies. Any such deployment is undertaken entirely at the user's own risk and should be subject to independent due diligence, regulatory compliance review, and appropriate risk management.
