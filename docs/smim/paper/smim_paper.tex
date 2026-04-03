@@ -92,7 +92,7 @@ We develop a spectral state-space framework for forecasting cross-sectional inve
 
 Capital allocation decisions propagate through a hierarchical, networked system of institutions. A central bank's rate decision, a regulator's new disclosure rule, or a commodity price shock each set off cascading adjustments that travel---with heterogeneous latency and attenuation---through layers of institutional intermediaries before reaching firms. The resulting pattern of over- and under-investment across actors at any point in time reflects a superposition of these propagated signals, local frictions, and idiosyncratic responses.
 
-Despite rich literatures on factor models \citep{fama1993common}, network effects in economics \citep{acemoglu2012network}, and spectral graph theory \citep{ortega2018graph}, to our knowledge no established framework jointly addresses: (i)~decompose how investment-relevant signals propagate through a heterogeneous actor hierarchy; (ii)~estimate actor-specific investment gaps as deviations from a structurally-informed benchmark; and (iii)~validate that the resulting gap estimates carry out-of-sample predictive content.
+Despite rich literatures on factor models \citep{fama1993common}, network effects in economics \citep{acemoglu2012network}, and spectral graph theory \citep{ortega2018graph}, to our knowledge no established framework jointly: (i)~decomposes how investment-relevant signals propagate through a heterogeneous actor hierarchy; (ii)~estimates actor-specific investment gaps as deviations from a structurally-informed benchmark; and (iii)~validates that the resulting gap estimates carry out-of-sample predictive content.
 
 This paper addresses all three objectives. We develop \textbf{SMIM} (\textbf{S}pectral \textbf{M}odal \textbf{I}nvestment \textbf{M}odel), a state-space framework that represents the cross-sectional dynamics of investment intensity through a low-dimensional modal basis extracted via Dynamic Mode Decomposition (DMD), filtered through a Kalman model with dual regularisation at both the observation and transition levels. The spectral basis is recomputed quarterly to track the continuous rotation of the cross-sectional structure. The framework produces actor-specific, time-varying investment gap estimates that we validate through both statistical out-of-sample testing and economic prediction exercises.
 
@@ -165,7 +165,7 @@ The framework constructs $y^*_{i,t}$ through five sequential stages plus a rolli
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig1_conceptual.pdf}
-\caption{\textbf{Framework overview} (descriptive). (a)~Multilayer actor structure: Layer~0 exogenous shocks show strong association with Layer~2 firm gaps ($r = 0.86$, Section~\ref{sec:economic}). Five sectors contain 93 actors with investment intensity. (b)~Static processing pipeline from raw intensity panel to investment gap estimates ($R^2 = 0.543$). Rolling basis recomputation (Section~\ref{sec:rolling}) raises performance to $R^2 = 0.691$.}
+\caption{\textbf{Framework overview} (descriptive). (a)~Multilayer actor structure: Layer~0 exogenous shocks show strong association with Layer~2 firm gaps ($r = 0.86$, Section~\ref{sec:economic}). Five sectors contain 93 actors with investment intensity. (b)~Static processing pipeline from raw intensity panel to investment gap estimates. Under nested CV, the rolling-basis variant achieves $R^2 = 0.702$ on validation windows and $R^2 = 0.765$ on frozen holdout (Table~\ref{tab:baselines}).}
 \label{fig:conceptual}
 \end{figure}
 
@@ -479,7 +479,7 @@ We evaluate five pipeline depths to determine which components justify their com
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig4_ablation.pdf}
-\caption{Extended component ablation heatmap (descriptive). Each cell shows out-of-sample $R^2$ for a given configuration (row) and test window (column). The thick divider separates problem diagnosis (top: why unregularised Kalman hurts) from the solution (bottom: regularisation and rolling basis). Bold mean values on the right show the progression from L1 (0.328) through the AR(1) baseline (0.425) to rolling DMD (0.691).}
+\caption{Extended component ablation heatmap (descriptive, fixed-configuration diagnostic). Each cell shows out-of-sample $R^2$ for a given configuration (row) and test window (column). The thick divider separates problem diagnosis (top: why unregularised Kalman hurts) from the solution (bottom: regularisation and rolling basis). All values use fixed $K\!=\!8$, $T\!=\!5$yr; headline nested-CV results are in Table~\ref{tab:baselines}.}
 \label{fig:ablation}
 \end{figure}
 
