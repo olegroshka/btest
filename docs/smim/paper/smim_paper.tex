@@ -188,7 +188,7 @@ At prediction time, the benchmark restores the mean: $y^*_{i,t} = \hat{\mu}_i + 
 
 Given the demeaned training panel $\tilde{Y} = [\tilde{y}_1, \ldots, \tilde{y}_T] \in \R^{N \times T}$, we extract a spectral basis that captures temporal cross-sectional dynamics.
 
-\textbf{Why DMD over static operators.} Classical spectral approaches decompose a static operator (e.g., the cross-correlation matrix $C = \tilde{Y}\tilde{Y}^\top / T$). This captures contemporaneous co-movement but not lagged cross-sectional dynamics. Dynamic Mode Decomposition \citep{schmid2010dynamic} bypasses the static operator entirely by working with temporal snapshot pairs, capturing which actors' past values are informative about others' future values.
+\textbf{Why DMD over static operators.} Classical spectral approaches decompose a static operator (e.g., the cross-correlation matrix $C = \tilde{Y}\tilde{Y}^\top / T$). This captures contemporaneous co-movement but not lagged cross-sectional dynamics. Dynamic Mode Decomposition \citep{schmid2010dynamic} bypasses the static operator entirely by working with temporal snapshot pairs, capturing lagged cross-sectional dynamics that are invisible to purely contemporaneous decompositions.
 
 \textbf{DMD algorithm.} Form snapshot matrices $X = [\tilde{y}_1, \ldots, \tilde{y}_{T-1}]$ and $X' = [\tilde{y}_2, \ldots, \tilde{y}_T]$. DMD seeks the best-fit linear operator $A$ such that $X' \approx AX$. Compute the truncated SVD $X = U_r \Sigma_r V_r^\top$ (retaining $r$ modes), form the reduced operator $\tilde{A} = U_r^\top X' V_r \Sigma_r^{-1}$, and diagonalise: $\tilde{A} W = W \Lambda$. The DMD modes are $\Phi = X' V_r \Sigma_r^{-1} W \in \R^{N \times K}$.
 
@@ -346,7 +346,7 @@ We employ a \textbf{nested rolling-validation} protocol with 10 non-overlapping 
 \item \textbf{Frozen holdout}: the final 2 windows (2023--2024) receive no inner tuning---they use the median of previously selected parameters.
 \end{itemize}
 
-Inner CV selects $K = 10$ and $T = 3$~years in the majority of outer folds, yielding nested-CV $R^2 = 0.702$ (8 CV windows) and holdout $R^2 = 0.765$ (2 untouched windows). All headline numbers in this paper are from this nested protocol; the holdout windows had zero exposure to any hyperparameter tuning.
+Inner CV selects $K = 10$ and $T = 3$~years in the majority of outer folds, yielding nested-CV $R^2 = 0.702$ (mean across 8 CV windows) and holdout $R^2 = 0.765$ (pooled over 2023--2024 actor-quarter observations; per-window values are 0.751 and 0.779). All headline numbers in this paper are from this nested protocol; the holdout windows had zero exposure to any hyperparameter tuning.
 
 \textbf{Scope condition.} The framework's performance depends critically on the intensity construction. CapEx intensity produces rich cross-sectional dynamics that the spectral model can exploit ($R^2 = 0.70$), while return intensity produces $R^2 = -0.15$ on the same actors (Section~\ref{sec:transfer}). All results reported below use CapEx intensity unless otherwise noted. Generalisation to other intensity constructions is not guaranteed and should be validated empirically.
 
@@ -382,12 +382,12 @@ Historical mean & same windows & 0.281 & 0/10 \\
 
 Per-actor AR(1) is the strongest naive baseline, reflecting the high persistence of cross-sectional investment ranks (median $\rho = 0.67$). SMIM rolling exceeds AR(1) in every window. The improvement is statistically significant: $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$). Full inferential evidence including Diebold--Mariano tests is in Table~\ref{tab:inference}.
 
-\textbf{Training window selection.} The nested inner CV selects $T = 3$~years for SMIM and $T = 10$~years for AR(1) (each model's respective optimum). SMIM benefits from shorter $T$ (more current cross-sectional structure), while AR(1) benefits from longer $T$ (more data per actor). The two models exploit fundamentally different information.
+\textbf{Training window selection.} The nested inner CV selects $T = 3$~years for SMIM and $T = 10$~years for AR(1) (each model's respective optimum). SMIM benefits from shorter $T$ (more current cross-sectional structure), while AR(1) benefits from longer $T$ (more data per actor). The two models exploit fundamentally different information. For same-$T$ fairness: at $T = 5$yr (a compromise length), SMIM rolling achieves $R^2 = 0.691$ versus AR(1) at $R^2 = 0.209$; at $T = 10$yr (AR(1)'s optimum), SMIM rolling still achieves $R^2 = 0.667$ versus AR(1) at $R^2 = 0.425$. SMIM dominates AR(1) at every training length tested.
 
 \subsection{Forecast Comparison with Formal Inference}
 \label{sec:inference}
 
-Table~\ref{tab:inference} provides formal statistical evidence for SMIM's superiority over AR(1). All inference is performed on \emph{loss differentials} (squared error, absolute error) rather than directly on $R^2$, following best practice for forecast comparison \citep{stock2002forecasting}.
+Table~\ref{tab:inference} provides formal statistical evidence for SMIM's superiority over AR(1). All inference is performed on \emph{loss differentials} (squared error, absolute error) rather than directly on $R^2$, following best practice for forecast comparison \citep{stock2002forecasting}. The table reports complementary inference at two aggregation levels: the permutation test and sign test operate on 8 window-level loss differentials, while the Diebold--Mariano test operates on 2{,}952 actor-quarter-level loss differentials with Newey--West HAC variance. The two levels address different concerns (window-level: ``does SMIM win consistently?''; actor-quarter: ``is the average loss reduction significant after accounting for dependence?'').
 
 \begin{table}[H]
 \centering\small
@@ -700,7 +700,7 @@ We present a spectral state-space framework for forecasting cross-sectional inve
 
 \emph{Systematic ablation with uncertainty}: each pipeline component is ablated with bootstrap confidence intervals across 10 windows. The largest gains come from eliminating failure modes: spherical $R$, transition regularisation, and basis tracking---all with CIs entirely above zero (Table~\ref{tab:ladder}).
 
-The model-implied gap estimates predict subsequent CapEx revision ($t \approx -6.4$ to $-7.1$ with clustered SEs), though this is a cross-sectional result that flips sign under actor fixed effects (Table~\ref{tab:capex_reg}). The transition dynamics use stable default scalars ($F = 0.99I$, $Q = 0.5I$) that performed robustly across all evaluation windows in this sample---only the spectral basis requires periodic re-estimation.
+The model-implied gap estimates predict subsequent CapEx revision ($t \approx -6.4$ to $-7.1$ with clustered SEs), though this is a cross-sectional result that flips sign under actor fixed effects (Table~\ref{tab:capex_reg}). The transition dynamics use stable default scalars ($F = 0.99I$, $Q = 0.5I$) that performed consistently across all evaluation windows in this sample---only the spectral basis requires periodic re-estimation.
 
 \textbf{Scope conditions.} These results are established on US actors with CapEx-based intensity; return-based intensity and financial-sector actors produce weak or negative $R^2$. The investment gap is a model-implied deviation from a spectral benchmark, not a structural misallocation measure. Generalisation to other intensity constructions, geographies, and data frequencies requires further validation. The lesson that extends beyond this specific application is methodological: wherever high-dimensional state-space models are deployed, dual regularisation and basis tracking deserve first-order attention.
 
