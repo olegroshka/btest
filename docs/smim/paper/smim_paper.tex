@@ -157,7 +157,7 @@ The investment gap for actor $i$ at time $t$ relative to a benchmark functional 
 \Delta_{i,t} = y_{i,t} - y^*_{i,t}, \qquad y^*_{i,t} = \mathcal{B}(Y_{1:t}, \theta),
 \label{eq:gap}
 \end{equation}
-where $\Delta_{i,t} > 0$ indicates over-investment and $\Delta_{i,t} < 0$ indicates under-investment relative to the benchmark, and $Y_{1:t}$ denotes the information set available at time $t$.
+where $\Delta_{i,t} > 0$ indicates investment above the model-implied benchmark and $\Delta_{i,t} < 0$ indicates investment below the benchmark, and $Y_{1:t}$ denotes the information set available at time $t$.
 \end{definition}
 
 The framework constructs $y^*_{i,t}$ through five sequential stages plus a rolling basis update, each justified by ablation (Section~\ref{sec:ablation}). Figure~\ref{fig:conceptual} provides an overview: panel~(a) shows the multilayer actor hierarchy with empirically-identified transmission channels; panel~(b) shows the static processing pipeline. The rolling basis extension is described in Section~\ref{sec:rolling}.
@@ -165,7 +165,7 @@ The framework constructs $y^*_{i,t}$ through five sequential stages plus a rolli
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig1_conceptual.pdf}
-\caption{\textbf{Framework overview} (descriptive). (a)~Multilayer actor structure: Layer~0 exogenous shocks show strong association with Layer~2 firm gaps ($r = 0.86$, Section~\ref{sec:economic}). Five sectors contain 93 actors with investment intensity. (b)~Static processing pipeline from raw intensity panel to investment gap estimates. Under nested CV, the rolling-basis variant achieves $R^2 = 0.702$ on validation windows and $R^2 = 0.765$ on frozen holdout (Table~\ref{tab:baselines}).}
+\caption{\textbf{Framework overview} (descriptive). (a)~Multilayer actor structure with three layers. Five sectors contain 93 actors with computed investment intensity. (b)~Static processing pipeline from raw intensity panel to investment gap estimates. Under nested CV, the rolling-basis variant achieves $R^2 = 0.702$ on validation windows and $R^2 = 0.765$ on frozen holdout (Table~\ref{tab:baselines}).}
 \label{fig:conceptual}
 \end{figure}
 
@@ -205,7 +205,7 @@ Given the modal basis $U \in \R^{N \times K}$, we model the latent modal dynamic
 
 The observation noise $R \in \R^{N \times N}$ is estimated via a single EM pass to obtain its scale. The transition matrix $F$ and state noise $Q$ are \emph{not} estimated by EM---they are set to regularised defaults (see below).
 
-\textbf{The overparameterisation problem.} The observation covariance $R$ has $N(N+1)/2 = 4{,}278$ free parameters for $N = 92$ actors, estimated from $T = 12$--$20$ quarterly observations (depending on the inner-CV-selected training window). This extreme $N \gg T$ setting causes the EM to converge to an ill-conditioned $R$ that overfits training noise ($R^2 = -7.3$ without regularisation; Figure~\ref{fig:reg}).
+\textbf{The overparameterisation problem.} The observation covariance $R$ has $N(N+1)/2 = 4{,}278$ free parameters for $N \approx 92$--$93$ actors (depending on window-specific data availability), estimated from $T = 12$--$20$ quarterly observations (depending on the inner-CV-selected training window). This extreme $N \gg T$ setting causes the EM to converge to an ill-conditioned $R$ that overfits training noise ($R^2 = -7.3$ without regularisation; Figure~\ref{fig:reg}).
 
 \textbf{Spherical observation regularisation.} We replace the full $R$ with
 \begin{equation}
@@ -359,6 +359,8 @@ Inner CV selects $K = 10$ and $T = 3$~years in the majority of outer folds, yiel
 \subsection{Baseline Comparison}
 \label{sec:baselines}
 
+Unless otherwise noted, the headline forecasting results in Sections~\ref{sec:results}--\ref{sec:economic} are reported on all actors with computed investment intensity (93 actors, predominantly US CapEx-based; see Table~\ref{tab:actors}). Fixed-configuration diagnostic tables are explicitly labeled.
+
 Table~\ref{tab:baselines} presents the baseline comparison. All SMIM numbers are from the nested-CV protocol (Section~\ref{sec:data}).
 
 \begin{table}[H]
@@ -382,7 +384,7 @@ Historical mean & same windows & 0.281 & 0/10 \\
 
 Per-actor AR(1) is the strongest naive baseline, reflecting the high persistence of cross-sectional investment ranks (median $\rho = 0.67$). SMIM rolling exceeds AR(1) in every window. The improvement is statistically significant: $\Delta R^2 = +0.093$ (95\% bootstrap CI $[+0.073, +0.110]$; permutation $p = 0.007$). Full inferential evidence including Diebold--Mariano tests is in Table~\ref{tab:inference}.
 
-\textbf{Training window selection.} The nested inner CV selects $T = 3$~years for SMIM and $T = 10$~years for AR(1) (each model's respective optimum). SMIM benefits from shorter $T$ (more current cross-sectional structure), while AR(1) benefits from longer $T$ (more data per actor). The two models exploit fundamentally different information. For same-$T$ fairness: at $T = 5$yr (a compromise length), SMIM rolling achieves $R^2 = 0.691$ versus AR(1) at $R^2 = 0.209$; at $T = 10$yr (AR(1)'s optimum), SMIM rolling still achieves $R^2 = 0.667$ versus AR(1) at $R^2 = 0.425$. SMIM dominates AR(1) at every training length tested.
+\textbf{Training window selection and baseline-number note.} The nested inner CV selects $T = 3$~years for SMIM. AR(1) in Table~\ref{tab:baselines} uses $T = 10$~years and is evaluated on the same nested-CV windows, yielding $R^2 = 0.610$. This differs from the AR(1) value of $R^2 = 0.425$ in the fixed-configuration diagnostic tables (Tables~\ref{tab:ladder},~\ref{tab:rolling}), which use a different window/actor alignment from the original ablation experiments. The two AR(1) numbers are not directly comparable; all formal inference (Table~\ref{tab:inference}) uses the nested-CV AR(1) ($R^2 = 0.610$) as the benchmark.
 
 \subsection{Forecast Comparison with Formal Inference}
 \label{sec:inference}
@@ -425,8 +427,8 @@ The following decomposition is a fixed-configuration diagnostic used to understa
 Step & Change & $R^2$ & $\Delta R^2$ & 95\% CI & Frac.\ + \\
 \midrule
 0 & Baseline ($T\!=\!10$yr, $K\!=\!3$, Schur, full demean) & 0.266 & --- & --- & --- \\
-1 & + EWM demeaning ($\tau\!=\!8$Q) & $<0$ & $<0$ & \multicolumn{2}{c}{\emph{Kalman overfits}} \\
-2 & + Shorter training ($T\!=\!5$yr) + higher $K\!=\!5$ & $\ll 0$ & $\ll 0$ & \multicolumn{2}{c}{\emph{without spherical $R$}} \\
+1 & + EWM demeaning ($\tau\!=\!8$Q) & $-0.89$ & $-1.16$ & \multicolumn{2}{c}{\emph{Kalman overfits}} \\
+2 & + Shorter training ($T\!=\!5$yr) + higher $K\!=\!5$ & divergent & divergent & \multicolumn{2}{c}{\emph{without spherical $R$}} \\
 3 & + Spherical $R$ in Kalman filter & 0.440 & +0.174 & --- & 100\% \\
 \midrule
 4 & + DMD basis (replacing Schur) & 0.472 & +0.033 & $[+0.006, +0.056]$ & 90\% \\
@@ -458,14 +460,14 @@ Spectral dynamics ($U\balpha_{t|t}$) & 0.262 & 48\% & 0.410 & 59\% \\
 Total & 0.543 & 100\% & 0.691 & 100\% \\
 \bottomrule
 \end{tabular}
-\caption{Variance decomposition. Rolling basis recomputation shifts the balance from mean-dominated (52\% mean) to dynamics-dominated (59\% spectral). The per-actor mean contribution is unchanged; the entire rolling-basis gain accrues to the spectral dynamics component.}
+\caption{Variance decomposition (descriptive, fixed $K\!=\!8$, $T\!=\!5$yr configuration). Rolling basis recomputation shifts the balance from mean-dominated (52\% mean) to dynamics-dominated (59\% spectral). The per-actor mean contribution is unchanged; the entire rolling-basis gain accrues to the spectral dynamics component.}
 \label{tab:variance}
 \end{table}
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{img/fig11_variance.pdf}
-\caption{Variance decomposition (descriptive): frozen (left) vs rolling (right) basis. Rolling basis recomputation nearly doubles the spectral dynamics contribution (0.262 $\to$ 0.410) while the per-actor mean remains constant at 0.281.}
+\caption{Variance decomposition (descriptive, fixed $K\!=\!8$, $T\!=\!5$yr): frozen (left) vs rolling (right) basis. Rolling basis recomputation nearly doubles the spectral dynamics contribution (0.262 $\to$ 0.410) while the per-actor mean remains constant at 0.281.}
 \label{fig:variance}
 \end{figure}
 
@@ -568,7 +570,7 @@ The \emph{dimensionality} of the estimated spectral structure appears stable: $K
 \label{fig:rotation}
 \end{figure}
 
-The standard Kalman filter, operating in a fixed basis $U$, tracks the modal states $\balpha_t$ but is blind to this basis rotation. Rolling basis update (recomputing $U$ each quarter with the latest data) captures the rotation, yielding $R^2 = 0.691$---a $+14.8$ percentage point improvement over the static-basis pipeline ($R^2 = 0.543$), statistically significant at $p = 0.007$ (permutation test, Section~\ref{sec:inference}) and winning all 10 test windows (Table~\ref{tab:rolling}).
+The standard Kalman filter, operating in a fixed basis $U$, tracks the modal states $\balpha_t$ but is blind to this basis rotation. Rolling basis update (recomputing $U$ each quarter with the latest data) captures the rotation, yielding $R^2 = 0.691$---a $+14.3$ percentage point improvement over the static-basis pipeline (CI $[+11.1, +17.2]$pp from the ablation bootstrap in Table~\ref{tab:ladder}) and winning all 10 test windows (Table~\ref{tab:rolling}).
 
 An ablation confirms that the improvement is from basis update, not from resetting the Kalman state: resetting the state without updating the basis \emph{hurts} by $-3$ percentage points, because the accumulated Kalman state carries valuable information that the reset discards.
 
