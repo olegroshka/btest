@@ -120,3 +120,93 @@ Take the top findings from A-E and test interactions:
 
 All phases combined: ~25 min on CPU, ~5 min on GPU.
 Total configs: ~150-200 across all phases.
+
+---
+
+## 7. Session Prompt
+
+Copy the block below into the next session to execute this plan.
+
+---
+
+# SMIM Iteration 5.2: Parameter Space Exploration
+
+## Context (read these docs first)
+
+Read `docs/smim/ITERATION_5_2_PLAN.md` for the full plan, then `docs/smim/STATUS.md`
+for current project status.
+
+**Current best result** (from Iteration 5.1, all verified):
+- Panel: 146-firm US CapEx/Revenue, quarterly, cross-sectional rank ∈ [0,1]
+- Config: K=2 modes, EWM halflife=12Q, T=3yr training, no operator learning
+- Pipeline: DMD + Kalman (spherical R, F=0.99I, Q₀=0.5I, online Q λ=0.3) + rolling basis
+- Nested CV: SMIM R²=0.711 vs AR(1) R²=0.669, delta=+0.042, 8/8 wins, DM p<0.001
+- T-sweep: delta grows as T shrinks (+5.7pp at T=2yr), cross-sectional pooling effect
+- At K=2 with rolling basis, Kalman is functionally redundant (adds only +0.3pp)
+- Paper: `docs/smim/paper/smim_paper.tex` (~870 lines, ready for arXiv)
+
+**Key scripts to reuse:**
+- `scripts/smim/run_smim_iter5_1_sweep.py` — 210-config sweep template (K×EWM×T)
+- `scripts/smim/run_smim_iter5_1_cv2.py` — nested CV runner (K=2, no OpLearn)
+- `scripts/smim/run_smim_iter5_1_ablation.py` — ablation ladder
+- `scripts/smim/run_smim_a1i5.py` — CapEx/Revenue panel builder + operator library
+
+**Data:**
+- CapEx/Revenue panel: built from `data/smim/processed/edgar_balance_sheet.parquet`
+- 93-actor structural panel: `data/smim/intensities/experiment_a1_intensities.parquet`
+
+## Your task
+
+Execute the plan in `docs/smim/ITERATION_5_2_PLAN.md`. Six phases:
+
+**Phase A (~5 min): Dual-regularisation sweep.**
+Fix K=2, EWM=12, T=3yr. Sweep F ∈ {0.90,0.93,0.95,0.97,0.99,1.00},
+Q₀ ∈ {0.1,0.3,0.5,0.7,1.0}, λ_Q ∈ {0.1,0.2,0.3,0.5}. Report top 10 by
+mean delta vs AR(1). Question: are the inherited constants optimal?
+
+**Phase B (~1 min): K=1 test.**
+Run K=1 with EWM∈{8,12}, T∈{2,3}. If K=1 beats K=2, that's a major finding.
+
+**Phase C (~5 min): Alternative intensities.**
+Run K=2 best config on Revenue/Assets (~259 firms), CapEx/Assets (~442 firms),
+and multi-ratio panel (CapEx/Rev + Rev/Assets, ~268 cols). Build the panels from
+EDGAR data using the same `build_capex_revenue_panel()` pattern.
+
+**Phase D (~3 min): Rolling DMD window.**
+Instead of using ALL training data for DMD, use only the most recent W quarters:
+W ∈ {8,12,16,20,all}. Fix K=2, EWM=12, T=3yr.
+
+**Phase E (~2 min): Fine EWM grid.**
+EWM ∈ {6,7,8,9,10,11,12,13,14} with K=2, T=3yr.
+
+**Phase F (~10 min): Interactions + nested CV.**
+Take top findings from A–E. If any config beats current best (+0.042 nested CV delta),
+run full nested CV to confirm.
+
+## Rules
+
+- ALL R² must be PREDICTIVE (alpha_{t|t-1}), never modal
+- Use `PYTHONIOENCODING=utf-8` on Windows
+- PROJECT_ROOT = `Path(__file__).resolve().parent.parent.parent`
+- Save results to `results/metrics/iter5_2_*.parquet`
+- Do NOT add operator learning back
+- Do NOT change the headline paper numbers unless improvement is substantial
+  AND passes nested CV
+- If Phase A finds F=0.97 beats F=0.99 by <0.5pp, treat as noise — don't update
+- If K=1 works, that IS worth updating the paper for
+
+## Success criteria
+
+| Level | Criterion |
+|-------|----------|
+| BRONZE | Fixed-config delta > +0.040 (current: +0.035) |
+| SILVER | Nested CV delta > +0.050 (current: +0.042) |
+| GOLD | Alternative intensity also beats AR(1) with K=2 |
+| PLATINUM | K=1 works |
+
+## After experiments
+
+1. Update `docs/smim/STATUS.md` with findings
+2. If any result is paper-worthy, update `docs/smim/paper/smim_paper.tex`
+3. Regenerate affected figures if numbers change
+4. Commit everything
