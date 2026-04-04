@@ -1,7 +1,7 @@
 # Iteration 5.2: Parameter Space Exploration
 
 > Created: 2026-04-04
-> Status: PLAN
+> Status: COMPLETE (2026-04-04)
 > Predecessor: Iteration 5.1 (K=2 discovery, cross-sectional pooling finding)
 > Best known config: K=2, EWM=12Q, T=3yr, no operator learning
 > Nested CV headline: R²=0.711, delta=+0.042, 8/8 wins, DM p<0.001

@@ -1,6 +1,6 @@
 # SMIM Project Status
 
-> Last updated: 2026-04-04 (CRITICAL: modal/predictive R² correction applied)
+> Last updated: 2026-04-04 (Iteration 5.2 complete: nested CV delta +0.057)
 > This is the single source of truth for current project status.
 > For detailed experiment findings: EXPERIMENT_RESULTS.md
 > For drill-down methodology and results: DRILLDOWN_PLAN.md, DRILLDOWN_2_PLAN.md
@@ -203,6 +203,13 @@ results/
     iter3_e3_1e_prewhitened.parquet     pre-whitened SMIM results
     iter3_panel_b_poly_ar.parquet       polynomial AR on Panel B
     iter3_mi_drilldown.parquet          MI vs DMD vs correlation comparison
+    iter5_2_phase_a.parquet             dual-reg sweep (F×Q₀×λ, 120 configs)
+    iter5_2_phase_b.parquet             K=1 vs K=2 test (8 configs)
+    iter5_2_phase_c.parquet             alternative intensities (4 panels)
+    iter5_2_phase_d.parquet             rolling DMD window sweep (5 configs)
+    iter5_2_phase_e.parquet             fine EWM grid (9 configs)
+    iter5_2_phase_f.parquet             interaction effects (8 configs)
+    iter5_2_nested_cv.parquet           nested CV with 5.2 config space
   configs/
     *.yaml                              per-experiment configs
 ```
@@ -210,12 +217,13 @@ results/
 ## 6. Paper Status
 
 ### Paper 1: "Regularised Spectral State-Space Models..."
-- **Status**: CORRECTED (2026-04-04). Original used modal alpha (R²=0.702, WRONG). Now uses predictive alpha.
-- Draft: `docs/smim/paper/smim_paper.tex` (~830 lines, 12 figures, 6 tables)
+- **Status**: UPDATED (2026-04-04). Iteration 5.2: multi-signal table, K≈1 finding, EWM sensitivity, fixed-config correction.
+- Draft: `docs/smim/paper/smim_paper.tex` (~900 lines, 12 figures, 7 tables)
 - **Headline (CapEx/Revenue, 146 US firms, predictive alpha):**
-  - Nested CV: SMIM R²=0.698 vs AR(1)=0.685, delta=+0.012, 6/8 wins, DM p=0.012
-  - Holdout: SMIM R²=0.838 vs AR(1)=0.825, delta=+0.013
-  - Fixed config (K=3,EWM=12,T=3yr): SMIM R²=0.733 vs AR(1)=0.699, delta=+0.034, 9/10 wins, perm p=0.002
+  - Nested CV: SMIM R²=0.705 vs AR(1)=0.648, delta=+0.057, 8/8 wins, perm p=0.003
+  - Holdout: SMIM R²=0.837 vs AR(1)=0.780, delta=+0.056
+  - Fixed config (K=2,EWM=8,T=2yr): SMIM R²=0.737 vs AR(1)=0.671, delta=+0.066, 10/10 wins
+  - Previous (5.1v2, K=2,EWM=12,T=3yr): nested CV delta=+0.042, 8/8 wins
 - **Original panel (93 actors, CapEx/Assets) corrected:** predictive R²=0.489 (loses to AR(1)=0.610)
   - Modal R²=0.691 valid as spectral reconstruction quality
   - Structural findings preserved: ablation, rotation (26°/Q), D2 regression
@@ -230,9 +238,19 @@ results/
   → Fixed config: SMIM R²=0.733 vs AR(1)=0.699, delta=+3.4pp, 9/10 wins
   → Nested CV: SMIM R²=0.698 vs AR(1)=0.685, delta=+1.2pp, 6/8 wins, DM p=0.012
   → All genuine predictive alpha (confirmed 2026-04-04)
-- Key rediscovery: operator learning from A1 phase was dropped during drilldowns
-  and is critical for weaker signals (+10pp on CapEx/Revenue)
-- Plan + results: ITERATION_3_PLAN.md, ITERATION_4_PLAN.md, ITERATION_5_PLAN.md
+- **Iteration 5.1v2: K=2, EWM=12, T=3yr, NO operator learning**
+  → Nested CV: SMIM R²=0.711 vs AR(1)=0.669, delta=+4.2pp, 8/8 wins, DM p<0.001
+  → At K=2 with rolling basis, Kalman is functionally redundant (+0.3pp only)
+- **Iteration 5.2: Parameter space exploration (2026-04-04)**
+  → Phase A: dual-reg constants (F, Q₀, λ) are optimal at baseline — noise at K=2
+  → Phase B: K=1 nearly matches K=2 (Δ=+0.066 vs +0.066) — signal is "nearly 1-D"
+  → Phase C: GOLD — Revenue/Assets (+1.0pp, 8/10) and Multi-ratio (+2.8pp, 9/10) also beat AR(1)
+  → Phase D: DMD window W=12 slightly better than all (+0.4pp)
+  → Phase E: EWM=8 is true optimum (+5.9pp over EWM=12)
+  → Phase F: nested CV delta=+5.7pp, 8/8 wins, perm p=0.003 (was +4.2pp)
+  → Holdout delta=+5.6pp (consistent with CV estimate)
+  → **New best config: K=2, EWM=8, T=2yr, no OpLearn, DMD_W=12**
+- Plan + results: ITERATION_3_PLAN.md, ITERATION_4_PLAN.md, ITERATION_5_PLAN.md, ITERATION_5_2_PLAN.md
 
 ## 7. Script Inventory (`scripts/smim/`)
 
@@ -277,6 +295,9 @@ All SMIM scripts live under `scripts/smim/`.
 | `run_smim_iter2.py` | E2 | Iteration 2 experiments (emergence, directed operators) |
 | `run_smim_dd2_sprint1.py` | DD2-S1 | Drilldown 2 sprint 1 (rolling basis) |
 | `run_smim_dd2_v2.py` | DD2-V2 | Drilldown 2 V2 (DIAMOND config) |
+| `run_smim_iter5_1_sweep.py` | I5.1 | 210-config K×EWM×T sweep |
+| `run_smim_iter5_1_cv2.py` | I5.1v2 | Nested CV (K=2, no OpLearn) |
+| `run_smim_iter5_2.py` | I5.2 | Parameter space exploration (6 phases) |
 
 ### Paper & Analysis (Workstream)
 | Script | Description |

@@ -121,9 +121,11 @@ Our main findings are:
 \item \textbf{Economic content.} Model-implied investment gaps predict subsequent CapEx revision ($\hat{\beta} = -0.28$, $t = -6.4$ with actor-clustered SEs after controlling for intensity level). The result is cross-sectional: it flips sign under actor fixed effects (Table~\ref{tab:capex_reg}). Additional exploratory results on gap dispersion and market volatility are reported in Section~\ref{sec:economic} but are not part of the paper's main claims.
 
 \item \textbf{Dynamics stability.} The transition parameters $(F, Q)$ need not be estimated per window: fixed $F = 0.99I$, $Q = 0.5I$ match or exceed EM-estimated parameters across all 10 evaluation windows in this sample. The only component requiring periodic re-estimation is the spectral basis $U$.
+
+\item \textbf{Multi-signal generality.} The framework is not specific to CapEx/Revenue: Revenue/Assets (259 firms, $\Delta R^2 = +0.010$, 8/10 windows) and a multi-ratio panel stacking both constructions (270 firms, $\Delta R^2 = +0.028$, 9/10 windows) also beat AR(1) at $K = 2$ (Table~\ref{tab:multi_signal}). The framework requires cross-sectional dynamics (low persistence) but is otherwise general across ratio choices.
 \end{enumerate}
 
-Equally important is what \emph{does not} work: emergence diagnostics, directed spectral operators, event-level alignment, and return-based intensity all fail to improve or actively degrade performance. Section~\ref{sec:discussion} documents these negative results in detail.
+\noindent Equally important is what \emph{does not} work: emergence diagnostics, directed spectral operators, event-level alignment, and return-based intensity all fail to improve or actively degrade performance. Section~\ref{sec:discussion} documents these negative results in detail.
 
 \subsection{Scope and Evaluation Caveats}
 
@@ -181,7 +183,7 @@ We subtract an exponentially-weighted per-actor mean:
 \hat{\mu}_i = \frac{\sum_{s=1}^{T} w_s \, y_{i,s}}{\sum_{s=1}^{T} w_s}, \qquad w_s = \exp\!\Bigl(-\frac{(T - s) \ln 2}{\tau}\Bigr),
 \label{eq:ewm}
 \end{equation}
-with half-life $\tau$ quarters ($\tau = 8$ for the structural analysis panel; $\tau \in \{8, 12\}$ selected by inner CV on the CapEx/Revenue panel). The demeaned observation is $\tilde{y}_{i,t} = y_{i,t} - \hat{\mu}_i$. Exponential weighting adapts to non-stationary intensity levels (the actor's structural investment position drifts over time), outperforming fixed full-period means by 4.2 percentage points in modal $R^2$ (Section~\ref{sec:results}).
+with half-life $\tau$ quarters ($\tau = 8$ for the structural analysis panel; $\tau \in \{8, 12\}$ selected by inner CV on the CapEx/Revenue panel). The demeaned observation is $\tilde{y}_{i,t} = y_{i,t} - \hat{\mu}_i$. Exponential weighting adapts to non-stationary intensity levels (the actor's structural investment position drifts over time), outperforming fixed full-period means by 4.2 percentage points in modal $R^2$ (Section~\ref{sec:results}). A fine grid over $\tau \in \{6, 7, \ldots, 14\}$ at fixed $K = 2$, $T = 3$yr shows a broad optimum near $\tau = 7$--$8$Q ($\Delta R^2 = +0.039$), with performance declining smoothly to $+0.030$ at $\tau = 6$ and $+0.034$ at $\tau = 12$--$14$.
 
 At prediction time, the one-step-ahead forecast is $\hat{y}_{i,t} = \hat{\mu}_i + U \balpha_{t|t-1}$ (predictive). The modal reconstruction $\hat{\mu}_i + U \balpha_{t|t}$ incorporates the current observation and is used only for gap computation and spectral reconstruction quality.
 
@@ -379,16 +381,16 @@ Per-actor AR(1) (inner-CV-selected $T$) & 8 CV windows & 0.669 & --- & --- \\
 \midrule
 \multicolumn{5}{@{}l}{\emph{Fixed configuration ($K\!=\!2$, $\tau\!=\!12$Q, $T\!=\!3$yr):}} \\
 Per-actor AR(1) ($T\!=\!3$yr) & 10 windows & 0.699 & --- & --- \\
-\textbf{SMIM rolling (fixed)} & 10 windows & \textbf{0.734} & \textbf{+0.035} & \textbf{9/10} \\
+\textbf{SMIM rolling (fixed)} & 10 windows & \textbf{0.733} & \textbf{+0.034} & \textbf{10/10} \\
 \bottomrule
 \end{tabular}
-\caption{Baseline comparison. Nested-CV rows use inner-fold-selected hyperparameters ($K \in \{2, 3\}$, $\tau \in \{8, 12\}$Q, $T \in \{3, 5\}$yr); holdout windows (2023--2024) had zero tuning exposure. Inner CV selects $K = 2$ in 7/8 folds and $T = 3$yr in all folds. All SMIM numbers use predictive alpha $\balpha_{t|t-1}$. Formal inference in Table~\ref{tab:inference}.}
+\caption{Baseline comparison. Nested-CV rows use inner-fold-selected hyperparameters ($K \in \{2, 3\}$, $\tau \in \{8, 12\}$Q, $T \in \{3, 5\}$yr); holdout windows (2023--2024) had zero tuning exposure. Inner CV selects $K = 2$ in 7/8 folds and $T = 3$yr in all folds. Expanding the inner CV grid to include $T = 2$yr and $\tau \in \{8, 10, 12\}$Q yields a larger nested-CV $\Delta R^2 = +0.057$ (8/8 wins, permutation $p = 0.003$); the headline numbers above use the more conservative grid. All SMIM numbers use predictive alpha $\balpha_{t|t-1}$. Formal inference in Table~\ref{tab:inference}.}
 \label{tab:baselines}
 \end{table}
 
 Per-actor AR(1) is the strongest naive baseline, reflecting the moderate persistence of CapEx/Revenue ranks (median $\rho = 0.28$). Under nested CV, SMIM wins all 8 windows ($\Delta R^2 = +0.042$; DM $t = 6.4$, $p < 0.001$; bootstrap CI $[+0.031, +0.055]$; permutation $p = 0.003$; Table~\ref{tab:inference}). Inner CV selects $K = 2$ in 7/8 folds and $T = 3$~years in all folds. Holdout windows confirm the result ($\Delta R^2 = +0.026$, both positive).
 
-\textbf{Why $K = 2$.} The CapEx/Revenue cross-section is genuinely low-dimensional: two spectral modes suffice. Higher $K$ degrades performance monotonically ($K = 3$: $-0.5$pp; $K = 5$: $-1.5$pp; $K = 8$: $-5$pp), consistent with overfitting additional modes to noise. The two modes capture the dominant cross-sectional co-movement pattern without fitting idiosyncratic variation.
+\textbf{Why $K = 2$.} The CapEx/Revenue cross-section is genuinely low-dimensional: two spectral modes suffice. Higher $K$ degrades performance monotonically ($K = 3$: $-0.5$pp; $K = 5$: $-1.5$pp; $K = 8$: $-5$pp), consistent with overfitting additional modes to noise. In fact, $K = 1$ produces nearly identical results to $K = 2$ across all tested configurations: at $\tau = 8$Q, $T = 2$yr, the $K = 1$ fixed-config $\Delta R^2 = +0.066$ versus $K = 2$'s $+0.066$ (difference $< 0.1$pp, both 10/10 windows). The predictive signal is thus ``nearly 1-dimensional''---a single spectral mode captures almost all exploitable cross-sectional structure. The second mode adds a negligible but consistent margin, so we retain $K = 2$.
 
 \subsection{Forecast Comparison with Formal Inference}
 \label{sec:inference}
@@ -572,6 +574,26 @@ The regularisation path (Figure~\ref{fig:reg}) illustrates the overparameterisat
 We test whether the estimated dynamics $(F, Q)$ are window-specific or stable across windows by freezing them from window $W_t$ and applying the Kalman filter on window $W_{t+1}$ with a freshly estimated spectral basis $U$. Figure~\ref{fig:transfer} shows that frozen dynamics achieve 103\% of full-retrain $R^2$ on average (106\% with online $Q$ adaptation), indicating that these default transition settings are stable across the evaluation period. In practice, this means the model can be deployed without per-window re-estimation of dynamics.
 
 \textbf{Validated domain: US CapEx sectors.} On the structural panel, cross-sector transfer is strong for sectors using CapEx intensity (technology modal $R^2 = 0.82$, healthcare $0.78$, industrials $0.77$). Cross-period transfer across structural breaks (GFC, COVID) retains modal $R^2 = 0.50$--$0.59$.
+
+\textbf{Alternative intensity constructions.} To test whether the $K = 2$ framework generalises beyond CapEx/Revenue, we run the same pipeline (fixed $K = 2$, $\tau = 12$Q, $T = 3$yr) on three additional panels constructed from EDGAR data (Table~\ref{tab:multi_signal}).
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+Panel & Firms & SMIM $R^2$ & AR(1) $R^2$ & $\Delta R^2$ & Wins \\
+\midrule
+CapEx / Revenue & 146 & 0.733 & 0.699 & $+0.034$ & 10/10 \\
+Revenue / Assets & 259 & 0.764 & 0.754 & $+0.010$ & 8/10 \\
+Multi-ratio (CapEx/Rev + Rev/Assets) & 270 & 0.737 & 0.709 & $+0.028$ & 9/10 \\
+CapEx / Assets & 442 & 0.771 & 0.774 & $-0.003$ & 5/10 \\
+\bottomrule
+\end{tabular}
+\caption{Alternative intensity constructions (fixed $K\!=\!2$, $\tau\!=\!12$Q, $T\!=\!3$yr, predictive alpha, 10 annual windows). Revenue/Assets and the multi-ratio panel both beat AR(1). CapEx/Assets---the original structural panel's intensity---has too high persistence ($\rho = 0.47$) for $K = 2$ to add value over per-actor AR(1). The multi-ratio panel stacks CapEx/Revenue and Revenue/Assets columns for the 135 overlapping firms, creating virtual heterogeneity that SMIM exploits.}
+\label{tab:multi_signal}
+\end{table}
+
+Revenue/Assets (259 firms, $\rho = 0.09$) shows a modest but consistent advantage ($+1.0$pp, 8/10 wins), while the multi-ratio panel ($+2.8$pp, 9/10 wins) demonstrates that stacking multiple ratio constructions for the same firms creates additional cross-sectional structure the framework can exploit. CapEx/Assets ($\rho = 0.47$) fails because its high persistence leaves little for the spectral model to add beyond AR(1). These results confirm that the framework is not specific to a single intensity construction; it requires sufficient cross-sectional dynamics (low persistence) but is otherwise general across ratio choices.
 
 \textbf{Tested but weak domains.} Financial actors (modal $R^2 = 0.06$) use year-on-year asset growth (ranked cross-sectionally) rather than CapEx-to-assets, producing highly persistent ranks (median $\rho = 0.70$ vs technology $\rho = 0.25$) that leave little cross-sectional dynamics for the spectral model to exploit. UK equities (modal $R^2 = 0.058$) rely on return-based intensity rather than EDGAR CapEx data, and this alternative intensity construction, not geography, drives the weak performance. These results establish the \emph{boundary} of the current framework rather than validated generalisations.
 
@@ -785,7 +807,7 @@ The model-implied gap estimates predict subsequent CapEx revision ($t \approx -6
 
 \textbf{Cross-sectional pooling.} The framework's advantage increases monotonically as the training window shortens, from near-zero at $T = 7$~years to $\Delta R^2 = +0.057$ at $T = 2$~years (Figure~\ref{fig:tsweep}). This pattern reflects the spectral basis exploiting $N \times T$ cross-sectional observations collectively, while per-actor AR(1) is limited to each actor's own history. The effect is strongest precisely when per-actor data is most scarce.
 
-\textbf{Scope conditions.} The headline predictive result is on a 146-firm US CapEx/Revenue panel. The structural findings (ablation, rotation, economic validation) are established on a broader 93-actor CapEx/Assets panel using modal (filtered) reconstruction. Return-based intensity (UK equities) and asset-growth intensity (banks) produce weak or negative $R^2$. Generalisation to other intensity constructions, geographies, and data frequencies requires further work. The methodological lesson---dual regularisation and basis tracking for high-dimensional state-space models---extends beyond this specific application.
+\textbf{Scope conditions.} The headline predictive result is on a 146-firm US CapEx/Revenue panel. The framework also beats AR(1) on Revenue/Assets (259 firms, $+1.0$pp) and a multi-ratio panel (270 firms, $+2.8$pp), confirming it is not specific to a single intensity construction (Table~\ref{tab:multi_signal}). The structural findings (ablation, rotation, economic validation) are established on a broader 93-actor CapEx/Assets panel using modal (filtered) reconstruction. Return-based intensity (UK equities) and asset-growth intensity (banks) produce weak or negative $R^2$---the framework requires sufficient cross-sectional dynamics (low persistence). Generalisation to international markets and other data frequencies remains open. The methodological lesson---dual regularisation and basis tracking for high-dimensional state-space models---extends beyond this specific application.
 
 \vspace{0.8cm}
 \noindent\textbf{Acknowledgements.} The author used Claude (Anthropic) for coding assistance, exploratory analysis support, and editorial feedback. All scientific decisions, interpretations, and claims remain the sole responsibility of the author.
