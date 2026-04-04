@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from quantdsl_backtest.smim.dynamics.kalman import KalmanFilter
@@ -115,7 +115,12 @@ def train_sph_r(otr_dm, N, U):
 
 def predict_quarter(obs_dm_quarter, om, N, U, F, Q_run, R_sph,
                     alpha_init, P_init):
-    """Single-quarter Kalman predict+update with online Q adaptation."""
+    """Single-quarter Kalman predict+update with online Q adaptation.
+
+    Returns (pred, pred_modal, a_f, P_f, Q_new) where:
+      pred       = U @ a_p + om  (PREDICTIVE: uses only t-1 info, genuine forecast)
+      pred_modal = U @ a_f + om  (MODAL: uses current obs via Kalman update)
+    """
     k_act = U.shape[1]
     a_p = F @ alpha_init
     P_p = F @ P_init @ F.T + Q_run
@@ -127,12 +132,13 @@ def predict_quarter(obs_dm_quarter, om, N, U, F, Q_run, R_sph,
         Kg = np.zeros((k_act, N))
     a_f = a_p + Kg @ v
     P_f = (np.eye(k_act) - Kg @ U) @ P_p
-    pred = (a_f @ U.T + om).ravel()
+    pred = (a_p @ U.T + om).ravel()          # PREDICTIVE (genuine OOS forecast)
+    pred_modal = (a_f @ U.T + om).ravel()    # MODAL (uses current obs — diagnostic only)
     # Online Q adaptation
     innov = a_f - F @ alpha_init
     Q_new = (1 - ONLINE_Q_LAMBDA) * Q_run + ONLINE_Q_LAMBDA * np.outer(innov, innov)
     Q_new = (Q_new + Q_new.T) / 2 + np.eye(k_act) * 1e-6
-    return pred, a_f, P_f, Q_new
+    return pred, pred_modal, a_f, P_f, Q_new
 
 
 # =========================================================
@@ -186,11 +192,11 @@ def run_rolling_pipeline(wide, test_year, K, T_train):
             continue
         q_dm = q_data[0] - om.ravel()
 
-        pred, alpha_new, P_new, Q_new = predict_quarter(
+        pred, pred_modal, alpha_new, P_new, Q_new = predict_quarter(
             q_dm, om, N, U_current, F_mat, Q_run, R_sph,
             alpha_c, P_c,
         )
-        preds_list.append(pred)
+        preds_list.append(pred)          # PREDICTIVE (genuine forecast)
         actuals_list.append(q_data[0])
         quarter_dates.append(q_date)
 

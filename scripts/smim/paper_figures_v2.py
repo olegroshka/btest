@@ -29,7 +29,7 @@ import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 IMG_DIR = PROJECT_ROOT / "docs" / "smim" / "paper" / "img"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 METRICS = PROJECT_ROOT / "results" / "metrics"
@@ -83,8 +83,8 @@ def fig_ladder():
         ("+ Spherical\nR", 0.434, 0.392),
         ("+ DMD\nbasis", 0.467, 0.434),
         ("+ Online Q\nK=8", 0.524, 0.467),
-        ("+ F reg\nQ=0.5", 0.543, 0.524),
-        ("+ Rolling\nDMD", 0.691, 0.543),
+        ("+ F reg\nQ=0.5", 0.549, 0.524),
+        ("+ Rolling\nDMD", 0.696, 0.549),
     ]
     fig, ax = plt.subplots(figsize=(10, 5))
 
@@ -105,9 +105,7 @@ def fig_ladder():
     bars = ax.bar(x, heights, bottom=bottoms, color=colors, width=0.6,
                   edgecolor="white", linewidth=1.5, zorder=3)
 
-    # AR(1) baseline
-    ax.axhline(0.425, color=RED, linestyle="--", linewidth=1.5, zorder=2)
-    ax.text(7.35, 0.427, "AR(1) = 0.425", fontsize=8, color=RED, va="bottom")
+    # AR(1) removed: modal R² is reconstruction quality, not comparable to AR(1) forecasts
 
     # Phase annotations
     ax.axvspan(-0.5, 5.5, alpha=0.04, color=ACCENT, zorder=1)
@@ -146,32 +144,30 @@ def fig_ladder():
 def fig_per_window():
     windows = [f"W{ty}" for ty in range(2015, 2025)]
 
-    # V2-1 results
-    rolling = [0.6672, 0.6106, 0.6636, 0.6885, 0.6823, 0.7640, 0.6447, 0.7524, 0.6878, 0.7497]
-    frozen =  [0.5612, 0.4324, 0.4783, 0.6519, 0.5585, 0.6590, 0.4394, 0.6010, 0.4933, 0.6109]
-    ar1_t10 = [0.3345, 0.2952, 0.3349, 0.4894, 0.4717, 0.5405, 0.3087, 0.4723, 0.4823, 0.5163]
+    # Verified values (independent re-run 2026-04-04)
+    rolling = [0.6672, 0.6106, 0.6635, 0.7332, 0.6822, 0.7639, 0.6447, 0.7524, 0.6915, 0.7496]
+    frozen =  [0.5610, 0.4320, 0.4775, 0.6552, 0.5580, 0.6588, 0.4392, 0.6011, 0.4931, 0.6107]
+    # AR(1) removed: modal R² is reconstruction quality, not comparable to forecasts
 
     fig, ax = plt.subplots(figsize=(10, 5))
     x = np.arange(len(windows))
-    w = 0.25
+    w = 0.3
 
-    ax.bar(x - w, rolling, w, color=TEAL, label=f"Rolling DMD (mean={np.mean(rolling):.3f})",
+    ax.bar(x - w/2, rolling, w, color=TEAL, label=f"Rolling DMD (mean={np.mean(rolling):.3f})",
            zorder=3, edgecolor="white")
-    ax.bar(x, frozen, w, color=ACCENT, label=f"Static basis (mean={np.mean(frozen):.3f})",
+    ax.bar(x + w/2, frozen, w, color=ACCENT, label=f"Static basis (mean={np.mean(frozen):.3f})",
            zorder=3, edgecolor="white")
-    ax.bar(x + w, ar1_t10, w, color=GOLD_COLOR, label=f"AR(1) T=10yr (mean={np.mean(ar1_t10):.3f})",
-           zorder=3, edgecolor="white", alpha=0.8)
 
     # Delta annotations above rolling bars
     for i in range(len(windows)):
         delta = rolling[i] - frozen[i]
-        ax.text(i - w, rolling[i] + 0.008, f"+{delta:.2f}",
+        ax.text(i - w/2, rolling[i] + 0.008, f"+{delta:.2f}",
                 ha="center", fontsize=6.5, color=TEAL, fontweight="bold")
 
     ax.set_xticks(x)
     ax.set_xticklabels(windows, fontsize=8)
-    ax.set_ylabel("Out-of-Sample R$^2$")
-    ax.set_title("Per-Window Performance: Rolling vs Static Basis vs AR(1)",
+    ax.set_ylabel("Modal R$^2$ (spectral reconstruction)")
+    ax.set_title("Per-Window Reconstruction Quality: Rolling vs Static Basis",
                  fontweight="bold", color=ACCENT)
     ax.legend(loc="upper left", framealpha=0.9, fontsize=8)
     ax.set_ylim(0, 0.85)
@@ -244,7 +240,7 @@ def fig_variance():
     fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
 
     # Panel (a): Static basis = 0.543
-    total_frozen = 0.543
+    total_frozen = 0.549
     mean_frozen = 0.281
     spectral_frozen = total_frozen - mean_frozen
     ax = axes[0]
@@ -260,8 +256,8 @@ def fig_variance():
             fontsize=12, fontweight="bold", color=ACCENT, zorder=6)
     ax.set_title("(a) Static Basis", fontweight="bold", fontsize=10, color=ACCENT)
 
-    # Panel (b): Rolling DMD = 0.691
-    total_rolling = 0.691
+    # Panel (b): Rolling DMD = 0.696
+    total_rolling = 0.696
     mean_rolling = 0.281  # EWM mean unchanged
     spectral_rolling = total_rolling - mean_rolling
     ax = axes[1]
@@ -377,21 +373,20 @@ def fig_ablation_extended():
     l3 = [0.286, 0.141, 0.117, 0.293, 0.331, 0.406, 0.274, 0.273, 0.324, 0.363]
     l5 = [0.286, 0.279, 0.117, 0.293, 0.385, 0.406, 0.284, 0.282, 0.341, 0.376]
 
-    # Baselines and improved configs
-    ar1 = [0.335, 0.295, 0.335, 0.489, 0.472, 0.541, 0.309, 0.472, 0.482, 0.516]
-    plat = [0.521, 0.409, 0.433, 0.633, 0.532, 0.650, 0.414, 0.572, 0.481, 0.589]
-    rolling = [0.667, 0.611, 0.664, 0.689, 0.682, 0.764, 0.645, 0.752, 0.688, 0.750]
+    # Verified values (independent re-run 2026-04-04)
+    # AR(1) removed: modal R² is reconstruction quality, not comparable to AR(1) forecasts
+    plat = [0.561, 0.432, 0.478, 0.655, 0.558, 0.659, 0.439, 0.601, 0.493, 0.611]
+    rolling = [0.667, 0.611, 0.664, 0.733, 0.682, 0.764, 0.645, 0.752, 0.692, 0.750]
 
     row_labels = [
         "L1: Graph factors\n(no Kalman)",
         "L2: + Kalman\n(unregularised R)",
         "L3: + Regime\nswitching",
         "L5: Full original\npipeline",
-        "AR(1) per actor\n(T=10yr baseline)",
         "SMIM\n(static basis)",
         "SMIM\n(rolling basis)",
     ]
-    data = np.array([l1, l2, l3, l5, ar1, plat, rolling])
+    data = np.array([l1, l2, l3, l5, plat, rolling])
     n_rows, n_cols = data.shape
 
     fig, ax = plt.subplots(figsize=(10, 5.5))
@@ -422,23 +417,23 @@ def fig_ablation_extended():
             val = data[i, j]
             # Use white text on dark cells, black on light
             color = "white" if val < 0.20 or val > 0.60 else "black"
-            fontweight = "bold" if i >= 5 else "normal"
+            fontweight = "bold" if i >= 4 else "normal"
             ax.text(j, i, f"{val:.2f}", ha="center", va="center",
                     fontsize=7, color=color, fontweight=fontweight)
 
     # Mean column on right
     for i in range(n_rows):
         mean_val = data[i].mean()
-        fontweight = "bold" if i >= 5 else "normal"
+        fontweight = "bold" if i >= 4 else "normal"
         ax.text(n_cols + 0.3, i, f"{mean_val:.3f}", ha="left", va="center",
-                fontsize=8, fontweight=fontweight, color=ACCENT if i >= 5 else GREY)
+                fontsize=8, fontweight=fontweight, color=ACCENT if i >= 4 else GREY)
 
     ax.text(n_cols + 0.3, -0.7, "Mean", ha="left", fontsize=8, fontweight="bold", color=ACCENT)
 
     # Phase labels
     ax.text(-0.5, 1.5, "Problem\ndiagnosis", ha="right", va="center", fontsize=8,
             color=RED, fontweight="bold", rotation=90, transform=ax.transData)
-    ax.text(-0.5, 5.0, "Solution", ha="right", va="center", fontsize=8,
+    ax.text(-0.5, 4.5, "Solution", ha="right", va="center", fontsize=8,
             color=TEAL, fontweight="bold", rotation=90, transform=ax.transData)
 
     cbar = fig.colorbar(im, ax=ax, shrink=0.8, pad=0.12)

@@ -125,10 +125,10 @@ def main():
 
     # ── Bottom annotation ────────────────────────────────────────────────
     ax.text(5.5, -0.3,
-            "$N = 93$ actors  |  6 sectors  |  84 quarters (2005 \u2013 2025)",
+            "Structural panel: $N = 93$ actors  |  5 sectors  |  84 quarters (2005 \u2013 2025)",
             ha="center", fontsize=8.5, color=GREY, fontstyle="italic")
     ax.text(5.5, -0.7,
-            "Intensity: CapEx / Assets, cross-sectional rank $\\in [0, 1]$",
+            "Headline panel: $N = 146$ US firms  |  CapEx / Revenue rank $\\in [0, 1]$",
             ha="center", fontsize=8.5, color=GREY, fontstyle="italic")
 
     # ══════════════════════════════════════════════════════════════════════
@@ -146,9 +146,9 @@ def main():
     stages = [
         (2.0, 4.8, "Intensity Panel\n$y_{i,t} \\in [0,1]$,  $N \\times T$",
          L2_BG, ACCENT),
-        (2.0, 3.5, "EWM Demeaning\n$\\tilde{y} = y - \\hat{\\mu}$,  $\\tau = 8$Q",
+        (2.0, 3.5, "EWM Demeaning\n$\\tilde{y} = y - \\hat{\\mu}$,  $\\tau \\in \\{8, 12\\}$Q",
          PIPE_GREEN, GREEN),
-        (2.0, 2.2, "DMD Decomposition\n$Y' \\approx AU$,  $K = 8$ modes",
+        (2.0, 2.2, "DMD Decomposition\n$Y' \\approx AU$,  $K = 2$ modes",
          PIPE_ORANGE, ORANGE),
         (2.0, 0.9, "Kalman Filter (dual reg.)\n$R = cI$,  $F = 0.99I$,  $Q_0 = 0.5I$",
          L2_BG, ACCENT),
@@ -165,20 +165,8 @@ def main():
         y2 = stages[i + 1][1] + bh / 2
         arrow(ax2, 2.0, y1, 2.0, y2, ACCENT, lw=1.8)
 
-    # R^2 annotations (updated for dual reg + rolling)
-    r2_data = [
-        (4.8, "0.339", ""),
-        (3.5, "0.381", "+4.2pp"),
-        (2.2, "0.392", "+1.1pp"),
-        (0.9, "0.543", "+15.1pp"),
-        (-0.4, "0.691", "+14.8pp"),
-    ]
-    for y, r2, delta in r2_data:
-        ax2.text(4.3, y + 0.1, f"$R^2 = {r2}$", fontsize=7.5, color=GREY,
-                 ha="left", fontstyle="italic")
-        if delta:
-            ax2.text(4.3, y - 0.17, delta, fontsize=8, color=GREEN,
-                     ha="left", fontweight="bold")
+    # No R^2 annotations — the ablation numbers are in Table 3 (structural panel).
+    # The conceptual figure shows architecture only.
 
     # Rolling basis update loop — just outside the left box edge
     loop_x = 2.0 - bw / 2 - 0.1  # just outside the left edge

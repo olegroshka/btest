@@ -21,7 +21,7 @@ import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 IMG_DIR = PROJECT_ROOT / "docs" / "smim" / "paper" / "img"
 IMG_DIR.mkdir(parents=True, exist_ok=True)
 METRICS = PROJECT_ROOT / "results" / "metrics"
@@ -242,7 +242,7 @@ def fig_regularisation():
     ax.plot(by_s.index, by_s["pred"], "s--", color=ACCENT_LIGHT, linewidth=1.5, markersize=5,
             label="Kalman predictive", zorder=3)
     ax.axhline(by_s["l1"].mean(), color=GREEN, linestyle=":", linewidth=1.5, label="L1 OLS (no Kalman)")
-    ax.axhline(0.425, color=RED, linestyle="--", linewidth=1.2, label="AR(1) baseline", alpha=0.7)
+    # AR(1) removed: modal R² not comparable to forecast baselines
 
     ax.set_xlabel("Shrinkage parameter $s$ (0 = sample R, 1 = spherical R)")
     ax.set_ylabel("Mean OOS R$^2$")

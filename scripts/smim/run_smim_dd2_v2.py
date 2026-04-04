@@ -97,7 +97,12 @@ def train_sph_r(otr_dm, N, U):
 
 def platinum_predict_quarter(obs_dm_quarter, om, N, U, F, Q, R_sph,
                               alpha_init, P_init, Q_run):
-    """PLATINUM prediction for a single quarter. Returns pred, updated state."""
+    """PLATINUM prediction for a single quarter.
+
+    Returns (pred, pred_modal, a_f, P_f, Q_new) where:
+      pred       = U @ a_p + om  (PREDICTIVE: genuine OOS forecast)
+      pred_modal = U @ a_f + om  (MODAL: uses current obs — diagnostic only)
+    """
     k_act = U.shape[1]
     a_p = F @ alpha_init
     P_p = F @ P_init @ F.T + Q_run
@@ -109,12 +114,13 @@ def platinum_predict_quarter(obs_dm_quarter, om, N, U, F, Q, R_sph,
         Kg = np.zeros((k_act, N))
     a_f = a_p + Kg @ v
     P_f = (np.eye(k_act) - Kg @ U) @ P_p
-    pred = (a_f @ U.T + om).ravel()
+    pred = (a_p @ U.T + om).ravel()          # PREDICTIVE (genuine forecast)
+    pred_modal = (a_f @ U.T + om).ravel()    # MODAL (diagnostic)
     # Online Q adaptation
     innov = a_f - F @ alpha_init
     Q_new = 0.7 * Q_run + 0.3 * np.outer(innov, innov)
     Q_new = (Q_new + Q_new.T) / 2 + np.eye(k_act) * 1e-6
-    return pred, a_f, P_f, Q_new
+    return pred, pred_modal, a_f, P_f, Q_new
 
 
 # =========================================================================
@@ -171,7 +177,7 @@ def run_v2_1(wide):
             if q_data.shape[0] == 0:
                 continue
             q_dm = q_data[0] - om.ravel()
-            pred, alpha_c, P_c, Q_run = platinum_predict_quarter(
+            pred, _modal, alpha_c, P_c, Q_run = platinum_predict_quarter(
                 q_dm, om, N, U_frozen, F_plat, Q_init, R_sph,
                 alpha_c, P_c, Q_run,
             )
@@ -200,7 +206,7 @@ def run_v2_1(wide):
             q_dm = q_data[0] - om.ravel()
 
             # Predict with CURRENT basis
-            pred, alpha_c_new, P_c_new, Q_run_new = platinum_predict_quarter(
+            pred, _modal, alpha_c_new, P_c_new, Q_run_new = platinum_predict_quarter(
                 q_dm, om, N, U_current, F_plat, Q_init, R_sph,
                 alpha_c, P_c, Q_run,
             )
