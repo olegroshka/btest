@@ -1,325 +1,417 @@
-# Iteration 6.1 — Methodological Ablation Sessions
+# Paper rewrite based on the Iteration 6.1 Results
 
-Read `docs/smim/ITERATION_6_1_PLAN.md` first. It contains the full rationale,
-hypotheses, kill criteria, and combinatorial matrix.
-
----
-
-# SESSION 1: Phase 1 Core Diagnostics (A1 + C4 + B2 + E1)
-
-## Context you need to know
-
-Iteration 6 found a **modal-predictive gap of 0.277** on the 93-actor panel:
-modal R²=0.69 (good reconstruction) but predictive R²=0.42 (loses to AR(1)
-at 0.59). The spectral structure is real but we destroy it during prediction
-by replacing DMD's learned dynamics with F=0.99I.
-
-This session runs the four highest-information experiments from the plan.
-Each attacks a different hypothesis about why prediction fails.
-
-## What to do
-
-### Experiment A1: DMD-Eigenvalue Diagonal F (attacks H1: transition mis-specification)
-
-**The most important experiment.** DMD already computes eigenvalues λ_k that
-encode mode-specific growth, decay, and oscillation. Currently we throw them
-away. Test using them as the transition matrix.
-
-Write `scripts/smim/run_iter6_1_phase1.py`. For the 93-actor panel at
-T=5yr, K=8, τ=12Q, implement:
-
-1. **Baseline:** Current SMIM (F=0.99I). Must reproduce R²=0.415 (±0.002).
-
-2. **A1a (simple diagonal):** After `dmd_basis()`, extract eigenvalues from
-   `mf.metadata["Atilde"]` via `np.linalg.eig(Atilde)`. Build F as:
-   - For real eigenvalues: F_kk = clip(|λ_k|, 0.01, 0.99)
-   - For complex conjugate pairs λ = r·e^{iθ}: 2×2 rotation-scaling block
-     F_block = clip(r, 0.01, 0.99) · [[cos θ, -sin θ], [sin θ, cos θ]]
-   This is the `_to_real_modes` structure already in `dmd.py`.
-
-3. **A1b (stability-clipped):** Same as A1a but clip all |λ_k| to max 0.95
-   (more conservative).
-
-4. **A1c (full Ã):** Use F = Atilde directly (the full reduced propagator,
-   not just eigenvalues). Clip spectral radius to 0.99 via:
-   `eigenvalues, W = eig(Atilde); scale = min(1, 0.99/max(|eigenvalues|));
-   F = Atilde * scale`
-
-**Critical implementation detail:** The DMD basis and eigenvalues are
-re-estimated every quarter (rolling). After each basis update, extract the
-NEW Ã and rebuild F from its eigenvalues. F changes every quarter along
-with U.
-
-### Experiment C4: Per-Mode Predictive R² Decomposition (diagnostic)
-
-For the baseline SMIM run and for A1a, decompose the prediction into per-mode
-contributions:
-
-For each mode k=1,...,K:
-- Compute per-mode prediction: ŷ_k = U[:,k] · α_{k,t|t-1}
-- Compute per-mode actual: a_k = U[:,k] · α_{k,t|t} (filtered)
-- R²_pred(k) = correlation between predicted and actual mode amplitudes
-
-Report a table: mode k, |λ_k|, R²_modal(k), R²_pred(k), gap(k).
-
-This reveals WHICH modes are forecastable. Hypothesis: slow modes (|λ|≈1)
-should be more forecastable than fast modes (|λ|≈0.5).
-
-### Experiment B2: Reduced-Rank Regression (attacks H2: wrong basis)
-
-Implement RRR as an alternative to DMD:
-
-```python
-def rrr_basis(otr, k=2):
-    """Reduced-rank regression basis (Reinsel & Velu 1998)."""
-    X = otr[:-1].T   # (N, T-1) — predictors
-    Y = otr[1:].T    # (N, T-1) — targets
-    # OLS coefficient: C = Y X^T (X X^T)^{-1}
-    XXT_inv = np.linalg.solve(X @ X.T + 1e-6*np.eye(N), np.eye(N))
-    C = Y @ X.T @ XXT_inv
-    # Rank-K approximation via SVD
-    L, S, Rt = np.linalg.svd(C, full_matrices=False)
-    U = L[:, :k]       # forecast-optimised basis
-    B = np.diag(S[:k]) @ Rt[:k, :]  # transition
-    return U, B
-```
-
-Prediction: ŷ_{t+1} = μ̂ + U · B · U^T · (y_t - μ̂)
-
-Run with K=2,4,8 matching SMIM. Report:
-- R² for each K
-- **Subspace angle** between RRR and DMD bases (use `scipy.linalg.subspace_angles`)
-- If angle > 30°: the reconstruction-prediction mismatch is real
-
-### Experiment E1: Uniform Normalisation (attacks H3: heterogeneous pooling)
-
-The 93-actor panel mixes minmax (macro, ρ≈0.88) and xsrank (firms, ρ≈0.60).
-Test whether this confounds the spectral decomposition.
-
-Load the raw intensities. Re-normalise ALL actors using cross-sectional
-percentile rank per quarter (matching the 146-firm methodology). Then re-run
-baseline SMIM and A1a on the re-normalised panel.
-
-```python
-# For each quarter, rank all 93 actors cross-sectionally
-panel_ranked = panel.rank(axis=1, method='average', pct=True)
-```
-
-Report how per-layer ρ changes after uniform ranking.
-
-### Output format
-
-```
-PHASE 1 RESULTS (93-actor panel, T=5yr, K=8):
-
-A1 — TRANSITION DYNAMICS:
-  Variant               R²     ΔR² vs AR1  ΔR² vs baseline  Wins
-  Baseline (F=0.99I)    0.415  -0.179       ---              0/10
-  A1a (eigenvalue F)    0.XXX  +0.XXX       +0.XXX           X/10
-  A1b (clipped 0.95)    0.XXX  +0.XXX       +0.XXX           X/10
-  A1c (full Ã)          0.XXX  +0.XXX       +0.XXX           X/10
-
-  DMD eigenvalues (mean across windows):
-  Mode   |λ|    θ(deg)  R²_modal  R²_pred  Gap
-  1      0.XXX  XX.X    0.XXX     0.XXX    0.XXX
-  ...
-  8      0.XXX  XX.X    0.XXX     0.XXX    0.XXX
-
-B2 — REDUCED-RANK REGRESSION:
-  K    RRR R²   DMD R²   Subspace angle
-  2    0.XXX    0.XXX    XX.X°
-  4    0.XXX    0.XXX    XX.X°
-  8    0.XXX    0.XXX    XX.X°
-
-E1 — UNIFORM NORMALISATION:
-  Model (on re-ranked panel)    R²     ΔR² vs AR1
-  Per-actor AR(1)               0.XXX
-  Pooled+FE                     0.XXX  +0.XXX
-  SMIM baseline (F=0.99I)       0.XXX  +0.XXX
-  SMIM A1a (eigenvalue F)       0.XXX  +0.XXX
-
-PHASE 1 DECISION:
-  [A1 gained ≥+0.05 → Phase 2a: refine F]
-  [B2 beats DMD → Phase 2a: use RRR basis]
-  [E1 helps → re-run A1 on fixed panel]
-  [All fail → Phase 2b: architectural changes]
-```
-
-Save results to `results/metrics/iter6_1_phase1_*.parquet`.
-
-### Quality gates
-
-- QG1: Baseline SMIM reproduces R²=0.415 (±0.002)
-- QG2: Per-actor AR(1) reproduces R²=0.594 (±0.002)
-- QG3: No NaN/Inf in any predictions
-- QG4: Report max |λ_k| for DMD eigenvalues in each window
-- QG5: Modal R² should not degrade under A1 variants (check separately)
-
-### Key files
-
-| File | Role |
-|------|------|
-| `docs/smim/ITERATION_6_1_PLAN.md` | Full plan — read first |
-| `scripts/smim/run_iter6_test3.py` | Template: 93-actor baseline runs |
-| `src/quantdsl_backtest/smim/spectral/dmd.py` | DMD impl — Ã in metadata |
-| `data/smim/intensities/experiment_a1_intensities.parquet` | 93-actor panel |
-| `data/smim/registries/experiment_a1_registry.json` | Layer labels |
-| `results/metrics/iter6_test3_t5yr.parquet` | Iter 6.0 baseline results |
-
-### What NOT to do
-
-- Do NOT run Phase 2 experiments yet — Phase 1 results determine the path
-- Do NOT modify existing scripts or results
-- Do NOT change the evaluation metric or panel
-- Do NOT implement Kim filter, Hankel-DMD, or DMDc in this session
-- Do NOT update the paper — just collect results
+Read `docs/smim/ITERATION_6_1_RESULTS.md` first. It contains the full rationale, 
+hypotheses and the results.
 
 ---
 
-# SESSION 2: Phase 2a — Refine the Best Variant
+The paper (`smim_paper.tex`) now needs a full Iteration 6.1 integration rewrite. Please revise it as a complete, internally consistent paper, preserving the existing structural-analysis sections but changing the forecasting narrative from “standalone SMIM beats AR(1)” to the correct 6.1 conclusion:
 
-## Context
+**Uniform-(F) standalone SMIM was mis-specified; repairing (F) helps but standalone still loses to simple baselines; the robust positive result is a two-stage spectral augmentation architecture.**
 
-Read Phase 1 results before starting. The path depends on which experiments
-succeeded.
+This rewrite must be careful, numerically exact, and referee-facing. Do not invent results. Use the Iteration 6.1 results exactly as established.
 
-## If A1 gained ≥+0.05 (eigenvalue F helps)
+## Core framing — non-negotiable
 
-Run experiments A2, A4, B4, D1 from the plan:
+The revised paper must communicate this nuanced answer clearly:
 
-1. **A2 (Shrinkage):** F = γ·F_DMD + (1-γ)·0.99I. Sweep γ ∈ {0, 0.1, 0.25,
-   0.5, 0.75, 1.0}. Report optimal γ.
+1. **Diagnostic negative result:** standalone spectral state-space forecasting on raw panel levels fails because the standard (F=0.99I) predict step destroys mode-specific dynamics.
+2. **Repair result:** replacing (F) with DMD-informed dynamics materially improves standalone performance, but even the repaired standalone model remains below simple baselines.
+3. **Architectural positive result:** the correct use of the spectral machinery is as a **second-stage residual model** on top of pooled persistence, not as a standalone replacement.
+4. **Parsimony result:** the essential gain is from **per-mode dynamics in the working reduced coordinates**, not from rich cross-mode propagation.
+5. **Complexity result:** extra Kalman/filter complexity beyond the corrected transition does not help.
 
-2. **A4 (Low-rank+diagonal F):** F = D + uv^T where D = eigenvalue diagonal.
-   Estimate the rank-1 perturbation from modal innovations via ridge regression.
+Do **not** simplify this to “spectral methods were fine all along” or “the failure was purely implementation-specific.” The truth is more precise and more interesting.
 
-3. **B4 (OptDMD → A1):** Implement OptDMD using variable projection (or use
-   BOP-DMD bagging). Extract more robust eigenvalues. Feed into A1-style F.
-   Report eigenvalue uncertainty σ(|λ_k|).
+## Exact architecture to present
 
-4. **D1 (Spectral Kalman):** Combine eigenvalue F + diagonal Q (mode-specific
-   innovation variance) + structured R (basis-aware observation noise). This
-   is the full spectral-aware filter.
+Use this distinction consistently throughout:
 
-5. **D2 (State persistence):** Test projecting Kalman state into new basis
-   instead of resetting. Apply to whichever F variant is best.
+* **Recommended default architecture:**
+  Stage 1 pooled AR(1)+FE, then residual DMD/Kalman with (F=\mathrm{diag}(\tilde A_r)).
+  This is the parsimonious default and should be presented as the recommended pipeline.
 
-## If B2 won (RRR basis beats DMD)
+* **Maximum-performance architecture:**
+  Same two-stage design, but residual-stage (F=\tilde A_r) (full reduced operator).
+  This is the best-performing 93-actor variant, but only marginally better than the default and not uniformly best across panels.
 
-1. Run A1 variants using the RRR basis instead of DMD basis.
-2. Compare: RRR + eigenvalue-F vs RRR + OLS-VAR-F.
-3. Report subspace angle evolution across rolling windows.
+Be careful:
 
-## If E1 helped (uniform normalisation matters)
+* On the **93-actor panel**, full (\tilde A_r) gives the headline max performance (R^2=0.630), while diag((\tilde A_r)) gives (0.619).
+* On the **146-firm panel**, the default diag variant is better than the full-(\tilde A_r) variant.
+* Therefore the paper must separate **default architecture** from **max-performance variant** and avoid implying that full (\tilde A_r) is universally the preferred deployed model.
 
-1. Re-run A1 and B2 on the uniformly-normalised panel.
-2. Report whether the gap closes further.
+## Numbers that must be reflected exactly
 
-## If all Phase 1 experiments failed
+### Standalone diagnostic arc (93-actor panel)
 
-Proceed to Phase 2b (Session 3).
+* SMIM baseline (F=0.99I): (R^2 = 0.415)
+* SMIM + diag((\tilde A)): (R^2 = 0.483)
+* SMIM + full (\tilde A): (R^2 = 0.486)
+* Per-actor AR(1): (R^2 = 0.594)
+* Pooled+FE: (R^2 = 0.591)
+* Layer-specific pooled+FE: (R^2 = 0.598)
 
-### Output: Same format as Session 1, extended with new variants.
+Interpretation:
 
----
+* Repairing (F) closes part of the gap, but standalone SMIM remains about 0.11 below AR(1).
+* A4 established that the gain is mainly **per-mode self-dynamics in the working reduced coordinates**, not cross-mode propagation.
 
-# SESSION 3: Phase 2b — Architectural Redesign
+### Residual-stage ablation ladder (93-actor panel)
 
-## Context
+* Pooled+FE only: (0.591)
+* * residual AR(1): (0.605)
+* * residual PCA projection: (0.404)
+* * residual PCA+VAR / DFM: (0.577)
+* * residual DMD projection: (0.469)
+* * residual DMD/Kalman with (F=0.99I): (0.471)
+* * residual DMD/Kalman with diag((\tilde A_r)): (0.619)
+* * residual DMD/Kalman with full (\tilde A_r): (0.630)
 
-Only reach this session if Phase 1 showed no transition or basis improvement.
-This tests whether SMIM can add value *on top of* pooled+FE rather than
-replacing it, and whether layer-specific decomposition helps.
+Interpretation:
 
-## What to do
+* This is the key evidence table.
+* Projection-only models actively destroy the result.
+* Residual DFM does not help.
+* Residual AR(1) is a fair but weaker second-stage baseline.
+* The gain is specifically from DMD/Kalman with learned residual dynamics.
+* (F=0.99I) is catastrophic even on residuals, confirming that transition mis-specification was the bottleneck.
 
-### Experiment C1: DMD on Pooled+FE Residuals
+### Strong baselines on the 93-actor panel
 
-Two-stage model:
-1. Compute pooled+FE predictions (reuse from iter5_3 code)
-2. Compute residuals: r_t = y_t - ŷ_pool_t
-3. Run DMD + Kalman on residual panel
-4. Final: ŷ = ŷ_pool + γ · U_resid · α^{resid}_{t|t-1}
+* Per-actor AR(1): (0.594)
+* Pooled+FE: (0.591), CI ([-0.015, +0.011]), p=0.650
+* Layer-specific pooled+FE: (0.598), CI ([-0.009, +0.021]), p=0.349
+* DFM (K=8): (0.568), CI ([-0.040, -0.011]), p=0.994
+* C1 combined full-(\tilde A_r): (0.630), (\Delta) vs AR(1) (= +0.036), CI ([+0.021, +0.054]), p=0.001, 10/10 wins
+* C1 vs layer-specific pooled+FE: (\Delta = +0.032), CI ([+0.022, +0.042]), 10/10 wins
 
-The residuals have lower persistence and are demeaned — potentially a better
-input for DMD. Cross-validate γ ∈ {0.1, 0.3, 0.5, 0.7, 1.0}.
+### Portability across panels
 
-**Kill:** R² on residuals ≤ 0.0 (no spectral structure in residuals).
-**Win:** Combined model beats pooled+FE.
+Report both the **default diag architecture** and the **max-performance variant where different**:
 
-### Experiment C2: Block-SMIM / Input-Output SMIM
+* **146-firm CapEx/Revenue**
 
-Separate DMD per layer:
-- Layer 0 (7 macro): K_0=2
-- Layer 2 (82 firms): K_2=4
+  * AR(1): (0.728)
+  * Pooled: (0.745)
+  * C1 diag: (0.749)
+  * C1 full: (0.745)
 
-Cross-layer transition: α^(2)_{t+1} = F_{22}·α^(2)_t + G·[α^(0)_t] + η
+* **270-actor multi-ratio**
 
-This directly implements the proposal's Eq. 11 (exogenous macro inputs).
-Ridge-regularise G toward zero.
+  * AR(1): (0.728)
+  * Pooled: (0.738)
+  * C1 diag: (0.745)
+  * C1 full: (0.753)
 
-### Experiment C3: DMDc (DMD with Control)
+* **93-actor multilayer**
 
-Stack macro as inputs: Ω = [X_firms; X_macro], Y = X'_firms.
-DMDc gives [Ã|B̃] = Û*·Y·V̂·Ŝ^{-1}.
+  * AR(1): (0.594)
+  * Pooled: (0.591)
+  * C1 diag: (0.619)
+  * C1 full: (0.630)
 
-**Quality gate:** B matrix entries should be non-trivial (F-test).
+Use the established CI/win-count results from the robustness table. Phrase this as:
 
-### Output format
+* augmentation improves over AR(1) across all three panels,
+* gains are largest on the most heterogeneous panel,
+* but the preferred deployed architecture is the parsimonious default unless the full variant’s improvement is clearly worth the extra parameters.
 
-```
-PHASE 2b RESULTS:
+### diag((\tilde A_r)) vs full (\tilde A_r) on 93-actor residual stage
 
-C1 — SPECTRAL AUGMENTATION:
-  Residual DMD R²:     0.XXX  (>0 = spectral structure exists in residuals)
-  Combined R²:         0.XXX  (ΔR² vs pooled+FE = +0.XXX)
-  Optimal blend γ:     X.X
+* Mean (\Delta = +0.011)
+* t(9)=2.47
+* p=0.036
+* CI ([+0.003, +0.019])
+* full wins 7/10
 
-C2 — BLOCK-SMIM:
-  Layer 0 R² (K=2):    0.XXX
-  Layer 2 R² (K=4):    0.XXX
-  Cross-layer G norm:  0.XXX  (>0 = propagation exists)
-  Combined R²:         0.XXX
+Interpretation:
 
-C3 — DMDc:
-  A matrix spec radius: 0.XXX
-  B matrix norm:        0.XXX
-  DMDc R²:              0.XXX
+* full (\tilde A_r) is a marginally significant max-performance variant,
+* diag((\tilde A_r)) remains the recommended default for parsimony and credibility,
+* the paper should present both honestly.
 
-VERDICT: [AUGMENTATION WORKS / PROPAGATION FOUND / DEFINITIVE NEGATIVE]
-```
+### D1 / D2 / A5 nulls
 
----
+* Spectralising (Q) and (R): no gain
+* State persistence across basis updates: no gain
+* Kim switching: dropped / not warranted
 
-# SESSION 4: Paper Revision (After All Experiments)
+Interpretation:
 
-## Context
+* the bottleneck was in (F), not the rest of the filter,
+* once the transition is corrected, extra spectral filter complexity does not help.
 
-All Phase 1 and Phase 2 experiments are complete. Read all results.
+### Economic validation
 
-## Decision tree
+Use both pooled and C1 gaps, with and without actor FE:
 
-Read `docs/smim/ITERATION_6_1_PLAN.md` Section 12 for the paper outcomes.
+* Pooled+FE gaps:
 
-### If any experiment reached SILVER or above
+  * No FE: (\beta=-0.589), t=-27.8, (R^2=0.173)
+  * Actor FE: (\beta=-0.630), t=-10.3, (R^2=0.194)
 
-Update the paper:
-- Add the successful variant(s) to the results
-- Reframe the contribution around the methodological finding
-- Keep honest about what works and what doesn't
-- Add a "methodology ablation" section
+* C1 gaps:
 
-### If HONEST FAIL
+  * No FE: (\beta=-0.530), t=-23.1, (R^2=0.127)
+  * Actor FE: (\beta=-0.566), t=-12.0, (R^2=0.142)
 
-Update the paper with the stronger negative result:
-- "Robust to a wide class of spectral, state-space, and operator variants"
-- Include the per-mode decomposition (C4) as diagnostic
-- Include subspace angle analysis (B2) as evidence
-- The negative result is now definitive at three levels:
-  dynamics (A1), basis (B2), and residual structure (C1)
+Gap-strength decomposition:
 
-### In either case
+* pooled gap (\sigma = 0.189), (\rho = 0.139)
+* C1 gap (\sigma = 0.179), (\rho = 0.054)
 
-- Update `docs/smim/ITERATION_6_1_PLAN.md` with final status
-- Write `docs/smim/ITERATION_6_1_DECISION.md`
-- Update ITERATION_6_PLAN.md to reference 6.1 results
+Interpretation:
+
+* both gap types survive actor FE with negative coefficients, so both have within-actor as well as cross-sectional content
+* C1 gaps are **less** predictable because the better model has absorbed some systematic structure into the forecast
+* do **not** frame weaker C1 gap predictability as a worse benchmark
+* explicitly state that stronger gap predictability can reflect a weaker model leaving more structure in the residual
+
+Also: remove any outdated claim in the current paper that the gap result flips sign under actor FE. That is no longer true in the revised architecture.
+
+## Revision tasks — section by section
+
+### 1) Title
+
+Propose **three** title options at the top of the deliverable, with one recommended. At least one option should foreground augmentation.
+
+Examples of the right direction:
+
+* “Spectral Augmentation of Panel Forecasts with Dynamic Mode Decomposition”
+* “Dynamic Mode Decomposition as Residual Spectral Augmentation for Cross-Sectional Investment Forecasts”
+* “Cross-Sectional Spectral Augmentation: Residual Dynamic Mode Decomposition for Investment Panels”
+
+Do not hard-code one title without offering options.
+
+### 2) Abstract
+
+Rewrite the abstract completely.
+
+It must say, in this order:
+
+1. We study cross-sectional investment forecasting with spectral state-space methods.
+2. Standalone spectral prediction on raw levels is informative but fails as a replacement for simple baselines because uniform transition regularisation destroys mode-specific dynamics.
+3. A corrected transition partially repairs standalone SMIM but remains below AR(1)/pooled baselines.
+4. The recommended solution is a two-stage architecture: pooled AR(1)+FE for shared persistence, then residual DMD/Kalman for cross-sectional rotational structure.
+5. The augmentation result on the 93-actor panel is the headline positive finding.
+6. The result generalises across all three panels.
+7. The ablation ladder shows the gain is specific to DMD/Kalman with learned residual dynamics, not generic second-stage models.
+8. Structural spectral findings remain valid.
+
+Be accurate about default vs max-performance transition variants. Do not imply that the diagonal and full variants are the same thing.
+
+### 3) Introduction
+
+Rewrite the preview-of-results list so the new headline is **spectral augmentation**, not standalone SMIM.
+
+Include explicit bullets for:
+
+* standalone diagnostic negative result
+* transition repair result
+* augmentation positive result
+* residual-stage ablation ladder
+* robustness across panels
+* structural findings that remain intact
+* economic-content interpretation of the new gaps
+
+Also update the Introduction’s framing sentence so the paper no longer claims that spectral structure is “descriptive rather than forecastable” in general. The revised claim is:
+
+* on raw levels, spectral structure is largely descriptive and standalone spectral prediction is inferior;
+* after removing shared persistence, there remains forecastable cross-sectional residual structure that spectral augmentation can exploit.
+
+### 4) Contribution / scope / caveats sections
+
+Revise the contribution section accordingly:
+
+* Diagnostic contribution
+* Methodological augmentation contribution
+* Empirical cross-panel contribution
+
+Update scope/caveats:
+
+* only three panels
+* US data / sample window caveat
+* gains are modest but stable
+* full-(\tilde A_r) advantage over diag((\tilde A_r)) is statistically marginal and not uniform across panels
+* the economic-validation regressions are predictive associations, not causal identification
+
+### 5) Framework section
+
+Add a new subsection for the **two-stage spectral augmentation architecture** and make it the recommended pipeline.
+
+It should include:
+
+* Stage 1 pooled AR(1)+FE forecast
+* residual construction
+* Stage 2 DMD on residuals
+* residual Kalman filter with DMD-informed transition
+* combined forecast equation
+
+Clarify that:
+
+* diag((\tilde A_r)) is the default residual transition,
+* full (\tilde A_r) is the max-performance residual transition,
+* (F=0.99I) is now diagnostic context, not the recommended transition.
+
+Update Algorithm 1 so the recommended algorithm is the two-stage pipeline. If useful, keep the standalone SMIM algorithm as a diagnostic/legacy algorithm or move it to an appendix or subsection.
+
+### 6) Results section
+
+Reorganise to include the following new/rewritten subsections:
+
+#### 6a) Standalone transition diagnostic
+
+Use Table A.
+Purpose: explain why standalone SMIM fails and what transition repair recovers.
+Make the A4 finding explicit:
+
+* the gain is mainly per-mode dynamics in the working coordinates,
+* not evidence of cross-mode propagation.
+
+#### 6b) Residual-stage ablation ladder
+
+Use Table B prominently.
+This should be the centrepiece evidence table.
+
+#### 6c) Strong baseline comparison on the 93-actor panel
+
+Include per-actor AR(1), pooled+FE, layer-specific pooled+FE, DFM, and combined augmentation model.
+
+#### 6d) Cross-panel robustness
+
+Use Table C.
+Be careful to distinguish default diag architecture from max-performance variant.
+
+#### 6e) Structural spectral analysis
+
+Preserve the existing modal (R^2), basis rotation, stable dimensionality, and structural decomposition results.
+These stay, but they are now complementary evidence rather than the forecasting headline.
+
+### 7) Economic validation section
+
+Revise this section so it covers:
+
+* pooled gaps and C1 gaps
+* no-FE and actor-FE results
+* gap-strength decomposition
+* signal absorption interpretation
+
+Important:
+state explicitly that the C1 gaps are less persistent and less predictable because the better model has moved systematic structure into the forecast.
+
+Do **not** recycle the old “sign flip under actor FE” discussion.
+
+### 8) Discussion
+
+Create or revise discussion subsections along these lines:
+
+#### What fails
+
+* standalone spectral replacement fails
+* forecast-optimised RRR basis loses to DMD in the short-panel (N \gg T) regime
+* projection-only and residual DFM variants fail
+* extra filter complexity does not help
+* propagation claims are not supported by A4 / residual-mode evidence
+
+#### What works
+
+* two-stage augmentation
+* learned per-mode residual dynamics
+* cross-sectional rotation patterns among firms after shared persistence is removed
+* gains scale with heterogeneity, but are present across all panels
+
+#### What not to claim
+
+* do not claim macro→firm propagation from these results
+* do not claim that full (\tilde A_r) is universally necessary
+* do not claim that stronger gap predictability means a better benchmark
+
+### 9) Conclusion
+
+Rewrite around three layers:
+
+1. diagnostic negative result on standalone SMIM
+2. methodological positive result on spectral augmentation
+3. empirical cross-panel robustness result
+
+The conclusion should end with the correct broad claim:
+spectral methods earn their complexity as **residual augmenters of simple panel baselines**, not as standalone replacements.
+
+### 10) Structural-analysis sections to preserve
+
+Do **not** delete the existing structural findings:
+
+* modal reconstruction
+* basis rotation
+* stable dimensionality
+* dual regularisation insight
+* related structural diagnostics
+
+Preserve them, but adjust nearby prose so they support the new architecture rather than the old standalone-forecasting claim.
+
+## Tables and figures
+
+### Must-add / must-update tables
+
+Create or update these cleanly in LaTeX:
+
+* **Table A — Standalone SMIM diagnostic arc**
+* **Table B — Residual-stage ablation ladder** (prominent placement)
+* **Table C — Cross-panel robustness**
+* **Updated economic validation table** with pooled vs C1, no FE vs actor FE
+* **Updated strong-baselines table** on the 93-actor panel
+
+### Figures
+
+Do the following if feasible from existing source/assets without blocking the paper rewrite:
+
+1. **Update the conceptual pipeline figure** so it shows the two-stage architecture.
+2. **Add one compact new figure** if it can be generated cleanly from existing results, choosing the most valuable of:
+
+   * residual-stage ablation ladder figure,
+   * cross-panel augmentation gains figure,
+   * residual-mode loading / sector-rotation illustration.
+
+If figure generation from raw results is cumbersome, prioritise the **updated pipeline figure** and keep the rest as tables. Do not delay the rewrite for optional figures.
+
+## Consistency scrub — very important
+
+Before finalising, do a full scrub of the manuscript and remove or update every stale claim that is no longer true, including but not limited to:
+
+* any headline statement that standalone SMIM beats AR(1) or pooled baselines
+* any blanket statement that spectral structure is descriptive rather than forecastable
+* any claim that the economic-validation sign flips under actor FE
+* any implication that propagation/cross-mode coupling is the key mechanism
+* any implication that extra Kalman complexity helped
+* any outdated table captions or discussion text tied to the old forecasting narrative
+
+Also ensure:
+
+* all section cross-references compile correctly
+* table/figure numbering is updated
+* the abstract, intro, results, discussion, and conclusion all tell the same story
+* default vs max-performance architecture is stated consistently
+* the portability table does not accidentally overstate full-(\tilde A_r) on the 146-firm panel
+
+## Deliverables
+
+Please produce all of the following:
+
+1. **Revised complete `smim_paper.tex`**
+2. **Compiled revised PDF**
+3. **Any updated or newly created figure files/source files**
+4. **A short change log** listing:
+
+   * major claim changes
+   * stale claims removed
+   * new tables/figures added
+   * any places where space constraints forced compression
+
+At the top of your response, first give:
+
+* the three proposed title options,
+* the recommended one,
+* and a 5–8 sentence summary of the paper’s revised story.
+
+Then provide the revised files.
