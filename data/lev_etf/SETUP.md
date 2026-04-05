@@ -1,13 +1,73 @@
-# LEV_ETF Research Data — Setup Guide
+# LEV_ETF Research — New Machine Setup & Verification
+
+## TL;DR
+
+**Just want to run the notebook?** → Do **Step 1 only** (clone + install). No Bloomberg, no DB needed.  
+**Want live data refresh from your own Bloomberg?** → Follow Option B (Steps 2–5).
+
+---
+
+## Data sources — what requires Bloomberg
+
+| Table / File | Source | Bloomberg required? |
+|---|---|---|
+| `cac_ivol.csv` | CAC 40 3m 50Δ implied vol | ✅ Yes (field `BVOL3M Index`) |
+| `../cactr_ohlcv.csv` | CAC 40 Total Return (CACT) | ✅ Yes (Bloomberg CACT index) |
+| `../lvc_ohlcv.csv` | LVC Amundi 2× CAC ETF OHLCV | ⚠️ Bloomberg or Yahoo (`LVC.PA`) |
+| `eur_overnight_rate.csv` | EONIA / €STR overnight rate | ❌ No — free from [ECB](https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_short-term_rate/html/index.en.html) |
+
+**Snapshots covering through March 2026 are committed to the repo — Bloomberg is only needed to extend them.**
+
+> For LVC without Bloomberg: Yahoo Finance ticker is `LVC.PA` (Euronext Paris).
+> For CACT without Bloomberg: use `^FCHI` (CAC price-only) as an approximation, or Euronext data.
+
+---
 
 ## What's in this directory
 
-| File | Description | Source |
-|------|-------------|--------|
-| `cac_ivol.csv` | CAC 3m 50-delta implied volatility (2006–present) | Sfera DB / Bloomberg |
-| `eur_overnight_rate.csv` | EONIA / €STR daily rate (2000–present) | ECB |
-| *(parent)* `../lvc_ohlcv.csv` | LVC Amundi 2× CAC OHLCV (2010–present) | Sfera DB / Bloomberg |
-| *(parent)* `../cactr_ohlcv.csv` | CAC 40 Total Return index OHLCV | Sfera DB / Bloomberg |
+| File | Description |
+|---|---|
+| `cac_ivol.csv` | CAC implied vol snapshot |
+| `eur_overnight_rate.csv` | ECB overnight rate snapshot |
+| *(parent)* `../lvc_ohlcv.csv` | LVC ETF price snapshot |
+| *(parent)* `../cactr_ohlcv.csv` | CACT total return snapshot |
+
+---
+
+## Step 1 — Clone and install (required on any machine)
+
+```bash
+# 1. Clone btest
+git clone https://github.com/olegroshka/btest.git
+cd btest
+
+# 2. Install Python dependencies
+pip install uv          # fast package manager (optional but recommended)
+uv pip install -e .     # installs btest + all deps from pyproject.toml
+# or: pip install -e .
+
+# 3. Install signum (charting library)
+cd ..
+git clone https://github.com/SugoiKitsune/signum.git
+pip install -e ./signum
+
+# 4. (Optional) Install sfera-db if you want live DB access
+# git clone https://github.com/olegroshka/sfera-db.git  (once public)
+# pip install -e ./sfera-db
+```
+
+### Verify Step 1 works
+
+Open `btest/research/Index Directional/signals/lev_etf/cac40_tr_leverage.ipynb` and run cells 1–3.
+
+Expected output from cell 3:
+```
+Data source : local CSV snapshot
+Date range  : 2010-01-06 → 2026-03-20  (4126 days)
+LVC B&H     Sharpe ...   Total ...%   MaxDD ...%
+```
+
+If you see that — **you're done**. Everything below is only for live data refresh.
 
 ---
 
@@ -20,81 +80,82 @@ Just clone `btest` and run the notebook — it will use local files automaticall
 
 ## Option B — Live connection to your own Sfera DB
 
-This lets you get the latest data and use `sfera_db` across all research notebooks.
+**Requires:** PostgreSQL installed locally + Bloomberg Terminal (or Yahoo Finance for LVC).
 
-### 1. Install PostgreSQL (15+)
+### B1. Install PostgreSQL 15+
 
-Download from https://www.postgresql.org/download/ and install with default settings.
-Note your password for the `postgres` superuser.
+Download from https://www.postgresql.org/download/ — use default port 5432.  
+Install pgAdmin (bundled) or DataGrip (https://www.jetbrains.com/datagrip/, 30-day free trial).
 
-### 2. Install DataGrip (recommended SQL client)
+### B2. Create schema
 
-Download from https://www.jetbrains.com/datagrip/ (30-day trial / free for students).
-Or use pgAdmin (free, comes with PostgreSQL installer).
-
-### 3. Create the Sfera schema
-
-In DataGrip / pgAdmin, connect to `localhost:5432` as `postgres`, then run:
+Connect to `localhost:5432` as `postgres`, run in pgAdmin / DataGrip query console:
 
 ```sql
 CREATE DATABASE sfera;
 \c sfera
-
 CREATE SCHEMA bbgidx;
 
--- CAC IVol
 CREATE TABLE bbgidx.index_implied_vol (
-    ticker      TEXT        NOT NULL,
-    trade_date  DATE        NOT NULL,
-    ivol        NUMERIC,
+    ticker TEXT NOT NULL, trade_date DATE NOT NULL, ivol NUMERIC,
     PRIMARY KEY (ticker, trade_date)
 );
-
--- Index OHLCV (CAC, CACT, etc.)
 CREATE TABLE bbgidx.index_prices (
-    ticker      TEXT        NOT NULL,
-    trade_date  DATE        NOT NULL,
-    open_price  NUMERIC,
-    high_price  NUMERIC,
-    low_price   NUMERIC,
-    close_price NUMERIC,
-    volume      BIGINT,
+    ticker TEXT NOT NULL, trade_date DATE NOT NULL,
+    open_price NUMERIC, high_price NUMERIC, low_price NUMERIC,
+    close_price NUMERIC, volume BIGINT,
     PRIMARY KEY (ticker, trade_date)
 );
-
--- Total return index
 CREATE TABLE bbgidx.index_total_return (
-    ticker      TEXT        NOT NULL,
-    trade_date  DATE        NOT NULL,
-    close_price NUMERIC,
+    ticker TEXT NOT NULL, trade_date DATE NOT NULL, close_price NUMERIC,
     PRIMARY KEY (ticker, trade_date)
 );
 ```
 
-### 4. Load data from the CSV snapshots
+### B3. Bootstrap without Bloomberg — load committed CSV snapshots
+
+In DataGrip: right-click table → **Import Data** and map columns to the CSV.  
+Or in psql (after adding a `ticker` column value manually or via sed):
 
 ```sql
--- Load CAC IVol
-\COPY bbgidx.index_implied_vol (ticker, trade_date, ivol)
-FROM '/path/to/btest/data/lev_etf/cac_ivol.csv'
-CSV HEADER;
+-- Easiest: use Python to load
+```
+```python
+import pandas as pd, psycopg, os
 
--- Load LVC prices
-\COPY bbgidx.index_prices (ticker, trade_date, open_price, high_price, low_price, close_price, volume)
-FROM '/path/to/btest/data/lvc_ohlcv.csv'
-CSV HEADER;
+conn = psycopg.connect(host='localhost', dbname='sfera', user='postgres', password='...')
+cur = conn.cursor()
 
--- Load CACT total return
-\COPY bbgidx.index_total_return (ticker, trade_date, close_price)
-FROM '/path/to/btest/data/cactr_ohlcv.csv'
-CSV HEADER;
+# CAC IVol
+df = pd.read_csv('data/lev_etf/cac_ivol.csv', parse_dates=['date'])
+df.insert(0, 'ticker', 'CAC')
+cur.executemany(
+    "INSERT INTO bbgidx.index_implied_vol VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+    df[['ticker','date','ivol']].itertuples(index=False, name=None)
+)
+
+# LVC OHLCV
+df = pd.read_csv('data/lvc_ohlcv.csv', parse_dates=['date'])
+df.insert(0, 'ticker', 'LVC')
+cur.executemany(
+    "INSERT INTO bbgidx.index_prices VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+    df.itertuples(index=False, name=None)
+)
+
+# CACTR
+df = pd.read_csv('data/cactr_ohlcv.csv', parse_dates=['date'])
+df.insert(0, 'ticker', 'CACT')
+cur.executemany(
+    "INSERT INTO bbgidx.index_total_return VALUES (%s,%s,%s) ON CONFLICT DO NOTHING",
+    df[['ticker','date','close']].itertuples(index=False, name=None)
+)
+conn.commit()
+print("Done")
 ```
 
-> **DataGrip tip:** You can right-click a table → *Import Data* and use the GUI instead of psql.
+### B4. Configure credentials
 
-### 5. Configure credentials
-
-Create a `.env` file in your home directory at `~/.sfera/.env`:
+Create `~/.sfera/.env` (works on Windows, Mac, Linux — `~` = your home directory):
 
 ```
 DB_HOST=localhost
@@ -104,31 +165,42 @@ DB_USER=postgres
 DB_PASSWORD=your_password_here
 ```
 
-`sfera_db` will find this automatically on startup.
+`sfera_db` finds this file automatically.
 
-### 6. Install sfera-db and signum
+### B5. Install sfera-db
 
 ```bash
-# From the Python codes workspace root:
+git clone https://github.com/olegroshka/sfera-db.git   # once public
 pip install -e ./sfera-db
-pip install -e ./signum
+# or direct: pip install git+https://github.com/olegroshka/sfera-db.git
 ```
 
-Or install from GitHub (once repos are public):
+### B6. Verify live connection
 
-```bash
-pip install git+https://github.com/olegroshka/sfera-db.git
-pip install git+https://github.com/olegroshka/signum.git   # adjust URL
+```python
+import sfera_db
+print(sfera_db.tables())                    # lists tables in bbgidx schema
+print(sfera_db.index_ivol('CAC').tail())    # should return recent IVol rows
 ```
 
-### 7. Install btest dependencies
+### B7. Extending data with Bloomberg
 
-```bash
-cd btest
-pip install uv   # fast package manager (optional)
-uv pip install -e .
-# or: pip install -e .
+Bloomberg fields used:
+
+| Data | Bloomberg ticker | Field |
+|---|---|---|
+| CAC implied vol | `BVOL3M Index` | `PX_LAST` |
+| CAC Total Return | `CACT Index` | `PX_LAST` |
+| LVC ETF OHLCV | `LVC FP Equity` | `PX_OPEN/HIGH/LOW/LAST/VOLUME` |
+
+Pull via BDH in Excel or `blpapi` in Python, shape to match the CSV columns, then:
+
+```python
+sfera_db.write_table(df, "index_implied_vol")   # appends new rows
 ```
+
+**Without Bloomberg:** LVC is available as `LVC.PA` on Yahoo Finance (`yfinance`).  
+CACT (total return) has no free substitute — use the snapshot or approximate with `^FCHI`.
 
 ---
 
