@@ -76,14 +76,17 @@ def save(fig, name):
 # ── Figure 2: Performance Ladder (8 steps to 0.691) ─────────────────────────
 
 def fig_ladder():
+    # Matches Table 5 (tab:ladder) in the paper.
+    # Steps 1-2 (EWM + shorter T without spherical R) cause Kalman divergence
+    # and are documented in the table but omitted from this figure.
+    # The successful steps are: 0 (baseline), 3 (spherical R), 4 (DMD),
+    # 5 (online Q + K=8), 6 (F reg), 7 (rolling DMD).
     steps = [
-        ("Original\n(T=10yr, K=3)", 0.339, None),
-        ("+ EWM\ndemean", 0.381, 0.339),
-        ("+ T=5yr\nK=5", 0.392, 0.381),
-        ("+ Spherical\nR", 0.434, 0.392),
-        ("+ DMD\nbasis", 0.467, 0.434),
-        ("+ Online Q\nK=8", 0.524, 0.467),
-        ("+ F reg\nQ=0.5", 0.549, 0.524),
+        ("Baseline\n(T=10yr, K=3\nSchur, full demean)", 0.266, None),
+        ("+ Spherical R\n(Kalman rescued)", 0.440, 0.266),
+        ("+ DMD\nbasis", 0.472, 0.440),
+        ("+ Online Q\nK=8", 0.530, 0.472),
+        ("+ F reg\nQ=0.5", 0.549, 0.530),
         ("+ Rolling\nDMD", 0.696, 0.549),
     ]
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -105,18 +108,16 @@ def fig_ladder():
     bars = ax.bar(x, heights, bottom=bottoms, color=colors, width=0.6,
                   edgecolor="white", linewidth=1.5, zorder=3)
 
-    # AR(1) removed: modal R² is reconstruction quality, not comparable to AR(1) forecasts
-
     # Phase annotations
-    ax.axvspan(-0.5, 5.5, alpha=0.04, color=ACCENT, zorder=1)
-    ax.axvspan(5.5, 7.5, alpha=0.04, color=TEAL, zorder=1)
-    ax.text(2.5, 0.02, "Iteration 1", fontsize=8, color=ACCENT, ha="center", alpha=0.6)
-    ax.text(6.5, 0.02, "Iteration 2", fontsize=8, color=TEAL, ha="center", alpha=0.6)
+    ax.axvspan(-0.5, 3.5, alpha=0.04, color=ACCENT, zorder=1)
+    ax.axvspan(3.5, 5.5, alpha=0.04, color=TEAL, zorder=1)
+    ax.text(1.5, 0.02, "Regularisation", fontsize=8, color=ACCENT, ha="center", alpha=0.6)
+    ax.text(4.5, 0.02, "Dual reg + rolling", fontsize=8, color=TEAL, ha="center", alpha=0.6)
 
     # Value labels
     for i, (label, val, prev) in enumerate(steps):
         ax.text(i, val + 0.01, f"{val:.3f}", ha="center", fontsize=9,
-                fontweight="bold", color=ACCENT if i < 7 else TEAL)
+                fontweight="bold", color=ACCENT if i < len(steps) - 1 else TEAL)
         if prev is not None:
             delta = val - prev
             if delta > 0.015:
@@ -131,8 +132,8 @@ def fig_ladder():
 
     ax.set_xticks(x)
     ax.set_xticklabels([s[0] for s in steps], fontsize=7.5)
-    ax.set_ylabel("Out-of-Sample R$^2$")
-    ax.set_title("Performance Ladder: From Baseline to Rolling DMD",
+    ax.set_ylabel("Modal R$^2$ (93-actor CapEx/Assets panel)")
+    ax.set_title("Performance Ladder: Successful Steps from Baseline to Rolling DMD",
                  fontweight="bold", color=ACCENT)
     ax.set_ylim(0, 0.78)
     fig.tight_layout()
@@ -227,7 +228,7 @@ def fig_basis_rotation():
 
     # Secondary info
     ax1.text(0.02, 0.95,
-             "K$_{eff}$ = 8 in all 60 quarters (zero mode birth/death)",
+             "K$_{eff}$ = 8 across all 52 transitions (zero mode birth/death)",
              transform=ax1.transAxes, fontsize=8, va="top", color=GREY, fontstyle="italic")
 
     fig.tight_layout()
