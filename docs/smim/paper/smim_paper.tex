@@ -77,7 +77,7 @@ Independent Researcher\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-We develop a spectral state-space framework for forecasting cross-sectional investment intensity. The framework extracts a low-dimensional ($K = 2$) spectral basis via Dynamic Mode Decomposition (DMD) and filters latent modal states through a Kalman filter with dual regularisation: spherical observation covariance ($R = cI$) and near-identity transition matrix ($F = 0.99I$). On a 146-firm US CapEx/Revenue panel under nested cross-validation (frozen holdout 2023--2024), the rolling-basis variant achieves predictive $R^2 = 0.711$ (8 CV windows; $\Delta R^2 = +0.042$ vs per-actor AR(1); bootstrap CI $[+0.031, +0.055]$; permutation $p = 0.003$; 8/8 windows) and $R^2 = 0.845$ on 2 holdout windows. Replacing DMD with PCA (same pipeline otherwise) yields $R^2 = 0.702$, statistically indistinguishable from AR(1) ($\Delta R^2 = +0.001$, $p > 0.4$), suggesting the advantage reflects DMD's temporal snapshot formulation rather than contemporaneous cross-sectional projection alone. The advantage increases monotonically as the training window shortens---$\Delta R^2 = +0.057$ at $T = 2$~years (fixed $K\!=\!2$, $\tau\!=\!12$Q; CI $[+0.042, +0.074]$; 10/10 windows)---consistent with cross-sectional pooling. On a 93-actor structural panel ($K = 8$), the spectral basis rotates at $25.8^\circ$/quarter ($\sigma = 6.5^\circ$; null simulation: $75.3^\circ$); ablation confirms that dual regularisation and rolling basis update are essential for spectral reconstruction quality, with rolling update providing the largest modal $R^2$ gain ($+14.7$pp, CI $[+11.1, +17.2]$pp). On the predictive panel, EWM demeaning provides the largest single forecast gain ($+3.5$pp), with rolling basis update adding $+3.4$pp. Predictive model-implied investment gaps are associated with subsequent cross-sectional CapEx-rank revision ($t \approx -6.4$ to $-7.1$ with clustered SEs; cross-sectional effect that reverses under actor fixed effects).
+We develop a spectral state-space framework for forecasting cross-sectional investment intensity. The framework extracts a low-dimensional ($K = 2$) spectral basis via Dynamic Mode Decomposition (DMD) and filters latent modal states through a Kalman filter with dual regularisation: spherical observation covariance ($R = cI$) and near-identity transition matrix ($F = 0.99I$). On a 146-firm US CapEx/Revenue panel under nested cross-validation (frozen holdout 2023--2024), the rolling-basis variant achieves predictive $R^2 = 0.711$ (8 CV windows; $\Delta R^2 = +0.042$ vs per-actor AR(1); bootstrap CI $[+0.031, +0.055]$; permutation $p = 0.003$; 8/8 windows) and $R^2 = 0.845$ on 2 holdout windows. Replacing DMD with PCA (same pipeline otherwise) yields $R^2 = 0.702$, statistically indistinguishable from AR(1) ($\Delta R^2 = +0.001$, $p > 0.4$), suggesting the advantage reflects DMD's temporal snapshot formulation rather than contemporaneous cross-sectional projection alone. The advantage increases monotonically as the training window shortens---$\Delta R^2 = +0.057$ at $T = 2$~years (fixed $K\!=\!2$, $\tau\!=\!12$Q; CI $[+0.042, +0.074]$; 10/10 windows)---consistent with cross-sectional pooling. On a 93-actor structural panel ($K = 8$), the spectral basis rotates at $25.8^\circ$/quarter ($\sigma = 6.5^\circ$; null simulation: $75.3^\circ$); ablation confirms that dual regularisation and rolling basis update are essential for spectral reconstruction quality, with rolling update providing the largest modal $R^2$ gain ($+14.7$pp, CI $[+11.1, +17.2]$pp). On the predictive panel, exponentially-weighted mean (EWM) demeaning provides the largest single forecast gain ($+3.5$pp), with rolling basis update adding $+3.4$pp. Predictive model-implied investment gaps are associated with subsequent cross-sectional CapEx-rank revision ($t \approx -6.4$ to $-7.1$ with clustered SEs; cross-sectional effect that reverses under actor fixed effects).
 \end{abstract}
 
 \vspace{0.3cm}
@@ -176,7 +176,7 @@ The framework constructs $y^*_{i,t}$ through five sequential stages plus a rolli
 \subsection{Stage 1: Exponentially-Weighted Demeaning}
 \label{sec:demean}
 
-Investment intensity ranks exhibit strong cross-sectional persistence: an actor's mean rank is the single largest source of variance (51\% of total $R^2$ in the static-basis configuration; Section~\ref{sec:variance_decomp}). The state-space model $\tilde{y}_t = U\balpha_t + \varepsilon_t$ assumes zero-mean observations. Without demeaning, the modal states $\balpha_t$ must absorb the $O(0.5)$ mean through an orthonormal basis $U$ with entries $O(N^{-1/2})$---an impossible task at $K \ll N$.
+Investment intensity ranks exhibit strong cross-sectional persistence: an actor's mean rank is the single largest source of variance (51\% of total $R^2$ in the static-basis configuration; Section~\ref{sec:variance_decomp}). The state-space model $\tilde{y}_t = U\balpha_t + \varepsilon_t$ assumes zero-mean observations. Without demeaning, the modal states $\balpha_t$ must absorb the $O(0.5)$ mean through a basis $U$ with entries $O(N^{-1/2})$---an impossible task at $K \ll N$.
 
 We subtract an exponentially-weighted per-actor mean:
 \begin{equation}
@@ -185,7 +185,7 @@ We subtract an exponentially-weighted per-actor mean:
 \end{equation}
 with half-life $\tau$ quarters ($\tau = 8$ for the structural analysis panel; $\tau \in \{8, 12\}$ selected by inner CV on the CapEx/Revenue panel). The demeaned observation is $\tilde{y}_{i,t} = y_{i,t} - \hat{\mu}_i$. Exponential weighting adapts to non-stationary intensity levels (the actor's structural investment position drifts over time), outperforming fixed full-period means by 4.2 percentage points in modal $R^2$ (Section~\ref{sec:results}). A fine grid over $\tau \in \{6, 7, \ldots, 14\}$ at fixed $K = 2$, $T = 3$yr shows a broad optimum near $\tau = 7$--$8$Q ($\Delta R^2 = +0.039$), with performance declining smoothly to $+0.030$ at $\tau = 6$ and $+0.034$ at $\tau = 12$--$14$.
 
-At prediction time, the one-step-ahead forecast is $\hat{y}_{i,t} = \hat{\mu}_i + U \balpha_{t|t-1}$ (predictive). The modal reconstruction $\hat{\mu}_i + U \balpha_{t|t}$ incorporates the current observation and is used only for gap computation and spectral reconstruction quality.
+At prediction time, the one-step-ahead forecast is $\hat{y}_{i,t} = \hat{\mu}_i + U \balpha_{t|t-1}$ (predictive). The investment gap (Eq.~\ref{eq:gap_compute}) also uses the predictive state $\balpha_{t|t-1}$. The modal reconstruction $\hat{\mu}_i + U \balpha_{t|t}$ incorporates the current observation and is used for spectral reconstruction quality (modal $R^2$) on the structural panel.
 
 \subsection{Stage 2: Dynamic Mode Decomposition}
 \label{sec:dmd}
@@ -268,12 +268,12 @@ Algorithm~\ref{alg:pipeline} summarises the complete procedure.
 \State Estimate $\hat{R}$ via single Kalman EM pass; set $R = \frac{\tr(\hat{R})}{N} I_N$ \Comment{Eq.~\eqref{eq:spherical}}
 \For{each test quarter $t$}
   \State Kalman predict: $\balpha_{t|t-1} = F\balpha_{t-1|t-1}$
-  \State \textbf{Forecast}: $\hat{y}_{i,t} = \hat{\mu}_i + U\balpha_{t|t-1}$ \Comment{Predictive, for evaluation}
-  \State Kalman update: $\balpha_{t|t}$ incorporating $\tilde{y}_t$, using $R$
-  \State Gap: $\Delta_{i,t} = y_{i,t} - (\hat{\mu}_i + U\balpha_{t|t})$ \Comment{Modal, for gap analysis}
+  \State \textbf{Forecast}: $\hat{y}_{i,t} = \hat{\mu}_i + U\balpha_{t|t-1}$ \Comment{Predictive; for evaluation}
+  \State \textbf{Predictive gap}: $\Delta_{i,t} = y_{i,t} - (\hat{\mu}_i + U\balpha_{t|t-1})$ \Comment{Ex-ante; Eq.~\eqref{eq:gap_compute}}
+  \State Kalman update: $\balpha_{t|t}$ incorporating $\tilde{y}_t$, using $R$ \Comment{Modal state for structural analysis}
   \State Innovation: $\mathrm{innov}_t = \balpha_{t|t} - F\balpha_{t-1|t-1}$
   \State Adapt: $Q \leftarrow (1-\lambda)Q + \lambda\,\mathrm{innov}_t\,\mathrm{innov}_t^\top$ \Comment{Eq.~\eqref{eq:online_q}}
-  \State \textbf{Rolling update:} expand training window to include $y_t$; recompute $U$, $\hat{\mu}$, $R$; reproject $\balpha_{t|t}$ into new basis via $\balpha \leftarrow U_{\mathrm{new}}^\top \tilde{y}_t$; reset $P$, $Q$, $F$ to defaults
+  \State \textbf{Rolling update:} expand training to include $y_t$; recompute $U$, $\hat{\mu}$, $R$; set $\balpha \leftarrow U_{\mathrm{new}}^\top \tilde{y}_t$; reset $P$, $Q$, $F$
 \EndFor
 \end{algorithmic}
 \end{algorithm}
@@ -396,10 +396,12 @@ Table~\ref{tab:baselines} presents the baseline comparison. All SMIM numbers are
 \toprule
 Model & Protocol & Mean $R^2$ & $\Delta R^2$ & Wins \\
 \midrule
-\multicolumn{5}{@{}l}{\emph{Nested CV (146-firm CapEx/Revenue, $K$ and $\tau$ selected by inner folds):}} \\
+\multicolumn{5}{@{}l}{\emph{Nested CV, SMIM vs matched AR(1) ($T$ selected by inner folds):}} \\
 Per-actor AR(1) (SMIM-selected $T$) & 8 CV windows & 0.669 & --- & --- \\
 \textbf{SMIM rolling (nested CV)} & 8 CV windows & \textbf{0.711} & \textbf{+0.042} & \textbf{8/8} \\
 \textbf{SMIM rolling (frozen holdout)} & 2 holdout windows & \textbf{0.845} & \textbf{+0.026} & \textbf{2/2} \\
+\cmidrule{1-5}
+\multicolumn{5}{@{}l}{\emph{Nested CV, PCA vs matched AR(1)\textsuperscript{a}:}} \\
 Per-actor AR(1) (PCA-selected $T$)\textsuperscript{a} & 8 CV windows & 0.701 & --- & --- \\
 PCA rolling + Kalman (nested CV)\textsuperscript{a} & 8 CV windows & 0.702 & $+0.001$ & 5/8 \\
 PCA projection-only (nested CV)\textsuperscript{a} & 8 CV windows & 0.699 & $-0.002$ & 5/8 \\
@@ -427,7 +429,7 @@ Per-actor AR(1) is the strongest naive baseline, reflecting the moderate persist
 
 The results are informative: under nested CV, neither PCA variant significantly outperforms AR(1) ($\Delta R^2 = +0.001$ and $-0.002$, bootstrap CIs include zero, permutation $p > 0.4$). In the fixed configuration at $T = 3$yr, PCA baselines show modest gains ($+1.2$pp and $+1.0$pp) but SMIM outperforms both by $+2.2$pp (CI $[+0.014, +0.031]$, 9/10 windows). At $T = 2$yr the gap widens further: PCA gains $+2.1$pp and $+2.3$pp over AR(1), but SMIM gains $+6.6$pp, outperforming PCA by $+4.5$pp (CI $[+0.033, +0.056]$, 9/10 windows). This is consistent with an operator-specific effect: DMD captures lagged cross-sectional dynamics through temporal snapshot pairs ($X' \approx AX$) that PCA's contemporaneous covariance ($\tilde{Y}^\top\tilde{Y}/(T-1)$) misses.
 
-We note that at $T = 2$yr, both the PCA covariance and the DMD snapshot matrices are severely underdetermined (8 snapshots for 146 variables). DMD's SVD truncation step provides implicit regularisation that PCA's eigendecomposition does not receive; the widening gap at shorter $T$ may partly reflect this regularisation advantage rather than lagged dynamics per se.
+We note that at $T = 2$yr, both the PCA covariance and the DMD snapshot matrices are severely underdetermined (8 snapshots for 146 variables). DMD's SVD truncation step provides implicit regularisation that PCA's eigendecomposition does not receive; the widening gap at shorter $T$ may partly reflect this regularisation advantage rather than lagged dynamics per se. A truncated PCA baseline---applying the same rank-$K$ SVD to the contemporaneous covariance---would isolate the regularisation effect from the lagged-dynamics effect; we have not implemented this comparison and it is a natural next step.
 
 Richer pooled baselines (pooled AR(1) with firm fixed effects, reduced-rank VARs) are a natural direction for future work.
 
@@ -438,7 +440,7 @@ Richer pooled baselines (pooled AR(1) with firm fixed effects, reduced-rank VARs
 
 Table~\ref{tab:inference} provides formal statistical evidence. We report inference at two levels:
 
-\textbf{Window-level inference (primary).} The block bootstrap (10{,}000 window resamples) and sign-flip permutation test operate on 8 CV-window $\Delta R^2$ values. With only 8 observations, power is limited, but both the bootstrap CI and the permutation $p$-value are conservative because each observation is an independent test window with its own training data.
+\textbf{Window-level inference (primary).} The percentile bootstrap (10{,}000 window resamples) and Monte Carlo sign-flip permutation test (10{,}000 random sign assignments) operate on 8 CV-window $\Delta R^2$ values. With only 8 observations, power is limited, but both the bootstrap CI and the permutation $p$-value are conservative because each observation is an independent test window with its own training data.
 
 \textbf{Actor-quarter-level inference (supportive).} The Diebold--Mariano test operates on $n = 4{,}600$ actor-quarter loss differentials (reflecting 137--146 firms per window across 8 windows $\times$ 4 quarters) with Newey--West HAC variance (bandwidth $\lfloor n^{1/3} \rfloor = 17$). This test has high power but is optimistic in this setting: within each test window, all actor-quarter observations share the same estimated spectral basis, EWM means, and Kalman parameters, inducing cross-sectional dependence that the HAC correction does not address. The DM $p$-value should therefore be interpreted as supportive rather than definitive.
 
@@ -465,7 +467,7 @@ $\Delta R^2$ vs PCA & $+0.045$ & $[+0.033, +0.056]$ & --- & --- \\
 Sign test & 9/10 wins & --- & --- & --- \\
 \bottomrule
 \end{tabular}
-\caption{Forecast comparison with inference, 146-firm CapEx/Revenue panel, $K = 2$ modes. \emph{Primary inference}: 95\% CI from block bootstrap (10{,}000 window resamples); permutation $p$ from sign-flip test on window-level $\Delta R^2$. \emph{Supportive}: DM $t$ from Diebold--Mariano test at actor-quarter level ($n = 4{,}600$, Newey--West HAC, bandwidth $\lfloor n^{1/3} \rfloor = 17$); this statistic is high-powered but optimistic because within-window observations share estimated parameters and exhibit cross-sectional dependence. The conservative window-level tests reject equal forecast accuracy at the 1\% level; the DM test provides additional confirmation.}
+\caption{Forecast comparison with inference, 146-firm CapEx/Revenue panel, $K = 2$ modes. \emph{Primary inference}: 95\% CI from percentile bootstrap (10{,}000 window resamples); permutation $p$ from Monte Carlo sign-flip test (10{,}000 random sign assignments) on window-level $\Delta R^2$. \emph{Supportive}: DM $t$ from Diebold--Mariano test at actor-quarter level ($n = 4{,}600$, Newey--West HAC, bandwidth $\lfloor n^{1/3} \rfloor = 17$); this statistic is high-powered but optimistic because within-window observations share estimated parameters and exhibit cross-sectional dependence. The conservative window-level tests reject equal forecast accuracy at the 1\% level; the DM test provides additional confirmation.}
 \label{tab:inference}
 \end{table}
 
@@ -681,7 +683,7 @@ On this 93-actor panel, the \emph{dimensionality} of the estimated spectral stru
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{img/fig12_rotation.pdf}
-\caption{Spectral basis rotation over time (descriptive with bootstrap CIs). Each bar shows the principal subspace angle between the current and previous quarter's DMD basis ($K = 8$) across 52 consecutive quarterly transitions (2010~Q2 to 2024~Q4). Red bars highlight high-rotation quarters ($>32^\circ$) aligned with macro events. The dashed line marks the mean ($25.8^\circ$). The effective dimensionality $K_{\mathrm{eff}} = 8$ holds in all quarters with zero mode births or deaths. Null simulation from fixed-basis panels produces $75.3^\circ$ apparent rotation, suggesting the observed values reflect consistently recoverable structure rather than estimation noise.}
+\caption{Spectral basis rotation over time (descriptive). Each bar shows the principal subspace angle between the current and previous quarter's DMD basis ($K = 8$) across 52 consecutive quarterly transitions (2010~Q2 to 2024~Q4). Red bars highlight high-rotation quarters ($>32^\circ$); the dashed line marks the mean ($25.8^\circ$). COVID (2020~Q2, $22^\circ$) is annotated but did \emph{not} produce high rotation---the pandemic changed investment magnitudes but not the cross-sectional co-movement structure. $K_{\mathrm{eff}} = 8$ in all quarters with zero mode births or deaths. Null simulation: $75.3^\circ$.}
 \label{fig:rotation}
 \end{figure}
 
@@ -718,9 +720,9 @@ A distinctive property of the spectral framework is that its forecast quality de
 \label{fig:tsweep}
 \end{figure}
 
-The pattern is \emph{consistent with} cross-sectional pooling: the DMD basis is estimated from the joint $N \times T$ panel, effectively borrowing strength across actors. Per-actor AR(1) has no mechanism for this---each actor's autoregressive coefficient is estimated from $T$ observations alone. As $T$ shrinks, the per-actor estimates degrade while the cross-sectional structure remains recoverable from the $N$-dimensional snapshots. At $T = 7$~years (28 quarters), AR(1) has sufficient data and SMIM adds nothing; at $T = 2$~years, the cross-sectional advantage produces a $+5.7$pp gain with bootstrap CI entirely above zero ($p = 0.001$). We note that this monotonic pattern is consistent with but does not prove cross-sectional pooling; alternative explanations (e.g., differential sensitivity to non-stationarity) cannot be excluded without a formal decomposition.
+The pattern is \emph{consistent with} cross-sectional pooling: the DMD basis is estimated from the joint $N \times T$ panel, effectively borrowing strength across actors. Per-actor AR(1) has no mechanism for this---each actor's autoregressive coefficient is estimated from $T$ observations alone. As $T$ shrinks, the per-actor estimates degrade while the cross-sectional structure remains recoverable from the $N$-dimensional snapshots. At $T = 7$~years (28 quarters), AR(1) has sufficient data and SMIM adds nothing; at $T = 2$~years, the cross-sectional advantage produces a $+5.7$pp gain with bootstrap CI entirely above zero ($p = 0.001$). We note that this monotonic pattern is consistent with but does not prove cross-sectional pooling; alternative explanations---including DMD's implicit SVD regularisation providing a more rigid prior at short $T$, or differential sensitivity to non-stationarity---cannot be excluded without a formal decomposition.
 
-\textbf{Predictive vs modal $R^2$.} The Kalman filter produces both a \emph{predictive} state $\balpha_{t|t-1} = F\balpha_{t-1|t-1}$ (using only information up to $t-1$) and a \emph{filtered} state $\balpha_{t|t}$ (incorporating the current observation $\tilde{y}_t$). All forecast comparisons in this paper use the predictive state; the filtered state is used only for investment gap computation (Section~\ref{sec:d2}), where it provides a better reconstruction of the current cross-section.
+\textbf{Predictive vs modal $R^2$.} The Kalman filter produces both a \emph{predictive} state $\balpha_{t|t-1} = F\balpha_{t-1|t-1}$ (using only information up to $t-1$) and a \emph{filtered} state $\balpha_{t|t}$ (incorporating the current observation $\tilde{y}_t$). All forecast comparisons and the investment gap (Eq.~\ref{eq:gap_compute}, Section~\ref{sec:d2}) use the predictive state $\balpha_{t|t-1}$. The filtered state is used for modal $R^2$ (spectral reconstruction quality) on the structural panel.
 
 \textbf{Structural analysis panel.} The ablation ladder (Table~\ref{tab:ladder}), basis rotation analysis, variance decomposition, and CapEx revision analysis (Section~\ref{sec:d2}) use a broader 93-actor panel with $K = 8$ modes and filtered (modal) $R^2$. Modal $R^2$ measures spectral reconstruction quality---how well the DMD basis represents the current cross-section---which is the relevant metric for structural decomposition. These findings (rolling basis dominates, dual regularisation is essential, gaps are associated with CapEx revision) are structural and do not depend on the forecast comparison metric.
 
@@ -754,7 +756,7 @@ The strongest economic validation result is that predictive investment gaps are 
 
 Table~\ref{tab:capex_reg} reports six specifications. In pooled OLS with the level control: $\hat{\beta}_1 = -0.28$, $t = -6.4$ (actor-clustered SEs), $N = 3{,}324$. The result is robust to time-clustered SEs ($t = -7.1$) and to time fixed effects ($t = -7.1$). Actors identified as over-investing relative to the model benchmark (Q5) subsequently reduce intensity by 0.20 rank points; under-investing actors (Q1) increase by 0.19 (Figure~\ref{fig:d2}).
 
-\textbf{The result is cross-sectional, not within-actor.} With actor FE (within-actor variation only), $\hat{\beta}_1$ flips sign to $+0.08$ ($t = +2.2$). This means the \emph{between-actor} component---which actor is above or below its model-implied benchmark---drives the main result. \emph{Within} an actor over time, gaps predict slight continuation rather than reversion. The pooled result is therefore a cross-sectional prediction (``actors that deviate more from the spectral benchmark tend to revert toward it''), not a within-actor prediction (``an actor's gap predicts its own next move''). This limits the interpretation: the gap captures cross-sectional mean-reversion in investment ranks, not actor-level predictability of CapEx dynamics.
+\textbf{The result is cross-sectional, not within-actor.} With actor FE (within-actor variation only), $\hat{\beta}_1$ flips sign to $+0.08$ ($t = +2.2$). This means the \emph{between-actor} component---which actor is above or below its model-implied benchmark---drives the main result. \emph{Within} an actor over time, gaps are associated with slight continuation rather than reversion. The pooled result is therefore a cross-sectional association (``actors that deviate more from the spectral benchmark tend to revert toward it''), not a within-actor relationship (``an actor's gap forecasts its own next move''). This limits the interpretation: the gap captures cross-sectional mean-reversion in investment ranks, not actor-level dynamics.
 
 \begin{table}[H]
 \centering\small
@@ -808,7 +810,7 @@ Gap cross-sectional dispersion correlates negatively with VIX at leads of 1--4 q
 
 \subsection{What Does Not Work}
 
-\textbf{Emergence diagnostics.} On the structural panel, we tested emergence through five distinct channels: PID synergy between spectral modes, TDA topological complexity, economic emergence features (cross-sectional dispersion, sector rotation velocity, Herfindahl concentration), Extended DMD (Koopman lifting with polynomial observables), and multi-resolution DMD divergence. None produces a positive $\Delta R^2$. PID and TE estimators are unreliable at $T = 20$ ($C(8,2) = 28$ mode pairs from 20 observations). Extended DMD with degree-2 polynomial lifting ($P = 44$ features) achieves modal $R^2 = 0.19$---far worse than linear DMD at $0.54$---because $T/P = 0.45$ is underdetermined. Economic emergence features are redundant with the DMD-Kalman pipeline ($\Delta R^2 = -0.003$).
+\textbf{Emergence diagnostics.} On the structural panel, we tested emergence through five distinct channels: partial information decomposition (PID) synergy between spectral modes, topological data analysis (TDA) complexity, economic emergence features (cross-sectional dispersion, sector rotation velocity, Herfindahl concentration), Extended DMD (Koopman lifting with polynomial observables), and multi-resolution DMD divergence. None produces a positive $\Delta R^2$. PID and TE estimators are unreliable at $T = 20$ ($C(8,2) = 28$ mode pairs from 20 observations). Extended DMD with degree-2 polynomial lifting ($P = 44$ features) achieves modal $R^2 = 0.19$---far worse than linear DMD at $0.54$---because $T/P = 0.45$ is underdetermined. Economic emergence features are redundant with the DMD-Kalman pipeline ($\Delta R^2 = -0.003$).
 
 \textbf{Directed spectral operators.} Transfer entropy and Granger causality operators produce genuinely asymmetric matrices (mean asymmetry $\sim 1.2$). However, the resulting spectral bases are too noisy for Kalman filtering: TE-Schur at $K = 8$ causes numerical divergence, and at $K = 3$ achieves only modal $R^2 = 0.36$ vs DMD's $0.54$.
 
@@ -819,12 +821,14 @@ Gap cross-sectional dispersion correlates negatively with VIX at leads of 1--4 q
 \subsection{When the Kalman Filter Is and Is Not Needed}
 \label{sec:simplification}
 
-At $K = 2$ with quarterly basis refresh, the Kalman filter's contribution to predictive $R^2$ is marginal ($+0.3$pp). The rolling basis update reprojects the modal state into the new basis each quarter (Algorithm~\ref{alg:pipeline}, step~12: $\balpha \leftarrow U_{\mathrm{new}}^\top \tilde{y}_t$), so the subsequent predict step uses $\balpha_{t|t-1} = 0.99 \cdot U_t^\top \tilde{y}_{t-1}$, where $U_t$ denotes the DMD basis estimated from data through quarter $t-1$ (used to forecast quarter $t$; after observing $y_t$, the basis is refreshed to $U_{t+1}$). The full predictive pipeline is then \emph{well approximated} by:
+\textbf{Notation.} Throughout this subsection, $U_t$ denotes the DMD basis estimated from data through quarter $t-1$ and used to forecast quarter $t$. This follows DMD convention; in standard filtration-subscript notation it would be $U_{t-1}$.
+
+At $K = 2$ with quarterly basis refresh, the Kalman filter's contribution to predictive $R^2$ is marginal ($+0.3$pp). The rolling basis update reprojects the modal state into the new basis each quarter (Algorithm~\ref{alg:pipeline}), so the subsequent predict step uses $\balpha_{t|t-1} = 0.99 \cdot U_t^\top \tilde{y}_{t-1}$. The full predictive pipeline is then \emph{well approximated} by:
 \begin{equation}
 \hat{y}_t \approx \hat{\mu} + 0.99 \cdot U_t \, U_t^\top \tilde{y}_{t-1},
 \label{eq:simplified}
 \end{equation}
-where $\hat{y}_t, \hat{\mu}, \tilde{y}_{t-1} \in \R^N$ are the full cross-sectional vectors. The product $U_t U_t^\top$ is not a true orthogonal projector because the DMD modes are not in general orthonormal (Section~\ref{sec:dmd}); it is a linear combination of (possibly non-orthogonal) basis vectors. The approximation also omits the Kalman gain correction and covariance update, which contribute the marginal $+0.3$pp. The actor-level forecast is $\hat{y}_{i,t} = [\hat{y}_t]_i$. This is a per-quarter DMD eigendecomposition followed by a matrix-vector product.
+where $\hat{y}_t, \hat{\mu}, \tilde{y}_{t-1} \in \R^N$ are the full cross-sectional vectors. Since the DMD modes are not orthonormal in general (Section~\ref{sec:dmd}), $U_t U_t^\top$ is not a true orthogonal projector; the implementation uses $U_t^\top \tilde{y}_{t-1}$ as an oblique projection (equivalent to the orthogonal projector only when $U_t^\top U_t = I$). This approximation also omits the Kalman gain correction and covariance update, which contribute the marginal $+0.3$pp. The actor-level forecast is $\hat{y}_{i,t} = [\hat{y}_t]_i$---a per-quarter DMD eigendecomposition followed by a matrix-vector product.
 
 \textbf{Latent state under basis refresh.} When the rolling DMD produces a new basis $U_{\mathrm{new}}$, the implementation reprojects the most recent demeaned observation into the new basis ($\balpha \leftarrow U_{\mathrm{new}}^\top \tilde{y}_t$) and resets the Kalman covariance $P$ and process noise $Q$ to their defaults. This means the accumulated Kalman state is discarded at each refresh---no attempt is made to carry the state forward or smoothly interpolate between old and new bases. This is acceptable at quarterly refresh frequency because the single-step-ahead prediction uses only the reprojected state, not the full Kalman history.
 
@@ -848,7 +852,7 @@ The structural analysis reveals that cross-sectional investment dynamics live in
 
 \subsection{Limitations}
 
-\textbf{Baselines.} Beyond the PCA baselines reported in Table~\ref{tab:baselines}, richer pooled benchmarks (pooled AR(1) with firm fixed effects, reduced-rank VARs, LASSO panel forecasts) have not been tested. The PCA comparison confirms the advantage is consistent with DMD's temporal formulation rather than contemporaneous pooling alone, but does not rule out all alternative explanations (e.g., implicit regularisation from SVD truncation; Section~\ref{sec:baselines}).
+\textbf{Baselines.} Beyond the PCA baselines reported in Table~\ref{tab:baselines}, richer pooled benchmarks (pooled AR(1) with firm fixed effects, reduced-rank VARs, LASSO panel forecasts) have not been tested. The PCA comparison is consistent with a DMD-specific advantage, but cannot distinguish DMD's lagged-dynamics capture from its implicit SVD regularisation. A truncated PCA baseline receiving comparable rank reduction would sharpen this distinction.
 
 \textbf{Panel scope.} Both panels (93-actor structural and 146-firm headline) are US-dominated, with limited international evidence. UK results are weak (modal $R^2 = 0.058$ on the structural panel) due to the return-based intensity method, not geography per se. Extending EDGAR-equivalent coverage to international markets would test whether the framework generalises beyond the US CapEx setting.
 

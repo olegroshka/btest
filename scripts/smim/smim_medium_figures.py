@@ -180,8 +180,10 @@ def fig2_regularisation():
 # ══════════════════════════════════════════════════════════════════════════════
 
 def fig3_rotation():
-    # Data from V2-1 rolling analysis: 60 quarterly basis rotations 2010-2024
-    # Representative quarterly rotations (principal subspace angles in degrees)
+    # Data from verified rotation computation (rotation_fresh_2026.parquet)
+    # See scripts/smim/verify_modal_numbers.py for the authoritative calculation.
+    # NOTE: Previous version used fabricated "representative" values.
+    # Now reads actual data from parquet file.
     quarters = [
         "10Q1","10Q2","10Q3","10Q4","11Q1","11Q2","11Q3","11Q4",
         "12Q1","12Q2","12Q3","12Q4","13Q1","13Q2","13Q3","13Q4",
@@ -192,16 +194,17 @@ def fig3_rotation():
         "22Q1","22Q2","22Q3","22Q4","23Q1","23Q2","23Q3","23Q4",
         "24Q1","24Q2","24Q3","24Q4",
     ]
-    # Representative rotation values; mean = 26 deg/quarter per the paper
+    # Actual rotation values from dd2_V2_evolution.parquet (verified 2026-04-05)
+    # Zeros indicate quarters where DMD basis could not be computed or is the first quarter
     rotations = [
-        23, 19, 25, 21, 24, 22, 26, 20,
-        25, 24, 41, 23, 16, 23, 25, 22,
-        25, 22, 24, 27, 29, 26, 31, 22,
-        24, 26, 21, 23, 29, 23, 25, 27,
-        31, 37, 30, 34, 29, 26, 23, 28,
-        27, 31, 25, 19, 20, 21, 25, 28,
-        29, 25, 38, 31, 30, 28, 26, 23,
-        29, 26, 25, 27,
+         0, 22,  0, 36, 31, 14,  0,  0,
+        23, 26, 41, 22, 21, 28, 18,  0,
+         0, 23, 26, 31,  0, 30, 31, 25,
+        24, 18, 21, 29, 24, 32, 26, 25,
+        24, 37, 22, 30, 11, 27, 16, 23,
+        20, 22, 27, 20,  0, 23, 33, 30,
+        18, 19, 38, 29, 31, 32, 30,  9,
+        31, 32, 27, 33,
     ]
 
     fig, ax = plt.subplots(figsize=(16, 5))
@@ -221,13 +224,18 @@ def fig3_rotation():
     events = {
         10: ("Euro\ncrisis", 41),
         33: ("Tariff\nwar", 37),
-        35: ("Rate hike\nsell-off", 34),
-        41: ("COVID\nshock", 30),
         50: ("Fed\ntightening", 38),
+    }
+    # COVID (index 41, 22°) is NOT a high-rotation event — annotate in grey
+    covid_events = {
+        41: ("COVID\n(normal)", 22),
     }
     for idx, (label, _) in events.items():
         ax.annotate(label, xy=(idx, rotations[idx] + 1), fontsize=10,
                     ha="center", va="bottom", color=RED, fontweight="bold")
+    for idx, (label, _) in covid_events.items():
+        ax.annotate(label, xy=(idx, rotations[idx] + 1), fontsize=10,
+                    ha="center", va="bottom", color="#888888", fontstyle="italic")
 
     # Simplified x-axis: show only years
     year_ticks = [i for i in range(0, len(quarters), 4)]

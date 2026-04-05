@@ -199,19 +199,17 @@ def fig_basis_rotation():
     mean_rot = rotation.mean()
     ax1.axhline(mean_rot, color=GREY, linestyle="--", linewidth=1.2, zorder=2)
     ax1.text(dates.iloc[-1] + pd.Timedelta(days=60), mean_rot,
-             f" mean={mean_rot:.0f} deg", fontsize=8, color=GREY, va="center",
+             f" mean={mean_rot:.1f}\u00b0", fontsize=8, color=GREY, va="center",
              bbox=dict(boxstyle="round,pad=0.2", facecolor="white", edgecolor="none", alpha=0.9))
 
-    # Event annotations
-    events = {
-        "2012-07-01": "Euro\ncrisis",
-        "2018-04-01": "Tariff\nwar",
-        "2020-04-01": "COVID",
-        "2022-07-01": "Fed\ntightening",
-    }
-    for date_str, label in events.items():
+    # Event annotations — only high-rotation events (>32°) get red labels
+    events = [
+        ("2012-07-01", "Euro\ncrisis"),
+        ("2018-04-01", "Tariff\nwar"),
+        ("2022-07-01", "Fed\ntightening"),
+    ]
+    for date_str, label in events:
         event_date = pd.Timestamp(date_str)
-        # Find closest quarter
         closest = dates.iloc[(dates - event_date).abs().argmin()]
         idx = dates.tolist().index(closest)
         rot_val = rotation[idx]
@@ -219,6 +217,15 @@ def fig_basis_rotation():
                      fontsize=7, ha="center", color=RED,
                      arrowprops=dict(arrowstyle="-", color=RED, lw=0.8),
                      fontweight="bold")
+    # COVID: annotate but in grey — NOT a high-rotation event (22°)
+    covid_date = pd.Timestamp("2020-04-01")
+    closest_c = dates.iloc[(dates - covid_date).abs().argmin()]
+    idx_c = dates.tolist().index(closest_c)
+    rot_c = rotation[idx_c]
+    ax1.annotate("COVID\n(normal)", xy=(closest_c, rot_c), xytext=(closest_c, rot_c + 8),
+                 fontsize=7, ha="center", color=GREY,
+                 arrowprops=dict(arrowstyle="-", color=GREY, lw=0.8),
+                 fontstyle="italic")
 
     ax1.set_ylabel("Basis Rotation (degrees per quarter)")
     ax1.set_xlabel("Quarter")
