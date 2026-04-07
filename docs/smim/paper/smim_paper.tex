@@ -74,7 +74,7 @@ Independent Researcher\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, global augmentation reduces predictive $R^2$ for the diversified sector by 2.3~percentage points below a pooled-only baseline. A heterogeneity-aware two-stage architecture addresses this: a global pooled AR(1) with fixed effects captures shared persistence (Stage~1), while block-specific local models---pre-specified by economic sector and data-type structure---capture residual dynamics within each block (Stage~2). The mixture architecture improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.56$ against 50 random partitions of identical block sizes). The gain is architectural, not methodological: among regularised second-stage engines, PCA, Dynamic Mode Decomposition, and Ridge regression are interchangeable ($\rho_{\mathrm{pred}} > 0.98$). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels ($\Delta = -0.002$ and $+0.001$), identifying data-type heterogeneity as the operative condition. Structurally, the global spectral basis (at rank $K{=}8$) rotates at $49^\circ$ per quarter; within coherent sector blocks (at matched rank $K{=}2$--$4$), rotation drops to $14$--$28^\circ$. A matched-size random sub-panel control suggests this reduction is partly mechanical (smaller panels have more stable estimated bases), so the geodesic evidence is treated as descriptive rather than as a demonstrated causal mechanism.
+Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, global augmentation reduces predictive $R^2$ for the diversified sector by 2.3~percentage points below a pooled-only baseline. A heterogeneity-aware two-stage architecture addresses this: a global pooled AR(1) with fixed effects captures shared persistence (Stage~1), while block-specific local models---pre-specified by economic sector and data-type structure---capture residual dynamics within each block (Stage~2). The mixture architecture improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.56$ against 50 random partitions of identical block sizes). The gain is architectural, not methodological: among regularised second-stage engines, PCA, Dynamic Mode Decomposition, and Ridge regression are interchangeable ($\rho_{\mathrm{pred}} > 0.98$). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels ($\Delta = -0.002$ and $+0.001$), identifying data-type heterogeneity as the operative condition. Structurally, the global spectral basis (at rank $K{=}8$) rotates at $49^\circ$ per quarter; within coherent sector blocks (at matched rank $K{=}2$--$4$), rotation drops to $14$--$28^\circ$. A matched-size random sub-panel control suggests this reduction is partly mechanical (smaller panels have more stable estimated bases), so the geodesic evidence is treated as descriptive rather than as a demonstrated causal mechanism. The architectural gain amplifies at short training windows, roughly doubling as the training period shrinks from 5 to 2 years.
 \end{abstract}
 
 \vspace{0.3cm}
@@ -544,7 +544,7 @@ Panel & $N$ & Heterogeneous? & Global $R^2$ & Mixture $R^2$ & $\Delta$ \\
 \end{tabular}
 \end{table}
 
-The mixture architecture does not improve prediction on homogeneous firm-only panels. The 146-firm panel (all firms, one ratio, one normalisation) shows no benefit: the global basis serves all actors equally well when the panel is homogeneous. The 270-actor panel (all firms, two ratio types) also shows no benefit---the ratio-type distinction is not severe enough to warrant local decomposition. The gain requires \emph{data-type heterogeneity}: mixing fundamentally different time series (trending macro indices and mean-reverting firm ranks) in a single panel.
+The mixture architecture does not improve prediction on homogeneous firm-only panels. The 146-firm panel (all firms, one ratio, one normalisation) shows no benefit: the global basis serves all actors equally well when the panel is homogeneous.\footnote{A separate spectral architecture---standalone DMD+Kalman with $K{=}2$ operating directly on the EWM-demeaned panel without a pooled Stage~1---provides a small gain over per-actor AR(1) on the 146-firm panel ($+0.028$ $R^2$, 9/10 windows positive). This operates through a different mechanism (low-rank persistence compression rather than cross-block interference removal) and is the subject of a separate methodological investigation.} The 270-actor panel (all firms, two ratio types) also shows no benefit---the ratio-type distinction is not severe enough to warrant local decomposition. The gain requires \emph{data-type heterogeneity}: mixing fundamentally different time series (trending macro indices and mean-reverting firm ranks) in a single panel.
 
 \subsection{Leave-One-Window-Out Block Selection}
 
@@ -643,6 +643,33 @@ Several further limitations qualify the findings:
   \item \textbf{FRED min-max look-ahead.} The 7 macro actors use full-sample min-max normalisation, introducing a mild look-ahead in target values. This does not affect the 82 firm actors (cross-sectional ranks are contemporaneous). The main result is driven by the tech/health block (no FRED actors), so the finding is not dependent on the macro normalisation.
   \item \textbf{Data-timing latency.} Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. The evaluation assumes all targets are available at the quarterly boundary. A real-time implementation would need to account for filing lags.
 \end{enumerate}
+
+\subsection{Configuration for Short Training Windows}
+\label{sec:parsimony}
+
+The main results use a 5-year training window, but practitioners often face shorter histories. Table~\ref{tab:parsimony} reports the mixture gain across $(T, K_b)$ pairs on the 93-actor panel.
+
+\begin{table}[ht]
+\centering
+\caption{Mixture gain $\Delta(M2 - G1)$ by training-window length $T$ and local rank $K_b$ on the 93-actor panel (10 rolling OOS windows each). The paper's operating point ($T{=}5$yr, $K_b{=}4$) is marked with $\star$.}
+\label{tab:parsimony}
+\small
+\begin{tabular}{ccccc}
+\toprule
+$T$ (yr) & $K_b{=}2$ & $K_b{=}3$ & $K_b{=}4$ & $K_b{=}6$ \\
+\midrule
+2 & $+0.083$ & $+0.090$ & $\mathbf{+0.097}$ & $+0.095$ \\
+3 & $+0.035$ & $+0.049$ & $+0.053$ & $\mathbf{+0.054}$ \\
+5 & $+0.029$ & $+0.045$ & $+0.047^\star$ & $+0.043$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two findings emerge. First, $K_b{=}4$ is near-optimal at every tested training-window length. Lower values ($K_b{=}2$) lose 0.014--0.018 $R^2$ versus $K_b{=}4$ at all $T$; $K_b{=}6$ is worse on aggregate because the smaller LAYER\_macro\_inst block ($N_b{=}11$) cannot support six modes, even though the tech/health block alone benefits from $K_b{=}6$. The pre-specified $K_b$ values in Table~\ref{tab:blocks} are robust to the choice of $T$.
+
+Second, the mixture gain \emph{increases} as the training window shrinks: $+0.047$ at $T{=}5$yr, $+0.054$ at $T{=}3$yr, $+0.097$ at $T{=}2$yr---roughly doubling. The mechanism is sample-size-dependent: at short $T$, the 93-actor global basis is poorly estimated from few observations, while the local 11--25-actor bases retain comparable conditioning because they target lower-dimensional subspaces. Cross-block interference in the global model worsens as $T$ shrinks, so the architectural gain from removing it grows correspondingly. The ridge penalty on the local VAR coefficients prevents the underdetermined basis estimates ($N_b{=}25$, $K_b{=}4$, $T{=}8$ quarters) from translating into unstable forecasts.
+
+This finding contradicts a pre-registered prediction that lower $K_b$ would be needed at shorter $T$; the opposite is true.\footnote{A post-hoc $T \times K_b$ grid was conducted with five pre-registered predictions, all of which failed in directions that strengthen the architectural finding. Full pre-registration and results in the replication archive.} For practitioners with limited training history, the heterogeneity-aware mixture architecture is more valuable, not less.
 
 \subsection{Extensions}
 
