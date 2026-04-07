@@ -37,7 +37,7 @@ K_DEFAULT = 8
 K_MAX = 15
 Q_INIT_SCALE = 0.5
 LAMBDA_Q = 0.3
-N_PLACEBO = 50
+N_PLACEBO = 1000
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -294,7 +294,7 @@ def main():
 
     print("=" * 80)
     print("  ITERATION 6.4b — PLACEBO / ROBUSTNESS CHECK")
-    print("  50 random block partitions vs real economic blocks")
+    print("  1000 random block partitions vs real economic blocks")
     print("=" * 80)
 
     panel, meta = load_panel_and_meta()
@@ -342,7 +342,7 @@ def main():
         if deltas:
             placebo_deltas.append(np.mean(deltas))
 
-        if (p_idx + 1) % 10 == 0:
+        if (p_idx + 1) % 50 == 0:
             print(f"    Placebo {p_idx+1}/{N_PLACEBO}: mean Δ = {placebo_deltas[-1]:+.4f}")
 
     placebo_arr = np.array(placebo_deltas)

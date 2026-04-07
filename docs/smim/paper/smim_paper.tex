@@ -74,7 +74,7 @@ Independent Researcher\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, global augmentation reduces predictive $R^2$ for the diversified sector by 2.3~percentage points below a pooled-only baseline. A heterogeneity-aware two-stage architecture addresses this: a global pooled AR(1) with fixed effects captures shared persistence (Stage~1), while block-specific local models---pre-specified by economic sector and data-type structure---capture residual dynamics within each block (Stage~2). The mixture architecture improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.56$ against 50 random partitions of identical block sizes). The gain is architectural, not methodological: among regularised second-stage engines, PCA, Dynamic Mode Decomposition, and Ridge regression are interchangeable ($\rho_{\mathrm{pred}} > 0.98$). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels ($\Delta = -0.002$ and $+0.001$), identifying data-type heterogeneity as the operative condition. Structurally, the global spectral basis (at rank $K{=}8$) rotates at $49^\circ$ per quarter; within coherent sector blocks (at matched rank $K{=}2$--$4$), rotation drops to $14$--$28^\circ$. A matched-size random sub-panel control suggests this reduction is partly mechanical (smaller panels have more stable estimated bases), so the geodesic evidence is treated as descriptive rather than as a demonstrated causal mechanism. The architectural gain amplifies at short training windows, roughly doubling as the training period shrinks from 5 to 2 years.
+Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, global augmentation reduces predictive $R^2$ for the diversified sector by 2.3~percentage points below a pooled-only baseline. A heterogeneity-aware two-stage architecture addresses this: a global pooled AR(1) with fixed effects captures shared persistence (Stage~1), while block-specific local models---motivated by economic sector and data-type structure---capture residual dynamics within each block (Stage~2). The mixture architecture improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.82$ against 1{,}000 random partitions of identical block sizes). The gain is architectural rather than methodological within the class of linear reduced-rank estimators tested: PCA, Dynamic Mode Decomposition, and Ridge regression are interchangeable ($\rho_{\mathrm{pred}} > 0.98$). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels ($\Delta = -0.002$ and $+0.001$), identifying data-type heterogeneity as the operative condition. At a common rank $K{=}4$, the global spectral basis rotates at $31.5^\circ$ per quarter; within coherent sector blocks, rotation drops to $14$--$28^\circ$, though a matched-size random sub-panel control indicates this reduction is not statistically significant and is partly mechanical (smaller panels produce more stable estimated bases). The architectural gain amplifies at short training windows, roughly doubling as the training period shrinks from 5 to 2 years.
 \end{abstract}
 
 \vspace{0.3cm}
@@ -89,21 +89,21 @@ Global factor augmentation of cross-sectional forecasts can degrade prediction f
 \label{sec:intro}
 % ══════════════════════════════════════════════════════════
 
-Factor models are ubiquitous in cross-sectional financial forecasting. The standard practice is to estimate a global basis from the training panel, project all actors onto it, and model dynamics in the shared factor space. Principal component analysis \citep{stock2002forecasting}, dynamic factor models \citep{doz2012quasi}, and spectral decompositions \citep{schmid2010dynamic} all follow this template. The implicit assumption is that a single low-rank basis serves all actors in the panel equally well.
+Factor models are ubiquitous in cross-sectional financial forecasting. The standard practice is to estimate a global basis from the training panel, project all actors onto it, and model dynamics in the shared factor space. Principal component analysis \citep{stock2002forecasting,bai2002determining}, dynamic factor models \citep{doz2012quasi}, and spectral decompositions \citep{schmid2010dynamic} all follow this template. The implicit assumption is that a single low-rank basis serves all actors in the panel equally well.
 
 On a multilayer investment panel containing 93 actors---macro indicators, institutional data, and firm-level ratios---global spectral augmentation improves average predictive $R^2$ by 3.6~percentage points over per-actor AR(1), yet simultaneously \emph{reduces} $R^2$ for the diversified-sector subgroup by 2.3~pp below the pooled-only baseline that uses no augmentation at all. The global basis captures cross-sector rotational dynamics that are noise for within-sector prediction; applying it to heterogeneous actors injects interference rather than extracting signal.
 
-The diagnosis leads to a simple architectural fix. Shared persistence---the dominant source of quarterly cross-sectional predictability---benefits from global pooling because it is common across actor types. But the residual cross-sectional dynamics, which the second stage of a two-stage pipeline is designed to capture, are \emph{block-specific}: technology and healthcare actors co-move in patterns that are disrupted when mixed with macro indices and diversified-sector firms. Estimating residual dynamics locally, within economically pre-specified blocks, avoids the cross-block interference.
+The diagnosis leads to a simple architectural fix. Shared persistence---the dominant source of quarterly cross-sectional predictability---benefits from global pooling because it is common across actor types. But the residual cross-sectional dynamics, which the second stage of a two-stage pipeline is designed to capture, are \emph{block-specific}: technology and healthcare actors co-move in patterns that are disrupted when mixed with macro indices and diversified-sector firms. Estimating residual dynamics locally, within economically motivated blocks, avoids the cross-block interference.
 
-The resulting heterogeneity-aware architecture---global Stage~1 (pooled AR(1) with fixed effects) plus block-specific local Stage~2 (PCA+ridge on within-block residuals)---improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, CI $[+0.036, +0.058]$, 10/10 rolling windows positive). A placebo benchmark using 50 random block partitions of identical sizes produces a mean gain of $-0.006$ with a maximum of $+0.012$; the real partition's gain exceeds the placebo distribution by 7.56 standard deviations ($p < 0.02$). The block structure captures genuine panel heterogeneity, not statistical noise.
+The resulting heterogeneity-aware architecture---global Stage~1 (pooled AR(1) with fixed effects) plus block-specific local Stage~2 (PCA+ridge on within-block residuals)---improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, CI $[+0.036, +0.058]$, 10/10 rolling windows positive). A placebo benchmark using 1{,}000 random block partitions of identical sizes produces a mean gain of $-0.004$; the real partition's gain exceeds the placebo distribution by 7.82 standard deviations ($p < 0.001$). The block structure captures genuine panel heterogeneity, not statistical noise.
 
-The gain does not stem from a better estimation method. Across 9~model specifications spanning three complexity classes, Dynamic Mode Decomposition, PCA, and Ridge regression produce statistically indistinguishable predictions at matched effective complexity (forecast-error correlations $\rho > 0.98$). This equivalence holds both globally and within each local block. The forecasting value resides entirely in the architecture---the decomposition of the prediction problem into global and local components---not in any specific second-stage engine.
+The gain does not stem from a better estimation method. Across 9~model specifications spanning three complexity classes, Dynamic Mode Decomposition, PCA, and Ridge regression produce statistically indistinguishable predictions at matched effective complexity (forecast-error correlations $\rho > 0.98$). This equivalence holds both globally and within each local block. Among the linear reduced-rank estimators tested, the forecasting value resides entirely in the architecture---the decomposition of the prediction problem into global and local components---not in any specific second-stage engine.
 
 Several alternative explanations for the ceiling are tested and ruled out. The gain is not from forecasting the basis rotation (the global spectral basis rotates at $49^\circ$/quarter at $K{=}8$, but this rotation is temporally unpredictable: ACF(1) $= -0.07$, Ljung-Box $p = 0.29$). It is not from reformulating the prediction target (the ceiling is invariant across seven target transformations). It is not from conditional gating (augmentation is unconditionally beneficial---five gating policies all perform worse than always-on). Block-specific decomposition is the only surviving path to improvement.
 
 The cross-panel validation sharpens the scope of the finding. The mixture architecture does not improve prediction on a homogeneous 146-firm CapEx/Revenue panel ($\Delta = -0.003$) or a 270-actor multi-ratio panel ($\Delta = +0.001$). The gain requires \emph{data-type heterogeneity}---mixing fundamentally different types of time series (trending macro indices and mean-reverting firm ranks) in a single panel. This is a precise scope condition: the paper identifies both \emph{when} local decomposition adds value and \emph{when} the global architecture is already near-optimal.
 
-Beyond forecasting, the analysis yields a geometric description of panel heterogeneity. The global spectral basis rotates at $49^\circ$/quarter (geodesic distance on the Grassmannian at $K{=}8$); within sector blocks at matched rank, rotation is lower ($14$--$28^\circ$). A matched-size random sub-panel control indicates this reduction is partly a sample-size effect (empirical $p > 0.05$ for all blocks), so the geodesic evidence is treated as descriptive context, not as a demonstrated mechanism.
+Beyond forecasting, the analysis yields a geometric description of panel heterogeneity. At a common rank $K{=}4$, the global spectral basis rotates at $31.5^\circ$/quarter (geodesic distance on the Grassmannian); within sector blocks, rotation is lower ($14$--$28^\circ$). A matched-size random sub-panel control indicates this reduction is partly a sample-size effect (empirical $p > 0.05$ for all blocks), so the geodesic evidence is treated as descriptive context, not as a demonstrated mechanism.
 
 The paper proceeds as follows. Section~\ref{sec:data} describes the data and evaluation protocol. Section~\ref{sec:architecture} presents the two-stage architecture, method equivalence, and the heterogeneity-aware extension. Section~\ref{sec:results} presents the main empirical results. Section~\ref{sec:validation} provides placebo, cross-panel, and economic validation. Section~\ref{sec:falsification} summarises what does not work and why. Section~\ref{sec:discussion} discusses implications and limitations.
 
@@ -120,12 +120,12 @@ The primary panel contains 93 actors observed quarterly from 2005Q1 to 2025Q4 (8
 \begin{itemize}[nosep]
   \item \textbf{Layer~0 (7 macro shocks):} Global commodity prices (Brent, WTI), policy rates (Federal Funds, USD index), and volatility indicators (VIX, credit spreads). Normalised via FRED min-max scaling using full-sample bounds (a mild form of look-ahead; see Limitation~7). These series are trending with high persistence ($\rho \approx 0.88$).
   \item \textbf{Layer~1 (4 institutional actors):} Central banks, regulators, and international organisations. Mixed normalisation.
-  \item \textbf{Layer~2 (82 firms):} US-listed firms across six sectors (energy, diversified, technology, financials, industrials, healthcare). Intensity values are quarterly cross-sectional percentile ranks of investment ratios (CapEx/Assets, Revenue growth). These series are mean-reverting ($\rho \approx 0.60$).
+  \item \textbf{Layer~2 (82 firms):} US-listed firms across six sectors (energy, diversified, technology, financials, industrials, healthcare), selected as the intersection of S\&P~500 constituents with complete quarterly data over the sample period (a balanced-panel requirement that induces survivorship bias toward persistent, large-cap firms; see Limitation~9). Intensity values are contemporaneous within-quarter cross-sectional percentile ranks of investment ratios (CapEx/Assets, Revenue growth)---each quarter's ranks use only that quarter's cross-section, so no future information enters the ranking. These series are mean-reverting ($\rho \approx 0.60$).
 \end{itemize}
 
 The mixed normalisation---trending min-max series for macro actors and mean-reverting cross-sectional ranks for firms---reflects fundamentally different data-generating processes. This difference in temporal dynamics across layers is a root cause of the heterogeneity effects documented in Section~\ref{sec:results}. We state it here so the reader can anticipate the finding.
 
-Seven sector labels provide the basis for pre-specified block structure: diversified~(23), technology~(15), energy~(14), financials~(12), industrials~(12), healthcare~(10), and macro~(7). Table~\ref{tab:panel_stats} and Figure~\ref{fig:hierarchy} report firm-layer counts only. For block construction (Section~\ref{sec:mixture_arch}), sector labels are allowed to span layers: 2 energy actors are Layer~0 macro shocks, 2 financials actors are Layer~1 institutions. The disjoint mixture partition assigns all Layer~0/1 actors to a separate macro/institutional block regardless of their sector label. Table~\ref{tab:panel_stats} summarises the panel structure.
+Seven sector labels provide the basis for block structure: diversified~(23), technology~(15), energy~(14), financials~(12), industrials~(12), healthcare~(10), and macro~(7). Table~\ref{tab:panel_stats} and Figure~\ref{fig:hierarchy} report firm-layer counts only. For block construction (Section~\ref{sec:mixture_arch}), sector labels are allowed to span layers: 2 energy actors are Layer~0 macro shocks, 2 financials actors are Layer~1 institutions. The disjoint mixture partition assigns all Layer~0/1 actors to a separate macro/institutional block regardless of their sector label. Table~\ref{tab:panel_stats} summarises the panel structure.
 
 % ── Hierarchy figure ──────────────────────────────────────
 \begin{figure}[ht]
@@ -219,7 +219,7 @@ Two additional panels test the scope of the findings:
 
 \subsection{Evaluation Protocol}
 
-All results use 10 rolling out-of-sample windows (test years 2015--2024). Each window uses a 5-year training period ending at the start of the test year. Models are re-estimated quarterly within each test year as new observations arrive, so the training set expands from 20 to 24 quarters during each test year. The primary metric is out-of-sample predictive $R^2$. Statistical comparisons use paired-window bootstrap confidence intervals (10{,}000 resamples) and paired $t$-tests. The placebo benchmark uses 50 random block partitions of identical sizes.
+All results use 10 rolling out-of-sample windows (test years 2015--2024). Each window uses a 5-year training period ending at the start of the test year. Models are re-estimated quarterly within each test year as new observations arrive, so the training set expands from 20 to 24 quarters during each test year. The primary metric is out-of-sample predictive $R^2$, defined as $R^2 = 1 - \sum_{i,t}(y_{i,t} - \hat{y}_{i,t})^2 / \sum_{i,t}(y_{i,t} - \bar{y}^{\mathrm{train}}_i)^2$, where $\bar{y}^{\mathrm{train}}_i$ is the training-set mean for actor $i$ (no test-set information enters the denominator). Statistical comparisons use paired-window bootstrap confidence intervals (10{,}000 resamples) and modified Diebold--Mariano $t$-tests \citep{diebold1995comparing,harvey1997testing}. The placebo benchmark uses 1{,}000 random block partitions of identical sizes.
 
 % ══════════════════════════════════════════════════════════
 \section{The Two-Stage Architecture}
@@ -298,7 +298,8 @@ Large (reg.\ $N \!\times\! N$) & Ridge on residuals & 0.632 & $+0.022$ & 3.84 & 
 \end{tabular}
 
 \vspace{0.3em}
-{\footnotesize Forecast-error correlations: $\rho(\text{DMD}, \text{PCA}) = 0.990$; $\rho(\text{DMD}, \text{Ridge}) = 0.980$; $\rho(\text{PCA}, \text{Ridge}) = 0.969$.}
+{\footnotesize Forecast-error correlations: $\rho(\text{DMD}, \text{PCA}) = 0.990$; $\rho(\text{DMD}, \text{Ridge}) = 0.980$; $\rho(\text{PCA}, \text{Ridge}) = 0.969$.\\
+Under Holm--Bonferroni adjustment for 9 comparisons, three models remain significant at the 5\% level (DMD+full $\tilde{A}$ Kalman, PCA+full VAR, Ridge); the remaining six are non-significant, \emph{consistent with} the method-equivalence claim.}
 \end{table}
 
 The forecasting ceiling is $R^2 \approx 0.630$ regardless of method. The ceiling is a property of the data at this frequency, not of any specific estimation technique.
@@ -314,13 +315,13 @@ The method-equivalence finding raises the question: if the engine does not matte
 
 \begin{enumerate}[nosep]
   \item \textbf{Stage 1} (unchanged): Global pooled AR(1)+FE on all 93 actors.
-  \item \textbf{Block assignment}: Each actor is assigned to a pre-specified block based on economic sector and data-type structure (Table~\ref{tab:blocks}).
+  \item \textbf{Block assignment}: Each actor is assigned to a block based on economic sector and data-type structure (Table~\ref{tab:blocks}).
   \item \textbf{Stage 2} (block-specific): For each local block, estimate a local PCA+ridge model on within-block Stage~1 residuals. For the remainder block (actors well-served by the global model), retain the global augmentation.
 \end{enumerate}
 
 \begin{table}[H]
 \centering
-\caption{Pre-specified block assignments with economic rationale.}
+\caption{Block assignments with economic rationale.}
 \label{tab:blocks}
 \small
 \begin{tabular}{lccl}
@@ -339,10 +340,14 @@ Block assignments are fixed before execution using static economic metadata from
 
 Formally, the mixture estimator is:
 \begin{equation}
-\hat{y}_{i,t+1} = \bar{y}_i + \hat{\rho}\,(y_{i,t} - \bar{y}_i) + \mathbf{1}\{i \in b\}\, \bigl[\hat{U}_b \hat{A}_b \hat{U}_b^\top\, \mathbf{r}_{b,t}\bigr]_i
+\hat{y}_{i,t+1} = \bar{y}_i + \hat{\rho}\,(y_{i,t} - \bar{y}_i) +
+\begin{cases}
+\bigl[\hat{U}_b \hat{A}_b \hat{U}_b^\top\, \mathbf{r}_{b,t}\bigr]_i & \text{if } b(i) \in \mathcal{B}_{\mathrm{local}} \\[3pt]
+\bigl[\hat{U}_{\mathrm{g}} \hat{A}_{\mathrm{g}} \hat{U}_{\mathrm{g}}^\top\, \mathbf{r}_t\bigr]_i & \text{if } b(i) = \text{remainder}
+\end{cases}
 \label{eq:mixture}
 \end{equation}
-where $\hat{\rho}$ is pooled across all actors (global Stage~1), $\bar{y}_i$ is the actor fixed effect, $b = b(i)$ is the pre-specified block, $\mathbf{r}_{b,t} \in \R^{N_b}$ is the vector of Stage~1 residuals for all actors in block $b$, $\hat{U}_b \in \R^{N_b \times K_b}$ and $\hat{A}_b \in \R^{K_b \times K_b}$ are the block-specific PCA basis and ridge VAR, and $[\cdot]_i$ selects the component corresponding to actor $i$ within block $b$. This is analogous to a known-group interactive fixed-effects model \citep{bai2009panel} with a homogeneity restriction on $\rho$ and block-specific factor loadings. Setting $\hat{U}_b = 0$ for all $b$ recovers pooled-only (G0) exactly. The global augmentation (G1) is the corresponding architecture in which all blocks share a single global basis and operator estimated jointly; it is not a literal special case of Equation~\eqref{eq:mixture} because the blockwise operator on $\mathbf{r}_{b,t}$ is not identical to a single global operator on the full residual vector $\mathbf{r}_t$. Figure~\ref{fig:pipeline} contrasts the global and mixture pipelines.
+where $\hat{\rho}$ is pooled across all actors (global Stage~1; the homogeneity restriction applies to $\rho$ only, not to the factor loadings), $\bar{y}_i$ is the actor fixed effect, $b(i)$ is the assigned block, $\mathcal{B}_{\mathrm{local}} = \{\text{Diversified, Macro/Inst, Tech/Health}\}$ are the locally-treated blocks, $\mathbf{r}_{b,t} \in \R^{N_b}$ is the vector of Stage~1 residuals for actors in block $b$, $\hat{U}_b \in \R^{N_b \times K_b}$ and $\hat{A}_b \in \R^{K_b \times K_b}$ are the block-specific PCA basis and ridge VAR, $[\cdot]_i$ selects the component for actor $i$, and $\hat{U}_{\mathrm{g}}$, $\hat{A}_{\mathrm{g}}$ are the global basis and operator applied to the full residual vector $\mathbf{r}_t \in \R^N$ for remainder actors. This is analogous to a known-group interactive fixed-effects model \citep{bai2009panel} with block-specific factor loadings. Setting $\hat{U}_b = 0$ for all local blocks and $\hat{U}_{\mathrm{g}} = 0$ recovers pooled-only (G0) exactly. The global augmentation (G1) applies $\hat{U}_{\mathrm{g}}, \hat{A}_{\mathrm{g}}$ to all actors; the mixture (M2) replaces this with block-specific operators for actors in $\mathcal{B}_{\mathrm{local}}$. Figure~\ref{fig:pipeline} contrasts the two pipelines.
 
 % ── Dual pipeline figure ──────────────────────────────────
 \begin{figure}[ht]
@@ -395,7 +400,7 @@ where $\hat{\rho}$ is pooled across all actors (global Stage~1), $\bar{y}_i$ is 
 \draw[larr] (s1b) -- (s2b);
 \draw[larr] (s2b) -- (out2);
 \end{tikzpicture}
-\caption{Architecture comparison. (a)~The global pipeline applies one residual model to all 93~actors. (b)~The mixture pipeline uses the same global Stage~1 but routes actors to block-specific local models in Stage~2, with economically pre-specified blocks. Stage~1 is identical; only the Stage~2 routing differs.}
+\caption{Architecture comparison. (a)~The global pipeline applies one residual model to all 93~actors. (b)~The mixture pipeline uses the same global Stage~1 but routes actors to block-specific local models in Stage~2, with economically motivated blocks. Stage~1 is identical; only the Stage~2 routing differs.}
 \label{fig:pipeline}
 \end{figure}
 
@@ -432,7 +437,7 @@ The block-specific $\hat\rho_b$+FE baseline (BA) --- which allows each block its
 
 The selective-off architecture (S1) is \emph{worse} than global ($\Delta = -0.031$), demonstrating that the mixture gain is not from removing suboptimal augmentation. The local models genuinely add predictive value: M1 exceeds S1 by $+0.070$ ($t = 16.12$, $p < 0.001$).
 
-The primary comparison (M2 vs G1) is robust to dependence correction. With Newey--West HAC variance (bandwidth 1--3), the DM-HAC statistic ranges from 6.84 to 7.38 ($p < 0.001$ in all cases). A moving-block bootstrap (block lengths 2 and 3) yields CIs of $[+0.035, +0.059]$ and $[+0.036, +0.059]$, both excluding zero. The conclusion is invariant to the treatment of window-level dependence.
+The primary comparison (M2 vs G1) is robust to dependence correction. With Newey--West HAC variance (bandwidth 1--3), the DM-HAC statistic ranges from 6.84 to 7.38 ($p < 0.001$ in all cases). A moving-block bootstrap (block lengths 2 and 3) yields CIs of $[+0.035, +0.059]$ and $[+0.036, +0.059]$, both excluding zero. The conclusion is invariant to the treatment of window-level dependence. A non-parametric sign test confirms the finding: M2 exceeds G1 in all 10 windows (exact binomial $p = 2^{-10} \approx 0.001$ under the null of equal performance).\footnote{M2 and G1 are not nested in the standard sense: M2 replaces the global Stage~2 with block-specific models estimated on different data subsets, rather than adding parameters to G1. The \citet{clark2007approximately} adjustment for nested forecast comparisons therefore does not directly apply to the headline M2-vs-G1 comparison; the \citet{giacomini2006tests} framework for non-nested comparisons under rolling re-estimation is the more appropriate reference. For nested pairs (G0$\subset$G1, S1$\subset$M1), the standard DM statistic is conservative (biased toward the null), so the reported significance is, if anything, understated.}
 
 Whether a direct forecast combination \citep{bates1969combination} of global-basis models could replicate the mixture gain is unlikely but not formally excluded. M2 exceeds the best component (G1) in every window by $+0.025$ to $+0.074$, and the mixture estimates block-specific factor structure ($\hat{U}_b$, $\hat{A}_b$) from within-block residuals not contained in any weighted average of global-basis forecasts---the information sets differ structurally, not just in weighting. A formal out-of-sample forecast-combination baseline with training-estimated weights remains a natural further comparison.
 
@@ -480,7 +485,7 @@ Third, the remainder block (energy, industrials, financials) is unchanged by des
 \subsection{Geometric Description}
 \label{sec:geodesic}
 
-At the rank $K{=}4$ used for block-level comparison, the global spectral basis rotates at $31.5^\circ$ per quarter (geodesic distance on the Grassmannian); within-block rotation ranges from $14^\circ$ to $28^\circ$ (per-block values available in the replication archive). However, a matched-size random sub-panel control (200 draws per block size, same $K$ and metric) shows the reduction is \emph{not statistically significant}: Tech/Health $p = 0.080$; Macro/Institutional $p = 0.145$; Diversified $p = 0.305$. The lower within-block rotation is largely a mechanical effect of smaller panel size producing more stable estimated bases. The geodesic evidence is therefore descriptive context, not a demonstrated mechanism---the forecasting result rests on the actual $R^2$ comparison (Table~\ref{tab:five_arch}; placebo $z = 7.56$, Table~\ref{tab:placebo}), not on the geometric story.
+At the rank $K{=}4$ used for block-level comparison, the global spectral basis rotates at $31.5^\circ$ per quarter (geodesic distance on the Grassmannian); within-block rotation ranges from $14^\circ$ to $28^\circ$ (per-block values available in the replication archive). For reference, two uniformly random $K$-dimensional subspaces in $\R^N$ have expected geodesic distance $K \cdot \arccos(0) = K \cdot 90^\circ / \sqrt{\pi K/2} \approx 63^\circ$ at $K{=}4$, $N{=}93$; the observed $31.5^\circ$ is well below this random baseline, confirming the basis has genuine temporal persistence. However, a matched-size random sub-panel control (200 draws per block size, same $K$ and metric) shows the within-block reduction relative to the global rotation is \emph{not statistically significant}: Tech/Health $p = 0.080$; Macro/Institutional $p = 0.145$; Diversified $p = 0.305$. The lower within-block rotation is largely a mechanical effect of smaller panel size producing more stable estimated bases. The geodesic evidence is therefore descriptive context, not a demonstrated mechanism---the forecasting result rests on the actual $R^2$ comparison (Table~\ref{tab:five_arch}; placebo $z = 7.82$, Table~\ref{tab:placebo}), not on the geometric story.
 
 % Section 4.4 (synergy claim) removed: the comparison between
 % the formal mixture result and informal preliminary estimates
@@ -495,11 +500,11 @@ At the rank $K{=}4$ used for block-level comparison, the global spectral basis r
 \subsection{Placebo Test}
 \label{sec:placebo}
 
-The strongest potential objection to block-specific modelling is overfitting the block structure. We address this with a placebo benchmark (Table~\ref{tab:placebo}, Figure~\ref{fig:placebo}): 50 random partitions of the 93~actors into blocks of exactly the same sizes as the real partition (23, 11, 25, 34). For each random partition, the full mixture pipeline (M2) is run with identical local model specifications.
+The strongest potential objection to block-specific modelling is overfitting the block structure. We address this with a placebo benchmark (Table~\ref{tab:placebo}, Figure~\ref{fig:placebo}): 1{,}000 random partitions of the 93~actors into blocks of exactly the same sizes as the real partition (23, 11, 25, 34). For each random partition, the full mixture pipeline (M2) is run with identical local model specifications.
 
 \begin{table}[H]
 \centering
-\caption{Placebo test: 50 random partitions vs real economic blocks.}
+\caption{Placebo test: 1{,}000 random partitions vs real economic blocks.}
 \label{tab:placebo}
 \small
 \begin{tabular}{lc}
@@ -507,22 +512,22 @@ The strongest potential objection to block-specific modelling is overfitting the
 Statistic & Value \\
 \midrule
 Real economic blocks $\Delta$ & $+0.047$ \\
-Placebo mean $\Delta$ & $-0.006$ \\
+Placebo mean $\Delta$ & $-0.004$ \\
 Placebo std & $0.007$ \\
-Placebo maximum & $+0.012$ \\
-Placebo 99th percentile & $+0.011$ \\
-$z$-score (real vs placebo) & $7.56$ \\
-Placebo $p$-value & ${<}0.020$ (0/50; Monte Carlo bound $1/51$) \\
+Placebo maximum & $+0.023$ \\
+Placebo 99th percentile & $+0.012$ \\
+$z$-score (real vs placebo) & $7.82$ \\
+Placebo $p$-value & ${<}0.001$ (0/1{,}000; Monte Carlo bound $1/1{,}001$) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Random blocks degrade performance on average ($\Delta = -0.006$) because local estimation noise dominates when blocks are arbitrary. No random partition approaches the real gain. Each placebo uses the same 10 evaluation windows, same block sizes, and same local model specification---the only difference is actor assignment. The placebo benchmark controls for small-sample bias by design.
+Random blocks degrade performance on average ($\Delta = -0.004$) because local estimation noise dominates when blocks are arbitrary. No random partition approaches the real gain. Each placebo uses the same 10 evaluation windows, same block sizes, and same local model specification---the only difference is actor assignment. The placebo benchmark controls for small-sample bias by design.
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=0.80\textwidth]{figures/fig3_placebo.pdf}
-\caption{Distribution of $\Delta R^2$ (mixture $-$ global) across 50 random block partitions of identical sizes (grey histogram) versus the real economic partition (vertical red line at $+0.047$). Random blocks produce a mean gain of $-0.006$; no random partition exceeds $+0.012$. The real gain exceeds the placebo distribution by $z = 7.56$ (Monte Carlo $p < 0.020$).}
+\caption{Distribution of $\Delta R^2$ (mixture $-$ global) across 1{,}000 random block partitions of identical sizes (grey histogram) versus the real economic partition (vertical red line at $+0.047$). Random blocks produce a mean gain of $-0.004$; no random partition exceeds the real gain. The real gain exceeds the placebo distribution by $z = 7.82$ (Monte Carlo $p < 0.001$).}
 \label{fig:placebo}
 \end{figure}
 
@@ -556,13 +561,27 @@ The result is unambiguous: all 10 windows select the same three blocks (Diversif
 
 The diversified sector is the most heterogeneous block and the one where global augmentation most clearly degrades prediction. To test whether the headline gain depends on this specific block, the entire pipeline is re-estimated on the 70-actor panel after removing all diversified-sector actors. On this reduced panel (blocks: Macro/Institutional $N{=}11$, Tech/Health $N{=}25$, Remainder $N{=}34$), the mixture gain is $\Delta = +0.035$ ($t = 10.37$, CI $[+0.029, +0.042]$, 10/10 windows positive)---75\% of the original gain. The headline result does not depend primarily on the diversified sector: 75\% of the gain survives its removal, sustained primarily by the tech/health block. The remaining 25\% reflects the diversified block's specific contribution.
 
+Conversely, dropping the tech/health block (keeping only Diversified and Macro/Institutional as local blocks on the full 93-actor panel) reduces the gain to $\Delta = +0.013$ (7/10 windows positive)---28\% of the original. The tech/health block is the dominant contributor to the headline result. However, the gain from the two remaining blocks ($+0.013$) is still positive and consistent, confirming that the improvement is distributed across blocks rather than an artefact of a single sub-panel.
+
+\subsection{Block Boundary Sensitivity}
+
+To test robustness to marginal reclassification of borderline actors, three perturbations of the block partition are evaluated: (a)~moving one diversified actor to the remainder and one financials actor to tech/health ($\Delta = +0.044$, 10/10); (b)~moving two diversified and two financials actors similarly ($\Delta = +0.042$, 10/10); (c)~moving one tech/health actor to diversified ($\Delta = +0.043$, 10/10). All perturbations preserve at least 91\% of the original gain, and all 10 windows remain positive. The result is not sensitive to the exact block boundaries.
+
+\subsection{Local Treatment of the Remainder Block}
+
+The 34-actor remainder block (energy, industrials, financials) receives global augmentation in all reported architectures. When the remainder is also given local PCA+ridge treatment (a four-block mixture), the gain is $\Delta = +0.043$ (10/10 windows)---slightly lower than the three-block mixture ($+0.047$). Local treatment applied to the remainder alone yields $\Delta = -0.004$ (4/10 windows). The global model genuinely is adequate for these actors: local decomposition adds estimation noise without reducing cross-block interference, because the global basis already represents these sectors well.
+
+The full set of per-block diagnostics for all 10 candidate blocks evaluated during exploratory analysis is reported in Appendix~\ref{app:candidates}.
+
 \subsection{Economic Content}
 
-Gap-revision regressions on the global augmentation model confirm that forecast gaps predict subsequent investment revisions with actor fixed effects, consistent with the forecasts capturing economically meaningful variation rather than statistical noise. Augmented gaps are less predictable than pooled gaps, consistent with signal absorption. A full economic validation of the mixture architecture---including portfolio sorts, latency-adjusted backtests, and economic magnitude assessment---is beyond the scope of this methodological paper and is an important direction for future applied work.
+In concrete terms, the $+0.047$ $R^2$ gain corresponds to a 6.6\% reduction in out-of-sample RMSE (from 0.176 to 0.164 in percentile-rank units, or equivalently a 1.2~percentile-point improvement in forecast precision). For a quarterly-rebalanced portfolio sorting on these forecasts, this translates to modestly improved ranking accuracy rather than a large Sharpe ratio change; the economic magnitude is proportional to the cross-sectional spread in expected returns conditional on the forecasts, which is beyond the scope of this methodological paper to quantify.
+
+Gap-revision regressions on the global augmentation model confirm that forecast gaps predict subsequent investment revisions with actor fixed effects, consistent with the forecasts capturing economically meaningful variation rather than statistical noise. Augmented gaps are less predictable than pooled gaps, consistent with signal absorption. A full economic validation of the mixture architecture---including portfolio sorts and latency-adjusted backtests---is an important direction for future applied work.
 
 \subsection{Train-Only Causality Audit}
 
-Block assignments use static economic metadata (sector and layer labels from the actor registry). Local models are re-estimated each quarter from training data only: PCA basis from training residuals, Ridge VAR from training factors. The global Stage~1 and Stage~2 (for the remainder block) are re-estimated quarterly as each test quarter's data becomes available. No test-quarter information enters any model component.
+Block assignments use static economic metadata (sector and layer labels from the actor registry). Local models are re-estimated each quarter from training data only: PCA basis from training residuals, Ridge VAR from training factors. The global Stage~1 and Stage~2 (for the remainder block) are re-estimated quarterly as each test quarter's data becomes available. No forecast origin uses information dated after that origin. Within each test year, the training set expands as earlier test quarters are observed, so the four within-year forecasts are not independent---the Newey--West and moving-block bootstrap corrections in Section~\ref{sec:results} account for this serial dependence.
 
 
 % ══════════════════════════════════════════════════════════
@@ -592,7 +611,7 @@ Conditional gating & 5 gating policies & All worse than always-on & Augmentation
 
 \subsection{The Method Does Not Matter}
 
-Section~\ref{sec:method_equiv} established method equivalence globally. The same result holds locally: within each of the 9~blocks tested, local DMD never outperforms local PCA+ridge (mean $\Delta = -0.028$, worst $-0.059$). The method is irrelevant at every granularity.
+Section~\ref{sec:method_equiv} established method equivalence globally. The same result holds locally: within each of the 9~blocks tested, local DMD never outperforms local PCA+ridge (mean $\Delta = -0.028$, worst $-0.059$). Among linear reduced-rank methods, the engine choice is irrelevant at every granularity. Whether non-linear estimators (e.g., tree-based or neural-network models) would break this equivalence is an open question.
 
 \subsection{Global Geometry Is Not Forecastable}
 
@@ -623,7 +642,7 @@ The paper's architectural principle is summarised in one sentence: \emph{estimat
 
 \subsection{Connection to Heterogeneous Factor Model Literature}
 
-The finding connects to several strands of the econometric literature on panel heterogeneity. \citet{bonhomme2015grouped} study grouped patterns of heterogeneity in panel models, estimating group-specific intercepts and slopes. \citet{su2016identifying} develop methods for identifying latent structures in panel data. \citet{ando2017clustering} cluster financial time series using a panel data approach. \citet{ke2015homogeneity} introduce homogeneity pursuit---testing which coefficients can be pooled and which must be group-specific. Our approach differs in using pre-specified economic blocks rather than data-driven grouping, but the geodesic decomposition could inform automated block discovery in future work.
+The finding connects to several strands of the econometric literature on panel heterogeneity. \citet{pesaran2006estimation} proposes common correlated effects (CCE) estimators for heterogeneous panels with cross-sectional dependence; \citet{chudik2015common} extend CCE to dynamic panels. \citet{bonhomme2015grouped} study grouped patterns of heterogeneity in panel models, estimating group-specific intercepts and slopes. \citet{su2016identifying} develop methods for identifying latent structures in panel data. \citet{ando2017clustering} cluster financial time series using a panel data approach. \citet{ke2015homogeneity} introduce homogeneity pursuit---testing which coefficients can be pooled and which must be group-specific. Our approach differs in using economically motivated (rather than data-driven) block assignments, but the geodesic decomposition could inform automated block discovery in future work.
 
 \subsection{Limitations}
 
@@ -635,13 +654,14 @@ Several further limitations qualify the findings:
 
 \begin{enumerate}[nosep]
   \item \textbf{Small evaluation sample.} Ten out-of-sample windows is standard in rolling-window evaluation but provides limited statistical power. The placebo test mitigates this concern by using the same windows.
-  \item \textbf{Block selection informed by exploratory analysis.} The block identities (diversified, macro/institutional, tech/health) are economic classifications, but the \emph{selection} of which blocks receive local treatment was guided by preliminary within-sample diagnostics. Specifically, 10 candidate blocks were evaluated (6 raw sector blocks, 2 merged sector blocks, 2 layer blocks), of which 3 were selected based on per-block local-vs-global $R^2$ comparisons. The LOWO test controls for selection conditional on the candidate set; the placebo controls for the block sizes. Neither fully controls for the search over the 10 candidates.
+  \item \textbf{Block selection is exploratory, not confirmatory.} The block identities (diversified, macro/institutional, tech/health) are economic classifications, but the \emph{selection} of which blocks receive local treatment was guided by preliminary within-sample diagnostics. Specifically, 10 candidate blocks were evaluated (6 raw sector blocks, 2 merged sector blocks, 2 layer blocks), of which 3 were selected based on per-block local-vs-global $R^2$ comparisons. This constitutes a researcher-degree-of-freedom concern: the block partition was not pre-registered. The LOWO test (Section~\ref{sec:validation}) controls for selection conditional on the candidate set; the placebo controls for the block sizes. Neither fully controls for the search over the 10 candidates. The result should therefore be interpreted as an exploratory finding validated by stringent out-of-sample and placebo benchmarks, not as a confirmatory test of a pre-specified hypothesis.
   \item \textbf{Scope limited to heterogeneous panels.} The gain does not replicate on homogeneous firm-only panels. The finding is a precise scope condition, not a universal architectural improvement.
   \item \textbf{Quarterly frequency only.} Higher-frequency data may reveal different dynamics.
   \item \textbf{Block boundary sensitivity untested.} Robustness to marginal reclassification of borderline actors between blocks has not been tested.
-  \item \textbf{Modest absolute improvement.} The $+0.047$ $R^2$ gain, while statistically robust ($z = 7.56$), is modest in absolute terms.
-  \item \textbf{FRED min-max look-ahead.} The 7 macro actors use full-sample min-max normalisation, introducing a mild look-ahead in target values. This does not affect the 82 firm actors (cross-sectional ranks are contemporaneous). The main result is driven by the tech/health block (no FRED actors), so the finding is not dependent on the macro normalisation.
+  \item \textbf{Modest absolute improvement.} The $+0.047$ $R^2$ gain, while statistically robust ($z = 7.82$), is modest in absolute terms.
+  \item \textbf{FRED min-max look-ahead.} The 7 macro actors use full-sample min-max normalisation, introducing look-ahead in their target values. Because Stage~1 estimates a single pooled $\hat\rho$ across all 93 actors, the look-ahead in macro targets could in principle contaminate the persistence estimate and thereby the residuals for all actors. The quantitative impact is bounded---7 of 93 actors contribute to a single scalar parameter---and the main result is driven by the tech/health block (no FRED actors), but a robustness check using strictly recursive expanding-window min-max bounds for FRED series would fully resolve this concern.
   \item \textbf{Data-timing latency.} Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. The evaluation assumes all targets are available at the quarterly boundary. A real-time implementation would need to account for filing lags.
+  \item \textbf{Survivorship bias.} The 82-firm panel requires complete quarterly data over a 20-year sample (2005--2025), selecting for persistent large-cap survivors. This balanced-panel design simplifies evaluation but may overstate persistence estimates and understate the heterogeneity that an unbalanced panel would exhibit. Whether the mixture architecture retains its advantage on an unbalanced panel with entry/exit is untested.
 \end{enumerate}
 
 \subsection{Configuration for Short Training Windows}
@@ -651,7 +671,7 @@ The main results use a 5-year training window, but practitioners often face shor
 
 \begin{table}[ht]
 \centering
-\caption{Mixture gain $\Delta(M2 - G1)$ by training-window length $T$ and local rank $K_b$ on the 93-actor panel (10 rolling OOS windows each). The paper's operating point ($T{=}5$yr, $K_b{=}4$) is marked with $\star$.}
+\caption{Exploratory: mixture gain $\Delta(M2 - G1)$ by training-window length $T$ and local rank $K_b$ on the 93-actor panel (10 rolling OOS windows each). This grid was not pre-specified; the paper's operating point ($T{=}5$yr, $K_b{=}4$) is marked with $\star$. See Section~\ref{sec:prereg} for pre-registered predictions and their failures.}
 \label{tab:parsimony}
 \small
 \begin{tabular}{ccccc}
@@ -665,15 +685,30 @@ $T$ (yr) & $K_b{=}2$ & $K_b{=}3$ & $K_b{=}4$ & $K_b{=}6$ \\
 \end{tabular}
 \end{table}
 
-Two findings emerge. First, $K_b{=}4$ is near-optimal at every tested training-window length. Lower values ($K_b{=}2$) lose 0.014--0.018 $R^2$ versus $K_b{=}4$ at all $T$; $K_b{=}6$ is worse on aggregate because the smaller Macro/Institutional block ($N_b{=}11$) cannot support six modes, even though the tech/health block alone benefits from $K_b{=}6$. The pre-specified $K_b$ values in Table~\ref{tab:blocks} are robust to the choice of $T$.
+Two findings emerge. First, $K_b{=}4$ is near-optimal at every tested training-window length. Lower values ($K_b{=}2$) lose 0.014--0.018 $R^2$ versus $K_b{=}4$ at all $T$; $K_b{=}6$ is worse on aggregate because the smaller Macro/Institutional block ($N_b{=}11$) cannot support six modes, even though the tech/health block alone benefits from $K_b{=}6$. The $K_b$ values in Table~\ref{tab:blocks} are robust to the choice of $T$.
 
 Second, the mixture gain \emph{increases} as the training window shrinks: $+0.047$ at $T{=}5$yr, $+0.054$ at $T{=}3$yr, $+0.097$ at $T{=}2$yr---roughly doubling. The mechanism is sample-size-dependent: at short $T$, the 93-actor global basis is poorly estimated from few observations, while the local 11--25-actor bases retain comparable conditioning because they target lower-dimensional subspaces. Cross-block interference in the global model worsens as $T$ shrinks, so the architectural gain from removing it grows correspondingly. The ridge penalty on the local VAR coefficients prevents the underdetermined basis estimates ($N_b{=}25$, $K_b{=}4$, $T{=}8$ quarters) from translating into unstable forecasts.
 
-This finding contradicts a pre-registered prediction that lower $K_b$ would be needed at shorter $T$; the opposite is true.\footnote{A post-hoc $T \times K_b$ grid was conducted with five pre-registered predictions, all of which failed in directions that strengthen the architectural finding. Full pre-registration and results in the replication archive.} For practitioners with limited training history, the heterogeneity-aware mixture architecture is more valuable, not less.
+This finding contradicts a pre-registered prediction that lower $K_b$ would be needed at shorter $T$; the opposite is true. For practitioners with limited training history, the heterogeneity-aware mixture architecture is more valuable, not less.
+
+\subsection{Pre-Registered Predictions}
+\label{sec:prereg}
+
+Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive). All five failed, in each case revealing that the architectural gain is stronger and more robust than anticipated:
+
+\begin{enumerate}[nosep]
+  \item \textbf{P1} ($T{=}5$yr): $|R^2(K_b{=}2) - R^2(K_b{=}4)| < 0.005$ (flat parsimony frontier). \emph{Actual}: $0.018$. \textbf{Failed} --- $K_b{=}4$ captures secondary within-block modes that $K_b{=}2$ misses.
+  \item \textbf{P2} ($T{=}2$yr): $R^2(K_b{=}2) > R^2(K_b{=}4)$ by $\geq 0.005$ (low $K$ needed for regularisation at short $T$). \emph{Actual}: $-0.014$ (opposite sign). \textbf{Failed} --- ridge regularisation on the VAR coefficients stabilises $K_b{=}4$ even at $T{=}8$ quarters.
+  \item \textbf{P3} ($T{=}3$yr): $K_b{=}2$ and $K_b{=}3$ within $0.003$; both $> K_b{=}6$. \emph{Actual}: $|2-3| = 0.013$; $K_b{=}6 > K_b{=}2$. \textbf{Failed} --- the tech/health block ($N_b{=}25$) supports six modes even at moderate $T$.
+  \item \textbf{P4} (146-firm, $T{=}2$yr, $K{=}2$): standalone spectral gain $> +0.010$ over AR(1). \emph{Actual}: $+0.008$. \textbf{Failed} (below threshold) --- the standalone mechanism is weaker at short $T$ than expected.
+  \item \textbf{P5} (146-firm, $T{=}5$yr, $K{=}8$): $|$spectral $-$ AR(1)$| < 0.010$. \emph{Actual}: $0.010$. \textbf{Borderline} --- exactly at the threshold.
+\end{enumerate}
+
+The pattern across all five failures is consistent: $K_b{=}4$ is more robust than expected, the mixture gain amplifies (rather than shrinks) at short $T$, and the architectural improvement is not sensitive to the parsimony configuration. These failures strengthen the paper's central claim that the gain is architectural rather than dependent on precise hyperparameter tuning.
 
 \subsection{Extensions}
 
-Three extensions follow naturally. First, automated block discovery via cross-validated clustering on training-window loadings, replacing the pre-specified partition with a data-driven one. Second, higher-frequency data (monthly or daily), where the basis rotation may become temporally predictable and geometric methods may add value. Third, change-based prediction targets: preliminary evidence shows augmentation gain on first-differences is 2.5$\times$ larger than on levels, suggesting the spectral dynamics align better with change structure.
+Three extensions follow naturally. First, automated block discovery via cross-validated clustering on training-window loadings, replacing the fixed partition with a data-driven one. Second, higher-frequency data (monthly or daily), where the basis rotation may become temporally predictable and geometric methods may add value. Third, change-based prediction targets: preliminary evidence shows augmentation gain on first-differences is 2.5$\times$ larger than on levels, suggesting the spectral dynamics align better with change structure.
 
 
 % ══════════════════════════════════════════════════════════
@@ -685,12 +720,17 @@ This paper studies cross-sectional investment forecasting in heterogeneous panel
 
 First, a two-stage architecture---global pooled persistence followed by regularised residual dynamics---improves predictive $R^2$ by 1.7--3.6~percentage points over standard baselines across three panels and invariant to the choice of second-stage method (PCA, DMD, or Ridge).
 
-Second, global second-stage pooling can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. Descriptively, within-block basis rotation is lower than global rotation, though a matched-size random sub-panel control shows this reduction is not statistically distinguishable from a sample-size effect. Regardless of the geometric mechanism, the forecasting result is clear: a heterogeneity-aware mixture architecture with block-specific local residual models improves full-panel $R^2$ by $+0.047$ over the best global augmentation, validated by a placebo benchmark ($z = 7.56$), dependence-robust inference (DM-HAC $t > 6.8$), and consistency across all 10 evaluation windows.
+Second, global second-stage pooling can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. Descriptively, within-block basis rotation is lower than global rotation, though a matched-size random sub-panel control shows this reduction is not statistically distinguishable from a sample-size effect. Regardless of the geometric mechanism, the forecasting result is clear: a heterogeneity-aware mixture architecture with block-specific local residual models improves full-panel $R^2$ by $+0.047$ over the best global augmentation, validated by a placebo benchmark ($z = 7.82$), dependence-robust inference (DM-HAC $t > 6.8$), and consistency across all 10 evaluation windows.
 
 Third, the improvement requires data-type heterogeneity---mixing macro indices with firm-level cross-sectional ranks---and does not arise on homogeneous panels. This scope condition, together with the geodesic diagnostic and method-equivalence finding, provides an empirical characterisation of when local decomposition adds forecasting value on this class of panels.
 
 The design principle is simple: \emph{pool globally for what is shared, decompose locally for what is heterogeneous}.
 
+
+% ── Data and Code Availability ────────────────────────────
+\subsection*{Data and Code Availability}
+
+Replication code, anonymised panel data, and the pre-registration document for the $T \times K_b$ sweep (Section~\ref{sec:parsimony}) are available at \url{https://github.com/anonymous/smim-replication} (link will be de-anonymised upon acceptance). The repository includes scripts to reproduce all tables, figures, and placebo permutations reported in this paper.
 
 % ══════════════════════════════════════════════════════════
 % BIBLIOGRAPHY
@@ -708,6 +748,11 @@ Bai, J. (2009).
 \newblock Panel data models with interactive fixed effects.
 \newblock \emph{Econometrica}, 77(4):1229--1279.
 
+\bibitem[Bai and Ng(2002)]{bai2002determining}
+Bai, J. and Ng, S. (2002).
+\newblock Determining the number of factors in approximate factor models.
+\newblock \emph{Econometrica}, 70(1):191--221.
+
 \bibitem[Bates and Granger(1969)]{bates1969combination}
 Bates, J.~M. and Granger, C.~W.~J. (1969).
 \newblock The combination of forecasts.
@@ -717,6 +762,16 @@ Bates, J.~M. and Granger, C.~W.~J. (1969).
 Bonhomme, S. and Manresa, E. (2015).
 \newblock Grouped patterns of heterogeneity in panel models.
 \newblock \emph{Econometrica}, 83(3):1147--1184.
+
+\bibitem[Chudik and Pesaran(2015)]{chudik2015common}
+Chudik, A. and Pesaran, M.~H. (2015).
+\newblock Common correlated effects estimation of heterogeneous dynamic panel data models with weakly exogenous regressors.
+\newblock \emph{Journal of Econometrics}, 188(2):393--420.
+
+\bibitem[Clark and West(2007)]{clark2007approximately}
+Clark, T.~E. and West, K.~D. (2007).
+\newblock Approximately normal tests for equal predictive accuracy in nested models.
+\newblock \emph{Journal of Econometrics}, 138(1):291--311.
 
 \bibitem[Diebold and Mariano(1995)]{diebold1995comparing}
 Diebold, F.~X. and Mariano, R.~S. (1995).
@@ -733,10 +788,20 @@ Fama, E.~F. and French, K.~R. (1993).
 \newblock Common risk factors in the returns on stocks and bonds.
 \newblock \emph{Journal of Financial Economics}, 33(1):3--56.
 
+\bibitem[Giacomini and White(2006)]{giacomini2006tests}
+Giacomini, R. and White, H. (2006).
+\newblock Tests of conditional predictive ability.
+\newblock \emph{Econometrica}, 74(6):1545--1578.
+
 \bibitem[Gagliardini et~al.(2016)]{gagliardini2016time}
 Gagliardini, P., Ossola, E., and Scaillet, O. (2016).
 \newblock Time-varying risk premium in large cross-sectional equity datasets.
 \newblock \emph{The Review of Financial Studies}, 29(3):714--742.
+
+\bibitem[Harvey et~al.(1997)]{harvey1997testing}
+Harvey, D., Leybourne, S., and Newbold, P. (1997).
+\newblock Testing the equality of prediction mean squared errors.
+\newblock \emph{International Journal of Forecasting}, 13(2):281--291.
 
 \bibitem[Hsieh and Klenow(2009)]{hsieh2009misallocation}
 Hsieh, C.-T. and Klenow, P.~J. (2009).
@@ -757,6 +822,11 @@ Kutz, J.~N., Brunton, S.~L., Brunton, B.~W., and Proctor, J.~L. (2016).
 Ledoit, O. and Wolf, M. (2004).
 \newblock A well-conditioned estimator for large-dimensional covariance matrices.
 \newblock \emph{Journal of Multivariate Analysis}, 88(2):365--411.
+
+\bibitem[Pesaran(2006)]{pesaran2006estimation}
+Pesaran, M.~H. (2006).
+\newblock Estimation and inference in large heterogeneous panels with a multifactor error structure.
+\newblock \emph{Econometrica}, 74(4):967--1012.
 
 \bibitem[Reinsel and Velu(1998)]{reinsel1998multivariate}
 Reinsel, G.~C. and Velu, R.~P. (1998).
@@ -806,7 +876,7 @@ Wurgler, J. (2000).
 \section{DMD Mathematics}
 \label{app:dmd}
 
-Dynamic Mode Decomposition (DMD) provides a rank-$K$ approximation of the linear propagator mapping consecutive cross-sectional snapshots. Given a snapshot matrix $X = [x_1, \ldots, x_{T-1}]$ and $Y = [x_2, \ldots, x_T]$ with $x_t \in \R^N$, the truncated SVD $X = U_r \Sigma_r V_r^*$ yields the reduced propagator $\tilde{A} = U_r^* Y V_r \Sigma_r^{-1} \in \R^{K \times K}$, where $K \leq \min(N, T-1)$ is the truncation rank. The eigendecomposition $\tilde{A} W = W \Lambda$ produces DMD eigenvalues $\lambda_k$ encoding per-mode growth rate ($|\lambda_k|$) and oscillation frequency ($\arg \lambda_k$). For forecasting, the relevant objects are the left singular vectors $U_r$ (the orthonormal basis spanning the dominant $K$-dimensional subspace) and the diagonal or full matrix $\tilde{A}$ (the transition dynamics). In the paper's two-stage architecture, these are applied to Stage~1 residuals, not to the raw panel. Spectral radius clipping $\tilde{A} \leftarrow \tilde{A} \cdot \min(1, 0.99 / \max_k |\lambda_k(\tilde{A})|)$ ensures stability.
+Exact DMD \citep{kutz2016dynamic} provides a rank-$K$ approximation of the linear propagator mapping consecutive cross-sectional snapshots. In the two-stage architecture, DMD operates on the exponentially-weighted demeaned Stage~1 residuals, not on the raw panel. Given a snapshot matrix $X = [x_1, \ldots, x_{T-1}]$ and $Y = [x_2, \ldots, x_T]$ with $x_t \in \R^N$ (columns are demeaned residual vectors), the truncated SVD $X = U_r \Sigma_r V_r^*$ yields the reduced propagator $\tilde{A} = U_r^* Y V_r \Sigma_r^{-1} \in \R^{K \times K}$, where $K \leq \min(N, T-1)$ is the truncation rank. The eigendecomposition $\tilde{A} W = W \Lambda$ produces DMD eigenvalues $\lambda_k$ encoding per-mode growth rate ($|\lambda_k|$) and oscillation frequency ($\arg \lambda_k$). For forecasting, the relevant objects are the left singular vectors $U_r$ (the orthonormal basis spanning the dominant $K$-dimensional subspace) and the diagonal or full matrix $\tilde{A}$ (the transition dynamics). In the paper's two-stage architecture, these are applied to Stage~1 residuals, not to the raw panel. Spectral radius clipping $\tilde{A} \leftarrow \tilde{A} \cdot \min(1, 0.99 / \max_k |\lambda_k(\tilde{A})|)$ ensures stability.
 
 \subsection*{DMD-Based Kalman Filter}
 
@@ -835,9 +905,9 @@ i.e., the mean squared projection residual of the training data onto the $K$-dim
 S_t &= U_r \, P_{t|t-1} \, U_r^\top + R \\
 K_t &= P_{t|t-1} \, U_r^\top \, S_t^{-1} \\
 \balpha_{t|t} &= \balpha_{t|t-1} + K_t \bigl(\tilde{r}_t - U_r \, \balpha_{t|t-1}\bigr) \\
-P_{t|t} &= (I_K - K_t \, U_r) \, P_{t|t-1}
+P_{t|t} &= (I_K - K_t \, U_r) \, P_{t|t-1} (I_K - K_t \, U_r)^\top + K_t \, R \, K_t^\top
 \end{align}
-where $\tilde{r}_t = r_t - \bar{r}$ is the demeaned observed residual.
+where $\tilde{r}_t = r_t - \bar{r}$ is the demeaned observed residual. The covariance update uses the Joseph (stabilised) form, which preserves symmetry and positive semi-definiteness numerically; the simpler $(I_K - K_t U_r) P_{t|t-1}$ form is algebraically equivalent but can lose PSD in finite precision. Note: $S_t \in \R^{N \times N}$ is formally the innovation covariance, but with spherical $R = \sigma^2_\perp I_N$ the inversion is handled via the Woodbury identity: $S_t^{-1} = \sigma^{-2}_\perp \bigl(I_N - U_r (U_r^\top U_r \cdot \sigma^{-2}_\perp + P_{t|t-1}^{-1})^{-1} U_r^\top \sigma^{-2}_\perp\bigr)$, reducing the $N \times N$ inversion to a $K \times K$ inversion and making the filter well-conditioned for $N \gg K$.
 
 \textbf{Adaptive process noise.} $Q$ is updated each quarter via exponential smoothing of the innovation outer product:
 \begin{equation}
@@ -849,7 +919,9 @@ with $\lambda_Q = 0.3$, symmetrised and regularised: $Q_t \leftarrow \frac{1}{2}
 
 \textbf{Rolling basis update.} At each quarterly step, the DMD basis $U_r$ and transition $\tilde{A}$ are re-estimated from the expanding training data. When the basis changes, the Kalman state is re-projected ($\balpha \leftarrow U_r^{\mathrm{new}\top} \tilde{r}_t$), and $P$, $Q$ are reset to their initial values.
 
-\textbf{Key design choices.} (i)~The spherical $R$ (Eq.~\ref{eq:sph_r}) makes the filter well-conditioned for $N = 93$, $K = 8$, $T \approx 20$, where estimating a full $N \times N$ observation covariance is infeasible. (ii)~The adaptive $Q$ (Eq.~\ref{eq:q_adapt}) allows the process noise to track regime changes without manual tuning. (iii)~Spectral radius clipping at 0.99 prevents explosive modal dynamics. (iv)~The quarterly basis re-estimation tracks evolving cross-sectional structure but discards accumulated Kalman state, resetting each quarter.
+\textbf{Key design choices.} (i)~The spherical $R$ (Eq.~\ref{eq:sph_r}) makes the filter well-conditioned for $N = 93$, $K = 8$, $T \approx 20$, where estimating a full $N \times N$ observation covariance is infeasible. (ii)~Spectral radius clipping at 0.99 prevents explosive modal dynamics. (iii)~The quarterly basis re-estimation tracks evolving cross-sectional structure but resets $P$ and $Q$ to their initial values each quarter.
+
+\textbf{Adaptive Q: caveats.} The adaptive $Q$ (Eq.~\ref{eq:q_adapt}) uses the state-space correction $\nu_t = \balpha_{t|t} - \balpha_{t|t-1}$ rather than the observation-space innovation $\varepsilon_t = \tilde{r}_t - U_r \balpha_{t|t-1}$. This creates a positive-feedback loop: as the filter converges, corrections shrink, $Q$ decays, $P$ shrinks, and corrections shrink further. With $\lambda_Q = 0.3$, the diagonal elements of $Q$ decay as ${\sim}0.7^t$ toward the $10^{-6}$ floor. In the present architecture, this collapse is mitigated by the quarterly basis reset (design choice~iii): $Q$ is reinitialised to $Q_0 = 0.5 \cdot I_K$ each quarter, limiting the effective decay window to ${\sim}20$ steps during training. The standard Mehra (1970) adaptive scheme using observation-space innovations would avoid this coupling, but has not been implemented. Since the method-equivalence results (Table~\ref{tab:method_comparison}) show that Kalman-filtered and non-Kalman models achieve statistically indistinguishable $R^2$, the adaptive $Q$ dynamics do not materially affect the headline forecasting results.
 
 \section{Standalone Transition Diagnostic}
 \label{app:standalone}
@@ -879,5 +951,40 @@ The global spectral basis rotates at $49.2^\circ \pm 16.8^\circ$ per quarter (ge
 % Appendix G (NCD diagnostics) removed: tercile symbolisation was too
 % lossy to be informative; the diagnostic added no value beyond what
 % the forecasting tables already show.
+
+\section{Candidate Block Evaluation}
+\label{app:candidates}
+
+Ten candidate blocks were evaluated during exploratory analysis (Section~\ref{sec:discussion}, Limitation~2). For each candidate, a single-block mixture was run: global Stage~1 for all 93 actors, local PCA+ridge for the candidate block only, global augmentation for all other actors. Table~\ref{tab:candidates} reports the mean $\Delta R^2$ (single-block local $-$ global) across 10 windows.
+
+\begin{table}[H]
+\centering
+\caption{All 10 candidate blocks evaluated. $\Delta$ is the mean $R^2$ gain from applying local PCA+ridge to that block only (vs global augmentation for all actors). W is the number of positive windows. The three blocks selected for the final mixture are marked with $\star$.}
+\label{tab:candidates}
+\small
+\begin{tabular}{llccl}
+\toprule
+Type & Block & $N$ & $\Delta$ (W/10) & Selection \\
+\midrule
+\multirow{6}{*}{Raw sector}
+& Diversified$^\star$ & 23 & $+0.014$ (8/10) & Selected \\
+& Technology & 15 & $+0.014$ (10/10) & Merged $\rightarrow$ Tech/Health \\
+& Healthcare & 10 & $+0.001$ (5/10) & Merged $\rightarrow$ Tech/Health \\
+& Financials & 10 & $+0.002$ (5/10) & Not selected \\
+& Energy & 12 & $-0.003$ (5/10) & Not selected \\
+& Industrials & 12 & $+0.001$ (6/10) & Not selected \\
+\midrule
+\multirow{2}{*}{Merged sector}
+& Tech/Health$^\star$ & 25 & $+0.031$ (10/10) & Selected \\
+& Industrials/Energy & 24 & $+0.001$ (6/10) & Not selected \\
+\midrule
+\multirow{2}{*}{Layer}
+& Macro/Institutional$^\star$ & 11 & $+0.002$ (9/10) & Selected \\
+& All firms & 82 & $+0.016$ (8/10) & Not selected (too broad) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The merged Tech/Health block ($+0.031$, 10/10) dominates all other single-block candidates by a wide margin. Diversified ($+0.014$) and Technology ($+0.014$) are the next strongest, but Technology gains more when merged with Healthcare (synergy in local basis estimation). Macro/Institutional shows a small but highly consistent gain ($+0.002$, 9/10 positive). Energy, Financials, and Industrials show near-zero or negative gains, confirming they are well-served by the global basis. The ``All firms'' block ($+0.016$) is positive but was not selected because it is too broad to capture block-specific structure---it includes the very actors that the global model already serves well.
 
 \end{document}

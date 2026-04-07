@@ -162,10 +162,10 @@ def fig3_placebo() -> None:
     fig, ax = plt.subplots(figsize=(6.5, 3.5))
 
     # Histogram of placebo deltas
-    n_bins = 18
+    n_bins = 35
     _n, _bins, _patches = ax.hist(
         placebo_deltas, bins=n_bins, color=GREY_BAR, edgecolor="white",
-        linewidth=0.8, alpha=0.85, zorder=2, label="Placebo partitions ($n=50$)",
+        linewidth=0.8, alpha=0.85, zorder=2, label="Placebo partitions ($n=1{,}000$)",
     )
 
     # Real value as vertical dashed line
