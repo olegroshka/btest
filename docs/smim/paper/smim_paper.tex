@@ -781,6 +781,49 @@ Wurgler, J. (2000).
 
 Dynamic Mode Decomposition (DMD) provides a rank-$K$ approximation of the linear propagator mapping consecutive cross-sectional snapshots. Given a snapshot matrix $X = [x_1, \ldots, x_{T-1}]$ and $Y = [x_2, \ldots, x_T]$ with $x_t \in \R^N$, the truncated SVD $X = U_r \Sigma_r V_r^*$ yields the reduced propagator $\tilde{A} = U_r^* Y V_r \Sigma_r^{-1} \in \R^{K \times K}$, where $K \leq \min(N, T-1)$ is the truncation rank. The eigendecomposition $\tilde{A} W = W \Lambda$ produces DMD eigenvalues $\lambda_k$ encoding per-mode growth rate ($|\lambda_k|$) and oscillation frequency ($\arg \lambda_k$). For forecasting, the relevant objects are the left singular vectors $U_r$ (the orthonormal basis spanning the dominant $K$-dimensional subspace) and the diagonal or full matrix $\tilde{A}$ (the transition dynamics). In the paper's two-stage architecture, these are applied to Stage~1 residuals, not to the raw panel. Spectral radius clipping $\tilde{A} \leftarrow \tilde{A} \cdot \min(1, 0.99 / \max_k |\lambda_k(\tilde{A})|)$ ensures stability.
 
+\subsection*{DMD-Based Kalman Filter}
+
+The DMD basis $U_r$ and transition $\tilde{A}$ define a linear state-space model in $K$-dimensional modal coordinates. Let $\balpha_t \in \R^K$ denote the modal state at time $t$. The filter operates as follows.
+
+\textbf{Initialisation.} $\balpha_0 = \mathbf{0}$, $P_0 = I_K$, $Q_0 = q_0 \cdot I_K$ (with $q_0 = 0.5$).
+
+\textbf{Prediction step.}
+\begin{align}
+\balpha_{t|t-1} &= F \, \balpha_{t-1|t-1}, \qquad
+P_{t|t-1} = F \, P_{t-1|t-1} \, F^\top + Q_{t-1}
+\end{align}
+where $F = \clip(\tilde{A}, 0.99)$ is the spectral-radius-clipped transition (diagonal $\diag(\tilde{A})$ for the default model; full $\tilde{A}$ for max-performance).
+
+\textbf{Observation model.} The predicted residual vector is $\hat{r}_t = U_r \, \balpha_{t|t-1} + \bar{r}$, where $\bar{r}$ is the EWM mean of training residuals (half-life 12 quarters).
+
+\textbf{Measurement noise (spherical regularisation).} The observation noise covariance is set to
+\begin{equation}
+R = \sigma^2_\perp \, I_N, \qquad \sigma^2_\perp = \frac{1}{NT}\sum_{t,i}\bigl(r_{i,t} - [U_r U_r^\top r_t]_i\bigr)^2
+\label{eq:sph_r}
+\end{equation}
+i.e., the mean squared projection residual of the training data onto the $K$-dimensional subspace. This spherical form assumes homogeneous noise across actors and avoids estimating an $N \times N$ covariance with $T \ll N$. It is the key regularisation that makes the Kalman filter well-conditioned in the $N > T$ regime.
+
+\textbf{Update step.}
+\begin{align}
+S_t &= U_r \, P_{t|t-1} \, U_r^\top + R \\
+K_t &= P_{t|t-1} \, U_r^\top \, S_t^{-1} \\
+\balpha_{t|t} &= \balpha_{t|t-1} + K_t \bigl(\tilde{r}_t - U_r \, \balpha_{t|t-1}\bigr) \\
+P_{t|t} &= (I_K - K_t \, U_r) \, P_{t|t-1}
+\end{align}
+where $\tilde{r}_t = r_t - \bar{r}$ is the demeaned observed residual.
+
+\textbf{Adaptive process noise.} $Q$ is updated each quarter via exponential smoothing of the innovation outer product:
+\begin{equation}
+Q_t = (1 - \lambda_Q)\, Q_{t-1} + \lambda_Q \, \nu_t \nu_t^\top, \qquad
+\nu_t = \balpha_{t|t} - \balpha_{t|t-1}
+\label{eq:q_adapt}
+\end{equation}
+with $\lambda_Q = 0.3$, symmetrised and regularised: $Q_t \leftarrow \frac{1}{2}(Q_t + Q_t^\top) + 10^{-6} I_K$.
+
+\textbf{Rolling basis update.} At each quarterly step, the DMD basis $U_r$ and transition $\tilde{A}$ are re-estimated from the expanding training data. When the basis changes, the Kalman state is re-projected ($\balpha \leftarrow U_r^{\mathrm{new}\top} \tilde{r}_t$), and $P$, $Q$ are reset to their initial values.
+
+\textbf{Key design choices.} (i)~The spherical $R$ (Eq.~\ref{eq:sph_r}) makes the filter well-conditioned for $N = 93$, $K = 8$, $T \approx 20$, where estimating a full $N \times N$ observation covariance is infeasible. (ii)~The adaptive $Q$ (Eq.~\ref{eq:q_adapt}) allows the process noise to track regime changes without manual tuning. (iii)~Spectral radius clipping at 0.99 prevents explosive modal dynamics. (iv)~The quarterly basis re-estimation tracks evolving cross-sectional structure but discards accumulated Kalman state, resetting each quarter.
+
 \section{Standalone Transition Diagnostic}
 \label{app:standalone}
 
