@@ -336,7 +336,7 @@ Remainder & 34 & --- & Energy, industrials, financials (global model adequate) \
 \end{tabular}
 \end{table}
 
-Block assignments are fixed before execution of the rolling evaluation protocol using static economic metadata from the actor registry. The selection of which blocks to treat locally was informed by preliminary per-block diagnostics during exploratory analysis (Limitation~2 and Appendix~\ref{app:candidates}).
+Block assignments are fixed before execution of the rolling evaluation protocol using static economic metadata from the actor registry. The selection of which blocks to treat locally was informed by preliminary per-block diagnostics during exploratory analysis (Section~\ref{sec:discussion}, Appendix~\ref{app:candidates}).
 
 Formally, the mixture estimator is:
 \begin{equation}
@@ -660,7 +660,7 @@ Several further limitations qualify the findings:
   \item \textbf{Scope limited to heterogeneous panels.} The gain does not replicate on homogeneous firm-only panels. The finding is a precise scope condition, not a universal architectural improvement.
   \item \textbf{Quarterly frequency only.} Higher-frequency data may reveal different dynamics.
   \item \textbf{Modest absolute improvement.} The $+0.047$ $R^2$ gain, while statistically robust ($z = 7.82$), is modest in absolute terms.
-  \item \textbf{FRED min-max look-ahead (resolved).} The 7 macro actors use full-sample min-max normalisation in the primary analysis, introducing look-ahead in their target values. A robustness check replaces this with strictly recursive expanding-window min-max bounds (each quarter normalised using only data available up to that quarter). The result is unchanged: the mixture gain is $\Delta = +0.048$ (10/10 windows positive) under recursive normalisation versus $+0.047$ under full-sample bounds. Excluding all macro and institutional actors entirely (82-firm panel) yields $\Delta = +0.053$ (10/10). The FRED look-ahead does not contribute to the headline finding.
+  \item \textbf{FRED min-max look-ahead.} The 7 macro actors use full-sample min-max normalisation in the primary analysis, introducing look-ahead in their target values. A robustness check with strictly recursive expanding-window min-max bounds (each quarter normalised using only data available up to that quarter) yields $\Delta = +0.048$ (10/10 windows positive) versus $+0.047$ under full-sample bounds. Excluding all macro and institutional actors entirely (82-firm panel) yields $\Delta = +0.053$ (10/10). The FRED look-ahead does not contribute to the headline finding.
   \item \textbf{Data-timing latency.} Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. The evaluation assumes all targets are available at the quarterly boundary. Consequently, the \emph{absolute} $R^2$ levels (e.g., 0.677 for M2) are overstated relative to what a real-time implementation would deliver; the \emph{relative} gain ($\Delta = +0.047$, M2 vs G1) is likely structural because both architectures face the same timing assumption, but this has not been verified with lagged firm data.
   \item \textbf{Survivorship bias.} The 82-firm panel requires complete quarterly data over a 20-year sample (2005--2025), selecting for persistent large-cap survivors. This balanced-panel design simplifies evaluation but may overstate persistence estimates. It may also \emph{understate} the cross-block interference documented here, because survivorship compresses cross-sectional variance; an unbalanced panel including distressed and newly-listed firms would likely exhibit greater heterogeneity. Whether the mixture architecture retains its advantage---and by how much it grows---on such a panel is untested.
 \end{enumerate}
@@ -695,7 +695,7 @@ This finding contradicts a pre-registered prediction that lower $K_b$ would be n
 \subsection{Pre-Registered Predictions}
 \label{sec:prereg}
 
-Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive; commit history preserved). Four of five failed and one was borderline, in each case revealing that the architectural gain is stronger and more robust than anticipated:
+Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive). Four of five failed and one was borderline, in each case revealing that the architectural gain is stronger and more robust than anticipated:
 
 \begin{enumerate}[nosep]
   \item \textbf{P1} ($T{=}5$yr): $|R^2(K_b{=}2) - R^2(K_b{=}4)| < 0.005$ (flat parsimony frontier). \emph{Actual}: $0.018$. \textbf{Failed} --- $K_b{=}4$ captures secondary within-block modes that $K_b{=}2$ misses.
@@ -731,7 +731,7 @@ The design principle is simple: \emph{pool globally for what is shared, decompos
 % ── Data and Code Availability ────────────────────────────
 \subsection*{Data and Code Availability}
 
-Replication code, anonymised panel data, and the pre-registration document for the $T \times K_b$ sweep (Section~\ref{sec:parsimony}) are available at \url{https://anonymous.4open.science/r/smim-replication} (link will be de-anonymised upon acceptance). The pre-registration document's timestamp is verifiable from the repository's commit history (commit preceding the sweep execution). The repository includes scripts to reproduce all tables, figures, and placebo permutations reported in this paper.
+Replication code, anonymised panel data, and the time-stamped pre-registration document for the $T \times K_b$ sweep (Section~\ref{sec:parsimony}) are available at \url{https://anonymous.4open.science/r/smim-replication}. The repository includes scripts to reproduce all tables, figures, and placebo permutations reported in this paper.
 
 % ══════════════════════════════════════════════════════════
 % BIBLIOGRAPHY
