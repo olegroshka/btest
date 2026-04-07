@@ -74,7 +74,7 @@ Independent Researcher\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, global augmentation reduces predictive $R^2$ for the diversified sector by 2.3~percentage points below a pooled-only baseline. A heterogeneity-aware two-stage architecture addresses this: a global pooled AR(1) with fixed effects captures shared persistence (Stage~1), while block-specific local models---motivated by economic sector and data-type structure---capture residual dynamics within each block (Stage~2). The mixture architecture improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.82$ against 1{,}000 random partitions of identical block sizes). The gain is architectural rather than methodological within the class of linear reduced-rank estimators tested: PCA, Dynamic Mode Decomposition, and Ridge regression are interchangeable ($\rho_{\mathrm{pred}} > 0.98$). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels ($\Delta = -0.002$ and $+0.001$), identifying data-type heterogeneity as the operative condition. At a common rank $K{=}4$, the global spectral basis rotates at $31.5^\circ$ per quarter; within coherent sector blocks, rotation drops to $14$--$28^\circ$, though a matched-size random sub-panel control indicates this reduction is not statistically significant and is partly mechanical (smaller panels produce more stable estimated bases). The architectural gain amplifies at short training windows, roughly doubling as the training period shrinks from 5 to 2 years.
+Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, global augmentation reduces predictive $R^2$ for the diversified sector by 2.3~percentage points below a pooled-only baseline. A heterogeneity-aware two-stage architecture addresses this: a global pooled AR(1) with fixed effects captures shared persistence (Stage~1), while block-specific local models---motivated by economic sector and data-type structure---capture residual dynamics within each block (Stage~2). The mixture architecture improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.82$ against 1{,}000 random partitions of identical block sizes). The gain is concentrated in the tech/health block (${\sim}72\%$), with smaller positive contributions from other locally-treated blocks. It is architectural rather than methodological within the class of linear reduced-rank estimators tested: PCA, Dynamic Mode Decomposition, and Ridge regression are interchangeable ($\rho_{\mathrm{pred}} > 0.98$). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels ($\Delta = -0.002$ and $+0.001$), identifying data-type heterogeneity as the operative condition. At a common rank $K{=}4$, the global spectral basis rotates at $31.5^\circ$ per quarter; within coherent sector blocks, rotation drops to $14$--$28^\circ$, though a matched-size random sub-panel control indicates this reduction is not statistically significant and is partly mechanical (smaller panels produce more stable estimated bases). The architectural gain amplifies at short training windows, roughly doubling as the training period shrinks from 5 to 2 years.
 \end{abstract}
 
 \vspace{0.3cm}
@@ -336,7 +336,7 @@ Remainder & 34 & --- & Energy, industrials, financials (global model adequate) \
 \end{tabular}
 \end{table}
 
-Block assignments are fixed before execution using static economic metadata from the actor registry. No optimisation of block membership is performed.
+Block assignments are fixed before execution of the rolling evaluation protocol using static economic metadata from the actor registry. The selection of which blocks to treat locally was informed by preliminary per-block diagnostics during exploratory analysis (Limitation~2 and Appendix~\ref{app:candidates}).
 
 Formally, the mixture estimator is:
 \begin{equation}
@@ -524,6 +524,8 @@ Placebo $p$-value & ${<}0.001$ (0/1{,}000; Monte Carlo bound $1/1{,}001$) \\
 
 Random blocks degrade performance on average ($\Delta = -0.004$) because local estimation noise dominates when blocks are arbitrary. No random partition approaches the real gain. Each placebo uses the same 10 evaluation windows, same block sizes, and same local model specification---the only difference is actor assignment. The placebo benchmark controls for small-sample bias by design.
 
+A natural question is whether concentration --- a random partition happening to place a coherent cluster in one block --- could produce a large aggregate gain. The evidence suggests not: the placebo maximum across 1{,}000 draws is $+0.023$, roughly half the real gain, and this includes any accidental coherence. Moreover, the real partition's gain is itself concentrated in the tech/health block (${\sim}72\%$; Section~\ref{sec:validation}), which means the placebo test is effectively comparing the real tech/health signal against the best accidental cluster in 1{,}000 random 25-actor sub-panels --- and the real signal dominates by a factor of two.
+
 \begin{figure}[ht]
 \centering
 \includegraphics[width=0.80\textwidth]{figures/fig3_placebo.pdf}
@@ -561,7 +563,7 @@ The result is unambiguous: all 10 windows select the same three blocks (Diversif
 
 The diversified sector is the most heterogeneous block and the one where global augmentation most clearly degrades prediction. To test whether the headline gain depends on this specific block, the entire pipeline is re-estimated on the 70-actor panel after removing all diversified-sector actors. On this reduced panel (blocks: Macro/Institutional $N{=}11$, Tech/Health $N{=}25$, Remainder $N{=}34$), the mixture gain is $\Delta = +0.035$ ($t = 10.37$, CI $[+0.029, +0.042]$, 10/10 windows positive)---75\% of the original gain. The headline result does not depend primarily on the diversified sector: 75\% of the gain survives its removal, sustained primarily by the tech/health block. The remaining 25\% reflects the diversified block's specific contribution.
 
-Conversely, dropping the tech/health block (keeping only Diversified and Macro/Institutional as local blocks on the full 93-actor panel) reduces the gain to $\Delta = +0.013$ (7/10 windows positive)---28\% of the original. The tech/health block is the dominant contributor to the headline result, accounting for roughly 72\% of the gain. However, the remaining blocks still contribute a positive and directionally consistent $+0.013$ (7/10), confirming that the architecture works broadly even though it specifically shines on the tech/health rotational signal.
+Conversely, dropping the tech/health block (keeping only Diversified and Macro/Institutional as local blocks on the full 93-actor panel) reduces the gain to $\Delta = +0.013$ (7/10 windows positive)---28\% of the original. The tech/health block is the dominant contributor (${\sim}72\%$ of the gain), which is internally consistent with the paper's mechanism: tech/health is the block where within-block co-movement is most coherent and thus where local modelling has the most to recover. The smaller but consistent contributions from Diversified and Macro/Institutional ($+0.013$, positive in 7/10 windows) confirm the effect is not purely a tech/health phenomenon, but the bulk of the improvement comes from one coherent sub-panel.
 
 \subsection{Block Boundary Sensitivity}
 
@@ -693,7 +695,7 @@ This finding contradicts a pre-registered prediction that lower $K_b$ would be n
 \subsection{Pre-Registered Predictions}
 \label{sec:prereg}
 
-Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive). All five failed, in each case revealing that the architectural gain is stronger and more robust than anticipated:
+Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive; commit history preserved). Four of five failed and one was borderline, in each case revealing that the architectural gain is stronger and more robust than anticipated:
 
 \begin{enumerate}[nosep]
   \item \textbf{P1} ($T{=}5$yr): $|R^2(K_b{=}2) - R^2(K_b{=}4)| < 0.005$ (flat parsimony frontier). \emph{Actual}: $0.018$. \textbf{Failed} --- $K_b{=}4$ captures secondary within-block modes that $K_b{=}2$ misses.
@@ -729,7 +731,7 @@ The design principle is simple: \emph{pool globally for what is shared, decompos
 % ── Data and Code Availability ────────────────────────────
 \subsection*{Data and Code Availability}
 
-Replication code, anonymised panel data, and the pre-registration document for the $T \times K_b$ sweep (Section~\ref{sec:parsimony}) are available at \url{https://github.com/anonymous/smim-replication} (link will be de-anonymised upon acceptance). The repository includes scripts to reproduce all tables, figures, and placebo permutations reported in this paper.
+Replication code, anonymised panel data, and the pre-registration document for the $T \times K_b$ sweep (Section~\ref{sec:parsimony}) are available at \url{https://anonymous.4open.science/r/smim-replication} (link will be de-anonymised upon acceptance). The pre-registration document's timestamp is verifiable from the repository's commit history (commit preceding the sweep execution). The repository includes scripts to reproduce all tables, figures, and placebo permutations reported in this paper.
 
 % ══════════════════════════════════════════════════════════
 % BIBLIOGRAPHY
@@ -916,7 +918,7 @@ Q_t = (1 - \lambda_Q)\, Q_{t-1} + \lambda_Q \, \nu_t \nu_t^\top, \qquad
 \end{equation}
 with $\lambda_Q = 0.3$, symmetrised and regularised: $Q_t \leftarrow \frac{1}{2}(Q_t + Q_t^\top) + 10^{-6} I_K$.
 
-\textbf{Rolling basis update.} At each quarterly step, the DMD basis $U_r$ and transition $\tilde{A}$ are re-estimated from the expanding training data. When the basis changes, the Kalman state is re-projected ($\balpha \leftarrow U_r^{\mathrm{new}\top} \tilde{r}_t$), and $P$, $Q$ are reset to their initial values.
+\textbf{Rolling basis update.} At each test quarter, the DMD basis $U_r$ and transition $\tilde{A}$ are re-estimated from the expanding training data; the filter is then re-run through all $T_{\mathrm{train}}$ training quarters from reinitialised $(\balpha_0, P_0, Q_0)$, producing the filtered state at the training boundary from which the one-step-ahead test forecast is computed. This means $Q$ undergoes ${\sim}T_{\mathrm{train}} \approx 20$ update steps between reinitialisations.
 
 \textbf{Key design choices.} (i)~The spherical $R$ (Eq.~\ref{eq:sph_r}) makes the filter well-conditioned for $N = 93$, $K = 8$, $T \approx 20$, where estimating a full $N \times N$ observation covariance is infeasible. (ii)~Spectral radius clipping at 0.99 prevents explosive modal dynamics. (iii)~The quarterly basis re-estimation tracks evolving cross-sectional structure but resets $P$ and $Q$ to their initial values each quarter.
 
@@ -984,6 +986,6 @@ Type & Block & $N$ & $\Delta$ (W/10) & Selection \\
 \end{tabular}
 \end{table}
 
-The merged Tech/Health block ($+0.031$, 10/10) dominates all other single-block candidates by a wide margin. Diversified ($+0.014$) and Technology ($+0.014$) are the next strongest, but Technology gains more when merged with Healthcare (synergy in local basis estimation). Macro/Institutional and Financials have identical mean $\Delta$ ($+0.002$), but Macro/Institutional was selected over Financials because of its superior window consistency (9/10 vs 5/10 positive windows)---both mean gain and window consistency informed the selection, not mean gain alone. Energy and Industrials show near-zero or negative gains, confirming they are well-served by the global basis. The ``All firms'' block ($+0.016$, 8/10) was not selected because it subsumes the remainder actors already well-served by the global model, diluting the block-specific signal; this is a granularity judgment, not a purely statistical criterion.
+The selection rule applied to sector-based candidates was: $\Delta > 0$ \emph{and} $W/10 \geq 7$. Among sector-based candidates, the merged Tech/Health block ($+0.031$, 10/10) dominates by a wide margin. Diversified ($+0.014$, 8/10) qualifies clearly. Macro/Institutional and Financials have identical mean $\Delta$ ($+0.002$), but Macro/Institutional was selected because of its superior window consistency (9/10 vs 5/10)---both criteria must be met. Technology ($+0.014$, 10/10) qualifies individually but gains more when merged with Healthcare. Energy and Industrials show near-zero or negative gains, confirming they are well-served by the global basis. The ``All firms'' candidate ($+0.016$, 8/10) represents a layer-based partition (all 82 firms as one block) rather than a sector-based one; it was evaluated as a separate partition scheme but excluded from the sector-based mixture because it subsumes the remainder actors already well-served by the global model, and a single 82-actor local block is not meaningfully different from the global Stage~2 operating on 82 of 93 actors.
 
 \end{document}
