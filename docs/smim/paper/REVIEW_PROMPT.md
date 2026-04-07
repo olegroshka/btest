@@ -1,112 +1,124 @@
-# Paper Review Prompt
+# Paper Review Prompt — Round 5 (Publication-Readiness)
 
 Paste the full LaTeX source of `smim_paper.tex` after this prompt.
 
 ---
 
-You are three anonymous referees reviewing this manuscript for simultaneous submission to the Journal of Econometrics (Referee 1), the Journal of Financial Economics (Referee 2), and IEEE Transactions on Signal Processing (Referee 3). Each referee is a tenured professor with 20+ years of experience who has published extensively in the relevant field and has reviewed hundreds of papers. Each referee writes independently.
+## Context
 
-**Your incentive structure:** You will be evaluated by the editor on the quality and depth of your review. Shallow, generic reviews ("the paper is interesting but could be improved") will be rejected. The editor specifically values:
-- Catching numerical errors (wrong arithmetic, inconsistent numbers across sections)
-- Identifying logical gaps in the argument chain
-- Finding claims that are not supported by the evidence presented
-- Spotting missing comparisons that would change the conclusion
-- Noting places where the prose asserts X but the tables show Y
+This manuscript has undergone four prior revision cycles with twelve
+independent referee reports across JBES, JFE, and JoE. The most recent
+round (Round 4) produced three verdicts of **Accept** or **Accept with
+cosmetic revisions** from senior associate editors at Gemini, GPT, and
+Opus. All numerical audits passed. All prior blocking issues have been
+resolved.
 
-**Instructions for each referee:**
-
-Read the ENTIRE manuscript twice. On the first pass, understand the argument. On the second pass, audit every claim against the evidence.
-
-Then write a formal referee report with these sections:
-
-## Referee 1 (Econometrics)
-
-### Recommendation
-One of: Accept / Minor Revision / Major Revision / Reject
-
-### Summary (3 sentences max)
-
-### Major Issues (numbered)
-For each issue: (a) quote the exact problematic text, (b) explain why it is wrong or insufficient, (c) suggest a specific fix. Focus on:
-
-1. **Identification**: Is the two-stage architecture just forecast combination (Bates & Granger 1969)? If so, what is the marginal contribution over a simple optimal combination weight? Has the paper adequately distinguished its approach from standard residual boosting?
-
-2. **Inference**: The bootstrap resamples 10 window-level R² values. With 5-year rolling windows and annual test periods, adjacent training sets overlap by 80%. Are the 10 observations independent? What is the effective sample size? Would a block bootstrap or HAC-corrected test change the conclusions?
-
-3. **Baselines**: Is the comparison fair? Would Ridge/Lasso/elastic net on lagged cross-sectional features achieve similar gains with less machinery? Would a PCA basis with diagonal AR(1) on residuals (same number of parameters as DMD/Kalman diag) isolate the DMD-specific contribution?
-
-4. **Economic validation**: The dependent variable Δy_{t→t+4} overlaps by 3 quarters for consecutive observations. Are the t-statistics valid? What standard error estimator is used? Are the gaps a generated regressor — if so, does this affect inference?
-
-5. **Metric**: R² is the only forecast metric reported. Is this sufficient? Would RMSE, MAE, directional accuracy, or a Diebold-Mariano test tell a different story?
-
-### Minor Issues (numbered)
-Notation, typos, missing definitions, unclear sentences. Give line/equation numbers.
-
-### Questions for the Authors (numbered)
+This is the **final review before submission**. The purpose is not to
+find new conceptual objections or request new experiments. The purpose
+is to catch anything — however small — that would embarrass the author
+or the journal after publication. Typos, orphaned references, prose
+that contradicts a table, a hedge in one section that becomes an
+assertion in another, a missing minus sign, a figure caption that
+describes a different figure.
 
 ---
 
-## Referee 2 (Finance)
+## Your role
 
-### Recommendation
+You are three independent referees performing a final acceptance check.
+Each referee reads the paper with the assumption that it WILL be
+published, and asks: **"Is there anything in this paper that I would
+be embarrassed to have in print under my editorial watch?"**
 
-### Summary (3 sentences max)
+You are looking for:
 
-### Major Issues (numbered)
-Focus on:
+**Category A — Errors of fact.** A number in the text that does not
+match the corresponding table. A CI that is reported as excluding zero
+but the bounds shown include it. A claim about "all 10 windows" when
+the table shows 9. A K value cited without specification when two K
+values are used. A figure caption describing content that doesn't
+match the figure.
 
-1. **Economic significance**: The gains are +1.7 to +3.6 percentage points in R². Is this economically meaningful? What does it translate to in terms of portfolio-level alpha, tracking error reduction, or capital allocation improvement? Without an economic magnitude assessment, is this a statistical curiosity?
+**Category B — Broken references.** A cross-reference to a table,
+figure, appendix, or equation that does not exist or points to the
+wrong object. An "Appendix X" that has no corresponding section. A
+"Table Y" that was renumbered but the reference was not updated.
 
-2. **Out-of-sample integrity**: The paper fixes K=8, τ=12Q, T=5yr "across all panels and windows" with "no inner cross-validation." How were these values chosen? If they were chosen by looking at the results, this is implicit data snooping. If they are truly a priori, what is the justification? Has the paper tested sensitivity to these choices?
+**Category C — Prose–evidence mismatches.** A sentence that asserts X
+where the evidence shows "X with qualification." A hedge in Section 4
+that becomes an unqualified assertion in the conclusion. A "robust
+across three panels" when the result is positive on one and null on
+two.
 
-3. **Investment gap interpretation**: The gap is defined as the residual from a forecast model (Eq. 8). How is this different from a forecast error? The economic validation shows that large positive gaps predict subsequent decline — but this is mechanically true for any mean-reverting series with a decent forecast model. What is the economic content beyond mean reversion?
+**Category D — Orphaned content.** A section that references material
+that was deleted in revision. A footnote that no longer applies. A
+limitation listed that has since been addressed. A "future work" item
+that was actually done.
 
-4. **Panel construction**: The 270-actor panel stacks two ratios for the same ~135 firms. This creates mechanical cross-sectional dependence. How does this affect the reported CIs and win counts? Would the result survive on a panel of 270 genuinely distinct entities?
+**Category E — Presentation.** Grammar, spelling, inconsistent
+notation, unclear antecedents, sentences that are ambiguous about
+which model is being discussed, paragraphs that could be misread.
 
-5. **Practical implementability**: Could a practitioner actually use this? What is the data latency for EDGAR filings? How sensitive is the result to the quarterly publication lag? Is the augmentation gain robust to realistic data-availability constraints?
-
-### Minor Issues (numbered)
-
-### Questions for the Authors (numbered)
-
----
-
-## Referee 3 (Signal Processing / Applied Mathematics)
-
-### Recommendation
-
-### Summary (3 sentences max)
-
-### Major Issues (numbered)
-Focus on:
-
-1. **DMD formulation completeness**: Is the exact DMD variant (exact vs projected vs optimised) specified? How are K modes selected from the r-rank SVD? Are the DMD modes orthogonal? How are complex eigenvalue pairs handled in the real-valued Kalman state?
-
-2. **Spectral radius clipping**: The paper defines clip_SR but only for proportional rescaling. For the full Ã matrix with complex eigenvalues, does rescaling by c/ρ(Ã) preserve the eigenvector structure exactly? What about for the diagonal case — is each entry clipped independently or is the whole diagonal rescaled? How sensitive are results to the clipping threshold (0.99)?
-
-3. **State reset at basis update**: The Kalman state, covariance P, and process noise Q are all reset at each quarterly basis update. This discards accumulated information. The paper reports that state projection across bases yields Δ = −0.001, but what projection method was tested? Was the pseudoinverse projection α_new = U_new† U_old α_old attempted? Was P projected as U_new† U_old P U_old† U_new?
-
-4. **Online Q adaptation**: Eq. 7 uses α_{t|t} − F α_{t−1|t−1} as the innovation proxy. This is NOT the standard Kalman innovation (which is y_t − H α_{t|t−1} in observation space). What is the statistical justification for this choice? Does it have known bias properties? (Cf. Mehra 1970, 1972 on adaptive Kalman filtering.)
-
-5. **Diagonal capture interpretation**: The claim that diag(Ã) captures 96% of the full-Ã gain is the paper's central interpretive finding. But in the N≫T regime, the off-diagonal entries of Ã are estimated from very limited data. Could the diagonal dominance be a statistical artifact (lower estimation variance) rather than evidence about the true dynamics? How would this interpretation change if T were longer?
-
-6. **Reconstruction vs prediction gap**: The paper shows modal R² = 0.696 (reconstruction) vs predictive R² = 0.415 (standalone prediction). The gap is attributed to F = 0.99I destroying mode-specific dynamics. But is there an alternative explanation: reconstruction uses α_{t|t} which incorporates the current observation — in a trivial sense, reconstructing y_t from y_t is always easier than predicting it. Is the reconstruction R² genuinely informative about spectral structure, or is it mostly measuring the Kalman update's ability to fit the current observation?
-
-### Minor Issues (numbered)
-
-### Questions for the Authors (numbered)
+You are NOT looking for:
+- New experiments or baselines
+- Fundamental reconceptualisation
+- Scope expansion
+- Economic significance (the paper explicitly positions as methods)
+- Theory or asymptotics (the paper explicitly disclaims these)
 
 ---
 
-## Cross-Referee Consistency Check
+## Report structure
 
-After all three reports are written, add a final section:
+Each referee writes a short report (max 1 page) with:
 
-### Contradictions Between Referees
-Note any cases where Referee 1 and Referee 3 disagree on methodology, or where Referee 2's economic concerns conflict with Referee 1's statistical assessment.
+### Recommendation
+Accept / Accept with corrections / Minor revision
 
-### Consensus Issues
-Note findings that all three referees independently flagged — these are the highest-priority fixes.
+### Findings
+A numbered list of specific items found, categorised A–E. For each:
+quote the exact text, state the problem, state the fix. If none
+found, state "No issues found."
 
-### The One Issue That Would Change the Paper's Conclusion
-Each referee: identify the single experiment or analysis that, if the result went the wrong way, would invalidate the paper's main claim. What is it, and has the paper addressed it?
+### Overall assessment
+One paragraph: is this paper ready for publication in JBES?
+
+---
+
+## Referee assignments
+
+### Referee 1 — The Proofreader
+Focus on Categories A and B. Your job is to verify every number,
+every cross-reference, every table/figure pointer. Read every table
+caption and check it against the table contents. Read every CI and
+check the bounds. Count table rows and match against captions.
+Verify that every "\ref{}" resolves to the correct object.
+
+### Referee 2 — The Consistency Checker
+Focus on Categories C and D. Your job is to read the abstract, then
+the conclusion, then the body, and check that no claim is stronger
+in the abstract/conclusion than the evidence in the body supports.
+Check that every hedge is propagated. Check that no deleted material
+is still referenced. Check that limitations match what was actually
+tested.
+
+### Referee 3 — The Reader
+Focus on Category E. Your job is to read the paper as a first-time
+reader would, noting any sentence that is confusing, any paragraph
+where the referent of "this" is unclear, any place where notation
+switches without explanation, any figure that is hard to read. You
+are the "fresh eyes" check.
+
+---
+
+## Synthesis
+
+After all three reports, add:
+
+### Publication-ready?
+Yes / Yes with corrections / No
+
+If corrections are needed, list them with estimated fix time
+(minutes, not hours). If the total fix time exceeds 2 hours, the
+paper needs another revision cycle. If it is under 30 minutes,
+accept with corrections.

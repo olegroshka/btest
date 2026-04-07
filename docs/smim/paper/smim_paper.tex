@@ -26,7 +26,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{}
-\fancyhead[R]{\small\textsc{Spectral Augmentation of Panel Forecasts}}
+\fancyhead[R]{\small\textsc{Global Persistence, Local Residual Structure}}
 \fancyfoot[C]{\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 \setlength{\headheight}{14pt}
@@ -48,10 +48,6 @@
 \newcommand{\balpha}{\bm{\alpha}}
 \newcommand{\clip}{\mathrm{clip}_{\mathrm{SR}}}
 
-\theoremstyle{definition}
-\newtheorem{definition}{Definition}[section]
-\newtheorem{proposition}{Proposition}[section]
-
 \setlength{\parskip}{0.4em}
 \setlength{\parindent}{0em}
 
@@ -59,15 +55,10 @@
 \begin{document}
 \thispagestyle{empty}
 
-% ── Title options (recommended: Option 1) ─────────────────
-% Option 1: Spectral Augmentation of Panel Forecasts with Dynamic Mode Decomposition
-% Option 2: Dynamic Mode Decomposition as Residual Spectral Augmentation for Cross-Sectional Investment Forecasts
-% Option 3: Cross-Sectional Spectral Augmentation: Residual Dynamic Mode Decomposition for Investment Panels
-
 \begin{center}
 {\LARGE\bfseries\color{accent}
-Spectral Augmentation of Panel Forecasts\\[6pt]
-with Dynamic Mode Decomposition\par}
+Global Persistence, Local Residual Structure:\\[6pt]
+Forecasting Heterogeneous Investment Panels\par}
 \vspace{1cm}
 {\large
 Oleg Roshka\\[6pt]
@@ -83,802 +74,542 @@ Independent Researcher\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-We study cross-sectional investment intensity forecasting with spectral state-space methods. On a 93-actor multilayer panel, standalone spectral prediction using Dynamic Mode Decomposition (DMD) with a near-identity Kalman transition ($F = 0.99I$) achieves predictive $R^2 = 0.415$---far below per-actor AR(1) at $0.594$---because the uniform transition destroys mode-specific dynamics captured by the DMD basis. Replacing the transition with DMD's own reduced propagator $\tilde{A}$ partially repairs standalone performance to $R^2 = 0.486$, but the fundamental limitation remains: a single spectral basis cannot replicate actor-specific persistence. The recommended architecture is a two-stage pipeline: pooled AR(1) with fixed effects captures shared persistence (Stage~1, $R^2 = 0.591$), then a DMD-based Kalman filter on Stage~1 residuals captures cross-sectional rotational structure (Stage~2). The default augmented model uses per-mode diagonal dynamics ($F = \diag(\tilde{A}_r)$, $R^2 = 0.619$); a maximum-performance variant uses the full reduced operator ($F = \tilde{A}_r$, $R^2 = 0.630$, $\Delta R^2 = +0.036$ vs AR(1); CI $[+0.021, +0.054]$; permutation $p = 0.001$; 10/10 windows). The result generalises across all three panels: $+1.7$pp on a 146-firm CapEx/Revenue panel, $+2.5$pp on a 270-actor multi-ratio panel, and $+3.6$pp on the 93-actor multilayer panel, with confidence intervals excluding zero in all cases. An ablation ladder demonstrates that the gain requires learned per-mode dynamics on the residuals: projection-only models, naive Kalman ($F = 0.99I$), and residual dynamic factor models all fail. Crucially, a PCA basis with diagonal AR(1) on residual principal component scores ($R^2 = 0.617$) matches DMD/Kalman with diagonal $\tilde{A}_r$ ($R^2 = 0.615$), and Ridge regression ($R^2 = 0.632$) matches the full-$\tilde{A}_r$ variant ($R^2 = 0.629$). The gain is from the two-stage architectural principle with per-mode dynamics, not from DMD's Koopman structure specifically. Additional filter complexity provides zero gain. Separately, the spectral basis rotates at $25.8^\circ$/quarter with stable 8-mode dimensionality, and dual regularisation is essential for reconstruction quality.
+Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, global augmentation reduces predictive $R^2$ for the diversified sector by 2.3~percentage points below a pooled-only baseline. A heterogeneity-aware two-stage architecture addresses this: a global pooled AR(1) with fixed effects captures shared persistence (Stage~1), while block-specific local models---pre-specified by economic sector and data-type structure---capture residual dynamics within each block (Stage~2). The mixture architecture improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.56$ against 50 random partitions of identical block sizes). The gain is architectural, not methodological: among regularised second-stage engines, PCA, Dynamic Mode Decomposition, and Ridge regression are interchangeable ($\rho_{\mathrm{pred}} > 0.98$). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels ($\Delta = -0.002$ and $+0.001$), identifying data-type heterogeneity as the operative condition. Structurally, the global spectral basis (at rank $K{=}8$) rotates at $49^\circ$ per quarter; within coherent sector blocks (at matched rank $K{=}2$--$4$), rotation drops to $14$--$28^\circ$. A matched-size random sub-panel control suggests this reduction is partly mechanical (smaller panels have more stable estimated bases), so the geodesic evidence is treated as descriptive rather than as a demonstrated causal mechanism.
 \end{abstract}
 
 \vspace{0.3cm}
-\noindent\textbf{Keywords:} spectral augmentation, dynamic mode decomposition, Kalman filter, panel forecasting, investment gap estimation, state-space models, capital allocation
+\noindent\textbf{Keywords:} heterogeneous panels, factor augmentation, cross-sectional forecasting, investment dynamics, block-specific estimation, panel heterogeneity
 
-\noindent\textbf{JEL Classification:} C32, C38, C58, E22, G11
+\noindent\textbf{JEL Classification:} C32, C38, C53, E22, G11
+
+\newpage
 
 % ══════════════════════════════════════════════════════════
 \section{Introduction}
 \label{sec:intro}
 % ══════════════════════════════════════════════════════════
 
-Capital allocation decisions propagate through a hierarchical, networked system of institutions. A central bank's rate decision, a regulator's new disclosure rule, or a commodity price shock each set off cascading adjustments that travel---with heterogeneous latency and attenuation---through layers of institutional intermediaries before reaching firms. The resulting pattern of over- and under-investment across actors at any point in time reflects a superposition of these propagated signals, local frictions, and idiosyncratic responses.
+Factor models are ubiquitous in cross-sectional financial forecasting. The standard practice is to estimate a global basis from the training panel, project all actors onto it, and model dynamics in the shared factor space. Principal component analysis \citep{stock2002forecasting}, dynamic factor models \citep{doz2012quasi}, and spectral decompositions \citep{schmid2010dynamic} all follow this template. The implicit assumption is that a single low-rank basis serves all actors in the panel equally well.
 
-Despite rich literatures on factor models \citep{fama1993common}, network effects in economics \citep{acemoglu2012network}, and spectral graph theory \citep{ortega2018graph}, to our knowledge no established framework jointly: (i)~decomposes how investment-relevant signals propagate through a heterogeneous actor hierarchy; (ii)~estimates actor-specific investment gaps as deviations from a structurally-informed benchmark; and (iii)~validates that the resulting gap estimates carry out-of-sample predictive content.
+On a multilayer investment panel containing 93 actors---macro indicators, institutional data, and firm-level ratios---global spectral augmentation improves average predictive $R^2$ by 3.6~percentage points over per-actor AR(1), yet simultaneously \emph{reduces} $R^2$ for the diversified-sector subgroup by 2.3~pp below the pooled-only baseline that uses no augmentation at all. The global basis captures cross-sector rotational dynamics that are noise for within-sector prediction; applying it to heterogeneous actors injects interference rather than extracting signal.
 
-This paper addresses all three objectives. We develop a spectral state-space framework that represents the cross-sectional dynamics of investment intensity through a low-dimensional modal basis extracted via Dynamic Mode Decomposition (DMD), filtered through a Kalman model with dual regularisation at both the observation and transition levels. On raw panel levels, standalone spectral prediction is informative for structural decomposition but inferior to simple baselines for forecasting. After removing shared persistence via a pooled AR(1) with fixed effects, there remains forecastable cross-sectional residual structure that a \textbf{spectral augmentation} architecture can exploit.
+The diagnosis leads to a simple architectural fix. Shared persistence---the dominant source of quarterly cross-sectional predictability---benefits from global pooling because it is common across actor types. But the residual cross-sectional dynamics, which the second stage of a two-stage pipeline is designed to capture, are \emph{block-specific}: technology and healthcare actors co-move in patterns that are disrupted when mixed with macro indices and diversified-sector firms. Estimating residual dynamics locally, within economically pre-specified blocks, avoids the cross-block interference.
 
-\subsection{Preview of Results}
+The resulting heterogeneity-aware architecture---global Stage~1 (pooled AR(1) with fixed effects) plus block-specific local Stage~2 (PCA+ridge on within-block residuals)---improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, CI $[+0.036, +0.058]$, 10/10 rolling windows positive). A placebo benchmark using 50 random block partitions of identical sizes produces a mean gain of $-0.006$ with a maximum of $+0.012$; the real partition's gain exceeds the placebo distribution by 7.56 standard deviations ($p < 0.02$). The block structure captures genuine panel heterogeneity, not statistical noise.
 
-Throughout, we measure forecast performance by the out-of-sample coefficient of determination,
-\begin{equation}
-R^2 = 1 - \frac{\sum_{i,t}(y_{i,t} - \hat{y}_{i,t})^2}{\sum_{i,t}(y_{i,t} - \bar{y})^2},
-\label{eq:r2}
-\end{equation}
-where $\hat{y}_{i,t}$ is the model's prediction and $\bar{y}$ is the grand mean of observed $y_{i,t}$ across all actor--quarter pairs in the test window. Using the test-period mean (rather than the training-period mean) as the denominator follows the convention for pooled panel $R^2$; all models share the same denominator, so comparative $\Delta R^2$ is unaffected. Per-window $R^2$ values are averaged across the 10 test windows.
+The gain does not stem from a better estimation method. Across 9~model specifications spanning three complexity classes, Dynamic Mode Decomposition, PCA, and Ridge regression produce statistically indistinguishable predictions at matched effective complexity (forecast-error correlations $\rho > 0.98$). This equivalence holds both globally and within each local block. The forecasting value resides entirely in the architecture---the decomposition of the prediction problem into global and local components---not in any specific second-stage engine.
 
-Our main findings are:
+Several alternative explanations for the ceiling are tested and ruled out. The gain is not from forecasting the basis rotation (the global spectral basis rotates at $49^\circ$/quarter at $K{=}8$, but this rotation is temporally unpredictable: ACF(1) $= -0.07$, Ljung-Box $p = 0.29$). It is not from reformulating the prediction target (the ceiling is invariant across seven target transformations). It is not from conditional gating (augmentation is unconditionally beneficial---five gating policies all perform worse than always-on). Block-specific decomposition is the only surviving path to improvement.
 
-\begin{enumerate}[nosep]
-\item \textbf{Standalone diagnostic negative result.} On the 93-actor multilayer panel ($K = 8$), standalone DMD/Kalman with a near-identity transition ($F = 0.99I$) achieves predictive $R^2 = 0.415$, far below per-actor AR(1) at $0.594$. The uniform transition destroys mode-specific dynamics. Replacing $F$ with DMD's reduced propagator $\tilde{A}$ partially repairs performance to $R^2 = 0.486$, but the standalone spectral model remains $0.108$ below AR(1). The gain is mainly per-mode dynamics in the working SVD coordinates, not cross-mode propagation: $\diag(\tilde{A})$ captures 96\% of the full-$\tilde{A}$ gain (Section~\ref{sec:standalone}).
+The cross-panel validation sharpens the scope of the finding. The mixture architecture does not improve prediction on a homogeneous 146-firm CapEx/Revenue panel ($\Delta = -0.003$) or a 270-actor multi-ratio panel ($\Delta = +0.001$). The gain requires \emph{data-type heterogeneity}---mixing fundamentally different types of time series (trending macro indices and mean-reverting firm ranks) in a single panel. This is a precise scope condition: the paper identifies both \emph{when} local decomposition adds value and \emph{when} the global architecture is already near-optimal.
 
-\item \textbf{Augmentation positive result.} The recommended architecture is a two-stage pipeline: pooled AR(1) with fixed effects (Stage~1, $R^2 = 0.591$), followed by a DMD-based Kalman filter on Stage~1 residuals (Stage~2). The augmented model achieves $R^2 = 0.630$ ($\Delta R^2 = +0.036$ vs AR(1); CI $[+0.021, +0.054]$; permutation $p = 0.001$; 10/10 windows). A parsimonious default using diagonal dynamics ($R^2 = 0.619$) is recommended for deployment (Section~\ref{sec:ablation_ladder}).
+Beyond forecasting, the analysis yields a geometric description of panel heterogeneity. The global spectral basis rotates at $49^\circ$/quarter (geodesic distance on the Grassmannian at $K{=}8$); within sector blocks at matched rank, rotation is lower ($14$--$28^\circ$). A matched-size random sub-panel control indicates this reduction is partly a sample-size effect (empirical $p > 0.05$ for all blocks), so the geodesic evidence is treated as descriptive context, not as a demonstrated mechanism.
 
-\item \textbf{Residual-stage ablation ladder.} The centrepiece evidence table demonstrates that the gain requires learned per-mode dynamics on the residuals. Projection-only models (PCA, DMD) actively destroy the pooled+FE result. Naive Kalman ($F = 0.99I$) and residual DFM also fail. A PCA basis with diagonal AR(1) on residual scores matches DMD/Kalman performance, and Ridge regression on lagged residuals also achieves comparable gains---the contribution is the two-stage architectural principle, not DMD's specific Koopman structure (Section~\ref{sec:ablation_ladder}).
-
-\item \textbf{Cross-panel robustness.} The augmentation result generalises across all three benchmark panels: $+1.7$pp on a 146-firm CapEx/Revenue panel, $+2.5$pp on a 270-actor multi-ratio panel, and $+3.6$pp on the 93-actor multilayer panel. All confidence intervals exclude zero (Section~\ref{sec:cross_panel}).
-
-\item \textbf{Structural spectral analysis.} The spectral basis on the 93-actor panel rotates at $25.8^\circ$ per quarter ($\sigma = 6.5^\circ$; null simulation: $75.3^\circ$) with stable 8-mode dimensionality across all 52 quarterly transitions. Dual regularisation---spherical observation covariance ($R = cI$) and regularised transition---is essential for spectral reconstruction quality. Rolling basis update provides the single largest modal $R^2$ gain ($+14.7$pp, CI $[+11.1, +17.2]$pp). These structural findings support the augmentation architecture (Sections~\ref{sec:structural_ladder}--\ref{sec:variance_decomp}).
-
-\item \textbf{Economic content.} Both pooled and augmented investment gaps predict subsequent cross-sectional intensity revision ($\beta < 0$, $|t| > 10$), and both survive actor fixed effects with negative coefficients. The augmented model's gaps are less persistent and less predictable---consistent with signal absorption rather than economic-content degradation (Section~\ref{sec:economic}).
-
-\item \textbf{Parsimony.} Additional filter complexity beyond the DMD-informed transition provides zero gain: spectralised noise covariances ($\Delta = 0.000$), state persistence across basis updates ($\Delta = -0.001$), and Kim-filter regime switching \citep{kim1994dynamic} are all tested and shown unnecessary (Section~\ref{sec:discussion}).
-\end{enumerate}
-
-\noindent Equally important is what \emph{does not} work: standalone spectral replacement of simple baselines, forecast-optimised reduced-rank regression (RRR) in the short-panel regime, emergence diagnostics, directed spectral operators, and return-based intensity all fail to improve or actively degrade performance.
-
-\subsection{Scope and Evaluation Caveats}
-
-Several features of our evaluation design should be kept in mind. First, the out-of-sample evaluation uses 10 non-overlapping annual test windows, each containing 4 quarterly observations; per-window $R^2$ estimates are therefore noisy. Second, hyperparameters ($K = 8$, EWM halflife $\tau = 12$Q, training window $T = 5$yr) are fixed across all panels; there is no inner cross-validation in the reported results. Third, only three panels are tested---all US-dominated---and gains are modest ($+1.7$ to $+3.6$pp). Fourth, the full-$\tilde{A}$ advantage over $\diag(\tilde{A})$ is statistically marginal ($p = 0.036$) and not uniform across panels. Fifth, the economic-validation regressions are predictive associations, not causal identification.
-
-\subsection{Contribution}
-
-Our contributions are diagnostic, methodological, and empirical:
-
-\textbf{Diagnostic.} We identify the transition matrix as the bottleneck of standalone spectral state-space forecasting. The near-identity prior ($F = 0.99I$) that is essential for regularising the Kalman filter's state-space dynamics simultaneously destroys the mode-specific temporal structure captured by DMD. This diagnostic explains why spectral models that work well for structural decomposition (modal $R^2 = 0.696$) fail for forecasting (predictive $R^2 = 0.415$). The distinction is clean: reconstruction quality depends on the Kalman \emph{update} step (which corrects using the current observation), while forecasting depends on the \emph{predict} step (which relies entirely on $F$).
-
-\textbf{Methodological.} We propose a two-stage spectral augmentation architecture that resolves the standalone limitation. Stage~1 captures shared persistence; Stage~2 captures cross-sectional rotational structure in the residuals. The key insight is that DMD-informed per-mode dynamics in the working reduced coordinates ($\diag(\tilde{A})$, 8 parameters) capture 96\% of the gain from the full reduced operator ($\tilde{A}$, 64 parameters)---the value-add is per-mode self-dynamics, not cross-mode propagation. We further show that in the short-panel ($N \gg T$) regime, DMD's implicit Koopman structural constraint dominates explicit forecast optimisation (RRR), a finding of independent methodological interest.
-
-\textbf{Empirical.} We provide a systematic ablation of residual-stage models demonstrating that the forecasting gain requires learned per-mode dynamics on the residuals---projection-only, naive Kalman, and DFM models all fail---but is not specific to the DMD basis: PCA with diagonal AR(1) and Ridge regression achieve comparable gains. The augmentation result generalises across three panels of varying heterogeneity, with the largest gains on the most heterogeneous panel.
-
-\subsection{Related Literature}
-
-Our work connects to several strands. The investment gap concept relates to the capital allocation literature, including \citet{hsieh2009misallocation} and \citet{restuccia2017causes}; our gap is a forecasting-based deviation, not a structural measure. Our spectral approach builds on signal processing on graphs \citep{ortega2018graph,sandryhaila2013discrete} and Dynamic Mode Decomposition \citep{schmid2010dynamic,kutz2016dynamic}, adapted here for economic panel data. The state-space filtering component extends the dynamic factor model tradition \citep{stock2002forecasting,doz2012quasi} with the regularisation insights of \citet{ledoit2004well}. The two-stage residual modelling draws on the forecast combination literature \citep{bates1969combination,timmermann2006forecast}. The reduced-rank regression comparison relates to \citet{reinsel1998multivariate}. The economic validation relates to the capital allocation efficiency literature \citep{wurgler2000financial} and the predictability of corporate investment \citep{abel1983optimal}.
+The paper proceeds as follows. Section~\ref{sec:data} describes the data and evaluation protocol. Section~\ref{sec:architecture} presents the two-stage architecture, method equivalence, and the heterogeneity-aware extension. Section~\ref{sec:results} presents the main empirical results. Section~\ref{sec:validation} provides placebo, cross-panel, and economic validation. Section~\ref{sec:falsification} summarises what does not work and why. Section~\ref{sec:discussion} discusses implications and limitations.
 
 
 % ══════════════════════════════════════════════════════════
-\section{Framework}
-\label{sec:framework}
+\section{Data and Setting}
+\label{sec:data}
 % ══════════════════════════════════════════════════════════
 
-\subsection{Setup}
+\subsection{The 93-Actor Multilayer Panel}
 
-Let $V = \{1, \ldots, N\}$ index economic actors (firms, banks, institutional bodies) observed over $T$ quarterly periods. Each actor $i$ has an observed \emph{investment intensity} $y_{i,t} \in [0,1]$, constructed as a cross-sectional percentile rank of a type-specific investment measure (Section~\ref{sec:data}). The $N \times T$ panel $Y = [y_{i,t}]$ is the primary input.
+The primary panel contains 93 actors observed quarterly from 2005Q1 to 2025Q4 (84~quarters). Actors span three layers (Figure~\ref{fig:hierarchy}) that reflect the hierarchical structure of the investment system:
 
-\begin{definition}[Investment Gap]
-\label{def:gap}
-The investment gap for actor $i$ at time $t$ relative to a benchmark functional $\mathcal{B}$ is
-\begin{equation}
-\Delta_{i,t} = y_{i,t} - y^*_{i,t}, \qquad y^*_{i,t} = \mathcal{B}(Y_{1:t}, \theta),
-\label{eq:gap}
-\end{equation}
-where $\Delta_{i,t} > 0$ indicates investment above the model-implied benchmark and $Y_{1:t}$ denotes the information set available at time $t$.
-\end{definition}
+\begin{itemize}[nosep]
+  \item \textbf{Layer~0 (7 macro shocks):} Global commodity prices (Brent, WTI), policy rates (Federal Funds, USD index), and volatility indicators (VIX, credit spreads). Normalised via FRED min-max scaling using full-sample bounds (a mild form of look-ahead; see Limitation~7). These series are trending with high persistence ($\rho \approx 0.88$).
+  \item \textbf{Layer~1 (4 institutional actors):} Central banks, regulators, and international organisations. Mixed normalisation.
+  \item \textbf{Layer~2 (82 firms):} US-listed firms across six sectors (energy, diversified, technology, financials, industrials, healthcare). Intensity values are quarterly cross-sectional percentile ranks of investment ratios (CapEx/Assets, Revenue growth). These series are mean-reverting ($\rho \approx 0.60$).
+\end{itemize}
 
-The framework operates on a hierarchical actor universe spanning three layers (Figure~\ref{fig:hierarchy}). The benchmark $y^*_{i,t}$ is constructed through five processing steps---demeaning, basis extraction, Kalman filtering, online adaptation, and gap computation---described in Sections~\ref{sec:demean}--\ref{sec:gap_compute}. These building blocks are then assembled into the recommended two-stage forecasting pipeline (Section~\ref{sec:two_stage}, Figure~\ref{fig:pipeline}).
+The mixed normalisation---trending min-max series for macro actors and mean-reverting cross-sectional ranks for firms---reflects fundamentally different data-generating processes. This difference in temporal dynamics across layers is a root cause of the heterogeneity effects documented in Section~\ref{sec:results}. We state it here so the reader can anticipate the finding.
+
+Seven sector labels provide the basis for pre-specified block structure: diversified~(23), technology~(15), energy~(14), financials~(12), industrials~(12), healthcare~(10), and macro~(7). Table~\ref{tab:panel_stats} and Figure~\ref{fig:hierarchy} report firm-layer counts only. For block construction (Section~\ref{sec:mixture_arch}), sector labels are allowed to span layers: 2 energy actors are Layer~0 macro shocks, 2 financials actors are Layer~1 institutions. The disjoint mixture partition assigns all Layer~0/1 actors to a separate macro/institutional block regardless of their sector label. Table~\ref{tab:panel_stats} summarises the panel structure.
 
 % ── Hierarchy figure ──────────────────────────────────────
-\begin{figure}[H]
+\begin{figure}[ht]
 \centering
 \begin{tikzpicture}[
-  a0/.style={rectangle, draw=red!50, fill=red!8, rounded corners=2pt,
+  a0/.style={rectangle, draw=red!40, fill=red!5, rounded corners=2pt,
              font=\footnotesize, minimum height=0.5cm, inner sep=3pt},
-  a1/.style={rectangle, draw=blue!50, fill=blue!8, rounded corners=2pt,
+  a1/.style={rectangle, draw=blue!40, fill=blue!5, rounded corners=2pt,
              font=\footnotesize, minimum height=0.5cm, inner sep=3pt},
-  a2/.style={rectangle, draw=accent!50, fill=accent!5, rounded corners=2pt,
+  a2/.style={rectangle, draw=accent!40, fill=accent!3, rounded corners=2pt,
              font=\footnotesize, minimum height=0.5cm, inner sep=3pt},
-  arr/.style={-{Stealth[length=2mm]}, color=gray!40, semithick},
+  arr/.style={-{Stealth[length=2mm]}, color=gray!35, semithick},
   band/.style={rounded corners=4pt, thick}
 ]
-
 % ── Layer 0 ───────────────────────────
-\fill[red!4, band, draw=red!25] (-6.5, 3.05) rectangle (6.5, 4.35);
-\node[font=\small\bfseries, text=red!60!black, anchor=west] at (-6.3, 4.1)
+\fill[red!3, band, draw=red!20] (-6.2, 3.05) rectangle (6.2, 4.25);
+\node[font=\small\bfseries, text=red!55!black, anchor=west] at (-6.0, 4.0)
   {Layer 0 --- Exogenous Shocks};
-\node[font=\tiny, text=red!50!black, anchor=east] at (6.3, 4.1) {7 actors};
-
-\node[a0] at (-4.5, 3.55) {Oil price};
-\node[a0] at (-2.5, 3.55) {Fed funds};
-\node[a0] at (-0.7, 3.55) {VIX};
-\node[a0] at (1.0, 3.55)  {USD index};
-\node[a0] at (2.8, 3.55)  {CPI};
-\node[font=\tiny, text=gray] at (4.8, 3.55) {+ 2 more};
-
+\node[font=\tiny, text=red!45!black, anchor=east] at (6.0, 4.0) {7 actors};
+\node[a0] at (-4.2, 3.5) {Oil price};
+\node[a0] at (-2.2, 3.5) {Fed funds};
+\node[a0] at (-0.4, 3.5) {VIX};
+\node[a0] at (1.2, 3.5)  {USD index};
+\node[a0] at (2.9, 3.5)  {CPI};
+\node[font=\tiny, text=gray!60] at (4.5, 3.5) {+2 more};
 % ── Layer 1 ───────────────────────────
-\fill[blue!4, band, draw=blue!25] (-6.5, 1.25) rectangle (6.5, 2.55);
-\node[font=\small\bfseries, text=blue!60!black, anchor=west] at (-6.3, 2.3)
+\fill[blue!3, band, draw=blue!20] (-6.2, 1.35) rectangle (6.2, 2.55);
+\node[font=\small\bfseries, text=blue!55!black, anchor=west] at (-6.0, 2.3)
   {Layer 1 --- Institutional Actors};
-\node[font=\tiny, text=blue!50!black, anchor=east] at (6.3, 2.3) {5 actors};
-
-\node[a1] at (-4.2, 1.75) {Federal Reserve};
-\node[a1] at (-1.7, 1.75) {SEC};
-\node[a1] at (0.2, 1.75)  {IMF};
-\node[a1] at (2.5, 1.75)  {Bank of England};
-\node[a1] at (5.0, 1.75)  {FCA};
-
+\node[font=\tiny, text=blue!45!black, anchor=east] at (6.0, 2.3) {4 actors};
+\node[a1] at (-3.2, 1.8) {Federal Reserve};
+\node[a1] at (-0.8, 1.8) {SEC};
+\node[a1] at (1.3, 1.8)  {IMF};
+\node[a1] at (3.8, 1.8)  {Bank of England};
 % ── Layer 2 ───────────────────────────
-\fill[accent!3, band, draw=accent!25] (-6.5, -0.85) rectangle (6.5, 0.75);
-\node[font=\small\bfseries, text=accent, anchor=west] at (-6.3, 0.5)
+\fill[accent!2, band, draw=accent!20] (-6.2, -0.75) rectangle (6.2, 0.75);
+\node[font=\small\bfseries, text=accent, anchor=west] at (-6.0, 0.5)
   {Layer 2 --- Firms};
-\node[font=\tiny, text=accent!70, anchor=east] at (6.3, 0.5) {91 actors};
-
-\node[a2] at (-5.0, -0.1) {Energy (12)};
-\node[a2] at (-2.9, -0.1) {Tech (19)};
-\node[a2] at (-1.0, -0.1) {Fin.\ (12)};
-\node[a2] at (0.9, -0.1)  {Health (10)};
-\node[a2] at (2.8, -0.1)  {Ind.\ (11)};
-\node[a2] at (4.7, -0.1)  {Banks (10)};
-\node[font=\tiny, text=gray] at (6.0, -0.1) {+17};
-
-% ── Arrows L0 → L1 ───────────────────
-\foreach \x in {-3.5, -1.5, 0.5, 2.0} {
+\node[font=\tiny, text=accent!60, anchor=east] at (6.0, 0.5) {82 actors};
+\node[a2] at (-4.6, -0.05) {Diversif.\ (23)};
+\node[a2] at (-2.6, -0.05) {Tech (15)};
+\node[a2] at (-0.8, -0.05) {Energy (12)};
+\node[a2] at (1.0, -0.05)  {Fin.\ (10)};
+\node[a2] at (2.8, -0.05)  {Ind.\ (12)};
+\node[a2] at (4.6, -0.05)  {Health (10)};
+% ── Arrows ────────────────────────────
+\foreach \x in {-3.0, -1.0, 1.0, 2.5}
   \draw[arr] (\x, 3.05) -- (\x, 2.55);
-}
-
-% ── Arrows L1 → L2 ───────────────────
-\foreach \x in {-3.0, -0.8, 1.2, 3.5} {
-  \draw[arr] (\x, 1.25) -- (\x, 0.75);
-}
-
-% ── Bottom annotation ────────────────
-\node[font=\scriptsize, text=gray!60, align=center] at (0, -1.3)
-  {93 actors with computed intensity
-   \;\textbar\; US + UK
-   \;\textbar\; 2010--2024 quarterly};
-
+\foreach \x in {-2.5, -0.5, 1.5, 3.5}
+  \draw[arr] (\x, 1.35) -- (\x, 0.75);
+\node[font=\scriptsize, text=gray!50, align=center] at (0, -1.2)
+  {93 actors \;\textbar\; quarterly 2005Q1--2025Q4 \;\textbar\; mixed normalisation};
 \end{tikzpicture}
-\caption{\textbf{Multilayer actor hierarchy.} The 103-actor universe spans three layers: exogenous shocks (Layer~0, FRED macro series), institutional intermediaries (Layer~1, central banks and regulators), and firms (Layer~2, US and UK equities and banks grouped by sector). Of these, 93 have computed investment intensity and enter the spectral analysis. The heterogeneous composition---mixing macro, institutional, and firm-level actors across sectors and geographies---creates the cross-sectional structure that the spectral augmentation architecture exploits.}
+\caption{Multilayer actor hierarchy. Layer~0 comprises exogenous macro shocks (FRED min-max normalised); Layer~1 comprises institutional intermediaries; Layer~2 comprises US-listed firms grouped by sector (cross-sectional percentile ranks). The heterogeneous composition and mixed normalisation create the cross-block interference that motivates the mixture architecture (Section~\ref{sec:results}).}
 \label{fig:hierarchy}
 \end{figure}
 
-\subsection{Stage 1: Exponentially-Weighted Demeaning}
-\label{sec:demean}
+\begin{table}[ht]
+\centering
+\caption{Panel descriptive statistics.}
+\label{tab:panel_stats}
+\small
+\begin{tabular}{lccccl}
+\toprule
+Layer / Sector & $N$ & Quarters & Normalisation & Persistence $\rho$ & Data type \\
+\midrule
+Layer 0 (Macro) & 7 & 84 & FRED min-max & 0.88 & Trending indices \\
+Layer 1 (Institutional) & 4 & 84 & Mixed & 0.72 & Institutional indicators \\
+Layer 2 (Firms) & 82 & 84 & Cross-sectional rank & 0.60 & Investment ratios \\
+\midrule
+\quad Diversified & 23 & & & & \\
+\quad Technology & 15 & & & & \\
+\quad Energy & 12 & & & & \\
+\quad Financials & 10 & & & & \\
+\quad Industrials & 12 & & & & \\
+\quad Healthcare & 10 & & & & \\
+\midrule
+\textbf{Total} & \textbf{93} & \textbf{84} & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Investment intensity ranks exhibit strong cross-sectional persistence: an actor's mean rank is the single largest source of variance (51\% of total $R^2$ in the static-basis configuration; Section~\ref{sec:variance_decomp}). The state-space model $\tilde{y}_t = U\balpha_t + \varepsilon_t$ assumes zero-mean observations. We subtract an exponentially-weighted per-actor mean:
-\begin{equation}
-\hat{\mu}_i = \frac{\sum_{s=1}^{T} w_s \, y_{i,s}}{\sum_{s=1}^{T} w_s}, \qquad w_s = \exp\!\Bigl(-\frac{(T - s) \ln 2}{\tau}\Bigr),
-\label{eq:ewm}
-\end{equation}
-with half-life $\tau = 12$ quarters. The demeaned observation is $\tilde{y}_{i,t} = y_{i,t} - \hat{\mu}_i$.
+\subsection{Validation Panels}
 
-\subsection{Stage 2: Dynamic Mode Decomposition}
-\label{sec:dmd}
+Two additional panels test the scope of the findings:
 
-Given the demeaned training panel $\tilde{Y} = [\tilde{y}_1, \ldots, \tilde{y}_T] \in \R^{N \times T}$, we extract a spectral basis that captures temporal cross-sectional dynamics.
-
-\textbf{Why DMD over static operators.} Classical spectral approaches decompose a static operator (e.g., the cross-correlation matrix $C = \tilde{Y}\tilde{Y}^\top / T$). This captures contemporaneous co-movement but not lagged dynamics. DMD \citep{schmid2010dynamic} works with temporal snapshot pairs, capturing lagged cross-sectional dynamics invisible to contemporaneous decompositions.
-
-\textbf{DMD algorithm.} Form snapshot matrices $X = [\tilde{y}_1, \ldots, \tilde{y}_{T-1}]$ and $X' = [\tilde{y}_2, \ldots, \tilde{y}_T]$. DMD seeks the best-fit linear operator $A$ such that $X' \approx AX$. Compute the truncated SVD $X = U_{\mathrm{svd}} \Sigma_r V_r^\top$, retaining $r$ singular values (we use $r = 15$, above which singular values are indistinguishable from noise). Form the reduced operator $\tilde{A} = U_{\mathrm{svd}}^\top X' V_r \Sigma_r^{-1} \in \R^{r \times r}$. We use the first $K = 8$ columns of $U_{\mathrm{svd}}$ as the modal basis $U \in \R^{N \times K}$ (projected DMD; this is the left-singular subspace of $X$, not the DMD eigenmodes). The full $r \times r$ operator $\tilde{A}$ is computed in the larger $r$-dimensional space; only the leading $K \times K$ block or its diagonal enters the transition matrix $F$.
-
-\textbf{Why DMD over reduced-rank regression.} Reduced-rank regression (RRR; \citealt{reinsel1998multivariate}) directly minimises one-step prediction error by finding a rank-$K$ approximation to the OLS coefficient matrix. In the $N \gg T$ regime ($N = 93$, $T \approx 20$ quarters), the OLS coefficient is severely under-determined. DMD's dynamics-structured SVD decomposition acts as an implicit regulariser by constraining the solution to the Koopman operator subspace ($X' \approx AX$), which is a stronger structural prior than RRR's pure rank constraint. On the 93-actor panel, RRR loses to DMD at all $K$ values (Table~\ref{tab:standalone}).
-
-\subsection{Stage 3: Kalman Filter with Spherical Observation Covariance}
-\label{sec:kalman}
-
-Given the modal basis $U \in \R^{N \times K}$, we model the latent modal dynamics as a linear Gaussian state-space system:
-\begin{align}
-\balpha_{t+1} &= F \balpha_t + \eta_t, \qquad \eta_t \sim \mathcal{N}(0, Q), \label{eq:state}\\
-\tilde{y}_t &= U \balpha_t + \varepsilon_t, \qquad \varepsilon_t \sim \mathcal{N}(0, R). \label{eq:obs}
-\end{align}
-
-\textbf{Spherical observation regularisation.} The observation covariance $R \in \R^{N \times N}$ has $O(N^2)$ free parameters---estimated from $T = 20$ observations. We replace it with
-\begin{equation}
-R_{\mathrm{sph}} = \frac{\tr(\hat{R})}{N} \, I_N,
-\label{eq:spherical}
-\end{equation}
-where $\hat{R}$ is the EM-estimated sample covariance. This reduces the parameter count from $O(N^2)$ to $O(1)$.
-
-\textbf{Spectral radius clipping.} For any square matrix $M$, we define $\clip(M, c) = M \cdot \min(1,\; c / \rho(M))$, where $\rho(M)$ is the spectral radius. This rescales $M$ proportionally so that $\rho(\clip(M, c)) \leq c$, preserving the eigenvector structure while ensuring stability. For a diagonal matrix, this clips each entry individually: $[\clip(D, c)]_{kk} = D_{kk} \cdot \min(1, c/|D_{kk}|)$.
-
-\textbf{Transition matrix options.} The transition $F \in \R^{K \times K}$ has $K^2$ free parameters. Three choices are relevant:
 \begin{itemize}[nosep]
-\item $F = 0.99 I_K$ (near-identity prior): a maximally regularised baseline that treats all modes identically. Section~\ref{sec:standalone} shows this destroys mode-specific dynamics and is the bottleneck of standalone forecasting.
-\item $F = \clip(\diag(\tilde{A}), 0.99)$ (diagonal of the DMD reduced operator, clipped to spectral radius $\leq 0.99$): the recommended default, which preserves per-mode dynamics with $K$ parameters.
-\item $F = \clip(\tilde{A}, 0.99)$ (full DMD reduced operator): the maximum-performance variant with $K^2$ parameters.
+  \item \textbf{146-firm CapEx/Revenue:} Homogeneous panel---all firms, one ratio type, cross-sectional percentile ranks. No layer heterogeneity.
+  \item \textbf{270-actor multi-ratio:} 135 firms $\times$ 2 ratios (CapEx/Revenue and Revenue/Assets). Moderate heterogeneity from ratio-type mixing, but no macro/institutional actors.
 \end{itemize}
 
-Together, spherical $R$ and the choice of transition define \emph{dual regularisation}: observation-level ($O(N^2) \to 1$) and transition-level ($K^2 \to K$ or $1$).
+\subsection{Evaluation Protocol}
 
-\subsection{Stage 4: Online State-Noise Adaptation}
-\label{sec:online}
+All results use 10 rolling out-of-sample windows (test years 2015--2024). Each window uses a 5-year training period ending at the start of the test year. Models are re-estimated quarterly within each test year as new observations arrive, so the training set expands from 20 to 24 quarters during each test year. The primary metric is out-of-sample predictive $R^2$. Statistical comparisons use paired-window bootstrap confidence intervals (10{,}000 resamples) and paired $t$-tests. The placebo benchmark uses 50 random block partitions of identical sizes.
 
-We augment the Kalman recursion with a recursive $Q$ update:
+% ══════════════════════════════════════════════════════════
+\section{The Two-Stage Architecture}
+\label{sec:architecture}
+% ══════════════════════════════════════════════════════════
+
+\subsection{Stage 1: Global Pooled AR(1) with Fixed Effects}
+
+The first stage estimates shared persistence from the full panel:
 \begin{equation}
-Q_{t+1} = (1 - \lambda)\, Q_t + \lambda\, (\balpha_{t|t} - F\balpha_{t-1|t-1})(\balpha_{t|t} - F\balpha_{t-1|t-1})^\top, \qquad \lambda = 0.3.
-\label{eq:online_q}
+\hat{y}^{\mathrm{pool}}_{i,t+1} = \bar{y}_i + \hat{\rho} \left( y_{i,t} - \bar{y}_i \right)
 \end{equation}
-This tracks regime-dependent state volatility without explicit regime identification. Initial $Q_0 = 0.5\, I_K$.
+where $\bar{y}_i$ is the actor-specific mean (fixed effect) and $\hat{\rho}$ is the pooled persistence parameter, both estimated by within-transformation OLS on the training data only and re-estimated quarterly as new observations arrive. Global estimation benefits from the larger effective sample for a single pooled $\hat\rho$. While persistence varies across layers (Table~\ref{tab:panel_stats}: macro $\rho \approx 0.88$, firms $\rho \approx 0.60$), the pooled estimator captures an effective average persistence; the layer-specific residual structure is then handled by Stage~2. Whether block-specific $\hat\rho_b$ would further improve Stage~1 is an open question addressed in Section~\ref{sec:discussion}.
 
-\subsection{Stage 5: Gap Computation}
-\label{sec:gap_compute}
+\subsection{Stage 2: Residual Dynamics}
 
-The investment gap for actor $i$ at test time $t$ is:
+The second stage operates on Stage~1 residuals $r_{i,t} = y_{i,t} - \hat{y}^{\mathrm{pool}}_{i,t}$, exponentially-weighted demeaned with a half-life of 12~quarters (3~years). These residuals capture the cross-sectional structure that shared persistence does not explain.
+
+Three interchangeable engines model the residual dynamics:
+\begin{enumerate}[nosep]
+  \item \textbf{PCA + diagonal AR:} Extract $K$ principal components from the exponentially-weighted residual covariance, fit per-component AR(1) coefficients.
+  \item \textbf{DMD + reduced operator:} Dynamic Mode Decomposition provides a rank-$K$ approximation of the one-step propagator via the Koopman framework (Appendix~A). The diagonal or full reduced propagator $\tilde{A}$ serves as the transition matrix.
+  \item \textbf{Ridge regression:} Direct regularised regression of $r_{t+1}$ on $r_t$ in the full $N$-dimensional space.
+\end{enumerate}
+
+The combined forecast is $\hat{y}_{i,t+1} = \hat{y}^{\mathrm{pool}}_{i,t+1} + \hat{r}_{i,t+1}$.
+
+\subsection{Why Two Stages?}
+
+A standalone spectral model (DMD-based state-space filter with $K = 8$ modes) achieves $R^2 = 0.486$---far below per-actor AR(1) at 0.594. The single spectral basis pools heterogeneous actors, losing actor-specific persistence that AR(1) captures trivially. The two-stage architecture resolves this: Stage~1 handles persistence; Stage~2 handles the cross-sectional rotational structure in the residual. The transition diagnostic is detailed in Appendix~B.
+
+Table~\ref{tab:augmentation} reports the augmentation gain on all three panels. The gain is robust across panels with different compositions, ranging from $+1.7$~pp on the homogeneous 146-firm panel to $+3.6$~pp on the heterogeneous 93-actor panel.
+
+\begin{table}[ht]
+\centering
+\caption{Two-stage augmentation vs baselines. $\Delta$ is the augmentation gain (augmented $R^2$ minus AR(1) $R^2$). All three panel-average gains are positive (the 93-actor panel CI and per-window detail are reported in Table~\ref{tab:five_arch}).}
+\label{tab:augmentation}
+\small
+\begin{tabular}{lcccc}
+\toprule
+Panel & $N$ & AR(1) $R^2$ & Augmented $R^2$ & Gain $\Delta$ \\
+\midrule
+93-actor multilayer & 93 & 0.594 & 0.630 & $+0.036$ \\
+146-firm CapEx/Revenue & 146 & 0.728 & 0.745 & $+0.017$ \\
+270-actor multi-ratio & 270 & 0.728 & 0.753 & $+0.025$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Method Equivalence}
+\label{sec:method_equiv}
+
+Table~\ref{tab:method_comparison} compares 9~models across three complexity classes on the 93-actor panel. At matched effective complexity, PCA, DMD, and Ridge achieve statistically indistinguishable predictive $R^2$:
+
+\begin{table}[H]
+\centering
+\caption{Method comparison: 9 models on the 93-actor panel. All models use global pooled+FE as Stage~1. $\Delta$ is versus per-actor AR(1). Forecast-error correlations $\rho_{\mathrm{pred}}$ confirm predictions are functionally identical, not just equally accurate on average.}
+\label{tab:method_comparison}
+\small
+\begin{tabular}{llccccl}
+\toprule
+Class & Model & $R^2$ & $\Delta$ AR(1) & $t$ & $p$ & CI \\
+\midrule
+\multirow{4}{*}{Tiny (${\sim}K$)} & PCA+diag Kalman & 0.622 & $+0.012$ & 1.97 & 0.080 & $[+0.002, +0.024]$ \\
+& DMD+diag Kalman & 0.619 & $+0.009$ & 2.07 & 0.068 & $[+0.001, +0.017]$ \\
+& PCA reduced (no Kalman) & 0.621 & $+0.011$ & 1.78 & 0.109 & $[+0.001, +0.023]$ \\
+& DMD reduced (no Kalman) & 0.618 & $+0.008$ & 1.86 & 0.096 & $[+0.000, +0.016]$ \\
+\midrule
+\multirow{4}{*}{Medium (${\sim}K^2$)} & PCA+full VAR & 0.577 & $-0.033$ & $-3.86$ & 0.004 & $[-0.049, -0.017]$ \\
+& DMD+full $\tilde{A}$ Kalman & 0.630 & $+0.020$ & 4.22 & 0.002 & $[+0.012, +0.029]$ \\
+& PCA+ridge VAR & 0.620 & $+0.010$ & 1.84 & 0.099 & $[-0.000, +0.019]$ \\
+& Reduced-rank Ridge $K{=}8$ & 0.629 & $+0.019$ & 3.19 & 0.011 & $[+0.009, +0.031]$ \\
+\midrule
+Large (reg.\ $N \!\times\! N$) & Ridge on residuals & 0.632 & $+0.022$ & 3.84 & 0.004 & $[+0.012, +0.033]$ \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.3em}
+{\footnotesize Forecast-error correlations: $\rho(\text{DMD}, \text{PCA}) = 0.990$; $\rho(\text{DMD}, \text{Ridge}) = 0.980$; $\rho(\text{PCA}, \text{Ridge}) = 0.969$.}
+\end{table}
+
+The forecasting ceiling is $R^2 \approx 0.630$ regardless of method. The ceiling is a property of the data at this frequency, not of any specific estimation technique.
+
+The equivalence holds at matched effective complexity among small-$K$ models: DMD with $K = 8$ diagonal parameters achieves $R^2 = 0.619$, while Ridge (heavily regularised $N \!\times\! N$) achieves $R^2 = 0.632$. That an 8-parameter spectral model nearly matches a regularised regression with orders-of-magnitude more effective parameters suggests the exploitable residual structure is genuinely low-rank. The practical implication: in settings where parsimony or interpretability matters, the spectral representation offers comparable predictive performance at a fraction of the complexity. Note that the equivalence is not universal: PCA with an unrestricted $K \!\times\! K$ VAR ($R^2 = 0.577$, significantly \emph{worse} than AR(1)) diverges from DMD with the full reduced operator ($R^2 = 0.630$), because the PCA VAR is not regularised and overfits at $K^2 = 64$ parameters on $T \approx 20$ quarters.
+
+This method-equivalence result---confirmed at both the global level and within each local block (Section~\ref{sec:falsification})---motivates the architectural focus of the remainder of the paper.
+
+\subsection{The Heterogeneity-Aware Mixture Architecture}
+\label{sec:mixture_arch}
+
+The method-equivalence finding raises the question: if the engine does not matter, what \emph{does} matter? The answer, developed in Section~\ref{sec:results}, is the \emph{granularity of the decomposition}. The mixture architecture replaces the single global Stage~2 with block-specific local models:
+
+\begin{enumerate}[nosep]
+  \item \textbf{Stage 1} (unchanged): Global pooled AR(1)+FE on all 93 actors.
+  \item \textbf{Block assignment}: Each actor is assigned to a pre-specified block based on economic sector and data-type structure (Table~\ref{tab:blocks}).
+  \item \textbf{Stage 2} (block-specific): For each local block, estimate a local PCA+ridge model on within-block Stage~1 residuals. For the remainder block (actors well-served by the global model), retain the global augmentation.
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{Pre-specified block assignments with economic rationale.}
+\label{tab:blocks}
+\small
+\begin{tabular}{lccl}
+\toprule
+Block & $N$ & Local $K$ & Economic rationale \\
+\midrule
+SEC\_diversified & 23 & 4 & Heterogeneous sector; global basis misrepresents \\
+LAYER\_macro\_inst & 11 & 2 & Different data types (FRED + institutional) \\
+MERGED\_tech\_health & 25 & 4 & Coherent sub-panel (high within-block loading similarity) \\
+REMAINDER & 34 & --- & Energy, industrials, financials (global model adequate) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Block assignments are fixed before execution using static economic metadata from the actor registry. No optimisation of block membership is performed.
+
+Formally, the mixture estimator is:
 \begin{equation}
-\Delta_{i,t} = y_{i,t} - \underbrace{(\hat{\mu}_i + U\balpha_{t|t-1})}_{\displaystyle y^*_{i,t}},
-\label{eq:gap_compute}
+\hat{y}_{i,t+1} = \bar{y}_i + \hat{\rho}\,(y_{i,t} - \bar{y}_i) + \mathbf{1}\{i \in b\}\, \bigl[\hat{U}_b \hat{A}_b \hat{U}_b^\top\, \mathbf{r}_{b,t}\bigr]_i
+\label{eq:mixture}
 \end{equation}
-where $\balpha_{t|t-1} = F\balpha_{t-1|t-1}$ is the Kalman-predicted modal state (using only information up to $t-1$).
+where $\hat{\rho}$ is pooled across all actors (global Stage~1), $\bar{y}_i$ is the actor fixed effect, $b = b(i)$ is the pre-specified block, $\mathbf{r}_{b,t} \in \R^{N_b}$ is the vector of Stage~1 residuals for all actors in block $b$, $\hat{U}_b \in \R^{N_b \times K_b}$ and $\hat{A}_b \in \R^{K_b \times K_b}$ are the block-specific PCA basis and ridge VAR, and $[\cdot]_i$ selects the component corresponding to actor $i$ within block $b$. This is analogous to a known-group interactive fixed-effects model \citep{bai2009panel} with a homogeneity restriction on $\rho$ and block-specific factor loadings. Setting $\hat{U}_b = 0$ for all $b$ recovers pooled-only (G0) exactly. The global augmentation (G1) is the corresponding architecture in which all blocks share a single global basis and operator estimated jointly; it is not a literal special case of Equation~\eqref{eq:mixture} because the blockwise operator on $\mathbf{r}_{b,t}$ is not identical to a single global operator on the full residual vector $\mathbf{r}_t$. Figure~\ref{fig:pipeline} contrasts the global and mixture pipelines.
 
-\subsection{Two-Stage Spectral Augmentation Architecture}
-\label{sec:two_stage}
-
-The standalone pipeline (Stages~1--5 applied to raw panel levels) fails because a single spectral basis pools heterogeneous actors, losing actor-specific persistence that per-actor AR(1) captures. The recommended architecture resolves this by separating shared persistence from cross-sectional rotational structure.
-
-\textbf{Stage~1: Pooled AR(1) with fixed effects.} Estimate a single persistence parameter $\hat{\rho}$ by within-transformation OLS on the training panel (pooling across all actors). The Stage~1 forecast is:
-\begin{equation}
-\hat{y}_{\mathrm{AR},i,t} = \hat{\mu}_i + \hat{\rho}\,(y_{i,t-1} - \hat{\mu}_i),
-\label{eq:stage1}
-\end{equation}
-where $\hat{\mu}_i$ is the EWM per-actor mean (Eq.~\ref{eq:ewm}).
-
-\textbf{Residual construction.} Training residuals are $r_{i,s} = y_{i,s} - \hat{y}_{\mathrm{AR},i,s}$ for $s$ in the training window.
-
-\textbf{Stage~2: Residual DMD/Kalman.} Apply DMD to the EWM-demeaned training residuals, extracting a residual basis $U_r$ and reduced operator $\tilde{A}_r$ (subscript $r$ denotes ``residual-stage,'' distinguishing this from the standalone operator $\tilde{A}$). Run the Kalman filter (Eqs.~\ref{eq:state}--\ref{eq:obs}) on the residuals with:
-\begin{equation}
-F_r = \clip(\diag(\tilde{A}_r),\; 0.99) \quad \text{[default]}, \qquad\text{or}\quad F_r = \clip(\tilde{A}_r,\; 0.99) \quad \text{[max-performance]}.
-\label{eq:Fr}
-\end{equation}
-
-\textbf{Combined forecast.} The final prediction is:
-\begin{equation}
-\hat{y}_{i,t} = \hat{y}_{\mathrm{AR},i,t} + [U_r \balpha_{t|t-1}^{(r)}]_i,
-\label{eq:combined}
-\end{equation}
-where $\balpha_{t|t-1}^{(r)}$ is the residual-stage Kalman predicted state. The investment gap is $\Delta_{i,t} = y_{i,t} - \hat{y}_{i,t}$.
-
-\textbf{Why this works.} Stage~1 captures shared persistence ($R^2 = 0.591$ on the 93-actor panel). Its residuals have near-zero persistence ($\rho \approx 0.04$) but retain cross-sectional structure: the residual spectral $R^2 = 0.095$. Stage~2's DMD basis captures the rotation patterns among actors after removing the persistence floor, and the Kalman filter with DMD-informed dynamics propagates these patterns forward for prediction.
-
-\subsection{Summary: The Recommended Pipeline}
-
-Algorithm~\ref{alg:pipeline} summarises the two-stage procedure.
-
-\begin{algorithm}[H]
-\caption{Two-Stage Spectral Augmentation (Recommended Pipeline)}
-\label{alg:pipeline}
-\begin{algorithmic}[1]
-\Require Intensity panel $Y \in [0,1]^{N \times T}$, training window length, $K$ (typically 8), $\tau$ (typically 12Q), $\lambda = 0.3$
-\Ensure Investment gaps $\Delta_{i,t}$ for test period
-\State Compute EWM mean $\hat{\mu}_i$ from training period \Comment{Eq.~\eqref{eq:ewm}}
-\State Estimate pooled AR(1) coefficient $\hat{\rho}$ by within-transformation OLS
-\For{each test quarter $t$}
-  \State \textbf{Stage~1 forecast:} $\hat{y}_{\mathrm{AR},i,t} = \hat{\mu}_i + \hat{\rho}(y_{i,t-1} - \hat{\mu}_i)$ \Comment{Eq.~\eqref{eq:stage1}}
-  \State Compute training residuals $r_s = y_s - \hat{y}_{\mathrm{AR},s}$
-  \State DMD on EWM-demeaned residuals $\to U_r, \tilde{A}_r$ \Comment{Section~\ref{sec:dmd}}
-  \State Set $F_r = \clip(\diag(\tilde{A}_r), 0.99)$,\; $Q = 0.5 I_K$ \Comment{Eq.~\eqref{eq:Fr}}
-  \State Estimate $R = \frac{\tr(\hat{R})}{N} I_N$ via single EM pass on training residuals \Comment{Eq.~\eqref{eq:spherical}}
-  \State \textbf{Stage~2 Kalman predict:} $\balpha_{t|t-1}^{(r)} = F_r \balpha_{t-1|t-1}^{(r)}$
-  \State \textbf{Combined forecast:} $\hat{y}_{i,t} = \hat{y}_{\mathrm{AR},i,t} + [U_r \balpha_{t|t-1}^{(r)}]_i$ \Comment{Eq.~\eqref{eq:combined}}
-  \State \textbf{Predictive gap:} $\Delta_{i,t} = y_{i,t} - \hat{y}_{i,t}$ \Comment{Eq.~\eqref{eq:gap_compute}}
-  \State Stage~2 Kalman update: $\balpha_{t|t}^{(r)}$ incorporating residual $\tilde{r}_t$
-  \State Adapt: $Q \leftarrow (1-\lambda)Q + \lambda\,\mathrm{innov}\,\mathrm{innov}^\top$ \Comment{Eq.~\eqref{eq:online_q}}
-  \State \textbf{Rolling update:} expand training; recompute $\hat{\mu}$, $\hat{\rho}$, $U_r$, $\tilde{A}_r$, $R$; reset $\balpha$, $P$, $Q$
-\EndFor
-\end{algorithmic}
-\end{algorithm}
-
-% ── Pipeline figure ───────────────────────────────────────
-\begin{figure}[H]
+% ── Dual pipeline figure ──────────────────────────────────
+\begin{figure}[ht]
 \centering
 \begin{tikzpicture}[
-  box/.style={rectangle, draw=accent, thick, rounded corners=3pt,
-              minimum width=11cm, text width=10.5cm, align=center, inner sep=8pt},
-  sbox/.style={rectangle, draw=accent!60, rounded corners=2pt,
-              minimum width=11cm, text width=10.5cm, align=center, inner sep=6pt, fill=accent!3},
-  arr/.style={-{Stealth[length=3mm]}, thick, color=accent!70},
-  node distance=0.6cm
+  box/.style={rectangle, draw=accent!60, thick, rounded corners=3pt,
+              align=center, inner sep=6pt, font=\small},
+  sbox/.style={rectangle, draw=accent!40, rounded corners=2pt,
+              align=center, inner sep=5pt, fill=accent!3, font=\small},
+  lbox/.style={rectangle, draw=red!50, thick, rounded corners=3pt,
+              align=center, inner sep=5pt, fill=red!4, font=\small},
+  arr/.style={-{Stealth[length=2.5mm]}, thick, color=accent!60},
+  larr/.style={-{Stealth[length=2.5mm]}, thick, color=red!50},
+  node distance=0.55cm
 ]
-\node[box, fill=accent!8] (input)
-  {\textbf{Input:} Panel $Y \in [0,1]^{N \times T}$, EWM demeaned};
+% ── LEFT: Global pipeline ─────────────
+\node[font=\small\bfseries, text=accent] at (-3.8, 4.0) {(a) Global};
+\node[box, fill=accent!6, minimum width=5.5cm, text width=5cm] (inp1) at (-3.8, 3.2)
+  {\textbf{Panel} $Y \in [0,1]^{93 \times T}$};
+\node[box, fill=blue!5, minimum width=5.5cm, text width=5cm, below=of inp1] (s1a)
+  {\textbf{Stage 1:} Global pooled AR(1)+FE\\[-1pt]
+   {\footnotesize $\hat{\rho}$ from all 93 actors}};
+\node[box, fill=orange!5, minimum width=5.5cm, text width=5cm, below=of s1a] (s2a)
+  {\textbf{Stage 2:} Global residual model\\[-1pt]
+   {\footnotesize One basis for all actors ($K{=}8$)}};
+\node[sbox, minimum width=5.5cm, below=of s2a] (out1)
+  {$\hat{y} = \hat{y}^{\mathrm{pool}} + \hat{r}^{\mathrm{global}}$\\[-1pt]
+   {\footnotesize $R^2 = 0.630$}};
+\draw[arr] (inp1) -- (s1a);
+\draw[arr] (s1a) -- (s2a);
+\draw[arr] (s2a) -- (out1);
 
-\node[box, fill=blue!6, below=of input] (s1)
-  {\textbf{Stage 1: Pooled AR(1) + Fixed Effects}\\[3pt]
-   $\hat{y}_{\mathrm{AR},i,t} = \hat{\mu}_i + \hat{\rho}(y_{i,t-1} - \hat{\mu}_i)$\\[2pt]
-   {\footnotesize Captures shared persistence \quad ($R^2 = 0.591$ on 93-actor panel)}};
-
-\node[sbox, below=of s1] (resid)
-  {\textbf{Residuals:} $r_t = y_t - \hat{y}_{\mathrm{AR},t}$ \quad
-   {\footnotesize ($\rho \approx 0.04$, near-white noise)}};
-
-\node[box, fill=orange!6, below=of resid] (s2)
-  {\textbf{Stage 2: Residual DMD / Kalman Filter}\\[3pt]
-   DMD on demeaned residuals $\to U_r,\; \tilde{A}_r$\\[2pt]
-   $F = \diag(\tilde{A}_r)$ {\footnotesize [default, 8 params]} \;\;or\;\;
-   $F = \tilde{A}_r$ {\footnotesize [max-perf., 64 params]}\\[2pt]
-   {\footnotesize Captures cross-sectional rotational structure
-   \quad ($R^2_{\mathrm{resid}} = 0.095$)}};
-
-\node[box, fill=green!6, below=of s2] (comb)
-  {\textbf{Combined:} $\hat{y}_{i,t} = \hat{y}_{\mathrm{AR},i,t}
-   + [U_r \balpha_{t|t-1}^{(r)}]_i$\\[3pt]
-   {\footnotesize $R^2 = 0.619$ (default) / $0.630$ (max-perf.) on 93-actor panel}};
-
-\node[sbox, below=of comb] (gap)
-  {\textbf{Investment gap:} $\Delta_{i,t} = y_{i,t} - \hat{y}_{i,t}$};
-
-\draw[arr] (input) -- (s1);
-\draw[arr] (s1) -- (resid);
-\draw[arr] (resid) -- (s2);
-\draw[arr] (s2) -- (comb);
-\draw[arr] (comb) -- (gap);
+% ── RIGHT: Mixture pipeline ──────────
+\node[font=\small\bfseries, text=red!60!black] at (3.8, 4.0) {(b) Mixture};
+\node[box, fill=accent!6, minimum width=5.5cm, text width=5cm] (inp2) at (3.8, 3.2)
+  {\textbf{Panel} $Y \in [0,1]^{93 \times T}$};
+\node[box, fill=blue!5, minimum width=5.5cm, text width=5cm, below=of inp2] (s1b)
+  {\textbf{Stage 1:} Global pooled AR(1)+FE\\[-1pt]
+   {\footnotesize $\hat{\rho}$ from all 93 actors (same)}};
+\node[lbox, minimum width=5.5cm, text width=5cm, below=of s1b] (s2b)
+  {\textbf{Stage 2:} Block-specific local models\\[-1pt]
+   {\footnotesize Diversified: local PCA+ridge ($K{=}4$)}\\[-1pt]
+   {\footnotesize Tech/Health: local PCA+ridge ($K{=}4$)}\\[-1pt]
+   {\footnotesize Macro/Inst: local PCA+ridge ($K{=}2$)}\\[-1pt]
+   {\footnotesize Remainder: global augmentation}};
+\node[sbox, minimum width=5.5cm, below=0.45cm of s2b] (out2)
+  {$\hat{y}_i = \hat{y}^{\mathrm{pool}}_i + \hat{r}^{\mathrm{local}}_{b(i)}$\\[-1pt]
+   {\footnotesize $R^2 = 0.677$}};
+\draw[arr] (inp2) -- (s1b);
+\draw[larr] (s1b) -- (s2b);
+\draw[larr] (s2b) -- (out2);
 \end{tikzpicture}
-\caption{\textbf{Two-stage spectral augmentation architecture} (recommended pipeline). Stage~1 captures shared persistence via pooled AR(1) with fixed effects. Stage~2 applies DMD/Kalman to Stage~1 residuals, exploiting cross-sectional rotational structure that Stage~1 leaves behind. The default transition uses per-mode diagonal dynamics ($K$ parameters); the maximum-performance variant uses the full reduced operator ($K^2$ parameters). Both outperform per-actor AR(1) across all three panels (Table~\ref{tab:cross_panel}).}
+\caption{Architecture comparison. (a)~The global pipeline applies one residual model to all 93~actors. (b)~The mixture pipeline uses the same global Stage~1 but routes actors to block-specific local models in Stage~2, with economically pre-specified blocks. Stage~1 is identical; only the Stage~2 routing differs.}
 \label{fig:pipeline}
 \end{figure}
 
 
 % ══════════════════════════════════════════════════════════
-\section{Data}
-\label{sec:data}
-% ══════════════════════════════════════════════════════════
-
-\subsection{Actor Universe}
-
-Our sample comprises 103 actors across three hierarchical layers (Table~\ref{tab:actors}). Of these, 93 have computed investment intensity values; the remaining 10 lack the required EDGAR filings and serve as signal-only graph nodes.
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lllrr@{}}
-\toprule
-Layer & Actor Type & Intensity Method & Total & With intensity \\
-\midrule
-0 (Exogenous) & Global shocks (Global) & FRED min-max & 7 & 7 \\
-\multirow{3}{*}{1 (Institutional)} & Central banks (US, UK) & FRED min-max & 2 & 1 \\
- & Regulators (US, UK) & FRED min-max & 2 & 2 \\
- & International orgs (Global) & FRED min-max & 1 & 1 \\
-\midrule
-\multirow{4}{*}{2 (Firms)} & Large firms (US) & CapEx intensity & 56 & 49 \\
- & Large firms (UK) & Return intensity & 23 & 21 \\
- & Banks (US) & Asset growth (ranked) & 10 & 10 \\
- & Sector leaders (UK) & CapEx intensity & 2 & 2 \\
-\midrule
-& & \textbf{Total} & \textbf{103} & \textbf{93} \\
-\bottomrule
-\end{tabular}
-\caption{Actor universe for the 93-actor multilayer panel. This panel is used for both structural spectral analysis and the primary forecasting evaluation. The 146-firm and 270-actor panels (Section~\ref{sec:cross_panel}) are constructed from EDGAR balance sheet data for cross-panel robustness.}
-\label{tab:actors}
-\end{table}
-
-\subsection{Investment Intensity}
-
-We construct several intensity measures, each mapped to a cross-sectional percentile rank in $[0,1]$ per quarter:
-
-\begin{itemize}[nosep]
-\item \textbf{CapEx/Assets intensity} (93-actor panel): ratio of capital expenditures to total assets, sourced from SEC EDGAR (XBRL), ranked cross-sectionally. This is the primary panel for ablation, structural analysis, and forecasting evaluation.
-\item \textbf{CapEx/Revenue intensity} (146-firm panel): ratio of capital expenditures to revenues, ranked cross-sectionally. Used for cross-panel robustness.
-\item \textbf{Multi-ratio} (270-actor panel): stacks CapEx/Revenue and Revenue/Assets columns for overlapping firms, creating virtual cross-sectional heterogeneity. Used for cross-panel robustness.
-\item \textbf{Institutional intensity}: FRED-based macro indices, min-max normalised within actor type.
-\end{itemize}
-
-\begin{table}[H]
-\centering\small
-\begin{tabularx}{\textwidth}{@{}lll>{\raggedright\arraybackslash}X@{}}
-\toprule
-Source & Data & Frequency & Role in Pipeline \\
-\midrule
-SEC EDGAR & CapEx, Assets, Revenue (XBRL) & Quarterly & Intensity construction (primary) \\
-Yahoo Finance & Equity total returns & Daily $\to$ quarterly & Intensity construction (UK alternative) \\
-FRED & 28 macro series & Mixed $\to$ quarterly & Institutional intensity \\
-\bottomrule
-\end{tabularx}
-\caption{Data sources. Only the intensity panel enters the recommended pipeline.}
-\label{tab:sources}
-\end{table}
-
-\subsection{Evaluation Protocol}
-\label{sec:eval}
-
-We employ a \textbf{rolling out-of-sample} protocol with 10 non-overlapping annual test windows (2015--2024). For each test year, the model trains on the preceding 5 years (20 quarters) and predicts the 4 quarters of the test year. Within each test year, the basis and Stage~1 parameters are updated quarterly (rolling update, Algorithm~\ref{alg:pipeline}).
-
-\textbf{Fixed hyperparameters.} $K = 8$ DMD modes, SVD truncation rank $r = 15$, EWM halflife $\tau = 12$ quarters, training window $T = 5$ years, $F_{\mathrm{reg}} = 0.99$ (spectral radius clip), $Q_0 = 0.5 I_K$, $\lambda = 0.3$. These are fixed across all panels and windows; there is no inner cross-validation.
-
-\textbf{Inference.} We report mean $\Delta R^2$ across 10 windows, 95\% bootstrap CIs (10{,}000 window resamples), exact permutation $p$-values ($2^{10} = 1{,}024$ sign assignments), and window win counts.
-
-\textbf{Notation summary.} Two $R^2$ types appear throughout:
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-Symbol & Definition & Usage \\
-\midrule
-Predictive $R^2$ & Uses $\balpha_{t|t-1}$ (info up to $t{-}1$ only) & All forecast comparisons \\
-Modal $R^2$ & Uses $\balpha_{t|t}$ (incorporates current obs) & Structural analysis only \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-
-% ══════════════════════════════════════════════════════════
-\section{Empirical Results}
+\section{When Global Models Misalign}
 \label{sec:results}
 % ══════════════════════════════════════════════════════════
 
-Sections~\ref{sec:standalone}--\ref{sec:cross_panel} present the forecasting results using predictive $R^2$ on all panels. Sections~\ref{sec:structural_ladder}--\ref{sec:variance_decomp} present complementary structural spectral analysis using modal $R^2$ on the 93-actor panel.
+\subsection{Full-Panel Result}
 
-\subsection{Standalone Transition Diagnostic}
-\label{sec:standalone}
-
-Table~\ref{tab:standalone} presents the standalone diagnostic: why does spectral forecasting on raw levels fail, and how much can transition repair recover?
+Table~\ref{tab:five_arch} compares five architectures on the full 93-actor panel; Figure~\ref{fig:per_window} shows the per-window comparison. The mixture architectures (M1, M2) beat the global always-on augmentation (G1) in every window.
 
 \begin{table}[H]
-\centering\small
-\begin{tabular}{@{}llccc@{}}
+\centering
+\caption{Five architectures on the full 93-actor panel (10 rolling OOS windows, 2015--2024). S1~applies pooled-only (no augmentation) to local blocks and global augmentation to the remainder. M1 and M2 apply local Ridge or local PCA+ridge to local blocks. W denotes the number of windows (out of 10) with a positive gain over G1.}
+\label{tab:five_arch}
+\small
+\begin{tabular}{llcccccc}
 \toprule
-Model & Transition & $R^2$ & $\Delta$ vs AR(1) & $\Delta$ vs baseline \\
+\# & Architecture & $R^2$ & $\Delta$ vs G1 & $t$ & $p$ & CI & W \\
 \midrule
-Per-actor AR(1) & --- & 0.594 & --- & --- \\
-Pooled + FE & --- & 0.591 & $-0.003$ & --- \\
-\midrule
-\multicolumn{5}{@{}l}{\emph{Standalone spectral model (93-actor panel, $K = 8$):}} \\
-Spectral baseline & $F = 0.99I$ & 0.415 & $-0.179$ & --- \\
-Spectral + $\diag(\tilde{A})$ & Per-mode dynamics & 0.483 & $-0.111$ & $+0.068$ \\
-Spectral + full $\tilde{A}$ & Full reduced operator & 0.486 & $-0.107$ & $+0.071$ \\
-\midrule
-\multicolumn{5}{@{}l}{\emph{Forecast-optimised alternative:}} \\
-RRR ($K = 2$) & Rank-constrained OLS & 0.391 & $-0.203$ & --- \\
-RRR ($K = 4$) & Rank-constrained OLS & 0.368 & $-0.226$ & --- \\
-RRR ($K = 8$) & Rank-constrained OLS & 0.347 & $-0.247$ & --- \\
+G0 & Pooled-only & 0.591 & $-0.039$ & $-7.14$ & ${<}0.001$ & $[-0.048, -0.029]$ & 0/10 \\
+BA & Block-specific $\hat\rho_b$+FE & 0.611 & $-0.019$ & $-3.72$ & $0.005$ & $[-0.028, -0.009]$ & 0/10 \\
+G1 & Global always-on & 0.630 & --- & --- & --- & --- & --- \\
+S1 & Selective-off & 0.599 & $-0.031$ & $-8.55$ & ${<}0.001$ & $[-0.037, -0.024]$ & 0/10 \\
+\textbf{M1} & \textbf{Mixture (Ridge)} & \textbf{0.669} & $\mathbf{+0.039}$ & $\mathbf{7.80}$ & $\mathbf{{<}0.001}$ & $\mathbf{[+0.030, +0.049]}$ & \textbf{10/10} \\
+\textbf{M2} & \textbf{Mixture (PCA+ridge)} & \textbf{0.677} & $\mathbf{+0.047}$ & $\mathbf{7.76}$ & $\mathbf{{<}0.001}$ & $\mathbf{[+0.036, +0.058]}$ & \textbf{10/10} \\
 \bottomrule
 \end{tabular}
-\caption{Standalone spectral model diagnostic arc (93-actor multilayer panel, 10 annual windows). Repairing the transition from $F = 0.99I$ to DMD's own $\tilde{A}$ closes 40\% of the gap to AR(1) but cannot overcome the fundamental limitation. The diagonal of $\tilde{A}$ captures 96\% of the full-$\tilde{A}$ gain ($0.483$ vs $0.486$), confirming that the signal is per-mode self-dynamics, not cross-mode coupling. Reduced-rank regression (RRR) loses at all $K$ values due to overfitting in the $N \gg T$ regime.}
-\label{tab:standalone}
 \end{table}
 
-\textbf{The transition is the bottleneck.} The near-identity prior $F = 0.99I$ shrinks every mode's predicted state toward zero at the same rate, destroying the mode-specific temporal structure that DMD captures. Replacing $F$ with $\tilde{A}$ (the DMD reduced operator) recovers mode-specific dynamics: each mode's predicted state evolves according to its learned eigenvalue, including oscillatory components ($\theta \approx 44$--$91^\circ$). This closes 40\% of the gap ($+0.071$~pp), but standalone spectral model remains $0.107$~pp below AR(1).
+The block-specific $\hat\rho_b$+FE baseline (BA) --- which allows each block its own persistence parameter but has no Stage~2 --- achieves $R^2 = 0.611$, well below M2 at 0.677 ($\Delta = +0.066$, $t = 7.92$, CI $[+0.052, +0.082]$, 10/10 windows). The gain is not from heterogeneous persistence alone: the local Stage~2 residual dynamics add genuine value beyond what block-specific $\hat\rho_b$ captures.
 
-\textbf{Per-mode dynamics, not propagation.} Testing the diagonal of $\tilde{A}$ in SVD coordinates shows that off-diagonal coupling contributes only $+0.003$ ($0.483$ vs $0.486$). The gain is from per-mode self-dynamics---each mode evolving at its own rate---not from cross-mode propagation. This finding limits the interpretive claims the paper can make about information transmission between actors.
+The selective-off architecture (S1) is \emph{worse} than global ($\Delta = -0.031$), demonstrating that the mixture gain is not from removing suboptimal augmentation. The local models genuinely add predictive value: M1 exceeds S1 by $+0.070$ ($t = 16.12$, $p < 0.001$).
 
-\textbf{Shrinkage.} Sweeping the convex combination $F_\gamma = \gamma \tilde{A} + (1-\gamma) \cdot 0.99I$ yields optimal $\gamma = 0.75$ ($R^2 = 0.490$), confirming that the dynamics are real (big jump $\gamma = 0 \to 0.5$) but mild shrinkage helps ($+0.004$ over $\gamma = 1$).
+The primary comparison (M2 vs G1) is robust to dependence correction. With Newey--West HAC variance (bandwidth 1--3), the DM-HAC statistic ranges from 6.84 to 7.38 ($p < 0.001$ in all cases). A moving-block bootstrap (block lengths 2 and 3) yields CIs of $[+0.035, +0.059]$ and $[+0.036, +0.059]$, both excluding zero. The conclusion is invariant to the treatment of window-level dependence.
 
-\textbf{RRR fails in short panels.} Reduced-rank regression directly minimises one-step prediction error but produces a severely under-determined OLS coefficient ($N = 93$, $T \approx 20$). DMD's Koopman structural constraint ($X' \approx AX$) provides implicit regularisation that RRR's rank constraint cannot match. Subspace angles of $40$--$70^\circ$ confirm the two methods find genuinely different subspaces.
+Whether a direct forecast combination \citep{bates1969combination} of global-basis models could replicate the mixture gain is unlikely but not formally excluded. M2 exceeds the best component (G1) in every window by $+0.025$ to $+0.074$, and the mixture estimates block-specific factor structure ($\hat{U}_b$, $\hat{A}_b$) from within-block residuals not contained in any weighted average of global-basis forecasts---the information sets differ structurally, not just in weighting. A formal out-of-sample forecast-combination baseline with training-estimated weights remains a natural further comparison.
 
-\subsection{Residual-Stage Ablation Ladder}
-\label{sec:ablation_ladder}
-
-Table~\ref{tab:ablation} is the centrepiece evidence table. It shows the effect of adding various second-stage models on top of the pooled+FE baseline.
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Residual-stage model & $R^2$ & $\Delta$ vs pooled & $\Delta$ vs AR(1) \\
-\midrule
-Pooled + FE only & 0.591 & --- & $-0.003$ \\
-\midrule
-\multicolumn{4}{@{}l}{\emph{Models that fail:}} \\
-+ Residual AR(1) & 0.605 & $+0.014$ & $+0.011$ \\
-+ Residual PCA projection & 0.404 & $-0.187$ & $-0.190$ \\
-+ Residual PCA + VAR (DFM) & 0.577 & $-0.014$ & $-0.016$ \\
-+ Residual DMD projection & 0.469 & $-0.122$ & $-0.125$ \\
-+ Residual DMD/Kalman ($F = 0.99I$) & 0.471 & $-0.120$ & $-0.122$ \\
-\midrule
-\multicolumn{4}{@{}l}{\emph{Models that succeed:}} \\
-+ Residual PCA + diag AR(1)\textsuperscript{$\dagger$} & 0.617 & $+0.026$ & $+0.023$ \\
-+ Residual DMD/Kalman ($\diag(\tilde{A}_r)$) & 0.619 & $+0.028$ & $+0.025$ \\
-+ Residual Ridge ($\alpha = 1.0$)\textsuperscript{$\dagger$} & \textbf{0.632} & $+0.041$ & $+0.038$ \\
-+ Residual DMD/Kalman (full $\tilde{A}_r$) & \textbf{0.630} & $+0.039$ & $+0.036$ \\
-\bottomrule
-\end{tabular}
-\caption{Residual-stage ablation ladder (93-actor panel, 10 windows). Projection-only models (PCA, DMD) \emph{destroy} the pooled+FE result. Naive Kalman ($F = 0.99I$) also hurts. The gain requires learned per-mode dynamics: among successful models, PCA + diagonal AR(1) matches DMD/Kalman diag ($0.617$ vs $0.619$), and Ridge regression matches DMD/Kalman full ($0.632$ vs $0.630$). The contribution is the two-stage architectural principle, not DMD's specific basis. \textsuperscript{$\dagger$}New baselines added in response to reviewer feedback.}
-\label{tab:ablation}
-\end{table}
-
-The ablation ladder establishes four key points:
-
-\emph{Projection alone hurts.} Both PCA and DMD projection-only models produce $R^2 < 0.47$---far below pooled+FE at $0.591$. The projection introduces reconstruction noise without a filtering step to suppress it.
-
-\emph{Naive dynamics hurt.} Adding a Kalman filter with $F = 0.99I$ ($0.471$) or a PCA+VAR dynamic factor model ($0.577$) fails to improve over pooled+FE. The uniform-transition Kalman mis-specifies mode-specific dynamics; the DFM's full VAR overfits with $K^2 = 64$ parameters from $T \approx 20$ observations.
-
-\emph{Per-mode dynamics are essential.} All four successful models---PCA + diagonal AR(1), DMD/Kalman diag, Ridge, and DMD/Kalman full---share the property of learning mode-specific or actor-specific persistence on the residuals.
-
-\emph{The gain is not DMD-specific.} PCA + diagonal AR(1) on residual PC scores ($R^2 = 0.617$) matches DMD/Kalman with $\diag(\tilde{A}_r)$ ($0.619$; paired $t = -0.46$, $p > 0.6$). Ridge regression with $\alpha = 1.0$ ($R^2 = 0.632$) matches DMD/Kalman with full $\tilde{A}_r$ ($0.630$). The contribution is the two-stage architecture with per-mode dynamics, not the specific choice of spectral basis. DMD retains a practical advantage in interpretability (the modes have loadings that can be inspected) and in the structural spectral analysis, but the forecasting gain does not require it.
-
-\subsection{Strong Baseline Comparison}
-\label{sec:baselines}
-
-Table~\ref{tab:baselines_strong} compares the augmented model against progressively stronger baselines on the 93-actor panel.
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lcccccc@{}}
-\toprule
-Model & $R^2$ & $\Delta$ vs AR(1) & CI & Perm.\ $p$ & Wins \\
-\midrule
-Per-actor AR(1) & 0.594 & --- & --- & --- & --- \\
-Pooled + FE & 0.591 & $-0.003$ & $[-0.015, +0.011]$ & 0.650 & --- \\
-Layer-specific pooled + FE & 0.598 & $+0.004$ & $[-0.009, +0.021]$ & 0.349 & --- \\
-DFM ($K = 8$) & 0.568 & $-0.026$ & $[-0.040, -0.011]$ & 0.994 & --- \\
-\midrule
-\textbf{Augmented (full $\tilde{A}_r$)}\textsuperscript{a} & \textbf{0.630} & $\mathbf{+0.036}$ & $[+0.021, +0.054]$ & \textbf{0.001} & \textbf{10/10} \\
-\bottomrule
-\end{tabular}
-\caption{Strong baseline comparison (93-actor panel, 10 windows). Neither pooled+FE, layer-specific pooled+FE, nor DFM significantly outperform AR(1). Only the two-stage spectral augmentation model beats AR(1) with CIs excluding zero and all windows positive. Augmented vs layer-specific pooled+FE: $\Delta = +0.032$, CI $[+0.022, +0.042]$, 10/10 wins. \textsuperscript{a}Two-stage pipeline from Section~\ref{sec:two_stage} with full $\tilde{A}_r$ transition.}
-\label{tab:baselines_strong}
-\end{table}
-
-\textbf{Default vs maximum-performance.} On the 93-actor panel, full $\tilde{A}_r$ ($R^2 = 0.630$) exceeds $\diag(\tilde{A}_r)$ ($R^2 = 0.619$) by $+0.011$ ($t(9) = 2.47$, $p = 0.036$, CI $[+0.003, +0.019]$, 7/10 wins). This is marginally significant. The $\diag(\tilde{A}_r)$ variant is the recommended default for parsimony (8 parameters vs 64) and for its superior performance on the 146-firm panel (Section~\ref{sec:cross_panel}).
-
-\subsection{Cross-Panel Robustness}
-\label{sec:cross_panel}
-
-Table~\ref{tab:cross_panel} tests the augmentation architecture on all three benchmark panels.
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lcccccccc@{}}
-\toprule
-Panel & $N$ & AR(1) & Pooled & Aug.\ diag & Aug.\ full & $\Delta_{\mathrm{full}}$ & CI & W \\
-\midrule
-146-firm CapEx/Rev & 146 & 0.728 & 0.745 & \textbf{0.749} & 0.745 & $+0.017$ & $[+0.009, +0.025]$ & 8/10 \\
-270-actor multi-ratio & 270 & 0.728 & 0.738 & 0.745 & \textbf{0.753} & $+0.025$ & $[+0.019, +0.030]$ & 10/10 \\
-93-actor multilayer & 93 & 0.594 & 0.591 & 0.619 & \textbf{0.630} & $+0.036$ & $[+0.021, +0.054]$ & 10/10 \\
-\bottomrule
-\end{tabular}
-\caption{Cross-panel robustness. All three panels show augmentation gains with CIs excluding zero. Gains are largest on the most heterogeneous panel (93-actor, $+3.6$pp) and smallest on the most homogeneous (146-firm, $+1.7$pp). Bold indicates the better variant for each panel. On the 146-firm panel, the default $\diag(\tilde{A}_r)$ variant ($0.749$) \emph{outperforms} the full variant ($0.745$), reinforcing the parsimony recommendation.}
-\label{tab:cross_panel}
-\end{table}
-
-The augmentation result is general: it holds across panels of different size ($N = 93$ to $270$), composition (multilayer vs single-ratio vs multi-ratio), and base persistence. The gains scale with panel heterogeneity---the 93-actor panel mixes FRED-based macro actors, central banks, regulators, and firms across US and UK, creating richer cross-sectional dynamics. The 146-firm panel (homogeneous US CapEx firms) shows the smallest gains. This pattern is consistent with DMD capturing cross-sectional rotational structure that is richer in more heterogeneous panels.
-
-\textbf{Architecture recommendation.} The $\diag(\tilde{A}_r)$ variant is the recommended default: it matches or exceeds full $\tilde{A}_r$ on the 146-firm panel and is within $+0.011$ on the 93-actor panel. The full variant is a maximum-performance option that may be preferred when the marginal gain justifies the additional $K^2 - K$ parameters.
-
-% ── Structural Spectral Analysis ──────────────────────────
-\vspace{0.5em}
-\noindent\textit{The following subsections present structural spectral analysis on the 93-actor panel using modal $R^2$ (spectral reconstruction quality). These findings are complementary to the forecasting results above: they characterise the spectral structure that the augmentation architecture exploits.}
-
-\subsection{The Structural Performance Ladder}
-\label{sec:structural_ladder}
-
-Independent of the forecasting architecture (Section~\ref{sec:two_stage}), we ask: what pipeline components are needed to build a high-quality spectral \emph{reconstruction} of the cross-section? Figure~\ref{fig:structural_pipeline} shows the standalone reconstruction pipeline; Table~\ref{tab:ladder} decomposes its modal $R^2$ into seven additive steps; Figure~\ref{fig:ladder} visualises the cumulative gains. This structural analysis uses $\tau = 8$Q and $T = 5$yr (the configuration under which these components were originally developed); the forecasting pipeline uses $\tau = 12$Q (Section~\ref{sec:eval}).
-
-% ── Structural reconstruction pipeline ────────────────────
-\begin{figure}[H]
+\begin{figure}[ht]
 \centering
-\begin{tikzpicture}[
-  box/.style={rectangle, draw=accent!60, thick, rounded corners=3pt,
-              minimum width=10cm, text width=9.5cm, align=center, inner sep=6pt,
-              fill=accent!4},
-  arr/.style={-{Stealth[length=2.5mm]}, thick, color=accent!50},
-  node distance=0.45cm
-]
-\node[box] (input)
-  {\textbf{Input:} Panel $Y \in [0,1]^{N \times T}$};
-
-\node[box, below=of input] (ewm)
-  {\textbf{EWM Demeaning} ($\tau = 8$Q for structural analysis)
-   \quad $\tilde{y}_{i,t} = y_{i,t} - \hat{\mu}_i$};
-
-\node[box, below=of ewm] (dmd)
-  {\textbf{DMD Basis Extraction} ($K = 8$ modes)
-   \quad $X' \approx AX \;\to\; U \in \R^{N \times K}$};
-
-\node[box, fill=orange!5, draw=orange!40, below=of dmd] (kalman)
-  {\textbf{Kalman Filter} (standalone, for reconstruction)\\[2pt]
-   $R = \frac{\tr(\hat{R})}{N}\,I_N$ \;\;
-   $F = 0.99\,I_K$ \;\;
-   $Q_0 = 0.5\,I_K$\\[2pt]
-   {\footnotesize $F = 0.99I$ is adequate here: the \emph{update} step
-    corrects using the current observation}};
-
-\node[box, below=of kalman] (online)
-  {\textbf{Online $Q$ Adaptation} ($\lambda = 0.3$)
-   \;+\; \textbf{Rolling Basis Update} (each quarter)};
-
-\node[box, fill=green!5, draw=green!50!black, below=of online] (out)
-  {\textbf{Modal reconstruction:}
-   $\hat{y}_{t|t} = \hat{\mu} + U\,\balpha_{t|t}$
-   \quad (modal $R^2 = 0.696$)};
-
-\draw[arr] (input) -- (ewm);
-\draw[arr] (ewm) -- (dmd);
-\draw[arr] (dmd) -- (kalman);
-\draw[arr] (kalman) -- (online);
-\draw[arr] (online) -- (out);
-\end{tikzpicture}
-\caption{\textbf{Standalone reconstruction pipeline} (structural analysis only). This pipeline uses $F = 0.99I$ and the filtered state $\balpha_{t|t}$ to reconstruct the current cross-section (modal $R^2$). It is \emph{not} used for forecasting---the forecasting architecture (Figure~\ref{fig:pipeline}) replaces $F$ with DMD-informed dynamics and uses the predicted state $\balpha_{t|t-1}$. The structural ladder (Table~\ref{tab:ladder}, Figure~\ref{fig:ladder}) decomposes how each component of this pipeline contributes to reconstruction quality.}
-\label{fig:structural_pipeline}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{img/fig2_ladder.pdf}
-\caption{Structural performance ladder (93-actor panel, modal $R^2$): cumulative reconstruction quality across pipeline components shown in Figure~\ref{fig:structural_pipeline}. Steps~1--2 (not shown) cause Kalman divergence without spherical $R$. Rolling basis update provides the dominant gain ($+14.7$pp). See Table~\ref{tab:ladder} for per-step $\Delta R^2$ with bootstrap confidence intervals.}
-\label{fig:ladder}
-\end{figure}
-
-\begin{table}[H]
-\centering\footnotesize
-\begin{tabularx}{\textwidth}{@{}lXcccc@{}}
-\toprule
-Step & Change & $R^2$ & $\Delta R^2$ & 95\% CI & Frac.\ + \\
-\midrule
-0 & Baseline ($T\!=\!10$yr, $K\!=\!3$, Schur, full demean) & 0.266 & --- & --- & --- \\
-1 & + EWM demeaning ($\tau\!=\!8$Q) & $-0.89$ & $-1.16$ & \multicolumn{2}{c}{\emph{Kalman overfits}} \\
-2 & + Shorter training ($T\!=\!5$yr) + higher $K\!=\!5$ & divergent & divergent & \multicolumn{2}{c}{\emph{without spherical $R$}} \\
-3 & + Spherical $R$ in Kalman filter & 0.440 & +0.174 & --- & 100\% \\
-\midrule
-4 & + DMD basis (replacing Schur) & 0.472 & +0.033 & $[+0.006, +0.056]$ & 90\% \\
-5 & + Online $Q$ adaptation + $K\!=\!8$ & 0.530 & +0.058 & $[+0.035, +0.092]$ & 100\% \\
-6 & + Transition reg.\ $F\!=\!0.99I$, $Q_0\!=\!0.5I$ & 0.549 & +0.018 & $[+0.013, +0.024]$ & 100\% \\
-7 & + Rolling basis update (recompute DMD each Q) & \textbf{0.696} & \textbf{+0.147} & $[+0.111, +0.172]$ & 100\% \\
-\bottomrule
-\end{tabularx}
-\caption{Structural performance ladder with uncertainty (93-actor panel, modal $R^2$, 10 windows). Steps~1--2 demonstrate the overparameterisation failure; spherical $R$ (step~3) rescues the pipeline. Rolling basis update is the dominant effect. \textbf{Note:} This ladder uses $F = 0.99I$ (step~6), which is adequate for modal $R^2$ because the Kalman \emph{update} step corrects any transition mis-specification using the current observation. The transition choice matters for \emph{predictive} $R^2$ (Section~\ref{sec:standalone}), where only the predict step is available.}
-\label{tab:ladder}
-\end{table}
-
-The distinction between modal and predictive $R^2$ explains why $F = 0.99I$ appears adequate in the structural ladder but catastrophic for forecasting. Modal $R^2$ measures $\hat{y}_{t|t} = \hat{\mu} + U\balpha_{t|t}$, where $\balpha_{t|t}$ incorporates the current observation through the Kalman update---correcting any mis-specification in $F$. Predictive $R^2$ measures $\hat{y}_{t|t-1} = \hat{\mu} + U\balpha_{t|t-1}$, where $\balpha_{t|t-1} = F\balpha_{t-1|t-1}$ depends entirely on $F$.
-
-\subsection{Spectral Method Comparison}
-\label{sec:spectral}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.7\textwidth]{img/fig5_spectral.pdf}
-\caption{Spectral method comparison (93-actor panel, modal $R^2$, 10 windows). Five static-operator methods produce identical results because the operator is symmetric. DMD outperforms by $+2.0$pp because it captures lagged cross-sectional dynamics from temporal snapshot pairs.}
-\label{fig:spectral}
-\end{figure}
-
-DMD ($R^2 = 0.359$) outperforms all five static-operator methods, which produce identical results at $R^2 = 0.339$. The identity is not a coincidence: the operator is built from the Pearson cross-correlation matrix, which is exactly symmetric. For any real symmetric matrix, the Schur, Polar, Hermitian, and PCA decompositions all reduce to the standard eigendecomposition. DMD sidesteps this by extracting modes from temporal snapshot pairs $X' \approx AX$, where the implicit operator captures lagged dynamics.
-
-\subsection{The Regularisation Path}
-\label{sec:reg_path}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.75\textwidth]{img/fig6_regularisation.pdf}
-\caption{Regularisation path (93-actor panel): $R^2$ as a function of shrinkage parameter $s$ where $R = (1-s)\hat{R} + s \cdot \frac{\tr(\hat{R})}{N}I$. At $s = 0$ (no shrinkage), modal $R^2 = -7.3$. Spherical $R$ ($s = 1.0$) is essential. The figure shows both modal $R^2$ (solid, incorporating current observation) and standalone predictive $R^2$ (dashed, one-step-ahead). The gap between the two curves illustrates the predict-step limitation identified in Section~\ref{sec:standalone}: even with correct observation regularisation, the standalone Kalman predict step underperforms because $F = 0.99I$ destroys mode-specific dynamics.}
-\label{fig:reg}
-\end{figure}
-
-The hockey-stick shape demonstrates that observation covariance regularisation is essential, not optional. At $s = 0$, the Kalman filter diverges ($R^2 = -7.3$). Performance improves monotonically, reaching $R^2 = 0.43$ at $s = 1.0$ (spherical).
-
-\subsection{Basis Rotation and Rolling Update}
-\label{sec:rolling}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=\textwidth]{img/fig3_per_window.pdf}
-\caption{Per-window modal $R^2$ (93-actor panel): rolling DMD vs static basis. Rolling wins all 10 windows, with the largest gains in periods where the cross-sectional structure shifts most from training.}
+\includegraphics[width=0.85\textwidth]{figures/fig2_per_window.pdf}
+\caption{Out-of-sample $R^2$ by test year for global always-on augmentation (G1) and the mixture architecture (M2). M2 exceeds G1 in all 10 windows. Horizontal reference lines show pooled-only and per-actor AR(1) baselines.}
 \label{fig:per_window}
 \end{figure}
 
-Tracking the DMD spectral basis across 52 rolling quarterly transitions (2010--2024) reveals gradual basis rotation (Figure~\ref{fig:rotation}). The mean principal subspace angle between successive quarterly bases is $25.8^\circ$ ($\sigma = 6.5^\circ$). High-rotation quarters ($>32^\circ$) tend to coincide with structural macroeconomic events: the European debt crisis (2012~Q3, $41^\circ$), the US--China tariff war (2018~Q2, $37^\circ$), and the Federal Reserve's tightening cycle (2022~Q3, $38^\circ$). COVID-19 (2020~Q2, $22^\circ$) did \emph{not} produce high rotation: the pandemic changed investment magnitudes but preserved the cross-sectional co-movement structure.
+\subsection{Per-Block Decomposition}
 
-The \emph{dimensionality} of the spectral structure is stable: $K_{\mathrm{eff}} = 8$ modes in all 52 quarters, with zero mode births or deaths. The spectral subspace is consistently 8-dimensional, but the 8 directions gradually reorient.
-
-\textbf{Null-simulation validation.} 500 panels from a fixed latent basis produce null rotation of $75.3^\circ$ ($\sigma = 1.5^\circ$)---far above the observed $25.8^\circ$. The observed rotation is consistent with reliably recoverable, low-dimensional structure that shifts gradually.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=\textwidth]{img/fig12_rotation.pdf}
-\caption{Spectral basis rotation over time (93-actor panel). Each bar: principal subspace angle between successive quarterly DMD bases ($K = 8$). Red bars: high-rotation quarters ($>32^\circ$). Dashed line: mean ($25.8^\circ$). $K_{\mathrm{eff}} = 8$ in all quarters. Null simulation: $75.3^\circ$.}
-\label{fig:rotation}
-\end{figure}
-
-Rolling basis update captures this rotation, yielding modal $R^2 = 0.696$---a $+14.7$pp improvement over the static-basis pipeline (CI $[+11.1, +17.2]$pp, 10/10 windows; Table~\ref{tab:rolling}).
+Table~\ref{tab:per_block} and Figure~\ref{fig:per_block} reveal the mechanism. The global basis causes cross-block interference that manifests differently across blocks.
 
 \begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Configuration & Mean modal $R^2$ & Std & $\Delta$ (rolling $-$ static) \\
-\midrule
-Spectral (rolling basis) & \textbf{0.696} & 0.050 & $+0.147$ \\
-Spectral (static basis) & 0.549 & 0.075 & --- \\
-\bottomrule
-\end{tabular}
-\caption{Rolling vs static basis (93-actor panel, modal $R^2$, 10 windows).}
-\label{tab:rolling}
-\end{table}
-
-\subsection{Variance Decomposition}
-\label{sec:variance_decomp}
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lccccc@{}}
-\toprule
-Source & \multicolumn{2}{c}{Static basis} & \multicolumn{2}{c}{Rolling basis} \\
-\cmidrule(lr){2-3} \cmidrule(lr){4-5}
-& $R^2$ & Share & $R^2$ & Share \\
-\midrule
-Per-actor EWM mean ($\hat{\mu}_i$) & 0.281 & 51\% & 0.281 & 40\% \\
-Spectral dynamics ($U\balpha_{t|t}$) & 0.268 & 49\% & 0.415 & 60\% \\
-\midrule
-Total & 0.549 & 100\% & 0.696 & 100\% \\
-\bottomrule
-\end{tabular}
-\caption{Variance decomposition (93-actor panel, modal $R^2$). Rolling basis recomputation shifts the balance from mean-dominated (51\%) to dynamics-dominated (60\%).}
-\label{tab:variance}
-\end{table}
-
-\begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{img/fig11_variance.pdf}
-\caption{Variance decomposition: frozen (left) vs rolling (right) basis. Rolling update nearly doubles the spectral dynamics contribution while the per-actor mean remains constant.}
-\label{fig:variance}
+\caption{Per-block $R^2$ by architecture. The diversified sector is degraded by global augmentation (0.392~$<$~0.415 pooled-only). The tech/health block gains most from local treatment. Note: per-block $R^2$ uses block-specific total sum of squares as denominator, so the $N$-weighted average of per-block $R^2$'s does not equal the full-panel $R^2$ in Table~\ref{tab:five_arch}.}
+\label{tab:per_block}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+Block & $N$ & G0 (pooled) & G1 (global) & S1 (sel-off) & M1 (Ridge) & M2 (PCA+r) \\
+\midrule
+SEC\_diversified & 23 & 0.415 & 0.392 & 0.415 & 0.461 & 0.449 \\
+LAYER\_macro\_inst & 11 & 0.600 & 0.649 & 0.600 & 0.692 & 0.689 \\
+MERGED\_tech\_health & 25 & 0.554 & 0.681 & 0.554 & 0.764 & 0.808 \\
+REMAINDER & 34 & 0.622 & 0.646 & 0.646 & 0.646 & 0.646 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three patterns emerge. First, the diversified sector is the clearest case of cross-block interference: global augmentation \emph{reduces} $R^2$ from 0.415 (pooled-only) to 0.392. The global basis, dominated by technology/healthcare and macro modes, injects noise into predictions for this heterogeneous sector. Local Ridge recovers $R^2 = 0.461$.
+
+Second, the tech/health block shows the largest absolute gain. Global augmentation already helps substantially ($+0.127$ over pooled), but local PCA+ridge with $K = 4$ nearly doubles the gain to $R^2 = 0.808$. The within-block co-movement structure is captured far more efficiently by a local 4-component model than by a global 8-component model that mixes in macro and diversified dynamics.
+
+Third, the remainder block (energy, industrials, financials) is unchanged by design---the same global augmentation is applied in all architectures. The global basis serves these sectors well; local decomposition is not needed.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/fig5_per_block.pdf}
+\caption{Per-block $R^2$ under three architectures: pooled-only (G0), global augmentation (G1), and mixture PCA+ridge (M2). The diversified sector is degraded by global augmentation ($\text{G1} < \text{G0}$); the tech/health block benefits most from local treatment.}
+\label{fig:per_block}
 \end{figure}
 
-\subsection{Component Ablation}
-\label{sec:comp_ablation}
+\subsection{Geometric Description}
+\label{sec:geodesic}
 
-A per-window heatmap of the reconstruction pipeline reveals a non-monotonic pattern: graph-factor OLS without Kalman filtering (modal $R^2 = 0.328$) \emph{outperforms} adding an unregularised Kalman filter ($0.291$) or adding regime switching ($0.293$). The Kalman filter hurts because the unregularised $R$ overfits. Spherical $R$ resolves this (SMIM static basis, $0.549$), and rolling basis update captures the structural evolution ($0.696$). The pattern is consistent across all 10 windows: unregularised Kalman is uniformly worse than no Kalman, and rolling basis is uniformly best.
+At the rank $K{=}4$ used for block-level comparison, the global spectral basis rotates at $31.5^\circ$ per quarter (geodesic distance on the Grassmannian); within-block rotation ranges from $14^\circ$ to $28^\circ$ (per-block values available in the replication archive). However, a matched-size random sub-panel control (200 draws per block size, same $K$ and metric) shows the reduction is \emph{not statistically significant}: MERGED\_tech\_health $p = 0.080$; LAYER\_macro\_inst $p = 0.145$; SEC\_diversified $p = 0.305$. The lower within-block rotation is largely a mechanical effect of smaller panel size producing more stable estimated bases. The geodesic evidence is therefore descriptive context, not a demonstrated mechanism---the forecasting result rests on the actual $R^2$ comparison (Table~\ref{tab:five_arch}; placebo $z = 7.56$, Table~\ref{tab:placebo}), not on the geometric story.
+
+% Section 4.4 (synergy claim) removed: the comparison between
+% the formal mixture result and informal preliminary estimates
+% was uncontrolled. The headline result stands on its own.
 
 
 % ══════════════════════════════════════════════════════════
-\section{Economic Validation}
-\label{sec:economic}
+\section{Validation}
+\label{sec:validation}
 % ══════════════════════════════════════════════════════════
 
-\subsection{What This Gap Is and Is Not}
+\subsection{Placebo Test}
+\label{sec:placebo}
 
-The investment gap $\Delta_{i,t}$ is a \emph{model-implied} deviation: the difference between observed investment intensity and a benchmark prediction (Eq.~\ref{eq:gap_compute}). It is \emph{not} a welfare-theoretic misallocation measure in the sense of \citet{hsieh2009misallocation}. We use the term ``investment gap'' rather than ``misallocation'' and interpret positive results as evidence that the gap captures meaningful dynamics, not welfare losses.
-
-\subsection{Gap Prediction Regressions}
-\label{sec:gap_reg}
-
-We estimate the panel regression:
-\begin{equation}
-\Delta y_{i,t \to t+4} = \beta_0 + \beta_1 \Delta_{i,t} + \beta_2 y_{i,t} + \epsilon_{i,t},
-\label{eq:d2}
-\end{equation}
-where $\Delta y_{i,t \to t+4}$ is the next-4-quarter intensity change. Table~\ref{tab:econ_val} reports results for both pooled+FE gaps and augmented-model gaps, with and without actor fixed effects. The sample covers 93 actors across 40 quarters (2015~Q1 to 2024~Q4), yielding $3{,}348$ actor-quarter observations after excluding terminal quarters that lack 4 future quarters for the dependent variable.
+The strongest potential objection to block-specific modelling is overfitting the block structure. We address this with a placebo benchmark (Table~\ref{tab:placebo}, Figure~\ref{fig:placebo}): 50 random partitions of the 93~actors into blocks of exactly the same sizes as the real partition (23, 11, 25, 34). For each random partition, the full mixture pipeline (M2) is run with identical local model specifications.
 
 \begin{table}[H]
-\centering\small
-\begin{tabular}{@{}llcccc@{}}
+\centering
+\caption{Placebo test: 50 random partitions vs real economic blocks.}
+\label{tab:placebo}
+\small
+\begin{tabular}{lc}
 \toprule
-Gap source & Specification & $\hat{\beta}_{\mathrm{gap}}$ & $t$-stat & $R^2$ \\
+Statistic & Value \\
 \midrule
-Pooled + FE & No actor FE & $-0.589$ & $-27.8$ & 0.173 \\
-Pooled + FE & Actor FE & $-0.630$ & $-10.3$ & 0.194 \\
-\midrule
-Augmented & No actor FE & $-0.530$ & $-23.1$ & 0.127 \\
-Augmented & Actor FE & $-0.566$ & $-12.0$ & 0.142 \\
+Real economic blocks $\Delta$ & $+0.047$ \\
+Placebo mean $\Delta$ & $-0.006$ \\
+Placebo std & $0.007$ \\
+Placebo maximum & $+0.012$ \\
+Placebo 99th percentile & $+0.011$ \\
+$z$-score (real vs placebo) & $7.56$ \\
+Placebo $p$-value & ${<}0.020$ (0/50; Monte Carlo bound $1/51$) \\
 \bottomrule
 \end{tabular}
-\caption{Gap$\to$future revision regression (93-actor panel). Both pooled and augmented gaps predict subsequent intensity revision with strongly negative $\beta$ ($|t| > 10$). Crucially, \emph{both survive actor fixed effects} with negative coefficients: the gap-revision relationship holds within actors over time, not only cross-sectionally. Pooled gaps have slightly higher $|t|$ and $R^2$---see text for interpretation.}
-\label{tab:econ_val}
 \end{table}
 
-\textbf{Both gap types survive actor FE.} Both pooled and augmented gaps maintain their negative revision coefficients under actor fixed effects. The within-actor effect ($\beta < 0$) means that when an individual actor deviates above its model-implied benchmark, it subsequently reverts---this holds both cross-sectionally and within actors over time.
+Random blocks degrade performance on average ($\Delta = -0.006$) because local estimation noise dominates when blocks are arbitrary. No random partition approaches the real gain. Each placebo uses the same 10 evaluation windows, same block sizes, and same local model specification---the only difference is actor assignment. The placebo benchmark controls for small-sample bias by design.
 
-\textbf{Pooled gaps are more predictive without FE.} Without actor fixed effects, pooled gaps have higher $|t|$ ($27.8$ vs $23.1$) and higher $R^2$ ($0.173$ vs $0.127$). Under actor FE, the comparison is mixed ($|t| = 10.3$ for pooled vs $12.0$ for augmented). This might seem paradoxical: the augmented model has higher forecast $R^2$, so why are its gaps \emph{less} predictable in the cross-sectional specification? The answer is signal absorption.
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.80\textwidth]{figures/fig3_placebo.pdf}
+\caption{Distribution of $\Delta R^2$ (mixture $-$ global) across 50 random block partitions of identical sizes (grey histogram) versus the real economic partition (vertical red line at $+0.047$). Random blocks produce a mean gain of $-0.006$; no random partition exceeds $+0.012$. The real gain exceeds the placebo distribution by $z = 7.56$ (Monte Carlo $p < 0.020$).}
+\label{fig:placebo}
+\end{figure}
 
-\subsection{Signal Absorption and Gap-Strength Decomposition}
-\label{sec:signal_absorption}
+\subsection{Cross-Panel Validation}
 
 \begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lcccc@{}}
+\centering
+\caption{Cross-panel validation. The mixture gain requires data-type heterogeneity.}
+\label{tab:cross_panel}
+\small
+\begin{tabular}{lccccc}
 \toprule
-Metric & Pooled gaps & Augmented gaps \\
+Panel & $N$ & Heterogeneous? & Global $R^2$ & Mixture $R^2$ & $\Delta$ \\
 \midrule
-Gap cross-sectional $\sigma$ & 0.189 & 0.179 \\
-Gap autocorrelation $\rho$ & 0.139 & 0.054 \\
-Revision regression $|\beta|$ & 0.589 & 0.530 \\
-Parent model OOS $R^2$ & 0.591 & 0.630 \\
+\textbf{93-actor multilayer} & \textbf{93} & \textbf{Yes} & \textbf{0.630} & \textbf{0.677} & $\mathbf{+0.047}$ \\
+146-firm CapEx/Revenue & 146 & No & 0.745 & 0.743 & $-0.002$ \\
+270-actor multi-ratio & 270 & Moderate & 0.753 & 0.754 & $+0.001$ \\
 \bottomrule
 \end{tabular}
-\caption{Gap-strength decomposition. Augmented gaps have lower variance, lower persistence, and lower revision predictability---consistent with the better model having absorbed systematic structure into the forecast, leaving residuals closer to white noise.}
-\label{tab:gap_decomp}
 \end{table}
 
-The pattern is internally consistent: The augmented model's lower gap variance ($0.179$ vs $0.189$), lower persistence ($\rho = 0.054$ vs $0.139$), and lower revision $|\beta|$ ($0.530$ vs $0.589$) all indicate that the augmented model has moved systematic cross-sectional structure \emph{into} the forecast, leaving less predictable residuals. Stronger gap predictability can reflect a \emph{weaker} model leaving more exploitable structure in its residual. The contribution of the augmented architecture is predictive improvement ($R^2 = 0.630$ vs $0.591$), not stronger economic content of the gaps.
+The mixture architecture does not improve prediction on homogeneous firm-only panels. The 146-firm panel (all firms, one ratio, one normalisation) shows no benefit: the global basis serves all actors equally well when the panel is homogeneous. The 270-actor panel (all firms, two ratio types) also shows no benefit---the ratio-type distinction is not severe enough to warrant local decomposition. The gain requires \emph{data-type heterogeneity}: mixing fundamentally different time series (trending macro indices and mean-reverting firm ranks) in a single panel.
+
+\subsection{Leave-One-Window-Out Block Selection}
+
+A potential concern is that the choice of which blocks receive local treatment was informed by the same evaluation windows used to measure the gain. To address this, a strict leave-one-window-out (LOWO) procedure is applied: for each test year $w$, the block selection uses per-block $R^2$ from the \emph{other} 9 windows only. A block receives local treatment if $\bar\Delta_{-w} = \overline{R^2_{\text{local}} - R^2_{\text{global}}} > 0$ across the held-out windows.
+
+The result is unambiguous: all 10 windows select the same three blocks (SEC\_diversified, LAYER\_macro\_inst, MERGED\_tech\_health). Since LOWO selects the identical partition every window, the resulting forecasts are the same as the fixed-partition mixture by construction---the gain is $+0.047$ with the same CI and significance. The per-block gain signal is so consistent across windows that no window's inclusion or exclusion changes the block selection.
+
+\subsection{Robustness: Dropping the Diversified Sector}
+
+The diversified sector is the most heterogeneous block and the one where global augmentation most clearly degrades prediction. To test whether the headline gain depends on this specific block, the entire pipeline is re-estimated on the 70-actor panel after removing all diversified-sector actors. On this reduced panel (blocks: LAYER\_macro\_inst $N{=}11$, MERGED\_tech\_health $N{=}25$, REMAINDER $N{=}34$), the mixture gain is $\Delta = +0.035$ ($t = 10.37$, CI $[+0.029, +0.042]$, 10/10 windows positive)---75\% of the original gain. The headline result does not depend primarily on the diversified sector: 75\% of the gain survives its removal, sustained primarily by the tech/health block. The remaining 25\% reflects the diversified block's specific contribution.
+
+\subsection{Economic Content}
+
+Gap-revision regressions on the global augmentation model confirm that forecast gaps predict subsequent investment revisions with actor fixed effects, consistent with the forecasts capturing economically meaningful variation rather than statistical noise. Augmented gaps are less predictable than pooled gaps, consistent with signal absorption. A full economic validation of the mixture architecture---including portfolio sorts, latency-adjusted backtests, and economic magnitude assessment---is beyond the scope of this methodological paper and is an important direction for future applied work.
+
+\subsection{Train-Only Causality Audit}
+
+Block assignments use static economic metadata (sector and layer labels from the actor registry). Local models are re-estimated each quarter from training data only: PCA basis from training residuals, Ridge VAR from training factors. The global Stage~1 and Stage~2 (for the remainder block) are re-estimated quarterly as each test quarter's data becomes available. No test-quarter information enters any model component.
+
+
+% ══════════════════════════════════════════════════════════
+\section{What Does Not Work and Why}
+\label{sec:falsification}
+% ══════════════════════════════════════════════════════════
+
+The heterogeneity finding emerged from a systematic programme that tested---and ruled out---four alternative explanations for the $R^2 \approx 0.630$ ceiling. Each negative result narrows the explanation space, leaving block-specific decomposition as the only surviving path to improvement. Table~\ref{tab:falsification} summarises the programme.
+
+\begin{table}[H]
+\centering
+\caption{Summary of alternative explanations tested and ruled out.}
+\label{tab:falsification}
+\small
+\begin{tabular}{p{3.5cm}p{4.5cm}p{3cm}p{3cm}}
+\toprule
+Alternative & Test & Result & Implication \\
+\midrule
+Better spectral method & 9 models, 3 complexity classes & DMD $\approx$ PCA $\approx$ Ridge ($\rho > 0.98$) & Architecture, not method \\
+Forecastable global geometry & 10 geometric models on Grassmannian & All worse than persistence & Rotation is estimation noise \\
+Target formulation & 7 target variants & Max $|\Delta\text{Gain}| = 0.018$ & Ceiling is target-invariant \\
+Conditional gating & 5 gating policies & All worse than always-on & Augmentation is unconditional \\
+% NCD row removed from main-text table; see Appendix G
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The Method Does Not Matter}
+
+Section~\ref{sec:method_equiv} established method equivalence globally. The same result holds locally: within each of the 9~blocks tested, local DMD never outperforms local PCA+ridge (mean $\Delta = -0.028$, worst $-0.059$). The method is irrelevant at every granularity.
+
+\subsection{Global Geometry Is Not Forecastable}
+
+The global spectral basis rotates at $49.2^\circ \pm 16.8^\circ$ per quarter at the model's operating rank $K{=}8$, dominated by a single principal angle ($\theta_1 = 45.8^\circ$). Despite the structural regularity, the rotation is temporally unpredictable: magnitude ACF(1) $= -0.07$, Ljung-Box $p = 0.29$, direction cosine $= 0.047$. All 10~geometric prediction models (Grassmannian extrapolation, projector averaging, Karcher mean, HS-linear regression) perform strictly worse than persistence. The rotation is consistent with finite-sample estimation noise. Full diagnostics appear in Appendix~F; structural spectral analysis (mode loadings, variance decomposition) is in Appendix~C.
+
+\subsection{The Target Is Not the Problem}
+
+Seven target formulations (percentile ranks, normal quantiles, winsorised $z$-scores, sector-relative ranks, moving averages, first differences) produce augmentation gains within $\pm 0.018$ of the baseline (excluding first differences, which show a larger gain of $+0.051$ but with absolute $R^2$ of only 0.047). Split-half reliability yields a noise-corrected ceiling of ${\sim}0.765$, suggesting some headroom from measurement noise, but no target reformulation closes the gap. Appendix~D provides the full comparison.
+
+\subsection{Conditional Gating Does Not Help}
+
+Five gating policies (NCD-based, dispersion-based, persistence-based, effective-rank-based, and combined) all produce \emph{lower} $R^2$ than always-on augmentation. The best gate (dispersion) loses $0.014$ versus always-on. Augmentation is unconditionally beneficial---no train-only diagnostic identifies quarters where the second stage should be deactivated. Appendix~E provides the full comparison.
+
+% NCD compression diagnostics removed from main text.
+% The tercile symbolisation discards too much information for the diagnostic
+% to be informative (compression-based ceiling falls below achieved R²).
+% Exploratory NCD results are in Appendix G.
 
 
 % ══════════════════════════════════════════════════════════
@@ -886,70 +617,36 @@ The pattern is internally consistent: The augmented model's lower gap variance (
 \label{sec:discussion}
 % ══════════════════════════════════════════════════════════
 
-\subsection{Negative Results and Failed Extensions}
+\subsection{Pool Globally, Decompose Locally}
 
-Several natural extensions of the spectral framework were tested and found unhelpful, establishing the boundaries of the approach.
+The paper's architectural principle is summarised in one sentence: \emph{estimate persistence globally (where pooling helps), estimate residual dynamics locally (where pooling introduces interference)}. Whether this principle applies beyond the specific panel studied here is an empirical question: the cross-panel validation (Table~\ref{tab:cross_panel}) shows null effects on two homogeneous firm-only panels, confirming the gain requires data-type heterogeneity. Panels mixing fundamentally different actor types in a common factor structure are natural candidates for further testing. The geodesic decomposition (global rotation $\gg$ local rotation) provides a suggestive diagnostic for when local decomposition may be warranted, though its predictive value for new panels has not been validated.
 
-Standalone DMD/Kalman on raw panel levels achieves $R^2 = 0.42$--$0.49$ depending on the transition---far below AR(1) at $0.594$. The spectral basis pools heterogeneous actors, losing actor-specific persistence. This is a fundamental limitation of the spectral representation, not a tuning problem. A forecast-optimised alternative, reduced-rank regression (RRR; \citealt{reinsel1998multivariate}), fares even worse: in the $N \gg T$ regime, the OLS coefficient is too under-determined for RRR's rank constraint to regularise effectively, whereas DMD's Koopman structural constraint provides stronger implicit regularisation.
+\subsection{Connection to Heterogeneous Factor Model Literature}
 
-On the residual stage, projection-only models (PCA and DMD without Kalman filtering) destroy the pooled+FE result ($R^2 = 0.40$--$0.47$ vs $0.591$), and a PCA+VAR dynamic factor model ($R^2 = 0.577$) is also worse than pooled+FE alone. The ablation ladder (Table~\ref{tab:ablation}) shows that the gain requires learned per-mode dynamics---but is not specific to DMD: PCA + diagonal AR(1) ($R^2 = 0.617$) and Ridge regression ($R^2 = 0.632$) achieve comparable results.
-
-Three additional refinements to the Kalman filter were tested after establishing the augmentation result: (i)~spectralised noise covariances (diagonal $Q$, structured $R$) yield $\Delta = 0.000$; (ii)~projecting the Kalman state across basis updates yields $\Delta = -0.001$; (iii)~Kim-filter regime switching \citep{kim1994dynamic} is not warranted given (i)--(ii). The adaptive $Q$ (Eq.~\ref{eq:online_q}) already captures the needed dynamics; once the transition incorporates learned mode-specific information, further filter complexity adds nothing.
-
-Emergence diagnostics (PID synergy, TDA complexity, Extended DMD), directed spectral operators (transfer entropy, Granger), event-level alignment, and return-based intensity were also tested and found to provide no improvement.
-
-\subsection{Sources of Forecasting Gain}
-
-The two-stage architecture succeeds by separating shared persistence (Stage~1) from cross-sectional rotational structure (Stage~2). The key mechanism is per-mode dynamics on the residuals: each component in the reduced space evolves at its own rate, capturing sector rotation and cross-sectional rebalancing patterns that shared-persistence models miss.
-
-The gain is \emph{not} specific to DMD. PCA + diagonal AR(1) on residual PC scores matches DMD/Kalman diag ($R^2 = 0.617$ vs $0.619$; $p > 0.6$), and Ridge regression matches DMD/Kalman full ($0.632$ vs $0.630$). The contribution is the two-stage architectural principle---separate persistence from rotation, then learn per-mode dynamics on the residuals---not the choice of spectral basis. DMD retains practical value for interpretability (mode loadings reveal which actors co-move) and for the structural spectral analysis, but is interchangeable with PCA or Ridge for pure forecasting.
-
-Nor is the gain evidence for directed propagation between actor layers. The diagonal of $\tilde{A}$ captures 96\% of the full-$\tilde{A}$ gain, and after removing shared persistence, residual modes are firm-dominated (macro loadings negligible). The forecastable structure reflects cross-sectional rotation among firms, not information transmission from macro actors to firms.
-
-The augmentation gains scale with panel heterogeneity: $+1.7$pp on the homogeneous 146-firm panel, $+2.5$pp on the 270-actor multi-ratio panel, and $+3.6$pp on the heterogeneous 93-actor multilayer panel. Richer cross-sectional structure provides more exploitable rotational patterns. The structural spectral analysis explains \emph{why}: the cross-section lives in a stable 8-dimensional spectral subspace that rotates at $25.8^\circ$/quarter, and rolling basis recomputation is essential to track this evolution.
-
-\subsection{Interpretive Boundaries}
-
-Three interpretive boundaries deserve emphasis. First, the full reduced operator $\tilde{A}_r$ outperforms the diagonal variant on the 93-actor panel ($+0.011$, $p = 0.036$) but \emph{underperforms} it on the 146-firm panel ($0.745$ vs $0.749$). The diagonal variant is the more conservative and portable recommendation; the full variant is a maximum-performance option whose advantage is panel-dependent and statistically marginal.
-
-Second, the augmented model's investment gaps are \emph{less} predictable than pooled gaps ($|\beta| = 0.530$ vs $0.589$; $\rho = 0.054$ vs $0.139$). This reflects signal absorption: the better model moves systematic structure into the forecast, leaving residuals closer to white noise. Weaker gap predictability is a sign of a better forecast, not a worse benchmark.
-
-Third, the economic-validation regressions (Table~\ref{tab:econ_val}) establish that gaps predict subsequent intensity revision ($\beta < 0$, $|t| > 10$) both cross-sectionally and within actors. However, these are predictive associations, not causal identification. The gap measures deviation from a model-implied benchmark, not from a welfare-theoretic optimum.
-
-\subsection{When the Kalman Filter Is and Is Not Needed}
-\label{sec:simplification}
-
-At low $K$ ($K = 2$) with quarterly basis refresh, the Kalman filter's contribution is marginal. The rolling update reprojects the modal state each quarter, and the subsequent predict step reduces to a scaled projection. The Kalman filter becomes essential at higher $K$ (the structural panel's $K = 8$ requires it for regularisation) and when the basis is not refreshed each quarter (online $Q$ adaptation tracks regime shifts between updates).
-
-\subsection{Reading the Spectral Structure}
-
-The structural analysis reveals that cross-sectional investment dynamics live in a stable 8-dimensional spectral subspace that rotates continuously.
-
-\textbf{The 8 modes are investment co-movement themes.} Each DMD mode assigns a loading to every actor. Same-sign loadings indicate co-movement; opposite-sign loadings indicate substitution. These are empirically identified directions that cut across sector boundaries.
-
-\textbf{$25.8^\circ$/quarter rotation means the themes drift.} Any model that is not re-estimated at least quarterly will track a structure that has shifted substantially.
-
-\textbf{Rotation speed is diagnostic.} High-rotation quarters ($>32^\circ$) signal structural reorganisation of the investment co-movement map. This is distinct from volatility: VIX measures price movement magnitude; rotation measures how the co-movement structure rearranges.
-
-\textbf{Stable dimensionality with shifting directions.} $K_{\mathrm{eff}} = 8$ is constant across all 52 transitions. No modes are born or die. The investment structure has a fixed number of degrees of freedom whose relative importance shifts gradually.
+The finding connects to several strands of the econometric literature on panel heterogeneity. \citet{bonhomme2015grouped} study grouped patterns of heterogeneity in panel models, estimating group-specific intercepts and slopes. \citet{su2016identifying} develop methods for identifying latent structures in panel data. \citet{ando2017clustering} cluster financial time series using a panel data approach. \citet{ke2015homogeneity} introduce homogeneity pursuit---testing which coefficients can be pooled and which must be group-specific. Our approach differs in using pre-specified economic blocks rather than data-driven grouping, but the geodesic decomposition could inform automated block discovery in future work.
 
 \subsection{Limitations}
 
-\textbf{Panel scope.} Only three panels are tested, all US-dominated. Gains are modest ($+1.7$ to $+3.6$pp). The 270-actor multi-ratio panel stacks two ratios for approximately 135 overlapping firms, creating mechanical within-firm dependencies that the bootstrap does not explicitly account for; results on this panel should be interpreted with caution. Extending to international markets and sub-quarterly frequencies is open.
+This paper is a purely empirical forecasting study. The evaluation operates in a finite-sample regime ($N = 93$, $T \approx 20$ per window, $K = 2$--$8$ modes) where classical large-$N$ or large-$T$ asymptotics do not directly apply. The validity of the comparisons rests on the rolling out-of-sample protocol, not on asymptotic guarantees. Whether the block-specific mixture estimator (Equation~\ref{eq:mixture}) enjoys formal consistency properties under a well-defined asymptotic regime is an open question.
 
-\textbf{Full $\tilde{A}_r$ advantage is marginal.} The $p = 0.036$ for diag vs full is not robust to multiple-testing correction and is not uniform across panels. The parsimony recommendation rests on this limitation.
+A block-specific pooled AR(1)+FE with block-specific $\hat\rho_b$ (no Stage~2) achieves $R^2 = 0.611$---substantially below the mixture at 0.677 (Table~\ref{tab:five_arch}). This confirms the gain is from heterogeneous \emph{residual} structure, not just heterogeneous persistence. A single-stage Ridge with block-dummy interactions or a forecast-combination scheme with block-level weights \citep{bates1969combination} remain natural additional comparisons for future work.
 
-\textbf{Remaining baselines.} PCA + diagonal AR(1) and Ridge regression are now included in the ablation ladder (Table~\ref{tab:ablation}). Elastic net and panel VAR with shrinkage priors (e.g., Minnesota-prior BVAR) are additional natural competitors not yet tested.
+Several further limitations qualify the findings:
 
-\textbf{Diagonal capture and estimation variance.} The finding that $\diag(\tilde{A})$ captures 96\% of the full-$\tilde{A}$ standalone gain could reflect either genuinely diagonal dynamics or superior estimation properties of the diagonal (8 parameters vs 64) in the $N \gg T$ regime. The fact that PCA + diagonal AR(1) matches DMD/Kalman diag (Table~\ref{tab:ablation}) is consistent with the latter interpretation: the gain comes from per-mode persistence estimation in any reasonable basis, not from DMD's specific Koopman structure.
+\begin{enumerate}[nosep]
+  \item \textbf{Small evaluation sample.} Ten out-of-sample windows is standard in rolling-window evaluation but provides limited statistical power. The placebo test mitigates this concern by using the same windows.
+  \item \textbf{Block selection informed by exploratory analysis.} The block identities (diversified, macro/institutional, tech/health) are economic classifications, but the \emph{selection} of which blocks receive local treatment was guided by preliminary within-sample diagnostics. Specifically, 10 candidate blocks were evaluated (6 raw sector blocks, 2 merged sector blocks, 2 layer blocks), of which 3 were selected based on per-block local-vs-global $R^2$ comparisons. The LOWO test controls for selection conditional on the candidate set; the placebo controls for the block sizes. Neither fully controls for the search over the 10 candidates.
+  \item \textbf{Scope limited to heterogeneous panels.} The gain does not replicate on homogeneous firm-only panels. The finding is a precise scope condition, not a universal architectural improvement.
+  \item \textbf{Quarterly frequency only.} Higher-frequency data may reveal different dynamics.
+  \item \textbf{Block boundary sensitivity untested.} Robustness to marginal reclassification of borderline actors between blocks has not been tested.
+  \item \textbf{Modest absolute improvement.} The $+0.047$ $R^2$ gain, while statistically robust ($z = 7.56$), is modest in absolute terms.
+  \item \textbf{FRED min-max look-ahead.} The 7 macro actors use full-sample min-max normalisation, introducing a mild look-ahead in target values. This does not affect the 82 firm actors (cross-sectional ranks are contemporaneous). The main result is driven by the tech/health block (no FRED actors), so the finding is not dependent on the macro normalisation.
+  \item \textbf{Data-timing latency.} Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. The evaluation assumes all targets are available at the quarterly boundary. A real-time implementation would need to account for filing lags.
+\end{enumerate}
 
-\textbf{Economic validation.} The gap-revision regressions are predictive associations, not causal identification. The dependent variable $\Delta y_{i,t \to t+4}$ overlaps by 3 quarters for consecutive observations of the same actor, inducing MA(3) serial correlation. The reported $t$-statistics do not use Newey--West or Driscoll--Kraay standard errors and should be interpreted as indicative rather than exact. Additionally, the gap regressor is a generated variable (the residual from the forecasting model), which introduces pre-estimation uncertainty not reflected in the standard errors.
+\subsection{Extensions}
 
-\textbf{Forecast metric.} We report only predictive $R^2$. Complementary metrics---RMSE, MAE, directional accuracy, and formal Diebold--Mariano tests \citep{diebold1995comparing} on loss differentials---would strengthen the forecast comparison.
-
-\textbf{Inference.} Per-window $R^2$ estimates from 4 quarterly observations are noisy. With 10 windows whose 5-year training samples overlap by 80\% between adjacent years, the window-level statistics are not fully independent; the bootstrap CI and permutation test should be interpreted with this dependence in mind.
-
-\textbf{Complex eigenvalues.} DMD of a real matrix can produce complex-conjugate eigenvalue pairs. In the implementation, all matrices are kept real: the basis $U$ consists of the real left-singular vectors of $X$, and $\tilde{A}$ is a real $r \times r$ matrix whose eigenvalues may be complex but whose matrix entries are real. The Kalman filter operates on real states throughout. The oscillatory components ($\theta \approx 44$--$91^\circ$) manifest as off-diagonal entries in the real $\tilde{A}$, not as explicit complex modes.
+Three extensions follow naturally. First, automated block discovery via cross-validated clustering on training-window loadings, replacing the pre-specified partition with a data-driven one. Second, higher-frequency data (monthly or daily), where the basis rotation may become temporally predictable and geometric methods may add value. Third, change-based prediction targets: preliminary evidence shows augmentation gain on first-differences is 2.5$\times$ larger than on levels, suggesting the spectral dynamics align better with change structure.
 
 
 % ══════════════════════════════════════════════════════════
@@ -957,43 +654,42 @@ The structural analysis reveals that cross-sectional investment dynamics live in
 \label{sec:conclusion}
 % ══════════════════════════════════════════════════════════
 
-This paper presents three layers of findings on spectral state-space models for cross-sectional investment intensity forecasting.
+This paper studies cross-sectional investment forecasting in heterogeneous panels containing actors with fundamentally different dynamics. Three findings emerge.
 
-\textbf{Diagnostic negative result.} Standalone spectral prediction using DMD with a near-identity Kalman transition ($F = 0.99I$) achieves $R^2 = 0.415$ on a 93-actor multilayer panel---far below per-actor AR(1) at $0.594$. The failure is implementation-specific: the uniform transition destroys mode-specific dynamics captured by the DMD basis. Replacing $F$ with DMD's reduced propagator partially repairs performance to $0.486$, but standalone spectral model cannot match simple baselines because a single spectral basis pools heterogeneous actors. In the $N \gg T$ regime, DMD's implicit Koopman constraint also dominates explicit forecast optimisation (reduced-rank regression), a finding of independent methodological interest.
+First, a two-stage architecture---global pooled persistence followed by regularised residual dynamics---improves predictive $R^2$ by 1.7--3.6~percentage points over standard baselines across three panels and invariant to the choice of second-stage method (PCA, DMD, or Ridge).
 
-\textbf{Methodological positive result.} The recommended architecture is a two-stage augmentation pipeline: pooled AR(1) with fixed effects captures shared persistence (Stage~1), then a second-stage model with learned per-mode dynamics on the residuals captures cross-sectional rotational structure (Stage~2). Using DMD/Kalman, the default model achieves $R^2 = 0.619$ ($\diag(\tilde{A}_r)$) and the maximum-performance variant $R^2 = 0.630$ (full $\tilde{A}_r$, $\Delta = +0.036$ vs AR(1); CI $[+0.021, +0.054]$; $p = 0.001$; 10/10 windows). The ablation ladder demonstrates that the gain requires learned per-mode dynamics---projection-only models, naive Kalman, and residual DFM all fail---but is not DMD-specific: PCA + diagonal AR(1) ($R^2 = 0.617$) and Ridge regression ($R^2 = 0.632$) achieve comparable results. The contribution is the two-stage architectural principle, not the choice of basis. Additional filter complexity provides zero gain.
+Second, global second-stage pooling can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. Descriptively, within-block basis rotation is lower than global rotation, though a matched-size random sub-panel control shows this reduction is not statistically distinguishable from a sample-size effect. Regardless of the geometric mechanism, the forecasting result is clear: a heterogeneity-aware mixture architecture with block-specific local residual models improves full-panel $R^2$ by $+0.047$ over the best global augmentation, validated by a placebo benchmark ($z = 7.56$), dependence-robust inference (DM-HAC $t > 6.8$), and consistency across all 10 evaluation windows.
 
-\textbf{Empirical cross-panel robustness.} The augmentation result generalises across all three benchmark panels: $+1.7$pp on a 146-firm CapEx/Revenue panel, $+2.5$pp on a 270-actor multi-ratio panel, and $+3.6$pp on the 93-actor multilayer panel, with confidence intervals excluding zero throughout. Gains scale with panel heterogeneity. Both pooled and augmented investment gaps predict subsequent intensity revision ($\beta < 0$, $|t| > 10$), and both survive actor fixed effects---the gap-revision relationship holds within actors over time. The augmented model's gaps are less predictable, consistent with signal absorption: better forecasts leave less systematic structure in the residual.
+Third, the improvement requires data-type heterogeneity---mixing macro indices with firm-level cross-sectional ranks---and does not arise on homogeneous panels. This scope condition, together with the geodesic diagnostic and method-equivalence finding, provides an empirical characterisation of when local decomposition adds forecasting value on this class of panels.
 
-Structural spectral findings complement these results. On the 93-actor panel ($K = 8$), the DMD basis rotates at $25.8^\circ$ per quarter ($\sigma = 6.5^\circ$; null: $75.3^\circ$) with stable dimensionality. Rolling basis recomputation provides the single largest structural gain ($+14.7$pp modal $R^2$). Dual regularisation---spherical observation covariance and regularised transition---is essential for reconstruction quality. The per-mode self-dynamics that drive the forecasting gain ($\diag(\tilde{A})$ captures 96\% of the full-$\tilde{A}$ effect) are consistent with sector rotation patterns in the spectral modes, not directed propagation between actor layers.
+The design principle is simple: \emph{pool globally for what is shared, decompose locally for what is heterogeneous}.
 
-The broad methodological lesson is that \textbf{two-stage residual augmentation with learned per-mode dynamics} improves panel forecasts, regardless of whether the second-stage basis is DMD, PCA, or Ridge. DMD retains value for structural interpretability (the spectral analysis in Sections~\ref{sec:structural_ladder}--\ref{sec:variance_decomp} relies on it), but the forecasting contribution is the architectural principle: separate persistence from rotation, then learn component-specific dynamics on the residuals.
-
-\vspace{0.8cm}
-\noindent\textbf{Acknowledgements.} The author used Claude (Anthropic) for coding assistance, exploratory analysis support, and editorial feedback. All scientific decisions, interpretations, and claims remain the sole responsibility of the author.
-
-\vspace{0.8cm}
-\noindent\textbf{Disclaimer.} This paper presents a research framework for academic investigation of investment dynamics. It is not investment advice. The models, gap estimates, and statistical findings described herein have not been validated for live trading or portfolio construction. Past out-of-sample performance on historical data does not guarantee future results.
-
-\vspace{0.5cm}
 
 % ══════════════════════════════════════════════════════════
+% BIBLIOGRAPHY
+% ══════════════════════════════════════════════════════════
+
 \begin{thebibliography}{99}
+
+\bibitem[Ando and Bai(2017)]{ando2017clustering}
+Ando, T. and Bai, J. (2017).
+\newblock Clustering huge number of financial time series: A panel data approach with high-dimensional predictors and factor structures.
+\newblock \emph{Journal of the American Statistical Association}, 112(519):1182--1198.
+
+\bibitem[Bai(2009)]{bai2009panel}
+Bai, J. (2009).
+\newblock Panel data models with interactive fixed effects.
+\newblock \emph{Econometrica}, 77(4):1229--1279.
 
 \bibitem[Bates and Granger(1969)]{bates1969combination}
 Bates, J.~M. and Granger, C.~W.~J. (1969).
 \newblock The combination of forecasts.
 \newblock \emph{Journal of the Operational Research Society}, 20(4):451--468.
 
-\bibitem[Abel and Blanchard(1983)]{abel1983optimal}
-Abel, A.~B. and Blanchard, O.~J. (1983).
-\newblock An intertemporal model of saving and investment.
-\newblock \emph{Econometrica}, 51(3):675--692.
-
-\bibitem[Acemoglu et~al.(2012)]{acemoglu2012network}
-Acemoglu, D., Carvalho, V.~M., Ozdaglar, A., and Tahbaz-Salehi, A. (2012).
-\newblock The network origins of aggregate fluctuations.
-\newblock \emph{Econometrica}, 80(5):1977--2016.
+\bibitem[Bonhomme and Manresa(2015)]{bonhomme2015grouped}
+Bonhomme, S. and Manresa, E. (2015).
+\newblock Grouped patterns of heterogeneity in panel models.
+\newblock \emph{Econometrica}, 83(3):1147--1184.
 
 \bibitem[Diebold and Mariano(1995)]{diebold1995comparing}
 Diebold, F.~X. and Mariano, R.~S. (1995).
@@ -1010,15 +706,20 @@ Fama, E.~F. and French, K.~R. (1993).
 \newblock Common risk factors in the returns on stocks and bonds.
 \newblock \emph{Journal of Financial Economics}, 33(1):3--56.
 
-\bibitem[Kim(1994)]{kim1994dynamic}
-Kim, C.-J. (1994).
-\newblock Dynamic linear models with {M}arkov-switching.
-\newblock \emph{Journal of Econometrics}, 60(1--2):1--22.
+\bibitem[Gagliardini et~al.(2016)]{gagliardini2016time}
+Gagliardini, P., Ossola, E., and Scaillet, O. (2016).
+\newblock Time-varying risk premium in large cross-sectional equity datasets.
+\newblock \emph{The Review of Financial Studies}, 29(3):714--742.
 
 \bibitem[Hsieh and Klenow(2009)]{hsieh2009misallocation}
 Hsieh, C.-T. and Klenow, P.~J. (2009).
 \newblock Misallocation and manufacturing TFP in China and India.
 \newblock \emph{The Quarterly Journal of Economics}, 124(4):1403--1448.
+
+\bibitem[Ke et~al.(2015)]{ke2015homogeneity}
+Ke, Z.~T., Fan, J., and Wu, Y. (2015).
+\newblock Homogeneity pursuit.
+\newblock \emph{Journal of the American Statistical Association}, 110(511):175--194.
 
 \bibitem[Kutz et~al.(2016)]{kutz2016dynamic}
 Kutz, J.~N., Brunton, S.~L., Brunton, B.~W., and Proctor, J.~L. (2016).
@@ -1030,11 +731,6 @@ Ledoit, O. and Wolf, M. (2004).
 \newblock A well-conditioned estimator for large-dimensional covariance matrices.
 \newblock \emph{Journal of Multivariate Analysis}, 88(2):365--411.
 
-\bibitem[Ortega et~al.(2018)]{ortega2018graph}
-Ortega, A., Frossard, P., Kova{\v{c}}evi{\'c}, J., Moura, J.~M., and Vandergheynst, P. (2018).
-\newblock Graph signal processing: Overview, challenges, and applications.
-\newblock \emph{Proceedings of the IEEE}, 106(5):808--828.
-
 \bibitem[Reinsel and Velu(1998)]{reinsel1998multivariate}
 Reinsel, G.~C. and Velu, R.~P. (1998).
 \newblock \emph{Multivariate Reduced-Rank Regression: Theory and Applications}.
@@ -1045,11 +741,6 @@ Restuccia, D. and Rogerson, R. (2017).
 \newblock The causes and costs of misallocation.
 \newblock \emph{Journal of Economic Perspectives}, 31(3):151--174.
 
-\bibitem[Sandryhaila and Moura(2013)]{sandryhaila2013discrete}
-Sandryhaila, A. and Moura, J.~M. (2013).
-\newblock Discrete signal processing on graphs.
-\newblock \emph{IEEE Transactions on Signal Processing}, 61(7):1644--1656.
-
 \bibitem[Schmid(2010)]{schmid2010dynamic}
 Schmid, P.~J. (2010).
 \newblock Dynamic mode decomposition of numerical and experimental data.
@@ -1059,6 +750,11 @@ Schmid, P.~J. (2010).
 Stock, J.~H. and Watson, M.~W. (2002).
 \newblock Forecasting using principal components from a large number of predictors.
 \newblock \emph{Journal of the American Statistical Association}, 97(460):1167--1179.
+
+\bibitem[Su et~al.(2016)]{su2016identifying}
+Su, L., Shi, Z., and Phillips, P.~C.~B. (2016).
+\newblock Identifying latent structures in panel data.
+\newblock \emph{Econometrica}, 84(6):2215--2264.
 
 \bibitem[Timmermann(2006)]{timmermann2006forecast}
 Timmermann, A. (2006).
@@ -1072,5 +768,46 @@ Wurgler, J. (2000).
 \newblock \emph{Journal of Financial Economics}, 58(1--2):187--214.
 
 \end{thebibliography}
+
+% ══════════════════════════════════════════════════════════
+% APPENDICES
+% ══════════════════════════════════════════════════════════
+\newpage
+\appendix
+\renewcommand{\thesection}{\Alph{section}}
+
+\section{DMD Mathematics}
+\label{app:dmd}
+
+Dynamic Mode Decomposition (DMD) provides a rank-$K$ approximation of the linear propagator mapping consecutive cross-sectional snapshots. Given a snapshot matrix $X = [x_1, \ldots, x_{T-1}]$ and $Y = [x_2, \ldots, x_T]$ with $x_t \in \R^N$, the truncated SVD $X = U_r \Sigma_r V_r^*$ yields the reduced propagator $\tilde{A} = U_r^* Y V_r \Sigma_r^{-1} \in \R^{K \times K}$, where $K \leq \min(N, T-1)$ is the truncation rank. The eigendecomposition $\tilde{A} W = W \Lambda$ produces DMD eigenvalues $\lambda_k$ encoding per-mode growth rate ($|\lambda_k|$) and oscillation frequency ($\arg \lambda_k$). For forecasting, the relevant objects are the left singular vectors $U_r$ (the orthonormal basis spanning the dominant $K$-dimensional subspace) and the diagonal or full matrix $\tilde{A}$ (the transition dynamics). In the paper's two-stage architecture, these are applied to Stage~1 residuals, not to the raw panel. Spectral radius clipping $\tilde{A} \leftarrow \tilde{A} \cdot \min(1, 0.99 / \max_k |\lambda_k(\tilde{A})|)$ ensures stability.
+
+\section{Standalone Transition Diagnostic}
+\label{app:standalone}
+
+The standalone spectral model (DMD-based Kalman filter with $K = 8$ modes) achieves $R^2 = 0.415$ with the default near-identity transition $F = 0.99 I$ versus $R^2 = 0.594$ for per-actor AR(1). Replacing $F$ with the diagonal of $\tilde{A}$ (per-mode eigenvalue dynamics) improves to $R^2 = 0.483$; the full reduced propagator $\tilde{A}$ yields $R^2 = 0.486$. The gap versus AR(1) is fundamental: a single spectral basis cannot replicate actor-specific persistence. The two-stage architecture resolves this by separating persistence (Stage~1) from cross-sectional structure (Stage~2).
+
+\section{Structural Spectral Analysis}
+\label{app:structural}
+
+The 93-actor panel's spectral structure includes 8~stable DMD modes with eigenvalue magnitudes $|\lambda_k| \in [0.87, 0.97]$ and substantial oscillatory components ($\theta \approx 44$--$91^\circ$). Modal $R^2 = 0.69$ (in-sample) confirms the structure is real. Mode interpretation from training-window loadings shows that modes~1--2 load on technology/healthcare versus financials (sector rotation), while macro loadings are negligible after removing shared persistence---consistent with the heterogeneity finding.
+
+\section{Target Sensitivity Details}
+\label{app:target}
+
+Seven target formulations tested: percentile ranks (baseline), normal quantiles ($R^2 = 0.610$, gain $+0.009$), winsorised $z$-scores ($R^2 = 0.628$, gain $+0.018$), sector-relative ranks ($R^2 = 0.595$, gain $+0.016$), 2Q moving average ($R^2 = 0.811$, gain $+0.016$), 4Q moving average ($R^2 = 0.934$, gain $+0.014$), first differences ($R^2 = 0.047$, gain $+0.051$). The first-differences result shows augmentation gain is 2.5$\times$ larger for changes than levels, but absolute $R^2$ is low. Split-half reliability: $\rho = 0.513$, Spearman-Brown reliability $= 0.678$, noise-corrected ceiling $\approx 0.765$.
+
+\section{Gating Policy Details}
+\label{app:gating}
+
+Five quarter-level causal gating policies compared to always-on augmentation: NCD gate ($\Delta = -0.015$), dispersion gate ($\Delta = -0.014$), persistence gate ($\Delta = -0.019$), effective-rank gate ($\Delta = -0.033$), combined gate ($\Delta = -0.028$). All worse than always-on. The augmentation is unconditionally beneficial.
+
+\section{Rotation Diagnostics and Predictability}
+\label{app:rotation}
+
+The global spectral basis rotates at $49.2^\circ \pm 16.8^\circ$ per quarter (geodesic distance at the model's operating rank $K = 8$). At $K = 4$ (used for the within-block comparison in Section~4.3, where block sizes preclude $K = 8$), the global geodesic is $31.5^\circ$. The rotation is dominated by $\theta_1 = 45.8^\circ$ (93\% of geodesic distance). Minor angles $\theta_4$--$\theta_8$ ($< 2^\circ$) show significant autocorrelation (ACF $> 0.5$) but contribute negligibly to the total rotation---a persistence-relevance trade-off. Six representative subspace prediction models tested: Grassmannian extrapolation ($\Delta = +0.021$ vs persistence, \emph{worse}), tangent-space AR ($+0.077$, worse), angle AR ($+0.080$, worse), constant velocity ($+0.149$, worse), Euclidean projector average ($+0.371$, worse), Karcher mean ($+0.383$, worse). No model beats persistence; the rotation is temporally unpredictable.
+
+% Appendix G (NCD diagnostics) removed: tercile symbolisation was too
+% lossy to be informative; the diagnostic added no value beyond what
+% the forecasting tables already show.
 
 \end{document}
