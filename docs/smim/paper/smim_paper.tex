@@ -327,10 +327,10 @@ The method-equivalence finding raises the question: if the engine does not matte
 \toprule
 Block & $N$ & Local $K$ & Economic rationale \\
 \midrule
-SEC\_diversified & 23 & 4 & Heterogeneous sector; global basis misrepresents \\
-LAYER\_macro\_inst & 11 & 2 & Different data types (FRED + institutional) \\
-MERGED\_tech\_health & 25 & 4 & Coherent sub-panel (high within-block loading similarity) \\
-REMAINDER & 34 & --- & Energy, industrials, financials (global model adequate) \\
+Diversified & 23 & 4 & Heterogeneous sector; global basis misrepresents \\
+Macro/Institutional & 11 & 2 & Different data types (FRED + institutional) \\
+Tech/Health & 25 & 4 & Coherent sub-panel (high within-block loading similarity) \\
+Remainder & 34 & --- & Energy, industrials, financials (global model adequate) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -456,10 +456,10 @@ Table~\ref{tab:per_block} and Figure~\ref{fig:per_block} reveal the mechanism. T
 \toprule
 Block & $N$ & G0 (pooled) & G1 (global) & S1 (sel-off) & M1 (Ridge) & M2 (PCA+r) \\
 \midrule
-SEC\_diversified & 23 & 0.415 & 0.392 & 0.415 & 0.461 & 0.449 \\
-LAYER\_macro\_inst & 11 & 0.600 & 0.649 & 0.600 & 0.692 & 0.689 \\
-MERGED\_tech\_health & 25 & 0.554 & 0.681 & 0.554 & 0.764 & 0.808 \\
-REMAINDER & 34 & 0.622 & 0.646 & 0.646 & 0.646 & 0.646 \\
+Diversified & 23 & 0.415 & 0.392 & 0.415 & 0.461 & 0.449 \\
+Macro/Institutional & 11 & 0.600 & 0.649 & 0.600 & 0.692 & 0.689 \\
+Tech/Health & 25 & 0.554 & 0.681 & 0.554 & 0.764 & 0.808 \\
+Remainder & 34 & 0.622 & 0.646 & 0.646 & 0.646 & 0.646 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -480,7 +480,7 @@ Third, the remainder block (energy, industrials, financials) is unchanged by des
 \subsection{Geometric Description}
 \label{sec:geodesic}
 
-At the rank $K{=}4$ used for block-level comparison, the global spectral basis rotates at $31.5^\circ$ per quarter (geodesic distance on the Grassmannian); within-block rotation ranges from $14^\circ$ to $28^\circ$ (per-block values available in the replication archive). However, a matched-size random sub-panel control (200 draws per block size, same $K$ and metric) shows the reduction is \emph{not statistically significant}: MERGED\_tech\_health $p = 0.080$; LAYER\_macro\_inst $p = 0.145$; SEC\_diversified $p = 0.305$. The lower within-block rotation is largely a mechanical effect of smaller panel size producing more stable estimated bases. The geodesic evidence is therefore descriptive context, not a demonstrated mechanism---the forecasting result rests on the actual $R^2$ comparison (Table~\ref{tab:five_arch}; placebo $z = 7.56$, Table~\ref{tab:placebo}), not on the geometric story.
+At the rank $K{=}4$ used for block-level comparison, the global spectral basis rotates at $31.5^\circ$ per quarter (geodesic distance on the Grassmannian); within-block rotation ranges from $14^\circ$ to $28^\circ$ (per-block values available in the replication archive). However, a matched-size random sub-panel control (200 draws per block size, same $K$ and metric) shows the reduction is \emph{not statistically significant}: Tech/Health $p = 0.080$; Macro/Institutional $p = 0.145$; Diversified $p = 0.305$. The lower within-block rotation is largely a mechanical effect of smaller panel size producing more stable estimated bases. The geodesic evidence is therefore descriptive context, not a demonstrated mechanism---the forecasting result rests on the actual $R^2$ comparison (Table~\ref{tab:five_arch}; placebo $z = 7.56$, Table~\ref{tab:placebo}), not on the geometric story.
 
 % Section 4.4 (synergy claim) removed: the comparison between
 % the formal mixture result and informal preliminary estimates
@@ -550,11 +550,11 @@ The mixture architecture does not improve prediction on homogeneous firm-only pa
 
 A potential concern is that the choice of which blocks receive local treatment was informed by the same evaluation windows used to measure the gain. To address this, a strict leave-one-window-out (LOWO) procedure is applied: for each test year $w$, the block selection uses per-block $R^2$ from the \emph{other} 9 windows only. A block receives local treatment if $\bar\Delta_{-w} = \overline{R^2_{\text{local}} - R^2_{\text{global}}} > 0$ across the held-out windows.
 
-The result is unambiguous: all 10 windows select the same three blocks (SEC\_diversified, LAYER\_macro\_inst, MERGED\_tech\_health). Since LOWO selects the identical partition every window, the resulting forecasts are the same as the fixed-partition mixture by construction---the gain is $+0.047$ with the same CI and significance. The per-block gain signal is so consistent across windows that no window's inclusion or exclusion changes the block selection.
+The result is unambiguous: all 10 windows select the same three blocks (Diversified, Macro/Institutional, Tech/Health). Since LOWO selects the identical partition every window, the resulting forecasts are the same as the fixed-partition mixture by construction---the gain is $+0.047$ with the same CI and significance. The per-block gain signal is so consistent across windows that no window's inclusion or exclusion changes the block selection.
 
 \subsection{Robustness: Dropping the Diversified Sector}
 
-The diversified sector is the most heterogeneous block and the one where global augmentation most clearly degrades prediction. To test whether the headline gain depends on this specific block, the entire pipeline is re-estimated on the 70-actor panel after removing all diversified-sector actors. On this reduced panel (blocks: LAYER\_macro\_inst $N{=}11$, MERGED\_tech\_health $N{=}25$, REMAINDER $N{=}34$), the mixture gain is $\Delta = +0.035$ ($t = 10.37$, CI $[+0.029, +0.042]$, 10/10 windows positive)---75\% of the original gain. The headline result does not depend primarily on the diversified sector: 75\% of the gain survives its removal, sustained primarily by the tech/health block. The remaining 25\% reflects the diversified block's specific contribution.
+The diversified sector is the most heterogeneous block and the one where global augmentation most clearly degrades prediction. To test whether the headline gain depends on this specific block, the entire pipeline is re-estimated on the 70-actor panel after removing all diversified-sector actors. On this reduced panel (blocks: Macro/Institutional $N{=}11$, Tech/Health $N{=}25$, Remainder $N{=}34$), the mixture gain is $\Delta = +0.035$ ($t = 10.37$, CI $[+0.029, +0.042]$, 10/10 windows positive)---75\% of the original gain. The headline result does not depend primarily on the diversified sector: 75\% of the gain survives its removal, sustained primarily by the tech/health block. The remaining 25\% reflects the diversified block's specific contribution.
 
 \subsection{Economic Content}
 
@@ -665,7 +665,7 @@ $T$ (yr) & $K_b{=}2$ & $K_b{=}3$ & $K_b{=}4$ & $K_b{=}6$ \\
 \end{tabular}
 \end{table}
 
-Two findings emerge. First, $K_b{=}4$ is near-optimal at every tested training-window length. Lower values ($K_b{=}2$) lose 0.014--0.018 $R^2$ versus $K_b{=}4$ at all $T$; $K_b{=}6$ is worse on aggregate because the smaller LAYER\_macro\_inst block ($N_b{=}11$) cannot support six modes, even though the tech/health block alone benefits from $K_b{=}6$. The pre-specified $K_b$ values in Table~\ref{tab:blocks} are robust to the choice of $T$.
+Two findings emerge. First, $K_b{=}4$ is near-optimal at every tested training-window length. Lower values ($K_b{=}2$) lose 0.014--0.018 $R^2$ versus $K_b{=}4$ at all $T$; $K_b{=}6$ is worse on aggregate because the smaller Macro/Institutional block ($N_b{=}11$) cannot support six modes, even though the tech/health block alone benefits from $K_b{=}6$. The pre-specified $K_b$ values in Table~\ref{tab:blocks} are robust to the choice of $T$.
 
 Second, the mixture gain \emph{increases} as the training window shrinks: $+0.047$ at $T{=}5$yr, $+0.054$ at $T{=}3$yr, $+0.097$ at $T{=}2$yr---roughly doubling. The mechanism is sample-size-dependent: at short $T$, the 93-actor global basis is poorly estimated from few observations, while the local 11--25-actor bases retain comparable conditioning because they target lower-dimensional subspaces. Cross-block interference in the global model worsens as $T$ shrinks, so the architectural gain from removing it grows correspondingly. The ridge penalty on the local VAR coefficients prevents the underdetermined basis estimates ($N_b{=}25$, $K_b{=}4$, $T{=}8$ quarters) from translating into unstable forecasts.
 
