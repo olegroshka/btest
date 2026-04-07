@@ -485,7 +485,7 @@ Third, the remainder block (energy, industrials, financials) is unchanged by des
 \subsection{Geometric Description}
 \label{sec:geodesic}
 
-At the rank $K{=}4$ used for block-level comparison, the global spectral basis rotates at $31.5^\circ$ per quarter (geodesic distance on the Grassmannian); within-block rotation ranges from $14^\circ$ to $28^\circ$ (per-block values available in the replication archive). For reference, two uniformly random $K$-dimensional subspaces in $\R^N$ have expected geodesic distance $K \cdot \arccos(0) = K \cdot 90^\circ / \sqrt{\pi K/2} \approx 63^\circ$ at $K{=}4$, $N{=}93$; the observed $31.5^\circ$ is well below this random baseline, confirming the basis has genuine temporal persistence. However, a matched-size random sub-panel control (200 draws per block size, same $K$ and metric) shows the within-block reduction relative to the global rotation is \emph{not statistically significant}: Tech/Health $p = 0.080$; Macro/Institutional $p = 0.145$; Diversified $p = 0.305$. The lower within-block rotation is largely a mechanical effect of smaller panel size producing more stable estimated bases. The geodesic evidence is therefore descriptive context, not a demonstrated mechanism---the forecasting result rests on the actual $R^2$ comparison (Table~\ref{tab:five_arch}; placebo $z = 7.82$, Table~\ref{tab:placebo}), not on the geometric story.
+At the rank $K{=}4$ used for block-level comparison (block sizes preclude the model's operating rank $K{=}8$; the $K{=}8$ rotation and its unpredictability are analysed in Section~\ref{sec:falsification}), the global spectral basis rotates at $31.5^\circ$ per quarter (geodesic distance on the Grassmannian); within-block rotation ranges from $14^\circ$ to $28^\circ$ (per-block values available in the replication archive). For reference, two uniformly random $K$-dimensional subspaces in $\R^N$ have expected geodesic distance $K \cdot \arccos(0) = K \cdot 90^\circ / \sqrt{\pi K/2} \approx 63^\circ$ at $K{=}4$, $N{=}93$; the observed $31.5^\circ$ is well below this random baseline, confirming the basis has genuine temporal persistence. However, a matched-size random sub-panel control (200 draws per block size, same $K$ and metric) shows the within-block reduction relative to the global rotation is \emph{not statistically significant}: Tech/Health $p = 0.080$; Macro/Institutional $p = 0.145$; Diversified $p = 0.305$. The lower within-block rotation is largely a mechanical effect of smaller panel size producing more stable estimated bases. The geodesic evidence is therefore descriptive context, not a demonstrated mechanism---the forecasting result rests on the actual $R^2$ comparison (Table~\ref{tab:five_arch}; placebo $z = 7.82$, Table~\ref{tab:placebo}), not on the geometric story.
 
 % Section 4.4 (synergy claim) removed: the comparison between
 % the formal mixture result and informal preliminary estimates
@@ -571,13 +571,17 @@ To test robustness to marginal reclassification of borderline actors, three pert
 
 \subsection{Local Treatment of the Remainder Block}
 
-The 34-actor remainder block (energy, industrials, financials) receives global augmentation in all reported architectures. When the remainder is also given local PCA+ridge treatment (a four-block mixture), the gain is $\Delta = +0.043$ (10/10 windows)---slightly lower than the three-block mixture ($+0.047$). Local treatment applied to the remainder alone yields $\Delta = -0.004$ (4/10 windows). The global model genuinely is adequate for these actors: local decomposition adds estimation noise without reducing cross-block interference, because the global basis already represents these sectors well.
+The 34-actor remainder block (energy, industrials, financials) receives global augmentation in all reported architectures. When the remainder is also given local PCA+ridge treatment (a four-block mixture), the gain is $\Delta = +0.043$ (10/10 windows)---slightly lower than the three-block mixture ($+0.047$). Local treatment applied to the remainder alone yields $\Delta = -0.004$ (4/10 windows). Adding local treatment to the remainder provides no empirical benefit: local decomposition adds estimation noise without reducing cross-block interference for these sectors.
 
 The full set of per-block diagnostics for all 10 candidate blocks evaluated during exploratory analysis is reported in Appendix~\ref{app:candidates}.
 
 \subsection{FRED Normalisation Robustness}
 
 The 7 macro actors use full-sample min-max normalisation in the primary analysis, introducing a potential look-ahead in their target values. Because Stage~1 pools $\hat\rho$ across all 93 actors, this could in principle contaminate the persistence estimate and all downstream residuals. A robustness check replaces full-sample bounds with strictly recursive expanding-window min-max normalisation (each quarter normalised using only data available up to that quarter). The mixture gain is $\Delta = +0.048$ (10/10 windows positive) under recursive bounds versus $+0.047$ under full-sample bounds. Excluding all macro and institutional actors entirely (82-firm panel, two local blocks only) yields $\Delta = +0.053$ (10/10). The FRED normalisation does not contribute to the headline finding.
+
+\subsection{Filing-Lag Robustness}
+
+Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. To test whether the headline differential survives under real-time data availability, all 82 firm-layer actors are lagged by one quarter (each forecast origin uses firm data from $t{-}1$ rather than $t$), while the 11 macro/institutional actors retain their original timing. Under this lag, the mixture gain is $\Delta = +0.038$ (10/10 windows positive), retaining 80\% of the contemporaneous gain ($+0.047$). The absolute $R^2$ levels shift: G1 rises slightly from 0.630 to 0.639 (staler firm data is easier to ``predict'' when targets are also stale), while M2 is essentially unchanged at 0.677. The architectural differential is robust to real-time data availability.
 
 \subsection{Economic Content}
 
@@ -606,7 +610,7 @@ The heterogeneity finding emerged from a systematic programme that tested---and 
 \toprule
 Alternative & Test & Result & Implication \\
 \midrule
-Better spectral method & 9 models, 3 complexity classes & DMD $\approx$ PCA $\approx$ Ridge ($\rho > 0.98$) & Architecture, not method \\
+Better spectral method & 9 models, 3 complexity classes & DMD $\approx$ PCA $\approx$ Ridge ($\rho > 0.98$) & Architecture, not linear method \\
 Forecastable global geometry & 10 geometric models on Grassmannian & All worse than persistence & Rotation is estimation noise \\
 Target formulation & 7 target variants & Max $|\Delta\text{Gain}| = 0.018$ & Ceiling is target-invariant \\
 Conditional gating & 5 gating policies & All worse than always-on & Augmentation is unconditional \\
@@ -664,7 +668,7 @@ Several further limitations qualify the findings:
   \item \textbf{Scope limited to heterogeneous panels.} The gain does not replicate on homogeneous firm-only panels. The finding is a precise scope condition, not a universal architectural improvement.
   \item \textbf{Quarterly frequency only.} Higher-frequency data may reveal different dynamics.
   \item \textbf{Modest absolute improvement.} The $+0.047$ $R^2$ gain, while statistically robust ($z = 7.82$), is modest in absolute terms.
-  \item \textbf{Data-timing latency.} Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. The evaluation assumes all targets are available at the quarterly boundary. Consequently, the \emph{absolute} $R^2$ levels (e.g., 0.677 for M2) are overstated relative to what a real-time implementation would deliver; the \emph{relative} gain ($\Delta = +0.047$, M2 vs G1) is likely structural because both architectures face the same timing assumption, but this has not been verified with lagged firm data.
+  \item \textbf{Data-timing latency.} The primary analysis assumes all targets are available at the quarterly boundary. A robustness check lagging all 82 firm actors by one quarter (Section~\ref{sec:validation}) confirms the mixture gain survives ($\Delta = +0.038$, 10/10, 80\% of the contemporaneous gain). The absolute $R^2$ levels in the primary tables remain overstated relative to real-time availability; the one-quarter lag is a conservative proxy for the actual 30--45 day SEC filing delay.
   \item \textbf{Survivorship bias.} The 82-firm panel requires complete quarterly data over a 20-year sample (2005--2025), selecting for persistent large-cap survivors. This balanced-panel design simplifies evaluation but may overstate persistence estimates. It may also \emph{understate} the cross-block interference documented here, because survivorship compresses cross-sectional variance; an unbalanced panel including distressed and newly-listed firms would likely exhibit greater heterogeneity. Whether the mixture architecture retains its advantage---and by how much it grows---on such a panel is untested.
 \end{enumerate}
 
@@ -722,7 +726,7 @@ Three extensions follow naturally. First, automated block discovery via cross-va
 
 This paper studies cross-sectional investment forecasting in heterogeneous panels containing actors with fundamentally different dynamics. Three findings emerge.
 
-First, a two-stage architecture---global pooled persistence followed by regularised residual dynamics---improves predictive $R^2$ by 1.7--3.6~percentage points over standard baselines across three panels and invariant to the choice of second-stage method (PCA, DMD, or Ridge).
+First, a two-stage architecture---global pooled persistence followed by regularised residual dynamics---improves predictive $R^2$ by 1.7--3.6~percentage points over standard baselines across three panels and invariant to the choice of linear second-stage method among the three tested (PCA, DMD, and Ridge).
 
 Second, global second-stage pooling can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. Descriptively, within-block basis rotation is lower than global rotation, though a matched-size random sub-panel control shows this reduction is not statistically distinguishable from a sample-size effect. Regardless of the geometric mechanism, the forecasting result is clear: a heterogeneity-aware mixture architecture with block-specific local residual models improves full-panel $R^2$ by $+0.047$ over the best global augmentation, validated by a placebo benchmark ($z = 7.82$), dependence-robust inference (DM-HAC $t > 6.8$), and consistency across all 10 evaluation windows.
 
