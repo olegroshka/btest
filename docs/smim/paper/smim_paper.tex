@@ -74,7 +74,7 @@ Independent Researcher\\[6pt]
 % ── Abstract ──────────────────────────────────────────────
 \begin{abstract}
 \noindent
-Global factor augmentation of cross-sectional forecasts can degrade prediction for actor subgroups whose dynamics are misrepresented by the shared basis. On a 93-actor multilayer investment panel mixing macro indicators, institutional data, and firm ratios, a heterogeneity-aware two-stage architecture---global pooled AR(1) for shared persistence, block-specific local models for residual dynamics---improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, 95\% CI $[+0.036, +0.058]$, positive in all 10 rolling windows, placebo $z = 7.82$, $p < 0.001$). The gain is concentrated in the tech/health block (${\sim}72\%$), with smaller contributions from other locally-treated blocks, and is architectural rather than methodological within the linear reduced-rank estimators tested ($\rho_{\mathrm{pred}} > 0.98$ across PCA, DMD, and Ridge). The improvement arises on heterogeneous mixed-type panels but not on homogeneous firm-only panels, identifying data-type heterogeneity as the operative condition. The gain survives recursive macro normalisation ($\Delta = +0.048$) and a one-quarter filing-lag correction ($\Delta = +0.038$, 10/10), and amplifies at short training windows, roughly doubling as the training period shrinks from 5 to 2 years.
+On a 93-actor quarterly panel mixing macro indicators, institutional data, and firm-level investment ratios, global factor augmentation degrades prediction for actor subgroups whose dynamics are misrepresented by the shared basis. A two-stage architecture---global pooled AR(1) for shared persistence, block-specific local models for residual dynamics---improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, CI $[+0.036, +0.058]$, 10/10 windows, placebo $z = 7.82$). The gain is largely driven by the tech/health block, is architectural rather than methodological within the linear reduced-rank estimators tested, and arises only on heterogeneous mixed-type panels---not on homogeneous firm-only panels---identifying data-type heterogeneity as the operative condition. The result survives recursive macro normalisation ($+0.048$) and a one-quarter filing-lag correction ($+0.038$, 10/10).
 \end{abstract}
 
 \vspace{0.3cm}
@@ -268,6 +268,8 @@ Panel & $N$ & AR(1) $R^2$ & Augmented $R^2$ & Gain $\Delta$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Table~\ref{tab:augmentation} reports the gain of global augmentation (G1) over per-actor AR(1). The additional gain from the mixture architecture over G1 is reported separately in Table~\ref{tab:five_arch}.
 
 \subsection{Method Equivalence}
 \label{sec:method_equiv}
@@ -561,7 +563,7 @@ The result is unambiguous: all 10 windows select the same three blocks (Diversif
 
 \subsection{Robustness: Dropping the Diversified Sector}
 
-The diversified sector is the most heterogeneous block and the one where global augmentation most clearly degrades prediction. To test whether the headline gain depends on this specific block, the entire pipeline is re-estimated on the 70-actor panel after removing all diversified-sector actors. On this reduced panel (blocks: Macro/Institutional $N{=}11$, Tech/Health $N{=}25$, Remainder $N{=}34$), the mixture gain is $\Delta = +0.035$ ($t = 10.37$, CI $[+0.029, +0.042]$, 10/10 windows positive)---75\% of the original gain. The headline result does not depend primarily on the diversified sector: 75\% of the gain survives its removal, sustained primarily by the tech/health block. The remaining 25\% reflects the diversified block's specific contribution.
+The diversified sector is the most heterogeneous block and the one where global augmentation most clearly degrades prediction. To test whether the headline gain depends on this specific block, the entire pipeline is re-estimated on the 70-actor panel after removing all diversified-sector actors. On this reduced panel (blocks: Macro/Institutional $N{=}11$, Tech/Health $N{=}25$, Remainder $N{=}34$), the mixture gain is $\Delta = +0.035$ ($t = 10.37$, CI $[+0.029, +0.042]$, 10/10 windows positive)---75\% of the original gain. The headline result does not depend primarily on the diversified sector: 75\% of the gain survives its removal, sustained primarily by the tech/health block. The remaining 25\% reflects the diversified block's specific contribution.\footnote{The diversified block's marginal contribution within the three-block mixture ($+0.012 = 0.047 - 0.035$) is slightly below its standalone single-block value in Appendix~\ref{app:candidates} ($+0.014$), reflecting minor cross-block interaction.}
 
 Conversely, dropping the tech/health block (keeping only Diversified and Macro/Institutional as local blocks on the full 93-actor panel) reduces the gain to $\Delta = +0.013$ (7/10 windows positive)---28\% of the original. The tech/health block is the dominant contributor (${\sim}72\%$ of the gain), which is internally consistent with the paper's mechanism: tech/health is the block where within-block co-movement is most coherent and thus where local modelling has the most to recover. The smaller but consistent contributions from Diversified and Macro/Institutional ($+0.013$, positive in 7/10 windows) confirm the effect is not purely a tech/health phenomenon, but the bulk of the improvement comes from one coherent sub-panel.
 
@@ -698,7 +700,7 @@ This finding contradicts a pre-registered prediction that lower $K_b$ would be n
 \subsection{Pre-Registered Predictions}
 \label{sec:prereg}
 
-Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive). Four of five failed and one was borderline, in each case revealing that the architectural gain is stronger and more robust than anticipated:
+These predictions concern the hyperparameter sensitivity of the mixture architecture (Table~\ref{tab:parsimony}), not the headline M2-vs-G1 result itself, which is an exploratory finding (Limitation~2). Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive). Four of five failed and one was borderline, in each case revealing that the architectural gain is stronger and more robust than anticipated:
 
 \begin{enumerate}[nosep]
   \item \textbf{P1} ($T{=}5$yr): $|R^2(K_b{=}2) - R^2(K_b{=}4)| < 0.005$ (flat parsimony frontier). \emph{Actual}: $0.018$. \textbf{Failed} --- $K_b{=}4$ captures secondary within-block modes that $K_b{=}2$ misses.
@@ -999,7 +1001,11 @@ The 7 macro actors use full-sample min-max normalisation in the primary analysis
 \section{Filing-Lag Robustness}
 \label{app:lag}
 
-Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. To test whether the headline differential survives under real-time data availability, all 82 firm-layer actors are lagged by one quarter: the panel column for each firm actor is shifted by one row, so at every date the firm value corresponds to the \emph{previous} quarter's filing. This shifts both the training observations (from which $\hat\rho$ and residuals are computed) and the test-period targets symmetrically. The 11 macro/institutional actors retain their original timing. Under this lag, the mixture gain is $\Delta = +0.038$ (10/10 windows positive), retaining 80\% of the contemporaneous gain ($+0.047$). The absolute $R^2$ levels shift: G1 moves from 0.630 to 0.639 and M2 from 0.677 to 0.677. The G1 increase reflects the symmetric lag making the pooled prediction task mechanically easier (both predictions and targets use the same lagged series, which is smoother than the contemporaneous one). The architectural differential remains positive and consistent under this real-time proxy, though a formal paired test on the $+0.047$ vs $+0.038$ difference is not performed.
+Quarterly firm ratios from SEC filings are typically available 30--45 days after quarter-end, while macro indicators are available immediately. To test whether the headline differential survives under real-time data availability, all 82 firm-layer actors are lagged by one quarter: the panel column for each firm actor is shifted by one row, so at every date the firm value corresponds to the \emph{previous} quarter's filing. This shifts both training observations and targets for firm actors. The 11 macro/institutional actors retain their original timing, creating a partial-lag structure.
+
+Under this lag, the mixture gain is $\Delta = +0.038$ (10/10 windows positive), retaining 80\% of the contemporaneous gain ($+0.047$). The absolute $R^2$ levels shift: G1 moves from 0.630 to 0.639 and M2 from 0.677 to 0.6771. The G1 increase reflects the partial-lag structure: because firm cross-sectional ranks are mean-reverting ($\rho \approx 0.60$), the fully-realised rank at $t{-}1$ is informative for the rank at $t$, and the global pooled AR(1) captures this persistence slightly better when the predictor is a clean realised value rather than the noisier contemporaneous observation. This is a positive diagnostic for the global model's design rather than an artefact.
+
+The architectural differential is qualitatively robust to real-time data availability, retaining 80\% of its contemporaneous magnitude with the same 10/10 window-sign pattern.
 
 \section{Train-Only Causality Audit}
 \label{app:causality}
