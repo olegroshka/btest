@@ -50,6 +50,8 @@ All experiment outputs are saved to `results/metrics/`. Key files:
 | `iter6_4b_lowo.parquet` | `run_iter6_4b_lowo.py` | Section 5.3: leave-one-window-out block selection |
 | `iter6_4b_referee_perwindow.parquet` | `run_iter6_4b_referee.py` | DM-HAC inference, block-specific AR(1) |
 | `iter6_1_validation.parquet` | `run_iter6_1_validation.py` | Table 2: augmentation gain across panels |
+| `iter6_4b_referee_round3.parquet` | `run_iter6_4b_referee_round3.py` | GBM+sector features, cross-sectional rank IC |
+| `iter6_4b_referee_round3b.parquet` | `run_iter6_4b_referee_round3b.py` | Held-out decade, stratified placebo, rank-matched tech/health, SE(rho_b), ENS explanation |
 
 **Note**: `run_iter6_4b_supplementary.py` (GBM, two-block, MAE) outputs to console only and does not save a parquet file. Re-run the script to reproduce those numbers.
 
@@ -214,10 +216,13 @@ new outputs to match the LaTeX references, or update the `\includegraphics` path
 | R² 0.630 → 0.677, Δ=+0.047 | `run_iter6_4b.py` → `iter6_4b.parquet` |
 | CI [+0.036, +0.058] | `run_iter6_4b.py` bootstrap CI |
 | 10/10 windows | `iter6_4b.parquet`, column `full_r2`, arch G1 vs M2 |
-| placebo z=7.82 | `run_iter6_4b_placebo.py` → `iter6_4b_placebo.parquet` |
+| placebo p≤0.001 (0/1000) | `run_iter6_4b_placebo.py` → `iter6_4b_placebo.parquet` |
+| Held-out decade Δ=+0.050, 10/10 | `run_iter6_4b_referee_round3b.py` → Experiment 1 |
 | 72% from tech/health | `run_paper_robustness.py` (drop-tech/health experiment) |
+| Rank-matched super-additivity | `run_iter6_4b_referee_round3b.py` → Experiment 3 |
 | +0.048 recursive macro | `run_fred_recursive_robustness.py` |
 | +0.038 filing lag | `run_filing_lag_robustness.py` |
+| Stratified placebo z=7.25, p≤0.001 | `run_iter6_4b_referee_round3b.py` → Experiment 2 |
 
 ### Section 1 (Introduction)
 | Number | Source |
@@ -234,6 +239,7 @@ new outputs to match the LaTeX references, or update the `\includegraphics` path
 |--------|--------|
 | R²≈0.630 ceiling | `run_iter6_2_gate_a.py` → Table 3 |
 | GBM R²=0.661 | `run_iter6_4b_supplementary.py` → Experiment 2 |
+| GBM+sector R²=0.592 | `run_iter6_4b_referee_round3.py` → Experiment 1 |
 | Rolling AR(1) R²=0.610 | `run_iter6_2_gate_a.py` (rolling baseline) |
 
 ### Section 4.1 (Full-panel result)
@@ -257,6 +263,18 @@ new outputs to match the LaTeX references, or update the `\includegraphics` path
 | Number | Source |
 |--------|--------|
 | All 10 windows select same 3 blocks | `run_iter6_4b_lowo.py` |
+
+### Section 5.4 (Held-out decade — NEW)
+| Number | Source |
+|--------|--------|
+| Phase A: 7 blocks selected on 2010-2014 | `run_iter6_4b_referee_round3b.py` → Experiment 1 |
+| Phase B: Δ=+0.050, t=9.11, CI [+0.040, +0.061], 10/10 | `run_iter6_4b_referee_round3b.py` → Experiment 1 |
+
+### Section 5.5 (Stratified placebo — NEW)
+| Number | Source |
+|--------|--------|
+| Stratified z=7.25, p≤0.001, 0/1000 | `run_iter6_4b_referee_round3b.py` → Experiment 2 |
+| Placebo mean=+0.001, std=0.0063, max=+0.031 | `run_iter6_4b_referee_round3b.py` → Experiment 2 |
 
 ### Section 5.4 (Drop diversified)
 | Number | Source |
@@ -288,6 +306,9 @@ new outputs to match the LaTeX references, or update the `\includegraphics` path
 | 6.6% RMSE reduction | Computed: √(1-0.677)/√(1-0.630) = 0.934, i.e. 6.6% |
 | RMSE 0.176 → 0.164 | Derived from R² values |
 | MAE 0.129 → 0.120 | `run_iter6_4b_supplementary.py` → Experiment 3 |
+| Rank IC: M2=0.822, G1=0.794, Δ=+0.029, t=6.30 | `run_iter6_4b_referee_round3.py` → Experiment 2 |
+| Firm-only IC: M2=0.806, G1=0.773, Δ=+0.033, t=6.17 | `run_iter6_4b_referee_round3.py` → Experiment 2 |
+| IC IR: 11.9→15.3 (all actors), 10.3→12.9 (firms) | `run_iter6_4b_referee_round3.py` → Experiment 2 |
 
 ### Section 6.1 (Method does not matter — locally)
 | Number | Source |
@@ -314,7 +335,7 @@ new outputs to match the LaTeX references, or update the `\includegraphics` path
 |--------|--------|
 | 5 gating policies; best (dispersion) loses 0.014 | `run_iter6_4_gate_d.py` → `iter6_4_gate_d.parquet` |
 
-### Section 7.5 (Exploratory predictions P1-P5)
+### Section 7.5 (Hyperparameter insensitivity diagnostic P1-P5)
 | Number | Source |
 |--------|--------|
 | P1: |Δ|=0.018 (predicted <0.005) | `run_iter6_4c_parsimony.py` |
@@ -358,6 +379,8 @@ new outputs to match the LaTeX references, or update the `\includegraphics` path
 | Number | Source |
 |--------|--------|
 | 10 candidate blocks, per-block Δ and W/10 | `run_paper_robustness.py` |
+| Rank-matched: tech K3=+0.014, health K3=+0.001, merged K3=+0.028, merged K4=+0.031 | `run_iter6_4b_referee_round3b.py` → Experiment 3 |
+| SE(rho_b) ≈ 0.04 per block, cross-block range ≈ 0.60 | `run_iter6_4b_referee_round3b.py` → Experiment 4 |
 
 ### Appendix H (FRED normalisation robustness)
 | Number | Source |
@@ -437,6 +460,16 @@ PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_4c_parsimony.py
 PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_4b_supplementary.py
 ```
 
+### Phase 5b: Referee round-3 experiments (depends on Phase 2 output)
+```bash
+# GBM+sector features, cross-sectional rank IC (~60s)
+PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_4b_referee_round3.py
+
+# Held-out decade, stratified placebo, rank-matched tech/health,
+# SE(rho_b), ENS explanation (~4 min, dominated by stratified placebo)
+PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_4b_referee_round3b.py
+```
+
 ### Phase 6: Figures (depends on Phase 2 and 3 outputs)
 ```bash
 # All paper figures (requires iter6_4b.parquet and iter6_4b_placebo.parquet)
@@ -472,8 +505,10 @@ pdflatex smim_paper.tex
 | `run_filing_lag_robustness.py` | ~3 s | Filing lag |
 | `run_iter6_4b_lowo.py` | ~3 s | LOWO |
 | `run_iter6_4b_referee.py` | ~3 s | DM-HAC, block AR(1) |
+| `run_iter6_4b_referee_round3.py` | ~60 s | GBM+sector, rank IC |
+| `run_iter6_4b_referee_round3b.py` | ~4 min | Held-out decade, stratified placebo, rank-matched, SE(rho_b), ENS |
 | `paper_figures_v3.py` | ~2 s | Generate PDFs |
-| **Total** | **~27 min** | Dominated by placebo permutations |
+| **Total** | **~32 min** | Dominated by placebo permutations |
 
 ---
 
@@ -495,7 +530,13 @@ After running all scripts, verify these key values match the paper:
 | BA_M2 R² | 0.661 | `run_iter6_4b.py` | Full-panel table |
 | ENS R² | 0.639 | `run_iter6_4b.py` | Full-panel table |
 | GBM R² | 0.661 | `run_iter6_4b_supplementary.py` | Experiment 2 output |
+| GBM+sector R² | 0.592 | `run_iter6_4b_referee_round3.py` | Experiment 1 output |
 | MAE M2 | 0.120 | `run_iter6_4b_supplementary.py` | Experiment 3 output |
+| Rank IC M2 | 0.822 | `run_iter6_4b_referee_round3.py` | Experiment 2 output |
+| Rank IC G1 | 0.794 | `run_iter6_4b_referee_round3.py` | Experiment 2 output |
+| Held-out decade Δ | +0.050 | `run_iter6_4b_referee_round3b.py` | Experiment 1 output |
+| Stratified placebo z | 7.25 | `run_iter6_4b_referee_round3b.py` | Experiment 2 output |
+| Merged K3 Δ | +0.028 | `run_iter6_4b_referee_round3b.py` | Experiment 3 output |
 
 ---
 
@@ -519,7 +560,9 @@ After running all scripts, verify these key values match the paper:
 | `run_iter6_4b_referee.py` | Section 4.1 | DM-HAC inference |
 | `run_iter6_4c_parsimony.py` | Table 9, Section 7.5 | T x K_b grid + predictions P1-P5 |
 | `run_iter6_4b_supplementary.py` | Sections 3.4, 5.3, 5.8, 6.1 | Two-block, GBM, MAE (console output only — no parquet saved) |
-| `run_paper_robustness.py` | Sections 5.4-5.6, Appendix G | Drop-sector, boundary, remainder, 10 candidates |
+| `run_iter6_4b_referee_round3.py` | Sections 3.4, 5.8 | GBM+sector features, cross-sectional rank IC |
+| `run_iter6_4b_referee_round3b.py` | Sections 5.4, 5.5, App. G, Limitations | Held-out decade, stratified placebo, rank-matched tech/health, SE(rho_b), ENS explanation |
+| `run_paper_robustness.py` | Sections 5.6-5.8, Appendix G | Drop-sector, boundary, remainder, 10 candidates |
 | `run_fred_recursive_robustness.py` | Section 5.7, Appendix H | FRED recursive normalisation |
 | `run_filing_lag_robustness.py` | Section 5.7, Appendix I | Filing-lag robustness |
 | `paper_figures_v3.py` | Figures 2, 3, 5 | Generate all paper figures |
