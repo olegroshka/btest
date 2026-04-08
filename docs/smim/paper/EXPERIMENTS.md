@@ -81,15 +81,20 @@ PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_1_validation.py
 
 ---
 
-### Table 3: Method comparison — 9 models (Section 3.4)
-**Numbers**: 9 models across 3 complexity classes; forecast-error correlations ρ(DMD,PCA)=0.990, ρ(DMD,Ridge)=0.980, ρ(PCA,Ridge)=0.969  
-**Script**:
+### Table 3: Method comparison — 12 models (Section 3.4)
+**Numbers**: 12 models across 4 complexity classes (9 linear + 3 non-linear GBM); forecast-error correlations ρ(DMD,PCA)=0.990, ρ(DMD,Ridge)=0.980, ρ(PCA,Ridge)=0.969  
+**Scripts**:
 ```bash
+# 9 linear models
 PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_2_gate_a.py
+# GBM (global per-actor): R²=0.661, GBM (block-specific): R²=0.657
+PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_4b_supplementary.py
+# GBM + sector features: R²=0.592
+PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_4b_referee_round3.py
 ```
-**Output**: `results/metrics/iter6_2_gate_a_models.parquet`  
-**Reproduces**: All 9 R² values, Δ vs rolling AR(1), t-statistics, p-values, CIs, and pairwise forecast-error correlations in the table footnote.  
-**Holm-Bonferroni**: The adjustment is computed inline in the script output.
+**Output**: `results/metrics/iter6_2_gate_a_models.parquet` (linear models); `results/metrics/iter6_4b_referee_round3.parquet` (GBM per-window R²); supplementary GBM outputs to console only.  
+**Reproduces**: All 12 R² values, Δ vs rolling AR(1), t-statistics, p-values, CIs, and pairwise forecast-error correlations in the table footnote.  
+**Holm-Bonferroni**: Adjustment for 12 comparisons.
 
 ---
 

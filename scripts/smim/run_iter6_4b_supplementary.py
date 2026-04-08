@@ -552,6 +552,232 @@ def run_nonlinear_baseline(panel, meta):
 
 
 # ══════════════════════════════════════════════════════════════════════
+#  Experiment 4: Block-specific GBM (non-linear analog of M2)
+# ══════════════════════════════════════════════════════════════════════
+
+def run_block_specific_gbm(panel, meta):
+    """GBM estimated separately per block — the non-linear analog of M2.
+
+    For local blocks (Diversified, Macro/Inst, Tech/Health): train a per-actor
+    GBM using only within-block residuals as features.
+    For the remainder block: use global per-actor GBM (same as Experiment 2).
+    """
+    from sklearn.ensemble import GradientBoostingRegressor
+
+    print("\n" + "=" * 80)
+    print("  EXPERIMENT 4: BLOCK-SPECIFIC GBM (non-linear analog of M2)")
+    print("=" * 80)
+
+    actors = list(panel.columns)
+    blocks = {
+        "SEC_diversified": [a for a in actors
+                            if meta.get(a, {}).get("sector") == "diversified"],
+        "LAYER_macro_inst": [a for a in actors
+                             if meta.get(a, {}).get("layer", -1) in (0, 1)],
+        "MERGED_tech_health": [a for a in actors
+                               if meta.get(a, {}).get("sector")
+                               in ("technology", "healthcare")],
+    }
+    local_set = set()
+    for v in blocks.values():
+        local_set.update(v)
+    blocks["REMAINDER"] = [a for a in actors if a not in local_set]
+    local_block_names = ["SEC_diversified", "LAYER_macro_inst", "MERGED_tech_health"]
+
+    for bname, bactors in blocks.items():
+        print(f"  {bname}: {len(bactors)} actors")
+
+    bgbm_r2s = []
+    ggbm_r2s = []  # global GBM for comparison
+
+    for ty in TEST_YEARS:
+        prep = _prepare_window(panel, ty)
+        if prep is None:
+            bgbm_r2s.append(np.nan)
+            ggbm_r2s.append(np.nan)
+            continue
+
+        ad, otr, tq, N, v = prep
+        v_list = list(v)
+
+        # Build actor-to-block index mapping
+        actor_block = {}
+        for bname, bactors in blocks.items():
+            for a in bactors:
+                if a in v_list:
+                    actor_block[a] = bname
+        for a in v_list:
+            if a not in actor_block:
+                actor_block[a] = "REMAINDER"
+
+        block_indices = {}
+        for bname in blocks:
+            block_indices[bname] = [v_list.index(a) for a in v_list
+                                    if actor_block.get(a) == bname]
+
+        rho, bar_y = estimate_pooled_ar1(otr)
+        residuals = otr[1:] - (bar_y + rho * (otr[:-1] - bar_y))
+
+        preds_bgbm, preds_ggbm, actuals = [], [], []
+        prev = np.nan_to_num(otr[-1], nan=0.5)
+
+        for qd in tq:
+            qv = ad.loc[[qd]].values.astype(np.float64)
+            if qv.shape[0] == 0:
+                continue
+            obs = qv[0]
+
+            y_pool = bar_y + rho * (prev - bar_y)
+
+            X_train = residuals[:-1]  # (T-2, N)
+            Y_train = residuals[1:]   # (T-2, N)
+
+            if X_train.shape[0] < 4:
+                preds_bgbm.append(y_pool.copy())
+                preds_ggbm.append(y_pool.copy())
+                actuals.append(obs)
+                prev = obs
+                otr = np.vstack([otr, qv])
+                rho, bar_y = estimate_pooled_ar1(otr)
+                residuals = otr[1:] - (bar_y + rho * (otr[:-1] - bar_y))
+                continue
+
+            prev_resid = prev - (bar_y + rho * (
+                np.nan_to_num(otr[-2] if otr.shape[0] >= 2 else otr[-1],
+                              nan=0.5) - bar_y)
+            ) if otr.shape[0] >= 2 else np.zeros(N)
+
+            # ── Block-specific GBM ──
+            y_bgbm = y_pool.copy()
+            for bname in list(blocks.keys()):
+                bidx = block_indices[bname]
+                if len(bidx) < 2:
+                    continue
+
+                if bname in local_block_names:
+                    # Local: use only within-block residuals as features
+                    X_b = X_train[:, bidx]
+                    Y_b = Y_train[:, bidx]
+                    prev_r_b = prev_resid[bidx]
+                else:
+                    # Remainder: use all residuals (same as global per-actor)
+                    X_b = X_train
+                    Y_b = Y_train[:, bidx]
+                    prev_r_b = prev_resid
+
+                for j, gi in enumerate(bidx):
+                    try:
+                        gbm = GradientBoostingRegressor(
+                            n_estimators=50, max_depth=2, learning_rate=0.1,
+                            subsample=0.8, random_state=42
+                        )
+                        gbm.fit(X_b, Y_b[:, j])
+                        pred_resid = gbm.predict(
+                            prev_r_b.reshape(1, -1))[0]
+                        if np.isfinite(pred_resid):
+                            y_bgbm[gi] = y_pool[gi] + pred_resid
+                    except Exception:
+                        pass
+
+            # ── Global GBM (for comparison, same as Experiment 2) ──
+            y_ggbm = y_pool.copy()
+            for i in range(N):
+                try:
+                    gbm = GradientBoostingRegressor(
+                        n_estimators=50, max_depth=2, learning_rate=0.1,
+                        subsample=0.8, random_state=42
+                    )
+                    gbm.fit(X_train, Y_train[:, i])
+                    pred_resid = gbm.predict(prev_resid.reshape(1, -1))[0]
+                    if np.isfinite(pred_resid):
+                        y_ggbm[i] = y_pool[i] + pred_resid
+                except Exception:
+                    pass
+
+            preds_bgbm.append(y_bgbm)
+            preds_ggbm.append(y_ggbm)
+            actuals.append(obs)
+            prev = obs
+
+            otr = np.vstack([otr, qv])
+            rho, bar_y = estimate_pooled_ar1(otr)
+            residuals = otr[1:] - (bar_y + rho * (otr[:-1] - bar_y))
+
+        if actuals:
+            act_a = np.array(actuals)
+            r2_b = float(oos_r_squared(
+                np.array(preds_bgbm).ravel(), act_a.ravel()))
+            r2_g = float(oos_r_squared(
+                np.array(preds_ggbm).ravel(), act_a.ravel()))
+            bgbm_r2s.append(r2_b)
+            ggbm_r2s.append(r2_g)
+            print(f"  W{ty}: block-GBM={r2_b:.4f}  global-GBM={r2_g:.4f}"
+                  f"  delta={r2_b - r2_g:+.4f}")
+        else:
+            bgbm_r2s.append(np.nan)
+            ggbm_r2s.append(np.nan)
+
+    # ── Compare ──
+    df_4b = pd.read_parquet(METRICS_DIR / "iter6_4b.parquet")
+    g1_stored = df_4b[df_4b["architecture"] == "G1"].sort_values("year")[
+        "full_r2"].values
+    m2_stored = df_4b[df_4b["architecture"] == "M2"].sort_values("year")[
+        "full_r2"].values
+
+    bgbm_arr = np.array(bgbm_r2s)
+    ggbm_arr = np.array(ggbm_r2s)
+
+    print(f"\n  {'Model':<30s} {'Mean R²':>8s} {'Δ vs G1':>9s} {'Δ vs M2':>9s}")
+    print(f"  {'-' * 60}")
+    for label, arr in [("GBM (global per-actor)", ggbm_arr),
+                       ("GBM (block-specific)", bgbm_arr),
+                       ("G1 (global linear)", g1_stored),
+                       ("M2 (mixture PCA+ridge)", m2_stored)]:
+        m = np.nanmean(arr)
+        print(f"  {label:<30s} {m:8.4f} {m - np.nanmean(g1_stored):+9.4f}"
+              f" {m - np.nanmean(m2_stored):+9.4f}")
+
+    # Paired tests
+    print(f"\n  Paired comparisons:")
+
+    d1 = bgbm_arr - g1_stored
+    t1, p1 = paired_t_test(d1)
+    ci1 = bootstrap_ci(d1)
+    w1 = int(np.nansum(d1 > 0))
+    print(f"  Block-GBM vs G1:         delta={np.nanmean(d1):+.4f}"
+          f"  t={t1:.2f}  p={p1:.4f}"
+          f"  CI [{ci1[0]:+.4f}, {ci1[1]:+.4f}]  W={w1}/10")
+
+    d2 = bgbm_arr - m2_stored
+    t2, p2 = paired_t_test(d2)
+    ci2 = bootstrap_ci(d2)
+    w2 = int(np.nansum(d2 > 0))
+    print(f"  Block-GBM vs M2:         delta={np.nanmean(d2):+.4f}"
+          f"  t={t2:.2f}  p={p2:.4f}"
+          f"  CI [{ci2[0]:+.4f}, {ci2[1]:+.4f}]  W={w2}/10")
+
+    d3 = bgbm_arr - ggbm_arr
+    t3, p3 = paired_t_test(d3)
+    ci3 = bootstrap_ci(d3)
+    w3 = int(np.nansum(d3 > 0))
+    print(f"  Block-GBM vs Global-GBM: delta={np.nanmean(d3):+.4f}"
+          f"  t={t3:.2f}  p={p3:.4f}"
+          f"  CI [{ci3[0]:+.4f}, {ci3[1]:+.4f}]  W={w3}/10")
+
+    if np.nanmean(bgbm_arr) >= np.nanmean(m2_stored):
+        print(f"\n  → Block-specific GBM ≥ M2: gain is purely architectural"
+              f" (block decomposition), method-agnostic")
+    else:
+        print(f"\n  → Block-specific GBM < M2: PCA+ridge captures structure"
+              f" that per-actor GBM within blocks cannot")
+        if np.nanmean(bgbm_arr) > np.nanmean(ggbm_arr):
+            print(f"    But block-GBM > global-GBM: block decomposition"
+                  f" still helps non-linear methods")
+
+    return bgbm_r2s, ggbm_r2s
+
+
+# ══════════════════════════════════════════════════════════════════════
 #  Experiment 3: MAE robustness
 # ══════════════════════════════════════════════════════════════════════
 
@@ -906,6 +1132,9 @@ def main():
 
     # C-3: Non-linear baseline
     run_nonlinear_baseline(panel, meta)
+
+    # C-5: Block-specific GBM (non-linear analog of M2)
+    run_block_specific_gbm(panel, meta)
 
     # B-9: MAE robustness
     run_mae_robustness()
