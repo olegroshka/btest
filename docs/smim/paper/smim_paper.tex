@@ -120,7 +120,7 @@ The primary panel contains 93 actors observed quarterly from 2005Q1 to 2025Q4 (8
 \begin{itemize}[nosep]
   \item \textbf{Layer~0 (7 macro shocks):} Global commodity prices (Brent, WTI), policy rates (Federal Funds, USD index), and volatility indicators (VIX, credit spreads). Normalised via FRED min-max scaling using full-sample bounds; a robustness check with recursive expanding-window bounds confirms this does not affect the results (Appendix~\ref{app:fred}). These series are trending with high persistence ($\rho \approx 0.88$).
   \item \textbf{Layer~1 (4 institutional actors):} Central banks, regulators, and international organisations. Mixed normalisation.
-  \item \textbf{Layer~2 (82 firms):} US-listed firms across six sectors (energy, diversified, technology, financials, industrials, healthcare), selected as the intersection of S\&P~500 constituents with complete quarterly data over the sample period (a balanced-panel requirement that induces survivorship bias toward persistent, large-cap firms; see Limitation~9). Intensity values are contemporaneous within-quarter cross-sectional percentile ranks of investment ratios (CapEx/Assets, Revenue growth)---each quarter's ranks use only that quarter's cross-section, so no future information enters the ranking. These series are mean-reverting ($\rho \approx 0.60$).
+  \item \textbf{Layer~2 (82 firms):} US-listed firms across six sectors (energy, diversified, technology, financials, industrials, healthcare), selected as the intersection of S\&P~500 constituents with complete quarterly data over the sample period (a balanced-panel requirement that induces survivorship bias toward persistent, large-cap firms; see Limitation~7). Intensity values are contemporaneous within-quarter cross-sectional percentile ranks of investment ratios (CapEx/Assets, Revenue growth)---each quarter's ranks use only that quarter's cross-section, so no future information enters the ranking. These series are mean-reverting ($\rho \approx 0.60$).
 \end{itemize}
 
 The mixed normalisation---trending min-max series for macro actors and mean-reverting cross-sectional ranks for firms---reflects fundamentally different data-generating processes. This difference in temporal dynamics across layers is a root cause of the heterogeneity effects documented in Section~\ref{sec:results}. We state it here so the reader can anticipate the finding.
@@ -278,12 +278,12 @@ Table~\ref{tab:method_comparison} compares 9~models across three complexity clas
 
 \begin{table}[H]
 \centering
-\caption{Method comparison: 9 models on the 93-actor panel. All models use global pooled+FE as Stage~1. $\Delta$ is versus per-actor AR(1). Forecast-error correlations $\rho_{\mathrm{pred}}$ confirm predictions are functionally identical, not just equally accurate on average.}
+\caption{Method comparison: 9 models on the 93-actor panel. All models use global pooled+FE as Stage~1. $\Delta$ is versus the pooled+FE baseline (Stage~1 only, $R^2 = 0.610$). Forecast-error correlations $\rho_{\mathrm{pred}}$ confirm predictions are functionally identical, not just equally accurate on average.}
 \label{tab:method_comparison}
 \small
 \begin{tabular}{llccccl}
 \toprule
-Class & Model & $R^2$ & $\Delta$ AR(1) & $t$ & $p$ & CI \\
+Class & Model & $R^2$ & $\Delta$ pool+FE & $t$ & $p$ & CI \\
 \midrule
 \multirow{4}{*}{Tiny (${\sim}K$)} & PCA+diag Kalman & 0.622 & $+0.012$ & 1.97 & 0.080 & $[+0.002, +0.024]$ \\
 & DMD+diag Kalman & 0.619 & $+0.009$ & 2.07 & 0.068 & $[+0.001, +0.017]$ \\
@@ -526,7 +526,7 @@ Placebo $p$-value & ${<}0.001$ (0/1{,}000; Monte Carlo bound $1/1{,}001$) \\
 
 Random blocks degrade performance on average ($\Delta = -0.004$) because local estimation noise dominates when blocks are arbitrary. No random partition approaches the real gain. Each placebo uses the same 10 evaluation windows, same block sizes, and same local model specification---the only difference is actor assignment. The placebo benchmark controls for small-sample bias by design.
 
-A natural question is whether concentration --- a random partition happening to place a coherent cluster in one block --- could produce a large aggregate gain. The evidence suggests not: the placebo maximum across 1{,}000 draws is $+0.023$, roughly half the real gain, and this includes any accidental coherence. Moreover, the real partition's gain is itself concentrated in the tech/health block (${\sim}72\%$; Section~\ref{sec:validation}), which means the placebo test is effectively comparing the real tech/health signal against the best accidental cluster in 1{,}000 random 25-actor sub-panels --- and the real signal dominates by a factor of two.
+A natural question is whether concentration --- a random partition happening to place a coherent cluster in one block --- could produce a large aggregate gain. The evidence suggests not: the placebo maximum across 1{,}000 draws is $+0.023$, roughly half the real gain, and this includes any accidental coherence. Moreover, the real partition's gain is itself concentrated in the tech/health block (${\sim}72\%$; see Section~5.4), which means the placebo test is effectively comparing the real tech/health signal against the best accidental cluster in 1{,}000 random 25-actor sub-panels --- and the real signal dominates by a factor of two.
 
 \begin{figure}[ht]
 \centering
@@ -585,7 +585,7 @@ Two pipeline-hygiene checks confirm that the headline differential is not driven
 
 In concrete terms, the $+0.047$ $R^2$ gain corresponds to a 6.6\% reduction in out-of-sample RMSE (from 0.176 to 0.164 in percentile-rank units, or equivalently a 1.2~percentile-point improvement in forecast precision). For a quarterly-rebalanced portfolio sorting on these forecasts, this translates to modestly improved ranking accuracy rather than a large Sharpe ratio change; the economic magnitude is proportional to the cross-sectional spread in expected returns conditional on the forecasts, which is beyond the scope of this methodological paper to quantify.
 
-Gap-revision regressions on the global augmentation model confirm that forecast gaps predict subsequent investment revisions with actor fixed effects, consistent with the forecasts capturing economically meaningful variation rather than statistical noise. Augmented gaps are less predictable than pooled gaps, consistent with signal absorption. A full economic validation of the mixture architecture---including portfolio sorts and latency-adjusted backtests---is an important direction for future applied work.
+Preliminary gap-revision regressions (available in the replication archive) suggest that forecast gaps predict subsequent investment revisions, consistent with the forecasts capturing economically meaningful variation, though a full economic validation of the mixture architecture---including portfolio sorts and latency-adjusted backtests---is an important direction for future work.
 
 \subsection{Train-Only Causality Audit}
 
