@@ -278,12 +278,12 @@ Table~\ref{tab:method_comparison} compares 9~models across three complexity clas
 
 \begin{table}[H]
 \centering
-\caption{Method comparison: 9 models on the 93-actor panel. All models use global pooled+FE as Stage~1. $\Delta$ is versus the pooled+FE baseline (Stage~1 only, $R^2 = 0.610$). Forecast-error correlations $\rho_{\mathrm{pred}}$ confirm predictions are functionally identical, not just equally accurate on average.}
+\caption{Method comparison: 9 models on the 93-actor panel. All models use global pooled+FE as Stage~1 and are re-estimated quarterly. $\Delta$ is versus rolling per-actor AR(1) ($R^2 = 0.610$), which is also re-estimated quarterly for a fair comparison (the fixed-parameter AR(1) in Table~\ref{tab:augmentation} achieves $R^2 = 0.594$; the rolling version is slightly better). Forecast-error correlations $\rho_{\mathrm{pred}}$ confirm predictions are functionally identical, not just equally accurate on average.}
 \label{tab:method_comparison}
 \small
 \begin{tabular}{llccccl}
 \toprule
-Class & Model & $R^2$ & $\Delta$ pool+FE & $t$ & $p$ & CI \\
+Class & Model & $R^2$ & $\Delta$ roll.\ AR(1) & $t$ & $p$ & CI \\
 \midrule
 \multirow{4}{*}{Tiny (${\sim}K$)} & PCA+diag Kalman & 0.622 & $+0.012$ & 1.97 & 0.080 & $[+0.002, +0.024]$ \\
 & DMD+diag Kalman & 0.619 & $+0.009$ & 2.07 & 0.068 & $[+0.001, +0.017]$ \\
