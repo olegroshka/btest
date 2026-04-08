@@ -2,7 +2,7 @@
 """
 Iteration 6.4b Placebo / Robustness Check.
 
-1. Placebo test: 50 random block assignments (same sizes as real blocks).
+1. Placebo test: 1000 random block assignments (same sizes as real blocks).
    If real gain falls within the placebo distribution, the result is spurious.
 2. Train-only audit: verify strict causality in the mixture architecture.
 

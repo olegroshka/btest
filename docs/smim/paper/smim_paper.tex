@@ -97,7 +97,7 @@ The diagnosis leads to a simple architectural fix. Shared persistence---the domi
 
 The resulting heterogeneity-aware architecture---global Stage~1 (pooled AR(1) with fixed effects) plus block-specific local Stage~2 (PCA+ridge on within-block residuals)---improves full-panel out-of-sample $R^2$ from 0.630 to 0.677 ($\Delta = +0.047$, CI $[+0.036, +0.058]$, 10/10 rolling windows positive). A placebo benchmark using 1{,}000 random block partitions of identical sizes produces a mean gain of $-0.004$; the real partition's gain exceeds the placebo distribution by 7.82 standard deviations ($p < 0.001$). The block structure captures genuine panel heterogeneity, not statistical noise.
 
-The gain does not stem from a better estimation method. Across 9~model specifications spanning three complexity classes, Dynamic Mode Decomposition, PCA, and Ridge regression produce statistically indistinguishable predictions at matched effective complexity (forecast-error correlations $\rho > 0.98$). This equivalence holds both globally and within each local block. Among the linear reduced-rank estimators tested, the forecasting value resides entirely in the architecture---the decomposition of the prediction problem into global and local components---not in any specific second-stage engine.
+The gain does not stem from a better estimation method. Across 9~model specifications spanning three complexity classes, Dynamic Mode Decomposition, PCA, and Ridge regression produce statistically indistinguishable predictions at matched effective complexity (pairwise forecast-error correlations $\rho$ between $0.969$ and $0.990$). This equivalence holds both globally and within each local block. Among the linear reduced-rank estimators tested, the forecasting value resides entirely in the architecture---the decomposition of the prediction problem into global and local components---not in any specific second-stage engine.
 
 Several alternative explanations for the ceiling are tested and ruled out. The gain is not from forecasting the basis rotation (the global spectral basis rotates at $49^\circ$/quarter at $K{=}8$, but this rotation is temporally unpredictable: ACF(1) $= -0.07$, Ljung-Box $p = 0.29$). It is not from reformulating the prediction target (the ceiling is invariant across seven target transformations). It is not from conditional gating (augmentation is unconditionally beneficial---five gating policies all perform worse than always-on). Block-specific decomposition is the only surviving path to improvement.
 
@@ -120,7 +120,7 @@ The primary panel contains 93 actors observed quarterly from 2005Q1 to 2025Q4 (8
 \begin{itemize}[nosep]
   \item \textbf{Layer~0 (7 macro shocks):} Global commodity prices (Brent, WTI), policy rates (Federal Funds, USD index), and volatility indicators (VIX, credit spreads). Normalised via FRED min-max scaling using full-sample bounds; a robustness check with recursive expanding-window bounds confirms this does not affect the results (Appendix~\ref{app:fred}). These series are trending with high persistence ($\rho \approx 0.88$).
   \item \textbf{Layer~1 (4 institutional actors):} Central banks, regulators, and international organisations. Mixed normalisation.
-  \item \textbf{Layer~2 (82 firms):} US-listed firms across six sectors (energy, diversified, technology, financials, industrials, healthcare), selected as the intersection of S\&P~500 constituents with complete quarterly data over the sample period (a balanced-panel requirement that induces survivorship bias toward persistent, large-cap firms; see Limitation~7). Intensity values are contemporaneous within-quarter cross-sectional percentile ranks of investment ratios (CapEx/Assets, Revenue growth)---each quarter's ranks use only that quarter's cross-section, so no future information enters the ranking. These series are mean-reverting ($\rho \approx 0.60$).
+  \item \textbf{Layer~2 (82 firms):} US-listed firms across six sectors (energy, diversified, technology, financials, industrials, healthcare), selected as the intersection of S\&P~500 constituents with complete quarterly data over the sample period (a balanced-panel requirement that induces survivorship bias toward persistent, large-cap firms; see Limitation~7). Intensity values are contemporaneous within-quarter cross-sectional percentile ranks of investment ratios (CapEx/Assets, Revenue growth)---each quarter's ranks use only that quarter's cross-section, so no future information enters the ranking. However, because the ranking pool consists exclusively of the 82 balanced-panel survivors, the cross-sectional distribution at every quarter is conditioned on future survival (see Limitation~7). These series are mean-reverting ($\rho \approx 0.60$).
 \end{itemize}
 
 The mixed normalisation---trending min-max series for macro actors and mean-reverting cross-sectional ranks for firms---reflects fundamentally different data-generating processes. This difference in temporal dynamics across layers is a root cause of the heterogeneity effects documented in Section~\ref{sec:results}. We state it here so the reader can anticipate the finding.
@@ -219,7 +219,9 @@ Two additional panels test the scope of the findings:
 
 \subsection{Evaluation Protocol}
 
-All results use 10 rolling out-of-sample windows (test years 2015--2024). Each window uses a 5-year training period ending at the start of the test year. Models are re-estimated quarterly within each test year as new observations arrive, so the training set expands from 20 to 24 quarters during each test year. The primary metric is out-of-sample predictive $R^2$, defined as $R^2 = 1 - \sum_{i,t}(y_{i,t} - \hat{y}_{i,t})^2 / \sum_{i,t}(y_{i,t} - \bar{y}^{\mathrm{train}}_i)^2$, where $\bar{y}^{\mathrm{train}}_i$ is the training-set mean for actor $i$ (no test-set information enters the denominator). Statistical comparisons use paired-window bootstrap confidence intervals (10{,}000 resamples) and modified Diebold--Mariano $t$-tests \citep{diebold1995comparing,harvey1997testing}. The placebo benchmark uses 1{,}000 random block partitions of identical sizes.
+All results use 10 rolling out-of-sample windows (test years 2015--2024). Each window uses a 5-year training period ending at the start of the test year. Models are re-estimated quarterly within each test year as new observations arrive, so the training set expands from 20 to 24 quarters during each test year. The primary metric is out-of-sample $R^2$, defined as $R^2 = 1 - \sum_{i,t}(y_{i,t} - \hat{y}_{i,t})^2 / \sum_{i,t}(y_{i,t} - \bar{y}^{\mathrm{test}}_i)^2$, where $\bar{y}^{\mathrm{test}}_i$ is the test-window mean for actor $i$, computed from the four quarterly test observations within each test year. This is the standard in-sample $R^2$ formula applied to held-out data (equivalent to regressing actuals on predictions over the test set). The denominator uses test-set information; the metric therefore measures explained variance \emph{within} each test window rather than improvement over a training-set baseline. Because all model comparisons (Tables~\ref{tab:five_arch}--\ref{tab:cross_panel}) use the same denominator, the $\Delta R^2$ differentials are unaffected by this choice. Statistical comparisons use paired-window percentile bootstrap confidence intervals (10{,}000 resamples; with $n = 10$ windows resampled with replacement, $\binom{19}{10} = 92{,}378$ distinct resamples exist, so bootstrap $p$-values cannot be finer than ${\sim}10^{-4}$) and modified Diebold--Mariano $t$-tests \citep{diebold1995comparing,harvey1997testing}. The Harvey--Leybourne--Newbold small-sample correction \citep{harvey1997testing} produces a multiplicative adjustment of $\sqrt{(n + 1 - 2 \cdot 1) / n} = \sqrt{0.9} \approx 0.949$ at $n = 10$, $h = 1$; this is negligible and does not change any significance conclusion. The placebo benchmark uses 1{,}000 random block partitions of identical sizes.
+
+\textbf{Contextualisation of $R^2$ levels.} The prediction targets are cross-sectional percentile ranks, which are bounded $[0,1]$, highly autocorrelated ($\rho \approx 0.60$), and compressed toward the centre. Per-actor AR(1) already achieves $R^2 = 0.594$; the reported absolute $R^2$ levels are therefore not analogous to $R^2$ on returns or growth rates. The contribution of this paper is the \emph{differential} $\Delta R^2 = +0.047$ between architectures, not the absolute level. Mean absolute error (MAE) confirms the finding: M2 reduces MAE from 0.129 to 0.120 versus G1 (10/10 windows, $t = 7.93$).
 
 % ══════════════════════════════════════════════════════════
 \section{The Two-Stage Architecture}
@@ -301,14 +303,14 @@ Large (reg.\ $N \!\times\! N$) & Ridge on residuals & 0.632 & $+0.022$ & 3.84 & 
 
 \vspace{0.3em}
 {\footnotesize Forecast-error correlations: $\rho(\text{DMD}, \text{PCA}) = 0.990$; $\rho(\text{DMD}, \text{Ridge}) = 0.980$; $\rho(\text{PCA}, \text{Ridge}) = 0.969$.\\
-Under Holm--Bonferroni adjustment for 9 comparisons, three models remain significant at the 5\% level (DMD+full $\tilde{A}$ Kalman, PCA+full VAR, Ridge); the remaining six are non-significant, \emph{consistent with} the method-equivalence claim.}
+Under Holm--Bonferroni adjustment for 9 comparisons, three models remain significant at the 5\% level. Two are significantly \emph{better} than rolling AR(1): DMD+full $\tilde{A}$ Kalman ($+0.020$) and Ridge ($+0.022$). One is significantly \emph{worse}: PCA+full VAR ($-0.033$), which overfits at $K^2 = 64$ unrestricted parameters. The remaining six models are non-significant, \emph{consistent with} the method-equivalence claim at matched effective complexity.}
 \end{table}
 
-The forecasting ceiling is $R^2 \approx 0.630$ regardless of method. The ceiling is a property of the data at this frequency, not of any specific estimation technique.
+Among the matched-complexity linear reduced-rank estimators tested, the forecasting ceiling is $R^2 \approx 0.630$. A global gradient-boosting baseline on Stage~1 residuals achieves $R^2 = 0.661$---above the linear ceiling but below M2 ($R^2 = 0.677$), confirming the ceiling is architectural rather than a linear-method artefact. The ceiling is a property of the global estimation granularity at this frequency, not of any specific estimation technique.
 
 The equivalence holds at matched effective complexity among small-$K$ models: DMD with $K = 8$ diagonal parameters achieves $R^2 = 0.619$, while Ridge (heavily regularised $N \!\times\! N$) achieves $R^2 = 0.632$. That an 8-parameter spectral model nearly matches a regularised regression with orders-of-magnitude more effective parameters suggests the exploitable residual structure is genuinely low-rank. The practical implication: in settings where parsimony or interpretability matters, the spectral representation offers comparable predictive performance at a fraction of the complexity. Note that the equivalence is not universal: PCA with an unrestricted $K \!\times\! K$ VAR ($R^2 = 0.577$, significantly \emph{worse} than AR(1)) diverges from DMD with the full reduced operator ($R^2 = 0.630$), because the PCA VAR is not regularised and overfits at $K^2 = 64$ parameters on $T \approx 20$ quarters.
 
-This method-equivalence result---confirmed at both the global level and within each local block (Section~\ref{sec:falsification})---motivates the architectural focus of the remainder of the paper.
+This method-equivalence result at the global level---together with the finding that PCA+ridge dominates DMD within individual blocks (Section~\ref{sec:falsification}), where smaller samples penalise the less regularised estimator---motivates the architectural focus of the remainder of the paper.
 
 \subsection{The Heterogeneity-Aware Mixture Architecture}
 \label{sec:mixture_arch}
@@ -349,7 +351,7 @@ Formally, the mixture estimator is:
 \end{cases}
 \label{eq:mixture}
 \end{equation}
-where $\hat{\rho}$ is pooled across all actors (global Stage~1; the homogeneity restriction applies to $\rho$ only, not to the factor loadings), $\bar{y}_i$ is the actor fixed effect, $b(i)$ is the assigned block, $\mathcal{B}_{\mathrm{local}} = \{\text{Diversified, Macro/Inst, Tech/Health}\}$ are the locally-treated blocks, $\mathbf{r}_{b,t} \in \R^{N_b}$ is the vector of Stage~1 residuals for actors in block $b$, $\hat{U}_b \in \R^{N_b \times K_b}$ and $\hat{A}_b \in \R^{K_b \times K_b}$ are the block-specific PCA basis and ridge VAR, $[\cdot]_i$ selects the component for actor $i$, and $\hat{U}_{\mathrm{g}}$, $\hat{A}_{\mathrm{g}}$ are the global basis and operator applied to the full residual vector $\mathbf{r}_t \in \R^N$ for remainder actors. This is analogous to a known-group interactive fixed-effects model \citep{bai2009panel} with block-specific factor loadings. Setting $\hat{U}_b = 0$ for all local blocks and $\hat{U}_{\mathrm{g}} = 0$ recovers pooled-only (G0) exactly. The global augmentation (G1) applies $\hat{U}_{\mathrm{g}}, \hat{A}_{\mathrm{g}}$ to all actors; the mixture (M2) replaces this with block-specific operators for actors in $\mathcal{B}_{\mathrm{local}}$. Figure~\ref{fig:pipeline} contrasts the two pipelines.
+where $\hat{\rho}$ is pooled across all actors (global Stage~1; the homogeneity restriction applies to $\rho$ only, not to the factor loadings), $\bar{y}_i$ is the actor fixed effect, $b(i)$ is the assigned block, $\mathcal{B}_{\mathrm{local}} = \{\text{Diversified, Macro/Inst, Tech/Health}\}$ are the locally-treated blocks, $\mathbf{r}_{b,t} \in \R^{N_b}$ is the vector of Stage~1 residuals for actors in block $b$, $\hat{U}_b \in \R^{N_b \times K_b}$ and $\hat{A}_b \in \R^{K_b \times K_b}$ are the block-specific PCA basis and ridge VAR, $[\cdot]_i$ selects the component corresponding to actor $i$'s position within its block (i.e., if actor $i$ is the $j$-th member of block $b$, $[\cdot]_i \equiv [\cdot]_j$ in the local $N_b$-dimensional space), and $\hat{U}_{\mathrm{g}}$, $\hat{A}_{\mathrm{g}}$ are the global basis and operator applied to the full residual vector $\mathbf{r}_t \in \R^N$ for remainder actors. This is analogous to a known-group interactive fixed-effects model \citep{bai2009panel} with block-specific factor loadings. Setting $\hat{U}_b = 0$ for all local blocks and $\hat{U}_{\mathrm{g}} = 0$ recovers pooled-only (G0) exactly. The global augmentation (G1) applies $\hat{U}_{\mathrm{g}}, \hat{A}_{\mathrm{g}}$ to all actors; the mixture (M2) replaces this with block-specific operators for actors in $\mathcal{B}_{\mathrm{local}}$. Figure~\ref{fig:pipeline} contrasts the two pipelines.
 
 % ── Dual pipeline figure ──────────────────────────────────
 \begin{figure}[ht]
@@ -414,11 +416,13 @@ where $\hat{\rho}$ is pooled across all actors (global Stage~1; the homogeneity 
 
 \subsection{Full-Panel Result}
 
-Table~\ref{tab:five_arch} compares five architectures on the full 93-actor panel; Figure~\ref{fig:per_window} shows the per-window comparison. The mixture architectures (M1, M2) beat the global always-on augmentation (G1) in every window.
+Eight architectures are compared. The core five: G0~(pooled-only, no augmentation), G1~(global always-on augmentation), S1~(selective-off: pooled-only for local blocks, global augmentation for the remainder---a diagnostic that isolates harm-removal from local modelling), M1~(mixture with local Ridge), M2~(mixture with local PCA+ridge). Three additional baselines address specific alternative explanations: BA~(block-specific $\hat\rho_b$+FE, no Stage~2), BA\_M2~(block-specific $\hat\rho_b$ + block-specific Stage~2, testing whether the M2 gain is from correcting Stage~1 persistence misspecification), and ENS~(equal-weighted ensemble of G1 and BA, testing whether simple forecast combination replicates the mixture gain).
+
+Table~\ref{tab:five_arch} reports all eight architectures on the full 93-actor panel; Figure~\ref{fig:per_window} shows the per-window comparison. The mixture architectures (M1, M2) beat the global always-on augmentation (G1) in every window.
 
 \begin{table}[H]
 \centering
-\caption{Five architectures on the full 93-actor panel (10 rolling OOS windows, 2015--2024). S1~applies pooled-only (no augmentation) to local blocks and global augmentation to the remainder. M1 and M2 apply local Ridge or local PCA+ridge to local blocks. W denotes the number of windows (out of 10) with a positive gain over G1.}
+\caption{Eight architectures on the full 93-actor panel (10 rolling OOS windows, 2015--2024). S1~applies pooled-only (no augmentation) to local blocks and global augmentation to the remainder. M1 and M2 apply local Ridge or local PCA+ridge to local blocks. BA\_M2 combines block-specific $\hat\rho_b$ (Stage~1) with block-specific PCA+ridge (Stage~2). ENS is the equal-weighted average of G1 and BA predictions. W denotes the number of windows (out of 10) with a positive gain over G1.}
 \label{tab:five_arch}
 \small
 \begin{tabular}{llcccccc}
@@ -426,22 +430,24 @@ Table~\ref{tab:five_arch} compares five architectures on the full 93-actor panel
 \# & Architecture & $R^2$ & $\Delta$ vs G1 & $t$ & $p$ & CI & W \\
 \midrule
 G0 & Pooled-only & 0.591 & $-0.039$ & $-7.14$ & ${<}0.001$ & $[-0.048, -0.029]$ & 0/10 \\
-BA & Block-specific $\hat\rho_b$+FE & 0.611 & $-0.019$ & $-3.72$ & $0.005$ & $[-0.028, -0.009]$ & 0/10 \\
+BA & Block-specific $\hat\rho_b$+FE & 0.611 & $-0.019$ & $-3.97$ & $0.003$ & $[-0.029, -0.011]$ & 0/10 \\
 G1 & Global always-on & 0.630 & --- & --- & --- & --- & --- \\
+ENS & Ensemble(G1, BA) & 0.639 & $+0.009$ & $5.28$ & ${<}0.001$ & $[+0.006, +0.012]$ & 9/10 \\
 S1 & Selective-off & 0.599 & $-0.031$ & $-8.55$ & ${<}0.001$ & $[-0.037, -0.024]$ & 0/10 \\
+BA\_M2 & Block $\hat\rho_b$ + local S2 & 0.661 & $+0.031$ & $4.83$ & ${<}0.001$ & $[+0.019, +0.044]$ & 10/10 \\
 \textbf{M1} & \textbf{Mixture (Ridge)} & \textbf{0.669} & $\mathbf{+0.039}$ & $\mathbf{7.80}$ & $\mathbf{{<}0.001}$ & $\mathbf{[+0.030, +0.049]}$ & \textbf{10/10} \\
 \textbf{M2} & \textbf{Mixture (PCA+ridge)} & \textbf{0.677} & $\mathbf{+0.047}$ & $\mathbf{7.76}$ & $\mathbf{{<}0.001}$ & $\mathbf{[+0.036, +0.058]}$ & \textbf{10/10} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The block-specific $\hat\rho_b$+FE baseline (BA) --- which allows each block its own persistence parameter but has no Stage~2 --- achieves $R^2 = 0.611$, well below M2 at 0.677 ($\Delta = +0.066$, $t = 7.92$, CI $[+0.052, +0.082]$, 10/10 windows). The gain is not from heterogeneous persistence alone: the local Stage~2 residual dynamics add genuine value beyond what block-specific $\hat\rho_b$ captures.
+The block-specific $\hat\rho_b$+FE baseline (BA) --- which allows each block its own persistence parameter but has no Stage~2 --- achieves $R^2 = 0.611$, well below M2 at 0.677. The interacting combination BA\_M2 --- block-specific $\hat\rho_b$ \emph{combined with} block-specific Stage~2 --- achieves $R^2 = 0.661$ ($\Delta = +0.031$, 10/10 windows). This is significantly better than BA alone ($+0.050$) but \emph{worse} than M2 ($-0.016$), demonstrating that the global pooled $\hat\rho$ in Stage~1 actually \emph{helps} the local Stage~2: the structured persistence residuals from global pooling contain cross-block information that block-specific $\hat\rho_b$ discards. The M2 gain is genuine local residual dynamics, not a correction for Stage~1 misspecification.
 
 The selective-off architecture (S1) is \emph{worse} than global ($\Delta = -0.031$), demonstrating that the mixture gain is not from removing suboptimal augmentation. The local models genuinely add predictive value: M1 exceeds S1 by $+0.070$ ($t = 16.12$, $p < 0.001$).
 
-The primary comparison (M2 vs G1) is robust to dependence correction. With Newey--West HAC variance (bandwidth 1--3), the DM-HAC statistic ranges from 6.84 to 7.38 ($p < 0.001$ in all cases). A moving-block bootstrap (block lengths 2 and 3) yields CIs of $[+0.035, +0.059]$ and $[+0.036, +0.059]$, both excluding zero. The conclusion is invariant to the treatment of window-level dependence. A non-parametric sign test confirms the finding: M2 exceeds G1 in all 10 windows (exact binomial $p = 2^{-10} \approx 0.001$ under the null of equal performance).\footnote{M2 and G1 are not nested in the standard sense: M2 replaces the global Stage~2 with block-specific models estimated on different data subsets, rather than adding parameters to G1. The \citet{clark2007approximately} adjustment for nested forecast comparisons therefore does not directly apply to the headline M2-vs-G1 comparison; the \citet{giacomini2006tests} framework for non-nested comparisons under rolling re-estimation is the more appropriate reference. For nested pairs (G0$\subset$G1, S1$\subset$M1), the standard DM statistic is conservative (biased toward the null), so the reported significance is, if anything, understated.}
+The primary comparison (M2 vs G1) is robust to dependence correction. With Newey--West HAC variance (bandwidth 1--3), the DM-HAC statistic ranges from 6.84 to 7.38 ($p < 0.001$ in all cases). A moving-block bootstrap (block lengths 2 and 3) yields CIs of $[+0.035, +0.059]$ and $[+0.036, +0.059]$, both excluding zero. All DM tests use $n = 10$ windows ($\mathrm{df} = 9$); at these degrees of freedom, HAC bandwidth 1--3 consumes 10--30\% of the sample in kernel weighting, and bootstrap estimators have limited resampling resolution ($\binom{10+10-1}{10} = 92{,}378$ distinct paired resamples). The DM-HAC statistics are therefore best interpreted as a sanity check on the primary paired bootstrap, not as independent asymptotic inference \citep[cf.][for finite-sample bias in HAC estimators]{kiefer2005new}. The primary inferential weight rests on the bootstrap CIs and the exact sign test. Nonetheless, the conclusion is invariant to the treatment of window-level dependence. A non-parametric sign test confirms the finding: M2 exceeds G1 in all 10 windows (exact binomial $p = 2^{-10} \approx 0.001$ under the null of equal performance). Because the four within-year forecasts share an expanding training set, the 10 annual windows are not fully independent; with an effective number of independent blocks of 7--8, the sign-test $p$-value rises to $2^{-8} \approx 0.004$, which remains significant.\footnote{M2 and G1 are not nested in the standard sense: M2 replaces the global Stage~2 with block-specific models estimated on different data subsets, rather than adding parameters to G1. The \citet{clark2007approximately} adjustment for nested forecast comparisons therefore does not directly apply to the headline M2-vs-G1 comparison; the \citet{giacomini2006tests} framework for non-nested comparisons under rolling re-estimation is the more appropriate reference. For nested pairs (G0$\subset$G1, S1$\subset$M1), the standard DM statistic is conservative (biased toward the null), so the reported significance is, if anything, understated.}
 
-Whether a direct forecast combination \citep{bates1969combination} of global-basis models could replicate the mixture gain is unlikely but not formally excluded. M2 exceeds the best component (G1) in every window by $+0.025$ to $+0.074$, and the mixture estimates block-specific factor structure ($\hat{U}_b$, $\hat{A}_b$) from within-block residuals not contained in any weighted average of global-basis forecasts---the information sets differ structurally, not just in weighting. A formal out-of-sample forecast-combination baseline with training-estimated weights \citep{timmermann2006forecast} remains a natural further comparison.
+A direct forecast combination \citep{bates1969combination} does not replicate the mixture gain. The equal-weighted ensemble of G1 (global augmentation) and BA (block-specific $\hat\rho_b$+FE) achieves $R^2 = 0.639$ ($\Delta = +0.009$ vs G1, 9/10 windows; Table~\ref{tab:five_arch}). This is a modest improvement over G1 but far below M2's $+0.047$. The mixture architecture captures block-specific factor structure ($\hat{U}_b$, $\hat{A}_b$) estimated from within-block residuals---information not contained in any weighted average of global-basis and per-actor AR(1) forecasts. The information sets differ structurally, not just in weighting.
 
 \begin{figure}[ht]
 \centering
@@ -456,7 +462,7 @@ Table~\ref{tab:per_block} and Figure~\ref{fig:per_block} reveal the mechanism. T
 
 \begin{table}[H]
 \centering
-\caption{Per-block $R^2$ by architecture. The diversified sector is degraded by global augmentation (0.392~$<$~0.415 pooled-only). The tech/health block gains most from local treatment. Note: per-block $R^2$ uses block-specific training-set actor means $\bar{y}^{\mathrm{train}}_i$ in the denominator (consistent with the OOS definition in Section~\ref{sec:data}), summing only over actors $i$ in that block, so the $N$-weighted average of per-block $R^2$'s does not equal the full-panel $R^2$ in Table~\ref{tab:five_arch}.}
+\caption{Per-block $R^2$ by architecture. The diversified sector is degraded by global augmentation (0.392~$<$~0.415 pooled-only). The tech/health block gains most from local treatment. Note: per-block $R^2$ uses the test-window mean $\bar{y}^{\mathrm{test}}_i$ in the denominator (consistent with the definition in Section~\ref{sec:data}), summing only over actors $i$ in that block, so the $N$-weighted average of per-block $R^2$'s does not equal the full-panel $R^2$ in Table~\ref{tab:five_arch}.}
 \label{tab:per_block}
 \small
 \begin{tabular}{lcccccc}
@@ -515,11 +521,11 @@ Statistic & Value \\
 \midrule
 Real economic blocks $\Delta$ & $+0.047$ \\
 Placebo mean $\Delta$ & $-0.004$ \\
-Placebo std & $0.007$ \\
+Placebo std & $0.0065$ \\
 Placebo maximum & $+0.023$ \\
 Placebo 99th percentile & $+0.012$ \\
 $z$-score (real vs placebo) & $7.82$ \\
-Placebo $p$-value & ${<}0.001$ (0/1{,}000; Monte Carlo bound $1/1{,}001$) \\
+Placebo $p$-value & ${\le}\,0.001$ (0/1{,}000; Monte Carlo bound $1/1{,}001$) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -547,7 +553,7 @@ A natural question is whether concentration --- a random partition happening to 
 Panel & $N$ & Heterogeneous? & Global $R^2$ & Mixture $R^2$ & $\Delta$ \\
 \midrule
 \textbf{93-actor multilayer} & \textbf{93} & \textbf{Yes} & \textbf{0.630} & \textbf{0.677} & $\mathbf{+0.047}$ \\
-146-firm CapEx/Revenue & 146 & No & 0.745 & 0.743 & $-0.002$ \\
+146-firm CapEx/Revenue & 146 & No & 0.745 & 0.743 & $-0.003$ \\
 270-actor multi-ratio & 270 & Moderate & 0.753 & 0.754 & $+0.001$ \\
 \bottomrule
 \end{tabular}
@@ -559,7 +565,9 @@ The mixture architecture does not improve prediction on homogeneous firm-only pa
 
 A potential concern is that the choice of which blocks receive local treatment was informed by the same evaluation windows used to measure the gain. To address this, a strict leave-one-window-out (LOWO) procedure is applied: for each test year $w$, the block selection uses per-block $R^2$ from the \emph{other} 9 windows only. A block receives local treatment if $\bar\Delta_{-w} = \overline{R^2_{\text{local}} - R^2_{\text{global}}} > 0$ across the held-out windows.
 
-The result is unambiguous: all 10 windows select the same three blocks (Diversified, Macro/Institutional, Tech/Health). Since LOWO selects the identical partition every window, the resulting forecasts are the same as the fixed-partition mixture by construction---the gain is $+0.047$ with the same CI and significance. The per-block gain signal is so consistent across windows that no window's inclusion or exclusion changes the block selection.
+The result is unambiguous: all 10 windows select the same three blocks (Diversified, Macro/Institutional, Tech/Health). Since LOWO selects the identical partition every window, the resulting forecasts are the same as the fixed-partition mixture by construction---the gain is $+0.047$ with the same CI and significance.
+
+An important qualification: LOWO controls for within-sample overfitting of the selection rule applied to the 10 candidate blocks, but it does not control for the researcher's prior choice to consider \emph{these} 10 candidates (6 raw sector blocks, 2 merged sector blocks, 2 layer blocks) rather than alternative candidate sets (e.g., size quantiles, loading-based clusters, geographic partitions). The researcher degree of freedom resides in the candidate-generation step, not the selection step. The placebo test (Section~\ref{sec:placebo}) controls for block \emph{sizes} but not the candidate space. A simpler two-block partition (Tech/Health local, remainder global) retains 66\% of the three-block gain ($\Delta = +0.031$, 10/10 windows), suggesting that even a minimally specified partition---one that requires selecting only the single most coherent sub-panel---captures the majority of the effect. Cross-panel replication (Table~\ref{tab:cross_panel}), which is immune to candidate-space search, provides the strongest external validation.
 
 \subsection{Robustness: Dropping the Diversified Sector}
 
@@ -608,7 +616,7 @@ The mixture gain documented above raises a natural question: why does the global
 \toprule
 Alternative & Test & Result & Implication \\
 \midrule
-Better spectral method & 9 models, 3 complexity classes & DMD $\approx$ PCA $\approx$ Ridge ($\rho > 0.98$) & Architecture, not linear method \\
+Better spectral method & 9 models, 3 complexity classes & DMD $\approx$ PCA $\approx$ Ridge ($\rho \geq 0.97$) & Architecture, not linear method \\
 Forecastable global geometry & 10 geometric models on Grassmannian & All worse than persistence & Rotation is estimation noise \\
 Target formulation & 7 target variants & Max $|\Delta\text{Gain}| = 0.018$ & Ceiling is target-invariant \\
 Conditional gating & 5 gating policies & All worse than always-on & Augmentation is unconditional \\
@@ -619,7 +627,7 @@ Conditional gating & 5 gating policies & All worse than always-on & Augmentation
 
 \subsection{The Method Does Not Matter}
 
-Section~\ref{sec:method_equiv} established method equivalence globally. The same result holds locally: within each of the 9~blocks tested, local DMD never outperforms local PCA+ridge (mean $\Delta = -0.028$, worst $-0.059$). Among linear reduced-rank methods, the engine choice is irrelevant at every granularity. Whether non-linear estimators (e.g., tree-based or neural-network models) would break this equivalence is an open question.
+Section~\ref{sec:method_equiv} established method equivalence at the global level among matched-complexity estimators. Within individual blocks, PCA+ridge consistently outperforms DMD (mean $\Delta = -0.028$, worst $-0.059$). This is not equivalence but dominance: at the small within-block sample sizes ($N_b = 11$--$25$, $T \approx 20$), DMD's SVD step is poorly conditioned, while PCA+ridge's explicit regularisation stabilises the local VAR. The implication is that the global equivalence reflects the larger effective sample, and that PCA+ridge is the preferred local engine. A global gradient-boosting baseline on Stage~1 residuals achieves $R^2 = 0.661$---above the linear ceiling ($0.630$) but below M2 ($0.677$, Table~\ref{tab:five_arch})---confirming that the residual $+0.016$ gap between GBM and M2 is architectural (block-specific factor structure) rather than a linear-method limitation \citep[cf.][for machine learning in asset pricing]{gu2020empirical}.
 
 \subsection{Global Geometry Is Not Forecastable}
 
@@ -650,13 +658,15 @@ The paper's architectural principle is summarised in one sentence: \emph{estimat
 
 \subsection{Connection to Heterogeneous Factor Model Literature}
 
-The finding connects to several strands of the econometric literature on panel heterogeneity. \citet{pesaran2006estimation} proposes common correlated effects (CCE) estimators for heterogeneous panels with cross-sectional dependence; \citet{chudik2015common} extend CCE to dynamic panels. \citet{bonhomme2015grouped} study grouped patterns of heterogeneity in panel models, estimating group-specific intercepts and slopes. \citet{su2016identifying} develop methods for identifying latent structures in panel data. \citet{ando2017clustering} cluster financial time series using a panel data approach. \citet{ke2015homogeneity} introduce homogeneity pursuit---testing which coefficients can be pooled and which must be group-specific. Our approach differs in using economically motivated (rather than data-driven) block assignments, but the geodesic decomposition could inform automated block discovery in future work.
+The mixture estimator (Equation~\ref{eq:mixture}) belongs to the family of grouped heterogeneous panel models. The estimation problem---which coefficients to pool and which to allow group-specific variation---is well-studied: \citet{pesaran2006estimation} proposes common correlated effects (CCE) estimators for heterogeneous panels; \citet{bonhomme2015grouped} estimate group-specific intercepts and slopes with data-driven group assignment; \citet{su2016identifying} identify latent group structures from the data; \citet{ke2015homogeneity} introduce homogeneity pursuit, testing which coefficients can be pooled.
+
+The novelty of the present contribution is not the grouped-heterogeneity idea itself but two empirical findings specific to \emph{forecasting} on mixed-type investment panels. First, the decomposition into ``pool persistence globally, estimate residual dynamics locally'' is not obvious from the estimation literature, where persistence and factor structure are typically treated jointly. The BA\_M2 experiment (Table~\ref{tab:five_arch}) shows that block-specific persistence \emph{combined with} block-specific dynamics performs worse than global persistence with block-specific dynamics---the two heterogeneity dimensions interact non-trivially. Second, the scope condition (the gain requires data-type heterogeneity and vanishes on homogeneous panels) provides a concrete empirical guide for when grouped estimation adds forecasting value, which the theoretical literature does not supply. Our approach differs from \citet{bonhomme2015grouped} and \citet{su2016identifying} in using economically motivated (rather than data-driven) block assignments; the geodesic decomposition could inform automated block discovery in future work.
 
 \subsection{Limitations}
 
 This paper is a purely empirical forecasting study. The evaluation operates in a finite-sample regime ($N = 93$, $T \approx 20$ per window, $K = 2$--$8$ modes) where classical large-$N$ or large-$T$ asymptotics do not directly apply. The validity of the comparisons rests on the rolling out-of-sample protocol, not on asymptotic guarantees. Whether the block-specific mixture estimator (Equation~\ref{eq:mixture}) enjoys formal consistency properties under a well-defined asymptotic regime is an open question.
 
-A block-specific pooled AR(1)+FE with block-specific $\hat\rho_b$ (no Stage~2) achieves $R^2 = 0.611$---substantially below the mixture at 0.677 (Table~\ref{tab:five_arch}). This confirms the gain is from heterogeneous \emph{residual} structure, not just heterogeneous persistence. A single-stage Ridge with block-dummy interactions or a forecast-combination scheme with block-level weights \citep{bates1969combination} remain natural additional comparisons for future work.
+A block-specific pooled AR(1)+FE with block-specific $\hat\rho_b$ (no Stage~2) achieves $R^2 = 0.611$---substantially below the mixture at 0.677 (Table~\ref{tab:five_arch}). The interacting combination---block-specific $\hat\rho_b$ combined with block-specific Stage~2 (BA\_M2, $R^2 = 0.661$)---confirms that the M2 gain is from genuine local residual dynamics rather than a correction for global persistence misspecification. In fact, M2 exceeds BA\_M2 by $+0.016$, showing that the global pooled $\hat\rho$ actually helps local Stage~2: the structured residuals from global pooling retain cross-block information that block-specific $\hat\rho_b$ discards. An equal-weighted forecast combination of G1 and BA (ENS, $R^2 = 0.639$) achieves only $+0.009$ over G1, far below M2's $+0.047$, ruling out simple ensembling as an explanation. A single-stage Ridge with block-dummy interactions remains a natural additional comparison.
 
 Several further limitations qualify the findings:
 
@@ -697,10 +707,10 @@ Second, the mixture gain \emph{increases} as the training window shrinks: $+0.04
 
 This finding contradicts a pre-registered prediction that lower $K_b$ would be needed at shorter $T$; the opposite is true. For practitioners with limited training history, the heterogeneity-aware mixture architecture is more valuable, not less.
 
-\subsection{Pre-Registered Predictions}
+\subsection{Exploratory Hyperparameter Predictions}
 \label{sec:prereg}
 
-These predictions concern the hyperparameter sensitivity of the mixture architecture (Table~\ref{tab:parsimony}), not the headline M2-vs-G1 result itself, which is an exploratory finding (Limitation~2). Five predictions were written before running the $T \times K_b$ sweep (time-stamped in the replication archive). Four of five failed and one was borderline, in each case revealing that the architectural gain is stronger and more robust than anticipated:
+These predictions concern the hyperparameter sensitivity of the mixture architecture (Table~\ref{tab:parsimony}), not the headline M2-vs-G1 result itself, which is an exploratory finding (Limitation~2). Five predictions were written before running the $T \times K_b$ sweep and time-stamped in the replication archive's git history. This constitutes a self-maintained record, not third-party-verified pre-registration (e.g., OSF or arXiv); the predictions should be read as an informative diagnostic of author expectations, not as a formal pre-analysis plan. Four of five failed and one was borderline, in each case revealing that the architectural gain is stronger and more robust than anticipated:
 
 \begin{enumerate}[nosep]
   \item \textbf{P1} ($T{=}5$yr): $|R^2(K_b{=}2) - R^2(K_b{=}4)| < 0.005$ (flat parsimony frontier). \emph{Actual}: $0.018$. \textbf{Failed} --- $K_b{=}4$ captures secondary within-block modes that $K_b{=}2$ misses.
@@ -736,7 +746,7 @@ The design principle is simple: \emph{pool globally for what is shared, decompos
 % ── Data and Code Availability ────────────────────────────
 \subsection*{Data and Code Availability}
 
-Replication code, anonymised panel data, and the time-stamped pre-registration document for the $T \times K_b$ sweep (Section~\ref{sec:parsimony}) are available at \url{https://anonymous.4open.science/r/smim-replication}. The repository includes scripts to reproduce all tables, figures, and placebo permutations reported in this paper.
+Replication code, pseudonymised panel data (firm identities are replaced with opaque labels but are recoverable from the sector counts and balanced-panel constraint), and the time-stamped hyperparameter predictions (Section~\ref{sec:prereg}) for the $T \times K_b$ sweep (Section~\ref{sec:parsimony}) are available at \url{https://anonymous.4open.science/r/smim-replication}. The repository includes scripts to reproduce all tables, figures, and placebo permutations reported in this paper.
 
 % ══════════════════════════════════════════════════════════
 % BIBLIOGRAPHY
@@ -789,6 +799,11 @@ Doz, C., Giannone, D., and Reichlin, L. (2012).
 \newblock A quasi-maximum likelihood approach for large, approximate dynamic factor models.
 \newblock \emph{The Review of Economics and Statistics}, 94(4):1014--1024.
 
+\bibitem[Gu et~al.(2020)]{gu2020empirical}
+Gu, S., Kelly, B., and Xiu, D. (2020).
+\newblock Empirical asset pricing via machine learning.
+\newblock \emph{The Review of Financial Studies}, 33(5):2223--2273.
+
 \bibitem[Giacomini and White(2006)]{giacomini2006tests}
 Giacomini, R. and White, H. (2006).
 \newblock Tests of conditional predictive ability.
@@ -798,6 +813,11 @@ Giacomini, R. and White, H. (2006).
 Harvey, D., Leybourne, S., and Newbold, P. (1997).
 \newblock Testing the equality of prediction mean squared errors.
 \newblock \emph{International Journal of Forecasting}, 13(2):281--291.
+
+\bibitem[Kiefer and Vogelsang(2005)]{kiefer2005new}
+Kiefer, N.~M. and Vogelsang, T.~J. (2005).
+\newblock A new asymptotic theory for heteroskedasticity-autocorrelation robust tests.
+\newblock \emph{Econometric Theory}, 21(6):1130--1164.
 
 \bibitem[Ke et~al.(2015)]{ke2015homogeneity}
 Ke, Z.~T., Fan, J., and Wu, Y. (2015).
@@ -857,7 +877,7 @@ Timmermann, A. (2006).
 \section{DMD Mathematics}
 \label{app:dmd}
 
-Exact DMD \citep{kutz2016dynamic} provides a rank-$K$ approximation of the linear propagator mapping consecutive cross-sectional snapshots. In the two-stage architecture, DMD operates on the exponentially-weighted demeaned Stage~1 residuals, not on the raw panel. Given a snapshot matrix $X = [x_1, \ldots, x_{T-1}]$ and $Y = [x_2, \ldots, x_T]$ with $x_t \in \R^N$ (columns are demeaned residual vectors), the truncated SVD $X = U_r \Sigma_r V_r^*$ yields the reduced propagator $\tilde{A} = U_r^* Y V_r \Sigma_r^{-1} \in \R^{K \times K}$, where $K \leq \min(N, T-1)$ is the truncation rank. The eigendecomposition $\tilde{A} W = W \Lambda$ produces DMD eigenvalues $\lambda_k$ encoding per-mode growth rate ($|\lambda_k|$) and oscillation frequency ($\arg \lambda_k$). For forecasting, the relevant objects are the left singular vectors $U_r$ (the orthonormal basis spanning the dominant $K$-dimensional subspace) and the diagonal or full matrix $\tilde{A}$ (the transition dynamics). In the paper's two-stage architecture, these are applied to Stage~1 residuals, not to the raw panel. Spectral radius clipping $\tilde{A} \leftarrow \tilde{A} \cdot \min(1, 0.99 / \max_k |\lambda_k(\tilde{A})|)$ ensures stability.
+Exact DMD \citep{kutz2016dynamic} provides a rank-$K$ approximation of the linear propagator mapping consecutive cross-sectional snapshots. In the two-stage architecture, DMD operates on the exponentially-weighted demeaned Stage~1 residuals, not on the raw panel. Given a snapshot matrix $X = [x_1, \ldots, x_{T-1}]$ and $Y = [x_2, \ldots, x_T]$ with $x_t \in \R^N$ (columns are demeaned residual vectors), the truncated SVD $X = U_r \Sigma_r V_r^*$ yields the reduced propagator $\tilde{A} = U_r^* Y V_r \Sigma_r^{-1} \in \R^{K \times K}$, where $K \leq \min(N, T-1)$ is the truncation rank. The eigendecomposition $\tilde{A} W = W \Lambda$ produces DMD eigenvalues $\lambda_k$ encoding per-mode growth rate ($|\lambda_k|$) and oscillation frequency ($\arg \lambda_k$). For forecasting, the relevant objects are the left singular vectors $U_r$ (the orthonormal basis spanning the dominant $K$-dimensional subspace) and the diagonal or full matrix $\tilde{A}$ (the transition dynamics). In the paper's two-stage architecture, these are applied to Stage~1 residuals, not to the raw panel. Spectral radius clipping $\tilde{A} \leftarrow \tilde{A} \cdot \min(1, 0.99 / \max_k |\lambda_k(\tilde{A})|)$ ensures stability. This uniform scalar multiplication (rather than per-eigenvalue projection inside the unit circle) preserves the eigenvector structure of $\tilde{A}$ exactly and avoids the need to reconstruct $\tilde{A}$ from its eigendecomposition. The cost is that stable modes are unnecessarily dampened: e.g., if $\max |\lambda_k| = 1.05$, a mode at $|\lambda| = 0.90$ is compressed to $0.848$. Since Table~\ref{tab:method_comparison} shows that the DMD-based models achieve statistically indistinguishable $R^2$ from non-spectral methods, this conservative clipping does not materially affect the headline results, but a per-eigenvalue clip that leaves stable modes untouched could improve the standalone DMD baseline.
 
 \subsection*{DMD-Based Kalman Filter}
 
@@ -902,7 +922,7 @@ with $\lambda_Q = 0.3$, symmetrised and regularised: $Q_t \leftarrow \frac{1}{2}
 
 \textbf{Key design choices.} (i)~The spherical $R$ (Eq.~\ref{eq:sph_r}) makes the filter well-conditioned for $N = 93$, $K = 8$, $T \approx 20$, where estimating a full $N \times N$ observation covariance is infeasible. (ii)~Spectral radius clipping at 0.99 prevents explosive modal dynamics. (iii)~The quarterly basis re-estimation tracks evolving cross-sectional structure but resets $P$ and $Q$ to their initial values each quarter.
 
-\textbf{Adaptive Q: caveats.} The adaptive $Q$ (Eq.~\ref{eq:q_adapt}) uses the state-space correction $\nu_t = \balpha_{t|t} - \balpha_{t|t-1}$ rather than the observation-space innovation $\varepsilon_t = \tilde{r}_t - U_r \balpha_{t|t-1}$. This creates a positive-feedback loop: as the filter converges, corrections shrink, $Q$ decays, $P$ shrinks, and corrections shrink further. With $\lambda_Q = 0.3$, the diagonal elements of $Q$ decay as ${\sim}0.7^t$ toward the $10^{-6}$ floor. In the present architecture, this collapse is mitigated by the quarterly basis reset (design choice~iii): $Q$ is reinitialised to $Q_0 = 0.5 \cdot I_K$ each quarter, limiting the effective decay window to ${\sim}20$ steps during training. The standard \citet{mehra1970identification} adaptive scheme using observation-space innovations would avoid this coupling, but has not been implemented. Since the method-equivalence results (Table~\ref{tab:method_comparison}) show that Kalman-filtered and non-Kalman models achieve statistically indistinguishable $R^2$, the adaptive $Q$ dynamics do not materially affect the headline forecasting results.
+\textbf{Adaptive Q: caveats.} The adaptive $Q$ (Eq.~\ref{eq:q_adapt}) uses the state-space correction $\nu_t = \balpha_{t|t} - \balpha_{t|t-1}$ rather than the observation-space innovation $\varepsilon_t = \tilde{r}_t - U_r \balpha_{t|t-1}$. This creates a positive-feedback loop: as the filter converges, corrections shrink, $Q$ decays, $P$ shrinks, and corrections shrink further. With $\lambda_Q = 0.3$, the diagonal elements of $Q$ decay as ${\sim}0.7^t$ toward the $10^{-6}$ floor. In the present architecture, this collapse is mitigated by the quarterly basis reset (design choice~iii): $Q$ is reinitialised to $Q_0 = 0.5 \cdot I_K$ each quarter, limiting the effective decay window to ${\sim}20$ steps during training. The standard \citet{mehra1970identification} adaptive scheme using observation-space innovations would avoid this coupling, but has not been implemented. Since the method-equivalence results (Table~\ref{tab:method_comparison}) show that Kalman-filtered and non-Kalman models achieve statistically indistinguishable $R^2$, the adaptive $Q$ dynamics do not materially affect the headline forecasting results. The Kalman form is retained because it provides a principled state-space representation that supports downstream tasks (modal interpretation, uncertainty quantification) even though it does not improve point forecasts at this sample size.
 
 \section{Standalone Transition Diagnostic}
 \label{app:standalone}
@@ -981,6 +1001,36 @@ Quarterly firm ratios from SEC filings are typically available 30--45 days after
 Under this lag, the mixture gain is $\Delta = +0.038$ (10/10 windows positive), retaining 80\% of the contemporaneous gain ($+0.047$). The absolute $R^2$ levels shift: G1 moves from 0.630 to 0.639 and M2 from 0.677 to 0.677 (unchanged to three decimals). The G1 increase reflects the partial-lag structure: because firm cross-sectional ranks are mean-reverting ($\rho \approx 0.60$), the fully-realised rank at $t{-}1$ is informative for the rank at $t$, and the global pooled AR(1) captures this persistence slightly better when the predictor is a clean realised value rather than the noisier contemporaneous observation. This is a positive diagnostic for the global model's design rather than an artefact.
 
 The architectural differential is qualitatively robust to real-time data availability, retaining 80\% of its contemporaneous magnitude with the same 10/10 window-sign pattern.
+
+\section{Hyperparameter Inventory}
+\label{app:hyperparams}
+
+All hyperparameters used in the paper are listed below. None were tuned on the test set; all were set before the rolling evaluation began and held fixed throughout.
+
+\begin{table}[H]
+\centering
+\caption{Hyperparameter inventory. ``Prior work'' denotes values carried from the standalone spectral model development (Appendix~B); ``structural'' denotes values determined by the data or model structure.}
+\label{tab:hyperparams}
+\small
+\begin{tabular}{llll}
+\toprule
+Parameter & Value & Source & Used in \\
+\midrule
+Global SVD rank $K$ & 8 & Prior work & Global Stage~2 \\
+Local PCA rank $K_b$ & $\min(4, \max(2, N_b/5))$ & Grid search (Table~\ref{tab:parsimony}) & Local Stage~2 \\
+EWM half-life & 12 quarters & Prior work (3-year horizon) & Demeaning \\
+Ridge $\lambda$ (local VAR) & 1.0 & Fixed default & Local PCA+ridge \\
+Ridge $\alpha$ (local Ridge) & CV from $\{0.1, 1, 10\} \times N_b$ & Hold-last-2 CV & Local Ridge (M1) \\
+Spectral radius clip & 0.99 & Prior work & DMD transition \\
+Kalman $Q_0$ & $0.5 \cdot I_K$ & Prior work & Kalman filter \\
+Adaptive $\lambda_Q$ & 0.3 & Prior work & Kalman $Q$ update \\
+$Q$ floor & $10^{-6}$ & Numerical stability & Kalman $Q$ update \\
+Training window $T$ & 5 years & Standard & All models \\
+Bootstrap resamples & 10{,}000 & Standard & Inference \\
+Placebo permutations & 1{,}000 & Computational budget & Section~5.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Train-Only Causality Audit}
 \label{app:causality}

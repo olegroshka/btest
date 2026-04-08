@@ -2,16 +2,15 @@
 """
 Iteration 6.4b — Heterogeneity-Aware Local Decomposition.
 
-Five architectures on the full 93-actor panel:
-  G0: Pooled-only (no augmentation)
-  G1: Global always-on augmentation (C1 full Ã)
-  S1: Selective-off (pooled-only for local blocks, global for REMAINDER)
-  M1: Mixture (local Ridge for local blocks, global for REMAINDER)
-  M2: Mixture (local PCA+ridge for local blocks, global for REMAINDER)
-
-Primary comparison: M1 vs G1 (does mixture beat global?)
-Diagnostic comparison: M1 vs S1 (does local modelling add value beyond
-harm-removal?)
+Eight architectures on the full 93-actor panel:
+  G0:     Pooled-only (no augmentation)
+  BA:     Block-specific rho_b + FE (no Stage 2)
+  G1:     Global always-on augmentation (C1 full Ã)
+  S1:     Selective-off (pooled-only for local blocks, global for REMAINDER)
+  M1:     Mixture (local Ridge for local blocks, global for REMAINDER)
+  M2:     Mixture (local PCA+ridge for local blocks, global for REMAINDER)
+  BA_M2:  Block-specific rho_b + block-specific Stage 2 PCA+ridge  [A-1]
+  ENS:    Equal-weighted ensemble of G1 and BA predictions           [C-3]
 
 Usage::
     PYTHONIOENCODING=utf-8 uv run python scripts/smim/run_iter6_4b.py
@@ -73,6 +72,29 @@ def estimate_pooled_ar1(otr):
     num = np.sum(tilde[1:] * tilde[:-1])
     den = np.sum(tilde[:-1] ** 2)
     return float(num / den) if den > 1e-12 else 0.0, bar_y
+
+
+def estimate_block_ar1(otr, v_list, actor_block):
+    """Estimate block-specific rho_b and per-actor means."""
+    N = otr.shape[1]
+    rho_vec = np.zeros(N)
+    mean_vec = np.nan_to_num(otr.mean(axis=0), nan=0.5)
+    # Group actor indices by block
+    block_idx = {}
+    for i, a in enumerate(v_list):
+        b = actor_block.get(a, "REMAINDER")
+        block_idx.setdefault(b, []).append(i)
+    for b, idx in block_idx.items():
+        bd = otr[:, idx]
+        by = np.nan_to_num(bd.mean(axis=0), nan=0.5)
+        tl = bd - by
+        nm = np.sum(tl[1:] * tl[:-1])
+        dn = np.sum(tl[:-1] ** 2)
+        rb = float(nm / dn) if dn > 1e-12 else 0.0
+        for j, ii in enumerate(idx):
+            rho_vec[ii] = rb
+            mean_vec[ii] = by[j]
+    return rho_vec, mean_vec
 
 
 def sph_r(dm, U):
@@ -247,7 +269,7 @@ def fit_local_pca_ridge(dm_block, K_b):
 # ══════════════════════════════════════════════════════════════════════
 
 def run_window_all_architectures(panel, ty, blocks, T_yr=5):
-    """Run all 5 architectures for one test year.
+    """Run all 8 architectures for one test year.
 
     Returns per-architecture full-panel predictions and actuals.
     """
@@ -277,6 +299,10 @@ def run_window_all_architectures(panel, ty, blocks, T_yr=5):
     # ── Stage 1: Global pooled+FE ──
     rho, bar_y = estimate_pooled_ar1(otr)
     residuals = otr[1:] - (bar_y + rho * (otr[:-1] - bar_y))
+
+    # ── Stage 1 alt: Block-specific rho_b+FE (for BA, BA_M2, ENS) ──
+    rho_b_vec, mean_b_vec = estimate_block_ar1(otr, v_list, actor_block)
+    residuals_b = otr[1:] - (mean_b_vec + rho_b_vec * (otr[:-1] - mean_b_vec))
 
     # ── Global C1 augmentation (for G1, S1 remainder, M1 remainder, M2 remainder) ──
     om_r = ewm_demean(residuals, 12)
@@ -320,8 +346,26 @@ def run_window_all_architectures(panel, ty, blocks, T_yr=5):
             "om_b": om_b, "alpha": alpha, "K_b": K_b, "bidx": bidx, "N_b": N_b,
         }
 
+    # ── Local models on block-specific residuals (for BA_M2) ──
+    local_models_b = {}
+    for bname in local_block_names:
+        bidx = block_indices[bname]
+        if len(bidx) < 5:
+            local_models_b[bname] = None
+            continue
+        block_resids_b = residuals_b[:, bidx]
+        om_bb = ewm_demean(block_resids_b, 12)
+        dm_bb = block_resids_b - om_bb
+        N_b = len(bidx)
+        K_b = min(4, max(2, N_b // 5))
+        U_pca_b, A_pca_b = fit_local_pca_ridge(dm_bb, K_b)
+        local_models_b[bname] = {
+            "U_pca": U_pca_b, "A_pca": A_pca_b,
+            "om_b": om_bb, "K_b": K_b, "bidx": bidx, "N_b": N_b,
+        }
+
     # ── Rolling test ──
-    archs = ["G0", "G1", "S1", "M1", "M2"]
+    archs = ["G0", "BA", "G1", "S1", "M1", "M2", "BA_M2", "ENS"]
     preds = {a: [] for a in archs}
     actuals = []
     prev = np.nan_to_num(otr[-1], nan=0.5)
@@ -332,8 +376,11 @@ def run_window_all_architectures(panel, ty, blocks, T_yr=5):
             continue
         obs = qv[0]
 
-        # Stage 1 prediction (same for all)
+        # Stage 1 prediction (global pooled — same for G0/G1/S1/M1/M2)
         y_pool = bar_y + rho * (prev - bar_y)
+
+        # Stage 1 prediction (block-specific — for BA/BA_M2/ENS)
+        y_pool_b = mean_b_vec + rho_b_vec * (prev - mean_b_vec)
 
         # Global augmented prediction
         ap_r = F_r @ a_r
@@ -389,6 +436,31 @@ def run_window_all_architectures(panel, ty, blocks, T_yr=5):
                 y_m2[bidx] = y_pool[bidx]
         preds["M2"].append(y_m2)
 
+        # BA: block-specific rho_b+FE (no Stage 2)
+        preds["BA"].append(y_pool_b.copy())
+
+        # BA_M2: block-specific rho_b + block-specific local PCA+ridge Stage 2
+        # Remainder gets block-specific pooled only (no global aug — consistent
+        # with using rho_b everywhere)
+        y_bam2 = y_pool_b.copy()
+        prev_resid_block = prev - (mean_b_vec + rho_b_vec * (
+            np.nan_to_num(otr[-2] if otr.shape[0] >= 2 else otr[-1], nan=0.5) - mean_b_vec)
+        ) if otr.shape[0] >= 2 else np.zeros(N)
+        for bname in local_block_names:
+            lmb = local_models_b.get(bname)
+            if lmb is None:
+                continue
+            bidx = lmb["bidx"]
+            prev_resid_bb = prev_resid_block[bidx] - lmb["om_b"].ravel()
+            f_pca = lmb["U_pca"].T @ prev_resid_bb
+            local_pred = lmb["U_pca"] @ (lmb["A_pca"] @ f_pca) + lmb["om_b"].ravel()
+            if np.all(np.isfinite(local_pred)):
+                y_bam2[bidx] = y_pool_b[bidx] + local_pred
+        preds["BA_M2"].append(y_bam2)
+
+        # ENS: equal-weighted ensemble of G1 and BA
+        preds["ENS"].append(0.5 * y_global_aug + 0.5 * y_pool_b)
+
         actuals.append(obs)
 
         # ── Kalman update (global) ──
@@ -422,7 +494,11 @@ def run_window_all_architectures(panel, ty, blocks, T_yr=5):
             P_r = np.eye(k2); Q_r = np.eye(k2) * Q_INIT_SCALE
             R_r = sph_r(dm_r, U_r2); U_r = U_r2; ka = k2
 
-        # Re-estimate local models
+        # Re-estimate block-specific AR(1)
+        rho_b_vec, mean_b_vec = estimate_block_ar1(otr, v_list, actor_block)
+        residuals_b_new = otr[1:] - (mean_b_vec + rho_b_vec * (otr[:-1] - mean_b_vec))
+
+        # Re-estimate local models (on global residuals)
         residuals = residuals_new
         for bname in local_block_names:
             lm = local_models.get(bname)
@@ -441,6 +517,20 @@ def run_window_all_architectures(panel, ty, blocks, T_yr=5):
 
             K_b = lm["K_b"]
             lm["U_pca"], lm["A_pca"] = fit_local_pca_ridge(dm_b, K_b)
+
+        # Re-estimate local models on block-specific residuals (for BA_M2)
+        residuals_b = residuals_b_new
+        for bname in local_block_names:
+            lmb = local_models_b.get(bname)
+            if lmb is None:
+                continue
+            bidx = lmb["bidx"]
+            block_resids_b = residuals_b[:, bidx]
+            om_bb = ewm_demean(block_resids_b, 12)
+            dm_bb = block_resids_b - om_bb
+            K_b = lmb["K_b"]
+            lmb["U_pca"], lmb["A_pca"] = fit_local_pca_ridge(dm_bb, K_b)
+            lmb["om_b"] = om_bb
 
     if not actuals:
         return None
@@ -471,13 +561,16 @@ def run_window_all_architectures(panel, ty, blocks, T_yr=5):
 # ══════════════════════════════════════════════════════════════════════
 
 def print_results(all_results, blocks):
-    archs = ["G0", "G1", "S1", "M1", "M2"]
+    archs = ["G0", "BA", "G1", "S1", "M1", "M2", "BA_M2", "ENS"]
     labels = {
         "G0": "Pooled-only",
+        "BA": "Block-specific ρ_b+FE",
         "G1": "Global always-on",
         "S1": "Selective-off",
         "M1": "Mixture (Ridge)",
         "M2": "Mixture (PCA+ridge)",
+        "BA_M2": "Block ρ_b + local S2",
+        "ENS": "Ensemble(G1,BA)",
     }
 
     # Full-panel comparison
@@ -605,7 +698,8 @@ def evaluate_win_condition(all_results):
     print("  WIN CONDITION EVALUATION")
     print("=" * 90)
 
-    for arch, label in [("M1", "Mixture Ridge"), ("M2", "Mixture PCA+ridge"), ("S1", "Selective-off")]:
+    for arch, label in [("M1", "Mixture Ridge"), ("M2", "Mixture PCA+ridge"), ("S1", "Selective-off"),
+                         ("BA", "Block ρ_b+FE"), ("BA_M2", "Block ρ_b + local S2"), ("ENS", "Ensemble(G1,BA)")]:
         deltas = []
         for i in range(len(TEST_YEARS)):
             if all_results[i] is None:
@@ -640,11 +734,12 @@ def evaluate_win_condition(all_results):
 def main():
     t_start = time.time()
 
-    print("=" * 90)
+    print("=" * 100)
     print("  ITERATION 6.4b — HETEROGENEITY-AWARE LOCAL DECOMPOSITION")
-    print("  5 architectures: G0 (pooled) | G1 (global) | S1 (selective-off)")
+    print("  8 architectures: G0 (pooled) | BA (block ρ_b) | G1 (global) | S1 (selective-off)")
     print("                   M1 (mixture Ridge) | M2 (mixture PCA+ridge)")
-    print("=" * 90)
+    print("                   BA_M2 (block ρ_b + local S2) | ENS (G1+BA ensemble)")
+    print("=" * 100)
 
     panel, meta = load_panel_and_meta()
     blocks = define_blocks(panel, meta)
@@ -662,12 +757,16 @@ def main():
         all_results.append(result)
         if result:
             g0 = result["G0"]["full"]
+            ba = result["BA"]["full"]
             g1 = result["G1"]["full"]
             s1 = result["S1"]["full"]
             m1 = result["M1"]["full"]
             m2 = result["M2"]["full"]
-            print(f"  W{ty}: G0={g0:.4f}  G1={g1:.4f}  S1={s1:.4f}"
-                  f"  M1={m1:.4f}  M2={m2:.4f}  ({time.time()-t0:.1f}s)")
+            bam2 = result["BA_M2"]["full"]
+            ens = result["ENS"]["full"]
+            print(f"  W{ty}: G0={g0:.4f}  BA={ba:.4f}  G1={g1:.4f}  S1={s1:.4f}"
+                  f"  M1={m1:.4f}  M2={m2:.4f}  BA_M2={bam2:.4f}  ENS={ens:.4f}"
+                  f"  ({time.time()-t0:.1f}s)")
         else:
             print(f"  W{ty}: FAILED")
 
@@ -682,7 +781,7 @@ def main():
     for i, ty in enumerate(TEST_YEARS):
         if all_results[i] is None:
             continue
-        for arch in ["G0", "G1", "S1", "M1", "M2"]:
+        for arch in ["G0", "BA", "G1", "S1", "M1", "M2", "BA_M2", "ENS"]:
             row = {"year": ty, "architecture": arch,
                    "full_r2": all_results[i][arch]["full"]}
             for bname, br2 in all_results[i][arch].get("blocks", {}).items():
