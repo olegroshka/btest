@@ -123,17 +123,38 @@ class ExternalFactor(FactorNode):
     """
     Load pre-computed factor values from a file (pickle, parquet, or CSV).
 
-    The file must contain either:
-      - a ``pd.Series`` with a ``DatetimeIndex`` (values are the factor scores), or
-      - a ``pd.DataFrame`` with a ``DatetimeIndex`` and a column named ``column``.
+    **Broadcast mode** (default, ``per_instrument=False``):
+      The file contains a ``pd.Series`` with a ``DatetimeIndex``; the value is
+      broadcast to all instruments in the universe.  Use this for universe-wide
+      scalars (macro signals, index-level ML predictions, etc.).
 
-    The loaded series is broadcast across all instruments in the universe so it
-    can be used in comparisons and boolean signals like any other factor.
+      - ``pd.Series``           → used directly
+      - ``pd.DataFrame``        → column ``column`` or first column → Series
 
-    Primary use-case: ML model outputs (e.g. TKAN predictions) that are computed
-    offline and stored on disk.
+    **Per-instrument mode** (``per_instrument=True``):
+      The file contains a ``pd.DataFrame`` with a ``DatetimeIndex`` and **columns
+      named after the instrument tickers** in the universe.  Each column is
+      assigned to its matching instrument, so different instruments can carry
+      different pre-computed signals.
 
-    Example::
+      Use this when signals are fundamentally per-asset (e.g. QQQ SMA filter for
+      TQQQ, TLT SMA filter for TMF).  Any instrument not present in the file
+      columns receives ``NaN`` for the full period.
+
+      Example — SMA trend-filter for a 3-asset universe::
+
+          sma_filter = ExternalFactor(
+              name="sma_eligible",
+              path="data/signals/sma_eligible.parquet",
+              # parquet columns: TQQQ, TMF, IEF (one boolean per day per ticker)
+              per_instrument=True,
+          )
+
+    Primary use-case (broadcast): ML model outputs (e.g. TKAN predictions).
+    Primary use-case (per_instrument): per-asset SMA / trend filters loaded from
+    pre-computed parquet.
+
+    Example (broadcast)::
 
         tkan_pred = ExternalFactor(
             name="tkan_pred",
@@ -144,14 +165,13 @@ class ExternalFactor(FactorNode):
 
     path: str
     column: Optional[str] = None
-    # Optional callable: loader(obj: Any) -> pd.Series
+    per_instrument: bool = False
+    # Optional callable: loader(obj: Any) -> pd.Series  (broadcast mode)
+    #                 or loader(obj: Any) -> pd.DataFrame  (per_instrument mode)
     # Where obj is the raw deserialized object from disk.
     # Use this for non-standard formats (TKAN prediction tuples, HDF5
     # compound objects, custom NN output structures, etc.).
-    # If None, the engine applies standard rules:
-    #   pd.Series                → used directly
-    #   pd.DataFrame             → column `column` or first column
-    #   anything else            → TypeError (register a loader)
+    # If None, the engine applies standard rules.
     loader: Optional[Callable[[Any], "pd.Series"]] = field(default=None, compare=False, repr=False)
 
 

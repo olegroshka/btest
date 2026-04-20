@@ -86,3 +86,16 @@ def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame
         len(prices.index),
     )
     return md, prices, volumes
+
+
+def load_open_prices(md: "MarketData", instruments: "pd.Index") -> "pd.DataFrame":
+    """Extract open prices from already-loaded MarketData.
+
+    Returns a DataFrame [datetime x instrument] aligned to the same index as
+    the close prices.  Instruments missing an "open" column get NaN.
+    """
+    open_df = pd.DataFrame({
+        instr: md.bars[instr].get("open", pd.Series(dtype="float64"))
+        for instr in instruments
+    })
+    return open_df.sort_index().astype("float64")

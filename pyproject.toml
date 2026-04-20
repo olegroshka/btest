@@ -32,6 +32,7 @@ dependencies = [
   "scipy-stubs~=1.15.3",
   "openpyxl>=3.1.5",
   "ipykernel>=7.1.0",
+  "signum @ git+https://github.com/SugoiKitsune/signum.git",
 ]
 
 [project.optional-dependencies]

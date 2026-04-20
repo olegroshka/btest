@@ -13,10 +13,15 @@ from typing import Literal, Optional
 class OrderPolicy:
     """
     High-level order defaults for the strategy.
+
+    fill_on controls execution timing:
+      "close"  — fill at today's close (same bar as signal, default)
+      "open"   — fill at next bar's open (signal T close → fill T+1 open)
     """
 
     default_order_type: Literal["MKT", "MOC", "LIMIT"] = "MOC"
     time_in_force: Literal["DAY", "GTC"] = "DAY"
+    fill_on: Literal["close", "open"] = "close"
 
 
 @dataclass(slots=True)

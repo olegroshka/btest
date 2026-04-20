@@ -7,7 +7,7 @@ from typing import Dict, Optional
 import numpy as np
 import pandas as pd
 
-from ..dsl.portfolio import LongShortPortfolio, Book, TopN, BottomN
+from ..dsl.portfolio import LongShortPortfolio, Book, TopN, BottomN, MaskSelector
 from ..utils.logging import get_logger
 
 
@@ -45,18 +45,26 @@ def compute_target_weights_for_date(
         return signals.get(name)
 
     # Resolve rank/score DataFrames per book
-    _long_rank_try = _get_df_opt(getattr(long_sel, "factor_name", None))
-    long_rank_df = _long_rank_try if _long_rank_try is not None else signals.get("rank")
+    # MaskSelector: the named boolean signal IS both the rank and the mask.
+    if isinstance(long_sel, MaskSelector):
+        _long_signal_df = _get_df_opt(long_sel.signal_name)
+        long_rank_df = _long_signal_df   # 0.0/1.0 or True/False per instrument
+        long_mask_df = _long_signal_df   # same DataFrame used as mask
+    else:
+        _long_rank_try = _get_df_opt(getattr(long_sel, "factor_name", None))
+        long_rank_df = _long_rank_try if _long_rank_try is not None else signals.get("rank")
+        _long_mask_try = _get_df_opt(getattr(long_sel, "mask_name", None))
+        long_mask_df = _long_mask_try if _long_mask_try is not None else signals.get("long_candidates")
 
-    _short_rank_try = _get_df_opt(getattr(short_sel, "factor_name", None))
-    short_rank_df = _short_rank_try if _short_rank_try is not None else signals.get("rank")
-
-    # Resolve masks per book (default to all True over the rank_df shape)
-    _long_mask_try = _get_df_opt(getattr(long_sel, "mask_name", None))
-    long_mask_df = _long_mask_try if _long_mask_try is not None else signals.get("long_candidates")
-
-    _short_mask_try = _get_df_opt(getattr(short_sel, "mask_name", None))
-    short_mask_df = _short_mask_try if _short_mask_try is not None else signals.get("short_candidates")
+    if isinstance(short_sel, MaskSelector):
+        _short_signal_df = _get_df_opt(short_sel.signal_name)
+        short_rank_df = _short_signal_df
+        short_mask_df = _short_signal_df
+    else:
+        _short_rank_try = _get_df_opt(getattr(short_sel, "factor_name", None))
+        short_rank_df = _short_rank_try if _short_rank_try is not None else signals.get("rank")
+        _short_mask_try = _get_df_opt(getattr(short_sel, "mask_name", None))
+        short_mask_df = _short_mask_try if _short_mask_try is not None else signals.get("short_candidates")
 
     # Choose a reference index that contains the requested date
     ref_df: Optional[pd.DataFrame] = None
@@ -257,6 +265,13 @@ def _select_book_names(
     # Filter out instruments failing mask or with NaN rank
     masked_valid = rank_row[mask & rank_row.notna()]
     unmasked_valid = rank_row[rank_row.notna()]
+
+    # MaskSelector: select all instruments where the mask is True (no ranking needed)
+    if isinstance(book.selector, MaskSelector):
+        selected = mask[mask.astype(bool)].index.tolist()
+        if debugging:
+            log.debug("[%s][%s] MaskSelector: %d instruments selected", date, book.name, len(selected))
+        return selected
 
     if isinstance(book.selector, TopN):
         n = book.selector.n

@@ -221,18 +221,25 @@ class FactorEngine:
 
     def _compute_external(self, node: ExternalFactor) -> pd.DataFrame:
         """
-        Load a pre-computed factor from disk and broadcast across all instruments.
+        Load a pre-computed factor from disk.
 
-        Standard formats (no loader required):
+        **Broadcast mode** (``node.per_instrument=False``, default):
         - pickle / parquet / CSV of ``pd.Series``       → used directly
         - pickle / parquet / CSV of ``pd.DataFrame``    → column ``node.column`` or first column
+        The resulting scalar time-series is broadcast to every instrument.
+
+        **Per-instrument mode** (``node.per_instrument=True``):
+        The file must contain a ``pd.DataFrame`` with a ``DatetimeIndex`` and columns
+        named after instrument tickers.  Each column is assigned to its matching
+        instrument; instruments missing from the file columns receive ``NaN``.
+        Use this for per-asset signals (e.g. QQQ SMA filter → TQQQ, TLT SMA → TMF).
 
         Non-standard formats (ML model outputs, compound objects, etc.):
-        - Set ``node.loader = lambda obj: <pd.Series>`` to handle any custom structure.
-          The loader receives the raw deserialized object and must return a pd.Series
-          with a DatetimeIndex.  This keeps format-specific logic out of the engine.
+        - Set ``node.loader`` to handle any custom structure.  In broadcast mode it
+          must return ``pd.Series``; in per-instrument mode it must return ``pd.DataFrame``
+          with ticker columns.
 
-        Example (TKAN pred_cache tuple)::
+        Example (TKAN pred_cache tuple, broadcast)::
 
             def _tkan_loader(obj):
                 pred_df = obj[0]          # (pred_df, retrain_dates, fingerprint)
@@ -265,7 +272,28 @@ class FactorEngine:
             with open(path, "rb") as f:
                 obj = pickle.load(f)
 
-        # Custom loader: handles any non-standard format (TKAN tuples, etc.)
+        # --- Per-instrument mode: DataFrame with ticker columns ---
+        if node.per_instrument:
+            if node.loader is not None:
+                wide_df = node.loader(obj)
+            elif isinstance(obj, pd.DataFrame):
+                wide_df = obj
+            else:
+                raise TypeError(
+                    f"ExternalFactor '{node.name}' (per_instrument=True): expected a "
+                    f"pd.DataFrame with ticker columns, got '{type(obj).__name__}'. "
+                    f"Set node.loader=<callable> to return a DataFrame."
+                )
+            wide_df = wide_df.copy()
+            wide_df.index = pd.DatetimeIndex(wide_df.index)
+            # Reindex to backtest dates; assign NaN for missing instruments
+            result = pd.DataFrame(index=self.index, columns=self.instruments, dtype=float)
+            for instr in self.instruments:
+                if instr in wide_df.columns:
+                    result[instr] = wide_df[instr].reindex(self.index).values
+            return result
+
+        # --- Broadcast mode: scalar Series applied to all instruments ---
         if node.loader is not None:
             series = node.loader(obj)
         elif isinstance(obj, pd.Series):

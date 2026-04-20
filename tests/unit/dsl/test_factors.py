@@ -110,27 +110,27 @@ def test_field_factor_node_construction():
     assert ff.field == "ivol"
 
 
-def test_external_factor_unsupported_by_factor_engine():
-    """FactorEngine raises TypeError for ExternalFactor (handled by TimingRunner)."""
+def test_external_factor_missing_file_raises():
+    """FactorEngine raises FileNotFoundError for ExternalFactor with a bad path."""
     import pytest
     idx = pd.date_range("2020-01-01", periods=3, freq="D")
     close = pd.DataFrame([[100.0], [101.0], [102.0]], index=idx, columns=["A"])
     md = _make_md(idx, ["A"], close)
     engine = FactorEngine(md, close)
 
-    ef = ExternalFactor(name="tkan_pred", path="/dummy.pkl")
-    with pytest.raises(TypeError, match="Unsupported factor node type"):
+    ef = ExternalFactor(name="tkan_pred", path="/nonexistent_dummy.pkl")
+    with pytest.raises(FileNotFoundError):
         engine.compute("tkan_pred", ef)
 
 
-def test_field_factor_unsupported_by_factor_engine():
-    """FactorEngine raises TypeError for FieldFactor (handled by TimingRunner)."""
-    import pytest
+def test_field_factor_returns_nan_panel_for_missing_field():
+    """FactorEngine returns an all-NaN panel for a FieldFactor whose field is absent in md.bars."""
     idx = pd.date_range("2020-01-01", periods=3, freq="D")
     close = pd.DataFrame([[100.0], [101.0], [102.0]], index=idx, columns=["A"])
     md = _make_md(idx, ["A"], close)
     engine = FactorEngine(md, close)
 
     ff = FieldFactor(name="ivol_raw", field="ivol")
-    with pytest.raises(TypeError, match="Unsupported factor node type"):
-        engine.compute("ivol_raw", ff)
+    result = engine.compute("ivol_raw", ff)
+    assert result.shape == (3, 1)
+    assert result.isna().all().all()

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -28,10 +28,15 @@ def rebalance_to_target_weights(
     volumes: pd.Series,
     prev_positions: pd.Series,
     target_weights: pd.Series,
+    exec_prices: Optional[pd.Series] = None,
 ) -> Tuple[pd.Series, float, pd.DataFrame]:
     """
     Given target weights and current positions/cash, construct and execute
     trades at the bar's price (with slippage and volume limits).
+
+    Args:
+        exec_prices: Override fill price (e.g. next-bar open). Falls back to
+                     ``prices`` (close) when None.
 
     Returns:
         new_positions: Series of positions (units) post-trade
@@ -44,8 +49,8 @@ def rebalance_to_target_weights(
     volumes = volumes.reindex(instruments).fillna(0.0)
     prev_positions = prev_positions.reindex(instruments).fillna(0.0)
 
-    # For simplicity, use 'close' as execution price before slippage
-    base_prices = prices.copy()
+    # Execution price: use explicit exec_prices if provided, else close
+    base_prices = exec_prices.reindex(instruments) if exec_prices is not None else prices.copy()
 
     # Target notionals
     target_notional = target_weights * equity

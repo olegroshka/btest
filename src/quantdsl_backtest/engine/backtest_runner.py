@@ -10,7 +10,7 @@ import pandas as pd
 from ..dsl.strategy import Strategy
 from ..engine.results import BacktestResult
 from ..utils.logging import get_logger
-from .data_loader import load_data_for_strategy
+from .data_loader import load_data_for_strategy, load_open_prices
 from .factor_engine import FactorEngine
 from .signal_engine import SignalEngine
 from .portfolio_engine import compute_target_weights_for_date
@@ -784,6 +784,12 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     dates = prices.index
     instruments = prices.columns
 
+    # Load open prices if T+1 open fills are requested
+    _fill_on = getattr(getattr(strategy.execution, "order_policy", None), "fill_on", "close")
+    open_prices: Optional[pd.DataFrame] = None
+    if _fill_on == "open":
+        open_prices = load_open_prices(md, instruments).reindex(prices.index)
+
     # ------------------------------------------------------------------ #
     # 2. Compute factors & signals
     # ------------------------------------------------------------------ #
@@ -1020,17 +1026,43 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 cash_delta = 0.0
                 trades_today = pd.DataFrame()
             else:
-                new_positions, cash_delta, trades_today = rebalance_to_target_weights(
-                    date=dt,
-                    execution=strategy.execution,
-                    commission=strategy.costs.commission,
-                    fees=strategy.costs.fees,
-                    equity=equity_before,
-                    prices=price_t_eff,
-                    volumes=volume_t,
-                    prev_positions=st.prev_positions,
-                    target_weights=target_weights,
-                )
+                # Resolve execution price: T+1 open fill or same-bar close (default)
+                if _fill_on == "open" and open_prices is not None:
+                    open_t = open_prices.loc[dt]
+                    # Use today's open to fill *yesterday's* pending target weights,
+                    # then queue today's computed target weights for T+1.
+                    exec_weights = st.pending_target_weights
+                    st.pending_target_weights = target_weights
+                    if exec_weights is None:
+                        # No pending orders yet (day 0 of open-fill mode) — stay flat
+                        new_positions = st.prev_positions
+                        cash_delta = 0.0
+                        trades_today = pd.DataFrame()
+                    else:
+                        new_positions, cash_delta, trades_today = rebalance_to_target_weights(
+                            date=dt,
+                            execution=strategy.execution,
+                            commission=strategy.costs.commission,
+                            fees=strategy.costs.fees,
+                            equity=equity_before,
+                            prices=price_t_eff,
+                            volumes=volume_t,
+                            prev_positions=st.prev_positions,
+                            target_weights=exec_weights,
+                            exec_prices=open_t,
+                        )
+                else:
+                    new_positions, cash_delta, trades_today = rebalance_to_target_weights(
+                        date=dt,
+                        execution=strategy.execution,
+                        commission=strategy.costs.commission,
+                        fees=strategy.costs.fees,
+                        equity=equity_before,
+                        prices=price_t_eff,
+                        volumes=volume_t,
+                        prev_positions=st.prev_positions,
+                        target_weights=target_weights,
+                    )
 
             st.cash += cash_delta
             cur_positions = new_positions
@@ -1362,6 +1394,9 @@ class BacktestState:
     trading_halted: bool = False
     soft_scale_latched: bool = False
     ever_had_exposure: bool = False
+
+    # pending orders for T+1 open fill (None when fill_on="close")
+    pending_target_weights: Optional[pd.Series] = None
 
     # collectors
     sel_collector: SelectionTraceCollector = None  # type: ignore[assignment]
