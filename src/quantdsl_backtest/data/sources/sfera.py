@@ -37,7 +37,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse, parse_qs
 
 import pandas as pd
@@ -64,12 +64,25 @@ def _ensure_sfera_db_on_path() -> None:
 _ensure_sfera_db_on_path()
 
 try:
-    import sfera_db
-except ImportError as exc:  # pragma: no cover
-    raise ImportError(
-        "sfera-db package not found. Expected at <workspace>/sfera-db/. "
-        "Check your workspace layout."
-    ) from exc
+    import sfera_db as _sfera_db
+except ImportError:  # pragma: no cover - exercised when the optional workspace dep is absent
+    _sfera_db = None
+
+
+def _require_sfera_db() -> Any:
+    """Return the optional sfera-db module or raise a clear runtime error.
+
+    This keeps non-Sfera providers importable in environments that do not have
+    the local `sfera-db` workspace available, while preserving the existing
+    error when a Sfera-backed request is actually used.
+    """
+
+    if _sfera_db is None:
+        raise ImportError(
+            "sfera-db package not found. Expected at <workspace>/sfera-db/. "
+            "Check your workspace layout."
+        )
+    return _sfera_db
 
 
 # ── URI parsing ──────────────────────────────────────────────────────────────
@@ -149,6 +162,8 @@ def _coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
 
 def _fetch_raw(uri: _ParsedUri, start: str, end: str) -> pd.DataFrame:
     """Pull rows from sfera within [start, end] on the detected/declared date col."""
+    sfera_db = _require_sfera_db()
+
     # First get column info so we can build the WHERE clause correctly
     cols_df = sfera_db.columns(table=uri.table, schema=uri.schema)
     if cols_df.empty:
