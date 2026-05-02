@@ -47,14 +47,6 @@ dev = [
   "isort>=5.13",
   # Type stubs should be dev-only to avoid unnecessary runtime installs
   "pandas-stubs==2.3.3.251201",
-  # SMIM acceptance test reference implementations
-  "pydmd>=1.0",
-  "ripser>=0.6",
-  "persim>=0.3",
-  # R-TE-1: IDTxl (not on PyPI — installed from GitHub) + Java bridge
-  # Install manually: uv pip install "idtxl @ git+https://github.com/pwollstadt/IDTxl.git"
-  "JPype1>=1.5",
-  "setuptools>=61",   # provides pkg_resources required by idtxl.estimators_jidt
 ]
 
 platform = [

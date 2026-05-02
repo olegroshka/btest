@@ -155,27 +155,8 @@ Built artifacts are committed at `src/quantdsl_backtest/platform_ui/assets_dist/
 - `tests_slow/integration/` — full strategy runs, data source integration
 - `tests_slow/platform/` — FastAPI endpoint tests + Playwright browser E2E
 - `tests_slow/smoke/` — live-server smoke tests (marked `manual`, require running server)
-- `tests/acceptance/smim/` — 130 SMIM correctness tests (run on both CPU and CUDA)
-- `tests/benchmarks/smim/` — GPU vs CPU performance benchmarks (pytest-benchmark)
 
 Playwright tests require a running platform server and are marked `manual`. The `.platform_ui/server.port` file stores the active port.
-
-### SMIM acceptance and benchmark commands
-
-```bash
-# SMIM acceptance suite (CPU, ~65 s)
-uv run python scripts/smim/run_smim_acceptance.py
-
-# SMIM acceptance suite on CUDA
-SMIM_DEVICE=cuda uv run pytest tests/acceptance/smim/ -v --tb=short
-
-# Performance benchmarks (requires --extra benchmarks + --extra gpu)
-uv run pytest tests/benchmarks/smim/ -v --benchmark-columns=mean,stddev,rounds \
-    --benchmark-json=.benchmark_results.json
-
-# Speedup report (reads .benchmark_results.json)
-uv run python scripts/smim/gpu_speedup_report.py
-```
 
 ## Code Style
 
@@ -188,45 +169,30 @@ uv run python scripts/smim/gpu_speedup_report.py
 
 ## Architecture Rules
 
-- All new SMIM code goes under `src/quantdsl_backtest/smim/`
 - Existing `dsl/` and `engine/` code: read freely, modify only with explicit discussion
-- SMIM components implement protocols defined in `smim/interfaces.py`
-- Data adapters follow the existing FRED adapter pattern — read it first before writing new ones
-- Bridge signals (SMIM → btest) go in `smim/signals/` and follow `dsl/signals.py` conventions
-- Experiment configs are YAML files in `experiments/` parsed by `smim/config.py`
+- SMIM was extracted into the standalone sibling repo at `C:\Users\olegr\PycharmProjects\smim`
+- Do not add new implementation under `src/quantdsl_backtest/smim/`; that duplicate tree has been retired from `btest`
+- If `btest` needs SMIM-facing helpers, keep them as explicit DSL-side bridge code under `src/quantdsl_backtest/dsl/`
+- Data adapters for `btest` itself should follow the existing FRED adapter pattern; SMIM research adapters now belong in the standalone repo
 
 ## Testing Rules
 
 - Every new public function needs a test
-- Unit tests in `tests/unit/smim/` mirror the `smim/` directory structure
-- Integration tests in `tests_slow/smim/`
 - Matrix/numerical code: test against known analytical solutions where possible
 - Data adapters: test with cached fixtures, never hit live APIs in unit tests
 
-## SMIM-Specific Context
+## SMIM note
 
-Read `docs/smim/CLAUDE.md` for mathematical notation, standing assumptions,
-milestone status, and implementation patterns specific to the SMIM framework.
+SMIM is now maintained in the standalone sibling repository `C:\Users\olegr\PycharmProjects\smim`.
+Only btest-owned bridge helpers remain in `dsl` when needed for integration.
 
 ## Reference Documents (read when needed, not upfront)
 
-- `docs/smim/PROPOSAL_SUMMARY.md` — condensed research proposal (mathematical architecture, work packages)
-- `docs/smim/IMPLEMENTATION_PLAN.md` — milestones, quality gates, acceptance criteria
-- `docs/smim/TASK_REGISTRY.md` — Claude Code task decomposition with current status
-- `docs/smim/notation.md` — every mathematical symbol: LaTeX, Python variable, shape, module (G0 artefact)
-- `docs/smim/actor_taxonomy.md` — MVP actor universe with layer assignments and exemplars (G0 artefact)
-- `docs/smim/benchmark_specs.md` — formal definitions for all 5 benchmark families (G0 artefact)
-- `docs/smim/scope_selection.md` — justification for energy US+UK MVP scope (G0 artefact)
-- `docs/smim/DECISIONS.md` — architectural decision log (created at Gate G0; append after each gate)
-- `docs/smim/ADAPTER_GUIDE.md` — how to write a new data adapter (created in M1.2-T1)
-- `docs/smim/GPU_ACCELERATION_PLAN.md` — GPU acceleration design, measured speedups, quality gates
-- `smim/interfaces.py` — all Protocol definitions (read this before implementing anything)
-- `smim/config.py` — Pydantic config models (all tuneable parameters)
-- `experiments/mvp_energy_us_uk.yaml` — sample experiment config for the first build
+- For SMIM research materials, read them from the standalone sibling repo `C:\Users\olegr\PycharmProjects\smim`
+- In `btest`, the only retained SMIM-related code should be explicit DSL-side bridge helpers such as `src/quantdsl_backtest/dsl/smim.py`
 
 ## Git Conventions
 
-- Branch per feature: `smim/m2.1-granger-edges`
-- Commit format: `[SMIM M{wp}.{ms}-T{task}] Brief description`
-- Example: `[SMIM M2.1-T3] Implement NarrativeEdgeEstimator`
+- Use normal `btest` branch and commit conventions here.
+- SMIM-specific milestone branches and commit tags belong in the standalone `smim` repository, not in `btest`.
 - Run `uv run pytest -q` before every commit — existing tests must not break

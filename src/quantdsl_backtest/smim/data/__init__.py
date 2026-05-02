@@ -1,1 +1,0 @@
-"""SMIM data adapters and point-in-time store."""
