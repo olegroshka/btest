@@ -27,6 +27,7 @@ dependencies = [
   "streamlit>=1.53.1",
   "nbformat>=5.10.4",
   "ipywidgets>=8.1.8",
+  "requests>=2.31",
   "statsmodels>=0.14.6",
   "scikit-learn>=1.7.2",
   "scipy-stubs~=1.15.3",

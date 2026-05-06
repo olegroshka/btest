@@ -61,6 +61,9 @@ data/smim/raw/
 data/smim/processed/
 data/smim/pit_store/
 
+# EODHD UK/EU acquired data (local vendor data / private cache)
+data/raw/eodhd/
+
 # SMIM temporary / scratch files
 tmp_*.txt
 tmp_*.py
