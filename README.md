@@ -179,6 +179,20 @@ uv sync
 ```
 
 
+EODHD data workflows
+--------------------
+- Operator runbook: `scripts/eodhd/README.md`
+- Per-lane factual manifests:
+  - `scripts/eodhd/EODHD_US_COMMON_STOCK_DATA_MANIFEST.md`
+  - `scripts/eodhd/EODHD_US_ETF_DATA_MANIFEST.md`
+  - `scripts/eodhd/EODHD_INDEX_REF_DATA_MANIFEST.md`
+  - `scripts/eodhd/EODHD_UK_EU_DATA_MANIFEST.md`
+  - `scripts/eodhd/EODHD_UK_EU_ETF_DATA_MANIFEST.md`
+  - `scripts/eodhd/EODHD_UK_EU_INDEX_REF_DATA_MANIFEST.md`
+
+The runbook is the entry point for how to call and resume the fetchers. The manifests are the factual inventories for local artefacts, counts, and current observed coverage.
+
+
 Testing
 -------
 This repo separates **fast unit tests** (default) from **slow / integration-style tests** and **smoke tests**.

@@ -489,8 +489,10 @@ Update this manifest when the `scripts/eodhd/` workflow changes materially, espe
 
 ## 8. Operational ownership
 
-This manifest now serves as the single EODHD documentation entry point in `btest`.
+This manifest remains the factual inventory for the core UK/EU common-stock lane.
 
-It lives alongside the fetcher scripts under `scripts/eodhd/` so the operational notes, continuation semantics, and output inventory stay co-located with the code that maintains them.
+Operator-facing entry-point documentation for calling and resuming the broader EODHD fetchers now lives in `scripts/eodhd/README.md`.
+
+The lane-specific manifests under `scripts/eodhd/` remain the source for per-sleeve scope, output inventory, continuation semantics, and observed on-disk counts.
 
 
