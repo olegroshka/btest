@@ -125,6 +125,29 @@ Set-Location "C:\Users\olegr\PycharmProjects\btest"
 python -u tmp_poll_eodhd_progress.py
 ```
 
+Raw-data quality report:
+
+```powershell
+Set-Location "C:\Users\olegr\PycharmProjects\btest"
+uv run python scripts/eodhd/report_eodhd_raw_quality.py --lane all
+
+# write machine-readable per-lane outputs next to the raw data
+uv run python scripts/eodhd/report_eodhd_raw_quality.py --lane all --write-report
+```
+
+The QC report checks for:
+
+- universe/state/output coverage mismatches,
+- stale or sparse price histories,
+- duplicate or structurally invalid OHLC rows,
+- suspicious ETF zero-volume behavior,
+- and dividend/split sidecar inconsistencies.
+
+When `--write-report` is used, each audited lane root receives:
+
+- `qc_summary.json`
+- `qc_flags.csv`
+
 For a lane-specific audit, inspect:
 
 - the main parquet output (`prices_daily.parquet`, `dividends_history.parquet`, `splits_history.parquet`),
