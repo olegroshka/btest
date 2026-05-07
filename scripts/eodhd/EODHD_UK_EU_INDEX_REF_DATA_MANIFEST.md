@@ -71,3 +71,38 @@ Interpretation:
 
 - `prices_fetch_state.csv`: `up_to_date` means the local history already covered the requested `--to` bound and no HTTP request was needed on that rerun.
 
+### QC remediation note (2026-05-07)
+
+After the initial QC report surfaced structural price anomalies, the UK/EU subset below was re-fetched with targeted `--tickers ... --full-refresh` repairs:
+
+- `SCXP.INDX`
+- `SX3R.INDX`
+- `SX6R.INDX`
+- `SXER.INDX`
+- `SXIR.INDX`
+- `SXKR.INDX`
+
+Observed result after the targeted repairs and a second QC pass:
+
+- the same structural anomalies remained present,
+- and the UK/EU filtered reference sleeve now treats the following subset as known persistent provider-side price exceptions.
+
+Current known persistent UK/EU index-reference price exceptions:
+
+- `SCXP.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SX3R.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SX6R.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXER.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXIR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXKR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXOOR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXQR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXRR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXTR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+
+Operator rule:
+
+- do **not** keep re-running routine targeted full-refresh repairs for these exact symbols,
+- continue normal incremental reruns for the broader filtered UK/EU reference sleeve,
+- and only revisit the exception list after provider-side changes are observed or after adding explicit sanitation / exclusion handling downstream.
+

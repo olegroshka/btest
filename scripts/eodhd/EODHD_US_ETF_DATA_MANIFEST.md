@@ -144,6 +144,31 @@ Interpretation:
 - `dividends_fetch_state.csv` / `splits_fetch_state.csv`: `ok` means provider event history was returned; `empty` means the provider returned no event history for that pair.
 - `dividends_fetch_audit.csv` / `splits_fetch_audit.csv` mirror the event outcome inventory and are useful for quick operator audits.
 
+### QC remediation note (2026-05-07)
+
+After the initial QC report surfaced structural price anomalies, the following symbols were re-fetched with targeted `--tickers ... --full-refresh` repairs:
+
+- `PSQA.US`
+- `SSSEF.US`
+- `VYLD.US`
+
+Observed result after the targeted repairs and a second QC pass:
+
+- the same symbols remained flagged for `non_positive_prices`,
+- which indicates that these rows currently behave like persistent provider-returned oddities rather than local resume / merge corruption.
+
+Current known persistent US ETF price exceptions:
+
+- `PSQA.US` -> `non_positive_prices`
+- `SSSEF.US` -> `non_positive_prices`
+- `VYLD.US` -> `non_positive_prices`
+
+Operator rule:
+
+- do **not** keep re-running routine targeted full-refresh repairs for these exact symbols,
+- continue normal incremental lane reruns for the rest of the universe,
+- and only revisit these names after either provider-side changes are observed or code-level sanitation rules are introduced for explicitly handling them downstream.
+
 ## 4. Maintenance rule
 
 Update this manifest when the US ETF workflow changes materially, especially when any of the following move:

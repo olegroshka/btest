@@ -111,3 +111,27 @@ Interpretation:
 - `dividends_fetch_state.csv` / `splits_fetch_state.csv`: `ok` means provider event history was returned; `empty` means the provider returned no event history for that pair.
 - `dividends_fetch_audit.csv` / `splits_fetch_audit.csv` mirror the same per-pair outcome inventory for operator audits.
 
+### QC remediation note (2026-05-07)
+
+After the initial QC report surfaced structural price anomalies, the following symbols were re-fetched with targeted `--tickers ... --full-refresh` repairs:
+
+- `PHPT.AS`
+- `EX14.VI`
+
+Observed result after the targeted repairs and a second QC pass:
+
+- `PHPT.AS` remained flagged for `invalid_ohlc_relationship` and `non_positive_prices`,
+- `EX14.VI` remained flagged for `non_positive_prices`,
+- which indicates that these rows currently behave like persistent provider-returned oddities rather than local resume / merge corruption.
+
+Current known persistent UK/EU ETF price exceptions:
+
+- `PHPT.AS` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `EX14.VI` -> `non_positive_prices`
+
+Operator rule:
+
+- do **not** keep re-running routine targeted full-refresh repairs for these exact symbols,
+- continue normal incremental lane reruns for the rest of the ETF universe,
+- and only revisit these names after either provider-side changes are observed or explicit sanitation / exclusion handling is added downstream.
+

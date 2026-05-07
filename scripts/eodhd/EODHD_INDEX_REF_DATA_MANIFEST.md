@@ -94,6 +94,43 @@ Interpretation:
 
 - `prices_fetch_state.csv`: `ok` means the run fetched and merged index history for that symbol; `up_to_date` means local history was already current through the requested `--to` bound and no HTTP request was needed.
 
+### QC remediation note (2026-05-07)
+
+After the initial QC report surfaced structural price anomalies, the following symbols were re-fetched with targeted `--tickers ... --full-refresh` repairs:
+
+- `COR10D.INDX`
+- `COR90D.INDX`
+- `SCXP.INDX`
+- `SX3R.INDX`
+- `SX6R.INDX`
+- `SXER.INDX`
+
+Observed result after the targeted repairs and a second QC pass:
+
+- the same structural anomalies remained present,
+- and additional persistent structural exceptions are now treated as known provider-side oddities rather than local resume / merge corruption.
+
+Current known persistent index-reference price exceptions:
+
+- `COR10D.INDX` -> `invalid_ohlc_relationship`
+- `COR90D.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SCXP.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SX3R.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SX6R.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXER.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXIR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXKR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXOOR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXQR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXRR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+- `SXTR.INDX` -> `invalid_ohlc_relationship`, `non_positive_prices`
+
+Operator rule:
+
+- do **not** keep re-running routine targeted full-refresh repairs for these exact symbols,
+- continue normal incremental lane reruns for the broader `INDX` universe,
+- and only revisit the exception list after provider-side changes are observed or after introducing explicit sanitation / exclusion rules downstream.
+
 ## 4. Maintenance rule
 
 Update this manifest when the index / benchmark workflow changes materially, especially when any of the following move:

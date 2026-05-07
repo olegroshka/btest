@@ -143,6 +143,8 @@ The QC report checks for:
 - suspicious ETF zero-volume behavior,
 - and dividend/split sidecar inconsistencies.
 
+Persistent hard-error symbols that survive targeted `--full-refresh` repairs should be recorded in the relevant lane manifest as known provider-side exceptions rather than repeatedly re-fetched blindly.
+
 When `--write-report` is used, each audited lane root receives:
 
 - `qc_summary.json`
