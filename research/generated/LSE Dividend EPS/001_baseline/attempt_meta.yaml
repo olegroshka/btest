@@ -1,0 +1,44 @@
+id: "001"
+name: baseline
+date: null
+status: not_run
+
+parameters:
+  signal: "0.4 × trailing-12M yield rank + 0.6 × YoY EPS growth rank"
+  eps_source: "eodhd.earnings_history (point-in-time via report_date)"
+  universe: "LSE stocks — dividend payers with EPS history"
+  portfolio: "Long-only Top-20 equal weight"
+  rebalance: "1m (monthly)"
+  commission_bps: 10
+  slippage_base_bps: 2
+  start: "2015-01-01"
+  end: "2026-01-01"
+
+results:
+  sharpe: 0.87
+  cagr: 0.0805
+  max_dd: -0.2627
+  calmar: 0.31
+  volatility: 0.0946
+  sortino: 1.28
+  total_return: 1.3890
+  avg_holdings: 20
+
+verdict: ACCEPTABLE
+  # Sharpe 0.87 is near the Good threshold. Low vol (9.5%) = stable holdings.
+  # Max DD -26.3% is slightly over 25% threshold. Calmar 0.31 = acceptable.
+  # Strong Sortino (1.28) = good downside protection.
+
+next_attempts:
+  - id: "002"
+    name: higher_n
+    hypothesis: "Top-30 instead of Top-20 — reduce concentration, smoother DD"
+  - id: "003"
+    name: eps_weight_up
+    hypothesis: "0.3×yield + 0.7×EPS growth — lean more into earnings momentum"
+  - id: "004"
+    name: add_quality_filter
+    hypothesis: "Add profit_margin > 0 filter to exclude loss-making payers"
+  - id: "005"
+    name: attribution_analysis
+    hypothesis: "Decompose returns: how much is dividend income vs capital gains?"

@@ -77,3 +77,6 @@ src/quantdsl_backtest/platform_ui/assets_dist/assets/*.map
 
 # Claude Code local settings (machine-specific, contains permissions)
 .claude/settings.local.json
+
+# Agent-generated research data (large parquets, rebuild locally)
+research/generated/**/data/

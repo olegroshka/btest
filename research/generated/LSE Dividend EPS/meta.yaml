@@ -1,0 +1,26 @@
+slug: lse_dividend_eps
+display_name: "LSE Dividend EPS"
+hypothesis: >
+  LSE stocks with high trailing dividend yield AND accelerating EPS growth
+  outperform on a total-return basis. The composite ranks 40% yield + 60% EPS YoY
+  growth, rebalanced monthly. Attribution tracks how much return comes from
+  dividend income vs capital appreciation.
+exchange: LSE
+universe_type: long_only
+rebalance: monthly
+portfolio: Top-20 equal weight
+data_sources:
+  - eodhd.prices (exchange='LSE')
+  - eodhd.dividends (exchange='LSE')
+  - eodhd.earnings_history (exchange='LSE')
+
+attempts:
+  - id: "001"
+    name: baseline
+    date: "2026-05-10"
+    path: 001_baseline
+    status: done
+    sharpe: 0.87
+    cagr: 0.0805
+    max_dd: -0.2627
+    notes: "Composite 0.4×yield + 0.6×EPS_YoY, Top-20, monthly rebalance, 10bps commission. ACCEPTABLE."

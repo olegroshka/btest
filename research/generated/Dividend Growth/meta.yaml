@@ -1,0 +1,34 @@
+# ── Strategy metadata ─────────────────────────────────────────────────────────
+slug: dividend_growth_ls
+display_name: "Dividend Growth L/S"
+created: "2026-05-10"
+
+hypothesis: >
+  SP500 stocks that combine high trailing dividend yield with strong YoY dividend
+  growth are superior long candidates; stocks with low growth are inferior.
+  A dollar-neutral long/short exploits the spread between compounders and laggards.
+
+signal:
+  composite: "0.4 × trailing-12M yield rank + 0.6 × YoY dividend growth rank"
+  universe: "SP500 dividend payers only (NaN = non-payer = excluded)"
+  data_source: "eodhd.dividends via sfera postgres"
+
+portfolio: "Top-50 long / Bottom-20 short, weekly rebalance, dollar-neutral"
+
+signal_library_slug: null   # set if catalogued in agentic/signal_library/catalog/
+
+# ── Attempt index ────────────────────────────────────────────────────────────
+attempts:
+  - id: "001"
+    name: baseline
+    date: "2026-05-10"
+    description: "Initial implementation — vanilla yield+growth composite"
+    path: "001_baseline"
+    status: complete
+    sharpe: -0.01
+    cagr: -0.05%
+    max_dd: -12.28%
+    notes: >
+      Poor Sharpe driven by short book containing high-momentum low-payers
+      (GOOGL, META, NVDA). Short signal needs rethinking — bottom-payer ≠ underperformer.
+      Suggested next: short dividend-cutters only.
