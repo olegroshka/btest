@@ -14,6 +14,24 @@ frontend/.vite/
 local_cache/
 local_cache.bak/
 outputs/
+**/outputs/
+
+# Research — lives in workspace-root research/ folder, not in btest
+research/
+
+# Research generated data — rebuilt from DB, never commit
+research/**/shared_data/
+research/**/data/*.parquet
+tearsheet.html
+
+# Trained model weights (binary, large — rebuilt via training)
+*.h5
+
+# Root-level generated data
+data/**/*.parquet
+
+# Scratch / one-off debug artifacts
+dashboard_lines_1_260.txt
 
 # Local scratch / probe files
 _tmp_*.txt
@@ -28,6 +46,9 @@ pytest_*_out*.txt
 # More scratch artifacts created during debugging
 .tmp_*
 _meta_query_selection_sync_diagnostics_last.txt
+
+# IDE — machine-specific, not for collaborators
+.vscode/
 
 # IDE (may include absolute machine paths)
 .idea/

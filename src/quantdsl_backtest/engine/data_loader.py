@@ -15,6 +15,19 @@ from ..utils.logging import get_logger
 
 log = get_logger(__name__)
 
+# ---------------------------------------------------------------------------
+# Module-level data cache
+# Keyed by (source, start, end) so sweeps sharing the same universe + date
+# range only hit the parquet once per process.  Call clear_data_cache() to
+# free memory or to force a reload.
+# ---------------------------------------------------------------------------
+_DATA_CACHE: dict[tuple, tuple] = {}
+
+
+def clear_data_cache() -> None:
+    """Evict all cached market data (e.g. between unrelated backtests)."""
+    _DATA_CACHE.clear()
+
 
 def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame, pd.DataFrame]:
     """
@@ -29,6 +42,15 @@ def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame
     Important: Preserve the original timestamp index from the data adapter
     to maintain exact alignment with vectorbt baselines used in tests.
     """
+    _cache_key = (
+        str(strategy.data.source),
+        str(getattr(strategy.data, "start", None)),
+        str(getattr(strategy.data, "end", None)),
+    )
+    if _cache_key in _DATA_CACHE:
+        log.debug("Data cache hit for %s", strategy.data.source)
+        return _DATA_CACHE[_cache_key]
+
     log.info("Loading market data from %s", strategy.data.source)
     md = load_market_data(strategy.data, strategy.universe)
 
@@ -85,7 +107,9 @@ def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame
         len(instruments),
         len(prices.index),
     )
-    return md, prices, volumes
+    result = md, prices, volumes
+    _DATA_CACHE[_cache_key] = result
+    return result
 
 
 def load_open_prices(md: "MarketData", instruments: "pd.Index") -> "pd.DataFrame":

@@ -1356,12 +1356,23 @@ def _is_rebalance_date(
     portfolio,
 ) -> bool:
     """
-    Simple daily rebalance logic for now. Need to extend to weekly/monthly.
+    Return True on the bars where the portfolio should rebalance.
+
+    '1d' - every bar (default)
+    '1w' - first bar of each calendar week  (Mon changes)
+    '1m' - first bar of each calendar month
+    Any other value defaults to daily.
     """
     freq = portfolio.rebalance_frequency
     if freq == "1d":
         return True
-    # For now just do daily; you can extend later.
+    if idx == 0:
+        return True  # always rebalance on the very first bar
+    if freq == "1w":
+        return dates[idx].isocalendar().week != dates[idx - 1].isocalendar().week
+    if freq == "1m":
+        return dates[idx].month != dates[idx - 1].month
+    # Unknown frequency: fall back to daily
     return True
 
 
