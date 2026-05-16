@@ -1,0 +1,92 @@
+plan_id: LSE_FUNDAMENTAL_DIVEPS_S003
+parent_strategy: US_FUNDAMENTAL_DIVGROWTH
+signal_slug: 003_lse_div_eps
+exchange: LSE
+catalog_source: internal_generated
+
+# ── Hypothesis ────────────────────────────────────────────────────────────────
+hypothesis: >
+  LSE stocks with high trailing dividend yield AND accelerating EPS growth
+  outperform on a total-return basis. Composite: 40% yield rank + 60% EPS YoY
+  rank, rebalanced monthly, long-only Top-30.
+  Ported from generated/LSE Dividend EPS/002_fixed (Sharpe=0.57, status=ACCEPTABLE).
+
+# ── Signals ───────────────────────────────────────────────────────────────────
+signals:
+  - name: Trailing Dividend Yield (capped 15%)
+    identifier: yield_ttm
+    formula: "rolling_365d_dividends / adj_close, capped at 0.15"
+    source_tables: [eodhd.prices (exchange=LSE), eodhd.dividends (exchange=LSE)]
+    weight: 0.40
+
+  - name: EPS YoY Growth
+    identifier: eps_yoy
+    formula: "(eps_actual[t] / eps_actual[t - EPS_LAG]) - 1, lag=4 quarters"
+    source_tables: [eodhd.earnings_history (exchange=LSE)]
+    weight: 0.60
+
+# ── Execution ─────────────────────────────────────────────────────────────────
+execution:
+  long_n: 30
+  short_n: 0               # long-only
+  rebalance: 1m
+  direction: long_only
+  costs_commission_bps: 10.0
+  delay_bars: 1
+  universe_filters:
+    - HasHistory(min_days=252)
+    - MinPrice(min_price=100.0)   # GBX — 1 GBP floor
+
+# ── Limitations ───────────────────────────────────────────────────────────────
+limitations:
+  blockers: []
+  warnings:
+    - "LSE universe includes ADRs and foreign cross-listings — MinPrice+MinHistory filter reduces from ~3900 to ~250 tickers"
+    - "Bad ticks (|1d return|>50%) cleaned at build time via NaN→ffill; still 1,142 events in 2013–2026"
+    - "EPS data coverage on LSE is thinner than US — many smaller caps lack analyst estimates"
+    - "Monthly rebalance means stale signals during earnings season"
+  pit_lag_days: 1
+  recommended_start: "2015-01-01"
+
+# ── Variants ──────────────────────────────────────────────────────────────────
+variants:
+  - id: v1_baseline_002fixed
+    status: completed
+    top_n: 30
+    yield_cap: 0.15
+    yield_w: 0.40
+    eps_lag: 4
+    rebalance: 1m
+    sharpe: 0.57
+    cagr: 0.0665
+    max_drawdown: -0.3524
+    notes: "Run 2026-05-11. Fix for universe contamination + bad ticks. ACCEPTABLE."
+
+  - id: v2_higher_eps_weight
+    status: planned
+    yield_w: 0.20
+    eps_w: 0.80
+
+  - id: v3_long_short
+    status: planned
+    short_n: 10
+    notes: "Bottom-10 by composite as short book — test if low-yield/declining-EPS names underperform"
+
+# ── Results (fill after next run from new path) ───────────────────────────────
+results:
+  sharpe: 0.56
+  cagr: 0.0677
+  max_drawdown: -0.4255
+  calmar: ~
+  run_at: "2026-05-14"
+  prior_run:
+    sharpe: 0.57
+    cagr: 0.0665
+    max_drawdown: -0.3524
+    source: "research/generated/LSE Dividend EPS/002_fixed"
+    run_at: "2026-05-11"
+
+# ── Run commands ──────────────────────────────────────────────────────────────
+# From btest/ root:
+#   uv run python "research/generated/Dividend Growth/signals/003_lse_div_eps/build_signals.py"
+#   uv run python "research/generated/Dividend Growth/signals/003_lse_div_eps/strategy.py"

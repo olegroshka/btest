@@ -1,0 +1,145 @@
+# ── Strategy-level document ─────────────────────────────────────────────────
+# Edit this file; do NOT overwrite — it is the persistent thesis record.
+strategy_id: LSE_FUNDAMENTAL_DIVGROWTH
+name: "LSE Dividend Growth"
+category: fundamental
+exchange: LSE                # primary; expand to Europe later
+status: in_progress        # exploring | in_progress | composite_testing | production | retired
+created: "2026-05-10"
+updated: "2026-05-14"      # pivoted from US/SP500 to LSE; US signals parked
+
+# ── Canonical Universe ───────────────────────────────────────────────────────
+# Defined ONCE here. All signals import from universe.py — never re-define filters.
+# A signal may use a *subset* (e.g. dividend payers only, or EPS-covered only)
+# but starts from this base. To change the universe, change universe.py + this block.
+universe:
+  module: research/generated/Dividend Growth/universe.py   # import LSEUniverse from here
+  exchange: LSE
+  currencies: [GBX, GBP]          # excludes USD/EUR cross-listings and GDRs
+  min_price_gbx: 100.0             # 1 GBP floor — removes shells, warrants, penny stocks
+  min_history_days: 252            # ~1 trading year of history before ticker enters pool
+  bad_tick_threshold: 0.50         # |1d adj_close return| > 50% → NaN → ffill
+  pull_start: "2013-01-01"         # pull earlier than backtest start (warmup data)
+  pull_end: "2026-06-01"
+  backtest_start: "2015-01-01"
+  backtest_end: "2026-01-01"
+  approx_size: ~250                # tickers active at any given date (after filters)
+  data_sources:
+    - eodhd.prices          # OHLCV; filter: exchange='LSE', deprecated_at IS NULL
+    - eodhd.instruments     # currency, sector, industry, isin (for filter + contamination checks)
+  rationale: >
+    100 GBX floor excludes penny stocks, warrants, and shells. Currency filter
+    (GBX/GBP) removes ~500 US/EU cross-listings (GDRs, ADRs) that trade near 99 GBX
+    but are priced in USD and do not behave as LSE-native equities.
+    MinHistory 252d ensures at least 1 year of price history before first signal use.
+
+# ── Thesis ──────────────────────────────────────────────────────────────────
+thesis: >
+  Stocks that consistently grow their dividends demonstrate sustainable free-cash-flow
+  generation and management confidence in the business. Combining high yield with strong
+  dividend growth should identify quality compounders priced below intrinsic value,
+  while dividend cutters reveal financial stress before it is fully priced in.
+
+# ── Causal chain ─────────────────────────────────────────────────────────────
+# Populate as understanding deepens; future: DAG specification
+causal_chain:
+  - "Dividend growth → management confidence in future FCF → analyst re-rating → price drift"
+  - "High yield + growing dividend → income + growth demand → long-term outperformance"
+  - "Dividend cut >20% YoY → FCF deterioration signal → underperformance over 6–12 months"
+# causal_graph: ~
+
+# ── Signals under test ───────────────────────────────────────────────────────
+# Priority order: LSE signals first; US signals parked (exchange pivot 2026-05-14)
+signals:
+  # ── ACTIVE: LSE signals ────────────────────────────────────────────────────
+  - id: LSE_FUNDAMENTAL_DIVEPS_S003
+    slug: 003_lse_div_eps
+    exchange: LSE
+    priority: 1
+    name: "LSE: 40% Trailing Yield + 60% EPS YoY Growth — Long-only Top-30"
+    catalog_slug: ~
+    status: ported
+    prior_sharpe: 0.57
+    prior_cagr: 0.0665
+    prior_max_dd: -0.3524
+    prior_verdict: ACCEPTABLE
+    notes: >
+      Baseline LSE signal. Ported from LSE Dividend EPS/002_fixed.
+      Re-run needed from new path to confirm equity curve.
+      Next: add short book (cutters) → S003b. Add PEAD overlay → composite.
+
+  - id: LSE_EARNINGS_PEAD_S004
+    slug: 004_lse_pead
+    exchange: LSE
+    priority: 2
+    name: "LSE PEAD: SUE signal, Top-8 long-only, daily rebalance, 21d hold"
+    catalog_slug: ~
+    status: ported
+    prior_sharpe: ~
+    notes: >
+      Event-driven overlay — orthogonal alpha source vs S003 factor signal.
+      Run to get equity curve, then combine with S003 to test diversification.
+
+  - id: LSE_FUNDAMENTAL_DIVGROWTH_S005
+    slug: 005_lse_cutters_short
+    exchange: LSE
+    priority: 3
+    name: "LSE: Long yield+EPS composite, Short dividend cutters (>20% YoY)"
+    catalog_slug: ~
+    status: planned
+    notes: >
+      Add short book to S003: short LSE names that cut dividend >20% YoY.
+      Expected short universe: 3–10 names at any time (thin but quality signal).
+
+  - id: LSE_COMPOSITE_S006
+    slug: 006_lse_composite
+    exchange: LSE
+    priority: 4
+    name: "LSE Composite: S003 factor + S004 PEAD overlay"
+    catalog_slug: ~
+    status: planned
+    notes: >
+      Combine S003 (slow fundamental) + S004 (event drift) into one portfolio.
+      PEAD positions overlay the dividend quality book — different hold periods,
+      net exposure managed via target_gross_leverage.
+
+  # ── PARKED: US signals (exchange pivot, revisit when expanding to US) ──────
+  - id: US_FUNDAMENTAL_DIVGROWTH_S001
+    slug: 001_yield_growth_composite
+    name: "40% Trailing Yield + 60% YoY Dividend Growth  (L/S SP500)"
+    catalog_slug: ~
+    status: tested
+    sharpe: -0.01
+    cagr: "-0.05%"
+    max_dd: "-12.28%"
+    verdict: POOR
+    notes: >
+      Short book (bottom-20 payers by composite) captured low/no-dividend growth
+      stocks (GOOGL, META, MU, MPWR) that dominated 2021–2024 returns.
+      Short signal needs fundamental rethinking — bottom-payer ≠ underperformer.
+      Long book alone may have value; isolate before combining.
+
+  - id: US_FUNDAMENTAL_DIVGROWTH_S002
+    slug: 002_div_cutters_short
+    name: "Long yield+growth, Short dividend cutters (>20% cut YoY)"
+    catalog_slug: ~
+    status: planned
+    notes: >
+      Replace bottom-payer short with explicit dividend-cutter signal.
+      Risk: thin short universe in bull markets — few companies cut in 2021–2023.
+
+  - id: US_FUNDAMENTAL_DIVGROWTH_S003
+    slug: 003_long_only_quality
+    name: "Long-only: top-30 by composite, monthly rebalance (US SP500)"
+    catalog_slug: ~
+    status: parked
+    notes: "Parked — US exchange deprioritised. Revisit if expanding beyond LSE."
+
+# ── Combination (fill when composite strategy is ready) ──────────────────────
+combination: ~
+
+# ── Reference material ────────────────────────────────────────────────────────
+references:
+  - "Litzenberger & Ramaswamy (1979): dividend yield and stock returns"
+  - "Arnott & Asness (2003): dividend payout predicts earnings growth"
+  - "academic_rag: ~  # not yet indexed"
