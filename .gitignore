@@ -32,6 +32,8 @@ data/**/*.parquet
 
 # Scratch / one-off debug artifacts
 dashboard_lines_1_260.txt
+*.prompt.md
+.benchmark_results.json
 
 # Local scratch / probe files
 _tmp_*.txt
