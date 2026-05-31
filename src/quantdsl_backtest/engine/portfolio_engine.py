@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
 import numpy as np
 import pandas as pd
 
-from ..dsl.portfolio import LongShortPortfolio, Book, TopN, BottomN, MaskSelector
+from ..dsl.portfolio import (
+    Book,
+    BottomN,
+    EqualWeight,
+    LongShortPortfolio,
+    MaskSelector,
+    SignalWeight,
+    TargetWeights,
+    TopN,
+)
 from ..utils.logging import get_logger
-
 
 log = get_logger(__name__)
 
@@ -32,6 +40,17 @@ def compute_target_weights_for_date(
 
     Returns: Series of target weights indexed by instrument.
     """
+    # Generic target-weights portfolio: route to its own (much simpler) path.
+    # The execution engine calling us is portfolio-agnostic, so this plugs in
+    # without any runner changes.
+    if isinstance(portfolio, TargetWeights):
+        return _compute_target_weights_generic(
+            date=date,
+            portfolio=portfolio,
+            signals=signals,
+            prev_weights=prev_weights,
+        )
+
     # Use delayed signals. Make this generic by resolving factor/mask names
     # from the portfolio books rather than hardcoding specific keys.
     delay = portfolio.signal_delay_bars
@@ -48,13 +67,19 @@ def compute_target_weights_for_date(
     # MaskSelector: the named boolean signal IS both the rank and the mask.
     if isinstance(long_sel, MaskSelector):
         _long_signal_df = _get_df_opt(long_sel.signal_name)
-        long_rank_df = _long_signal_df   # 0.0/1.0 or True/False per instrument
-        long_mask_df = _long_signal_df   # same DataFrame used as mask
+        long_rank_df = _long_signal_df  # 0.0/1.0 or True/False per instrument
+        long_mask_df = _long_signal_df  # same DataFrame used as mask
     else:
         _long_rank_try = _get_df_opt(getattr(long_sel, "factor_name", None))
-        long_rank_df = _long_rank_try if _long_rank_try is not None else signals.get("rank")
+        long_rank_df = (
+            _long_rank_try if _long_rank_try is not None else signals.get("rank")
+        )
         _long_mask_try = _get_df_opt(getattr(long_sel, "mask_name", None))
-        long_mask_df = _long_mask_try if _long_mask_try is not None else signals.get("long_candidates")
+        long_mask_df = (
+            _long_mask_try
+            if _long_mask_try is not None
+            else signals.get("long_candidates")
+        )
 
     if isinstance(short_sel, MaskSelector):
         _short_signal_df = _get_df_opt(short_sel.signal_name)
@@ -62,9 +87,15 @@ def compute_target_weights_for_date(
         short_mask_df = _short_signal_df
     else:
         _short_rank_try = _get_df_opt(getattr(short_sel, "factor_name", None))
-        short_rank_df = _short_rank_try if _short_rank_try is not None else signals.get("rank")
+        short_rank_df = (
+            _short_rank_try if _short_rank_try is not None else signals.get("rank")
+        )
         _short_mask_try = _get_df_opt(getattr(short_sel, "mask_name", None))
-        short_mask_df = _short_mask_try if _short_mask_try is not None else signals.get("short_candidates")
+        short_mask_df = (
+            _short_mask_try
+            if _short_mask_try is not None
+            else signals.get("short_candidates")
+        )
 
     # Choose a reference index that contains the requested date
     ref_df: Optional[pd.DataFrame] = None
@@ -97,10 +128,16 @@ def compute_target_weights_for_date(
     sig_date = all_dates[sig_pos]
 
     # Pull rows for the signal date, with graceful fallbacks
-    def _safe_row(df_opt: Optional[pd.DataFrame], like: Optional[pd.DataFrame]) -> pd.Series:
+    def _safe_row(
+        df_opt: Optional[pd.DataFrame], like: Optional[pd.DataFrame]
+    ) -> pd.Series:
         if df_opt is None:
             # Create an all-NaN row matching the 'like' columns if available
-            cols = like.columns if like is not None else (prev_weights.index if prev_weights is not None else [])
+            cols = (
+                like.columns
+                if like is not None
+                else (prev_weights.index if prev_weights is not None else [])
+            )
             return pd.Series(index=cols, dtype="float64")
         # If date missing in df, return NaNs over its columns
         if sig_date not in df_opt.index:
@@ -115,7 +152,9 @@ def compute_target_weights_for_date(
     long_rank_row = _safe_row(long_rank_df, short_rank_df)
     short_rank_row = _safe_row(short_rank_df, long_rank_df)
 
-    def _safe_mask_row(mask_df_opt: Optional[pd.DataFrame], idx_like: pd.Index) -> pd.Series:
+    def _safe_mask_row(
+        mask_df_opt: Optional[pd.DataFrame], idx_like: pd.Index
+    ) -> pd.Series:
         if mask_df_opt is None:
             return pd.Series(True, index=idx_like, dtype="bool")
         if sig_date not in mask_df_opt.index:
@@ -148,8 +187,16 @@ def compute_target_weights_for_date(
         n_required = 0
 
     if n_required > 0:
-        valid_long = long_rank_row[long_rank_row.notna()].index if long_rank_row is not None else pd.Index([])
-        valid_short = short_rank_row[short_rank_row.notna()].index if short_rank_row is not None else pd.Index([])
+        valid_long = (
+            long_rank_row[long_rank_row.notna()].index
+            if long_rank_row is not None
+            else pd.Index([])
+        )
+        valid_short = (
+            short_rank_row[short_rank_row.notna()].index
+            if short_rank_row is not None
+            else pd.Index([])
+        )
         # union of symbols with a valid rank in either book
         valid_union = valid_long.union(valid_short)
         if int(valid_union.size) < n_required:
@@ -168,21 +215,25 @@ def compute_target_weights_for_date(
         book=portfolio.long_book,
         rank_row=long_rank_row,
         mask=long_mask,
-        debugging=portfolio.debugging
+        debugging=portfolio.debugging,
     )
     short_names = _select_book_names(
         date=sig_date,
         book=portfolio.short_book,
         rank_row=short_rank_row,
         mask=short_mask,
-        debugging=portfolio.debugging
+        debugging=portfolio.debugging,
     )
 
     # Diagnostics: mask sparsity and selection sizes (debug level)
     try:
         if portfolio.debugging:
-            long_mask_true = int(long_mask.sum()) if isinstance(long_mask, pd.Series) else 0
-            short_mask_true = int(short_mask.sum()) if isinstance(short_mask, pd.Series) else 0
+            long_mask_true = (
+                int(long_mask.sum()) if isinstance(long_mask, pd.Series) else 0
+            )
+            short_mask_true = (
+                int(short_mask.sum()) if isinstance(short_mask, pd.Series) else 0
+            )
             log.debug(
                 "[%s] masks: long_true=%d short_true=%d | selected: long=%d short=%d",
                 sig_date,
@@ -204,15 +255,49 @@ def compute_target_weights_for_date(
     long_gross = max(0.0, (L + N) / 2.0)
     short_gross = max(0.0, (L - N) / 2.0)
 
+    # Apply weighting scheme for long book
     if n_long > 0 and long_gross > 0.0:
-        w_long = long_gross / n_long
-        for name in long_names:
-            target[name] = w_long
+        long_weighting = portfolio.long_book.weighting
+        if isinstance(long_weighting, SignalWeight):
+            # Signal-proportional weighting
+            signal_name = long_weighting.signal_name
+            signal_values = long_rank_row.loc[list(long_names)].fillna(0.0)
+            signal_sum = signal_values.sum()
+            if signal_sum > 0:
+                for name in long_names:
+                    target[name] = long_gross * (signal_values[name] / signal_sum)
+            else:
+                # Fallback to equal weight if signal sum is zero
+                w_long = long_gross / n_long
+                for name in long_names:
+                    target[name] = w_long
+        else:
+            # Equal weight (default)
+            w_long = long_gross / n_long
+            for name in long_names:
+                target[name] = w_long
 
+    # Apply weighting scheme for short book
     if n_short > 0 and short_gross > 0.0:
-        w_short = -short_gross / n_short
-        for name in short_names:
-            target[name] = w_short
+        short_weighting = portfolio.short_book.weighting
+        if isinstance(short_weighting, SignalWeight):
+            # Signal-proportional weighting
+            signal_name = short_weighting.signal_name
+            signal_values = short_rank_row.loc[list(short_names)].fillna(0.0)
+            signal_sum = signal_values.sum()
+            if signal_sum > 0:
+                for name in short_names:
+                    target[name] = -short_gross * (signal_values[name] / signal_sum)
+            else:
+                # Fallback to equal weight if signal sum is zero
+                w_short = -short_gross / n_short
+                for name in short_names:
+                    target[name] = w_short
+        else:
+            # Equal weight (default)
+            w_short = -short_gross / n_short
+            for name in short_names:
+                target[name] = w_short
 
     # Enforce max abs weight per name
     max_w = portfolio.max_abs_weight_per_name
@@ -251,6 +336,106 @@ def compute_target_weights_for_date(
     return target
 
 
+def _compute_target_weights_generic(
+    date: pd.Timestamp,
+    portfolio: TargetWeights,
+    signals: Dict[str, pd.DataFrame],
+    prev_weights: pd.Series,
+) -> pd.Series:
+    """
+    Resolve target weights for a :class:`TargetWeights` portfolio on ``date``.
+
+    The weights come from one of:
+      * ``portfolio.weights`` — a precomputed ``[date x instrument]`` DataFrame, or
+      * ``portfolio.weights_signal`` — a signal panel of the same shape.
+
+    The delayed row (``date`` shifted back ``signal_delay_bars`` along the source
+    matrix's own index) is read, then optional post-processing is applied:
+    gross-leverage rescale, per-name clip, turnover limit. Everything else
+    (P&L, costs, financing, execution timing) is handled generically by the
+    execution engine, exactly as for the other portfolio types.
+
+    Returns a Series of target weights indexed by instrument. On any miss
+    (date not in the matrix, not enough history for the delay, all-NaN row) the
+    previous weights are carried forward, matching the L/S engine's behavior.
+    """
+    delay = int(portfolio.signal_delay_bars)
+
+    wmat: Optional[pd.DataFrame]
+    if portfolio.weights is not None:
+        wmat = portfolio.weights
+    else:
+        # __post_init__ guarantees weights_signal is set when weights is None.
+        wmat = signals.get(str(portfolio.weights_signal))
+
+    if not isinstance(wmat, pd.DataFrame):
+        log.debug(
+            "TargetWeights: weights source (%r) unavailable for %s; keeping previous weights.",
+            portfolio.weights_signal,
+            date,
+        )
+        return prev_weights.copy()
+
+    all_dates = wmat.index
+    if date not in all_dates:
+        # No weights aligned to this date; keep previous weights.
+        return prev_weights.copy()
+
+    date_pos = all_dates.get_loc(date)
+    if isinstance(date_pos, slice):
+        date_pos = date_pos.start
+
+    sig_pos = int(date_pos) - delay
+    if sig_pos < 0:
+        # Not enough history to satisfy the signal delay yet.
+        return prev_weights.copy()
+
+    sig_date = all_dates[sig_pos]
+    row = wmat.loc[sig_date]
+    if isinstance(row, pd.DataFrame):
+        row = row.iloc[0]
+
+    # NaNs mean "no target / flat" for that name, not "carry forward".
+    target: pd.Series = cast(pd.Series, row).astype("float64").fillna(0.0)
+
+    # Align to the engine's instrument universe (positions/prev_weights index).
+    # Names in the matrix that aren't in the universe are dropped; universe names
+    # absent from the matrix get a 0.0 (flat) target.
+    if prev_weights is not None and len(prev_weights.index) > 0:
+        target = target.reindex(prev_weights.index).fillna(0.0)
+
+    # Optional: rescale each row to a fixed gross leverage (abs-sum).
+    if portfolio.target_gross_leverage is not None:
+        gross = float(target.abs().sum())
+        if gross > 0.0:
+            target = target * (portfolio.target_gross_leverage / gross)
+
+    # Optional: clip any single name's absolute weight.
+    max_w = portfolio.max_abs_weight_per_name
+    if max_w is not None and max_w > 0:
+        target = target.clip(lower=-max_w, upper=max_w)
+
+    # Optional: turnover limit (reuses the shared helper).
+    if portfolio.turnover_limit is not None:
+        target = _apply_turnover_limit(
+            prev_weights=prev_weights,
+            target_weights=target,
+            max_fraction=portfolio.turnover_limit.max_fraction,
+        )
+
+    if portfolio.debugging:
+        log.debug(
+            "[%s] TargetWeights: sig_date=%s gross=%.4f net=%.4f nonzero=%d",
+            date,
+            sig_date,
+            float(target.abs().sum()),
+            float(target.sum()),
+            int((target.abs() > 1e-12).sum()),
+        )
+
+    return target
+
+
 def _select_book_names(
     date: pd.Timestamp,
     book: Book,
@@ -270,7 +455,12 @@ def _select_book_names(
     if isinstance(book.selector, MaskSelector):
         selected = mask[mask.astype(bool)].index.tolist()
         if debugging:
-            log.debug("[%s][%s] MaskSelector: %d instruments selected", date, book.name, len(selected))
+            log.debug(
+                "[%s][%s] MaskSelector: %d instruments selected",
+                date,
+                book.name,
+                len(selected),
+            )
         return selected
 
     if isinstance(book.selector, TopN):
@@ -290,7 +480,10 @@ def _select_book_names(
             if debugging and len(filler) > 0:
                 log.debug(
                     "[%s][%s] TopN filled %d/%d from unmasked pool",
-                    date, book.name, len(filler), n,
+                    date,
+                    book.name,
+                    len(filler),
+                    n,
                 )
             selected.extend(filler)
         return selected
@@ -312,7 +505,10 @@ def _select_book_names(
             if debugging and len(filler) > 0:
                 log.debug(
                     "[%s][%s] BottomN filled %d/%d from unmasked pool",
-                    date, book.name, len(filler), n,
+                    date,
+                    book.name,
+                    len(filler),
+                    n,
                 )
             selected.extend(filler)
         return selected
@@ -343,5 +539,7 @@ def _apply_turnover_limit(
         return target_weights
 
     scale = max_fraction / turnover
-    log.debug("Turnover %.4f > %.4f, scaling moves by %.4f", turnover, max_fraction, scale)
+    log.debug(
+        "Turnover %.4f > %.4f, scaling moves by %.4f", turnover, max_fraction, scale
+    )
     return prev + delta * scale
