@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **quantdsl-backtest** is an event-driven backtesting framework for systematic trading strategies using a declarative Python DSL. The main package is `quantdsl_backtest` under `src/`.
 
-Requires **Python 3.11.x** exactly. Use `uv` as the package manager.
+Requires **Python 3.11.x or 3.12.x**. Use `uv` as the package manager.
 
 ## Commands
 
@@ -160,7 +160,7 @@ Playwright tests require a running platform server and are marked `manual`. The 
 
 ## Code Style
 
-- Python 3.11 strict
+- Python 3.11 / 3.12 strict
 - Type hints on all public functions and methods
 - Google-style docstrings
 - No hardcoded parameters — all tunables read from YAML config via Pydantic

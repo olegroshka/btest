@@ -7,7 +7,7 @@ name = "quantdsl-backtest"
 version = "0.1.0"
 description = "Experimental internal DSL for trading strategy backtesting."
 readme = "README.md"
-requires-python = "==3.11.*"
+requires-python = ">=3.11"
 
 # Core runtime dependencies
 dependencies = [
