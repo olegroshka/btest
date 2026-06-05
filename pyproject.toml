@@ -33,7 +33,11 @@ dependencies = [
   "scipy-stubs~=1.15.3",
   "openpyxl>=3.1.5",
   "ipykernel>=7.1.0",
-  "signum @ git+https://github.com/SugoiKitsune/signum.git",
+  # NOTE: `signum` (optional research charting) was removed from core deps at
+  # the 3.12 upgrade — it is imported only in research/ scripts (all guarded by
+  # try/except "signum not installed" fallbacks), never in src/tests/platform,
+  # and its git repo publishes mismatched metadata (`signum-charts`) that breaks
+  # `uv` resolution. Install manually for research charts if needed.
 ]
 
 [project.optional-dependencies]
