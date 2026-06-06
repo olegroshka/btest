@@ -261,6 +261,13 @@ class TargetWeights:
     rebalance_at: Literal["market_open", "market_close"] = "market_close"
     signal_delay_bars: int = 1
 
+    # Event-driven rebalancing. When True, only trade when the target allocation actually CHANGES
+    # (e.g. a regime flip). Between changes the exact share count is held — no daily drift/cost-funding
+    # micro-trades. Use for rotation/timing strategies that should "hold IEF until the signal flips".
+    # When False (default), the portfolio rebalances on every `rebalance_frequency` bar back to the
+    # target (correct for fixed-weight books like 60/40 that must rebalance back as prices drift).
+    rebalance_on_change: bool = False
+
     # Optional per-row post-processing
     target_gross_leverage: Optional[float] = None
     max_abs_weight_per_name: Optional[float] = None

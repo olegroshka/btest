@@ -63,10 +63,8 @@ def _ensure_sfera_db_on_path() -> None:
 
 _ensure_sfera_db_on_path()
 
-try:
-    import sfera_db as _sfera_db
-except ImportError:  # pragma: no cover - exercised when the optional workspace dep is absent
-    _sfera_db = None
+# sfera DB client lives in the sfera repo as `connector` (pip-installed; exposes columns()/query()/index_prices()).
+import connector as _sfera_db
 
 
 def _require_sfera_db() -> Any:

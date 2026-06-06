@@ -1,0 +1,130 @@
+# Interactive Brokers Margin Loan Rates
+# 
+# OFFICIAL SOURCE (check here for updates):
+# https://www.interactivebrokers.com/en/trading/margin-rates.php
+# 
+# Last updated: May 17, 2026
+# Benchmark rates page: https://www.interactivebrokers.com/en/trading/margin-benchmarks.php
+#
+# Notes:
+# - BM = Benchmark Rate (varies by currency)
+# - GBP uses SONIA (Sterling Overnight Index Average)
+# - EUR uses €STR (Euro Short-Term Rate)
+# - USD uses Fed Funds Effective Rate
+# - Rates shown are for IBKR Pro accounts
+# - IBKR Lite has higher spreads (+1% additional on all tiers)
+# - Blended rates apply (e.g., first £80k at Tier 1, next £720k at Tier 2, etc.)
+
+currencies:
+  GBP:
+    benchmark: "SONIA"
+    current_benchmark: 3.696  # As of May 17, 2026 (calculated from 5.196% - 1.5%)
+    tiers:
+      - balance_min: 0
+        balance_max: 80000
+        spread_bps: 150
+        total_rate: 5.196
+        description: "£0 - £80,000"
+      
+      - balance_min: 80000
+        balance_max: 800000
+        spread_bps: 100
+        total_rate: 4.696
+        description: "£80,000 - £800,000"
+      
+      - balance_min: 800000
+        balance_max: 38000000
+        spread_bps: 75
+        total_rate: 4.446
+        description: "£800,000 - £38M"
+      
+      - balance_min: 38000000
+        balance_max: 150000000
+        spread_bps: 50
+        total_rate: 4.196
+        description: "£38M - £150M"
+      
+      - balance_min: 150000000
+        balance_max: null  # infinity
+        spread_bps: 50
+        total_rate: 4.196
+        description: ">£150M"
+        note: "May be subject to 1% surcharge if not pre-arranged"
+
+  EUR:
+    benchmark: "€STR"
+    current_benchmark: 1.896  # As of May 17, 2026 (calculated from 3.396% - 1.5%)
+    tiers:
+      - balance_min: 0
+        balance_max: 90000
+        spread_bps: 150
+        total_rate: 3.396
+        description: "€0 - €90,000"
+      
+      - balance_min: 90000
+        balance_max: 900000
+        spread_bps: 100
+        total_rate: 2.896
+        description: "€90,000 - €900,000"
+      
+      - balance_min: 900000
+        balance_max: 44000000
+        spread_bps: 75
+        total_rate: 2.646
+        description: "€900,000 - €44M"
+      
+      - balance_min: 44000000
+        balance_max: 180000000
+        spread_bps: 50
+        total_rate: 2.396
+        description: "€44M - €180M"
+      
+      - balance_min: 180000000
+        balance_max: null
+        spread_bps: 50
+        total_rate: 2.396
+        description: ">€180M"
+
+  USD:
+    benchmark: "Fed Funds Effective"
+    current_benchmark: 3.630  # As of May 17, 2026 (calculated from 5.130% - 1.5%)
+    tiers:
+      - balance_min: 0
+        balance_max: 100000
+        spread_bps: 150
+        total_rate: 5.130
+        description: "$0 - $100,000"
+      
+      - balance_min: 100000
+        balance_max: 1000000
+        spread_bps: 100
+        total_rate: 4.630
+        description: "$100,000 - $1M"
+      
+      - balance_min: 1000000
+        balance_max: 50000000
+        spread_bps: 75
+        total_rate: 4.380
+        description: "$1M - $50M"
+      
+      - balance_min: 50000000
+        balance_max: 250000000
+        spread_bps: 50
+        total_rate: 4.130
+        description: "$50M - $250M"
+      
+      - balance_min: 250000000
+        balance_max: null
+        spread_bps: 50
+        total_rate: 4.130
+        description: ">$250M"
+
+# Usage notes:
+# - Blended rate calculation: If you borrow £500k, you pay:
+#   - 5.196% on first £80k
+#   - 4.696% on remaining £420k
+#   - Weighted average = (80k * 5.196% + 420k * 4.696%) / 500k = 4.816%
+#
+# - Minimum floor: 0.75% minimum charged on all margin loans
+# - Interest accrued daily, posted monthly (3rd business day of following month)
+# - Rates subject to change without notice
