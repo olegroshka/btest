@@ -822,6 +822,13 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # ------------------------------------------------------------------ #
     # 4. Main daily loop
     # ------------------------------------------------------------------ #
+    # Event-driven rebalancing: remember the target allocation the portfolio is actually HOLDING
+    # (the last one we executed). When the target due for execution equals it, the position already
+    # reflects that allocation, so we hold the exact share count — no daily drift/cost-funding churn.
+    # Only a genuine change (regime flip) differs from what's held and triggers a rotation.
+    # Opt-in per portfolio via TargetWeights.rebalance_on_change (default off = legacy daily rebalance).
+    _roc = bool(getattr(strategy.portfolio, "rebalance_on_change", False))
+    _held_target = None
     for i, dt in enumerate(dates):
         price_t = prices.loc[dt]
         volume_t = volumes.loc[dt]
@@ -1038,31 +1045,51 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                         new_positions = st.prev_positions
                         cash_delta = 0.0
                         trades_today = pd.DataFrame()
+                    elif _roc and _held_target is not None and _same_alloc(exec_weights, _held_target):
+                        # Event-driven hold: the queued target equals the allocation we already
+                        # hold, so the desired exposure is unchanged. Keep the exact share count
+                        # (no cost-funding/drift micro-trades) until a real regime flip arrives.
+                        new_positions = st.prev_positions
+                        cash_delta = 0.0
+                        trades_today = pd.DataFrame()
                     else:
+                        # NO-LOOKAHEAD: hand the rebalance the OPEN as the single execution-time price
+                        # vector. It derives equity from it (cash + prev·open) and fills at it — today's
+                        # close is never passed in, so it cannot leak into the sizing.
+                        open_aligned = open_t.reindex(st.prev_positions.index)
+                        open_aligned = open_aligned.where(~open_aligned.isna(), st.prev_prices)
                         new_positions, cash_delta, trades_today = rebalance_to_target_weights(
                             date=dt,
                             execution=strategy.execution,
                             commission=strategy.costs.commission,
                             fees=strategy.costs.fees,
-                            equity=equity_before,
-                            prices=price_t_eff,
+                            cash=st.cash,
+                            prices=open_aligned,
                             volumes=volume_t,
                             prev_positions=st.prev_positions,
                             target_weights=exec_weights,
-                            exec_prices=open_t,
                         )
+                        _held_target = exec_weights.copy()
+                elif _roc and _held_target is not None and _same_alloc(target_weights, _held_target):
+                    # Event-driven hold (close-fill): allocation unchanged — hold exact shares.
+                    new_positions = st.prev_positions
+                    cash_delta = 0.0
+                    trades_today = pd.DataFrame()
                 else:
+                    # NO-LOOKAHEAD: close fill -> the single price vector IS the close. Equity is derived
+                    # from it inside the rebalance; mark and fill are the same prices, same instant.
                     new_positions, cash_delta, trades_today = rebalance_to_target_weights(
                         date=dt,
                         execution=strategy.execution,
                         commission=strategy.costs.commission,
                         fees=strategy.costs.fees,
-                        equity=equity_before,
+                        cash=st.cash,
                         prices=price_t_eff,
                         volumes=volume_t,
                         prev_positions=st.prev_positions,
                         target_weights=target_weights,
                     )
+                    _held_target = target_weights.copy()
 
             st.cash += cash_delta
             cur_positions = new_positions
@@ -1350,18 +1377,43 @@ def _resolve_reporting_output_dir(strategy: Strategy) -> Path | None:
         return Path("outputs") / (strategy.name or "run")
 
 
+def _same_alloc(a, b, atol: float = 1e-9) -> bool:
+    """True if two target-weight Series describe the same allocation (event-driven hold check)."""
+    if a is None or b is None:
+        return False
+    idx = a.index.union(b.index)
+    return bool(
+        np.allclose(
+            a.reindex(idx).fillna(0.0).values,
+            b.reindex(idx).fillna(0.0).values,
+            atol=atol,
+        )
+    )
+
+
 def _is_rebalance_date(
     idx: int,
     dates: pd.DatetimeIndex,
     portfolio,
 ) -> bool:
     """
-    Simple daily rebalance logic for now. Need to extend to weekly/monthly.
+    Return True on the bars where the portfolio should rebalance.
+
+    '1d' - every bar (default)
+    '1w' - first bar of each calendar week  (Mon changes)
+    '1m' - first bar of each calendar month
+    Any other value defaults to daily.
     """
     freq = portfolio.rebalance_frequency
     if freq == "1d":
         return True
-    # For now just do daily; you can extend later.
+    if idx == 0:
+        return True  # always rebalance on the very first bar
+    if freq == "1w":
+        return dates[idx].isocalendar().week != dates[idx - 1].isocalendar().week
+    if freq == "1m":
+        return dates[idx].month != dates[idx - 1].month
+    # Unknown frequency: fall back to daily
     return True
 
 

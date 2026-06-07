@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 # --- Selectors & weighting --------------------------------------------------
@@ -12,6 +15,7 @@ from typing import Literal, Optional
 @dataclass(slots=True)
 class Selector:
     """Base class for how we pick instruments into a book."""
+
     pass
 
 
@@ -58,13 +62,22 @@ class BottomN(Selector):
 @dataclass(slots=True)
 class Weighting:
     """Base class for within-book weighting schemes."""
+
     pass
 
 
 @dataclass(slots=True)
 class EqualWeight(Weighting):
     """Equal notional weights across selected instruments."""
+
     pass
+
+
+@dataclass(slots=True)
+class SignalWeight(Weighting):
+    """Weight instruments proportionally to their signal values."""
+
+    signal_name: str  # Name of the signal (typically the rank or composite)
 
 
 # --- Constraints / risk-style knobs ----------------------------------------
@@ -73,13 +86,13 @@ class EqualWeight(Weighting):
 @dataclass(slots=True)
 class SectorNeutral:
     sector_field: str = "sector"
-    tolerance: float = 0.02            # +/- tolerance in absolute weights
+    tolerance: float = 0.02  # +/- tolerance in absolute weights
 
 
 @dataclass(slots=True)
 class TurnoverLimit:
     window_bars: int = 1
-    max_fraction: float = 0.30         # fraction of *gross* per window
+    max_fraction: float = 0.30  # fraction of *gross* per window
 
 
 # --- Books and overall portfolio -------------------------------------------
@@ -167,3 +180,108 @@ class TimingPortfolio:
     rebalance_at: Literal["market_open", "market_close"] = "market_close"
     signal_delay_bars: int = 1
     target_leverage: float = 1.0
+
+
+@dataclass(slots=True, kw_only=True)
+class TargetWeights:
+    """
+    Generic target-weights portfolio: the single primitive that subsumes
+    timing, long/short, rotation, leverage and hedging.
+
+    Everything a portfolio does reduces to a ``[date x instrument]`` matrix of
+    target weights:
+
+    - **sign** = long (+) / short (-)
+    - **magnitude** = position size (fraction of equity)
+    - **row sum** = net exposure;  **sum of abs** = gross leverage
+
+    With this one class:
+
+    - ``TimingPortfolio``        = one-hot ``{0, 1}`` on a single column
+    - ``LongShortPortfolio``     = ranked ``+/-`` weights across a universe
+    - a rotation (e.g. r_lev_001) = one-hot across an instrument menu
+    - 2x leverage               = weights whose abs-sum is 2.0
+    - a hedge / pair            = mixed signs
+
+    The execution engine (event-driven and vectorized) is fully generic: it
+    applies ``signal_delay_bars`` + execution timing, computes
+    ``weights.shift(delay) . asset_returns``, charges turnover costs on
+    ``|delta weights|`` and financing on the borrowed/short notional. None of
+    that needs to know how the weights were produced.
+
+    **Two ways to supply weights** (exactly one must be set):
+
+    1. ``weights`` — a precomputed ``DataFrame`` indexed by date, columns =
+       instrument tickers. This is the maximally-general escape hatch: compute
+       the matrix any way you like (even in plain pandas — a rotation state
+       machine, a vol-target overlay, a leverage multiplier) and run it through
+       the engine with correct costs / financing / execution.
+
+    2. ``weights_signal`` — the name of an entry in ``Strategy.signals`` whose
+       panel *is* the ``[date x instrument]`` weights matrix. This is the
+       DSL-native path: the signal graph produces the weights.
+
+    Optional post-processing (applied per row, after the delay shift):
+
+    - ``target_gross_leverage`` — if set, each row is rescaled so its abs-sum
+      equals this value (``None`` = use the matrix as-is, the default).
+    - ``max_abs_weight_per_name`` — clip any single weight to ``+/-`` this.
+    - ``turnover_limit`` — cap per-rebalance turnover (scales the move toward
+      target), reusing the same machinery as ``LongShortPortfolio``.
+
+    Example (precomputed rotation matrix)::
+
+        import pandas as pd
+
+        w = pd.DataFrame(0.0, index=dates, columns=["TQQQ", "VIXY", "IEF", "DBC"])
+        # ... fill one-hot per the rotation state machine ...
+
+        portfolio = TargetWeights(
+            weights=w,
+            rebalance_frequency="1d",
+            signal_delay_bars=1,          # decide at T, fill at T+1 (MOO with fill_on="open")
+            target_gross_leverage=2.0,    # optional: lever the whole book 2x
+        )
+
+    Example (DSL-native, weights produced by the signal graph)::
+
+        portfolio = TargetWeights(
+            weights_signal="rotation_weights",   # a [date x instrument] signal panel
+            rebalance_frequency="1d",
+            signal_delay_bars=1,
+        )
+    """
+
+    # Exactly one of these supplies the weights.
+    weights: Optional["pd.DataFrame"] = None
+    weights_signal: Optional[str] = None
+
+    # Rebalance / timing policy (mirrors the other portfolio types)
+    rebalance_frequency: Literal["1d", "1w", "1m"] = "1d"
+    rebalance_at: Literal["market_open", "market_close"] = "market_close"
+    signal_delay_bars: int = 1
+
+    # Event-driven rebalancing. When True, only trade when the target allocation actually CHANGES
+    # (e.g. a regime flip). Between changes the exact share count is held — no daily drift/cost-funding
+    # micro-trades. Use for rotation/timing strategies that should "hold IEF until the signal flips".
+    # When False (default), the portfolio rebalances on every `rebalance_frequency` bar back to the
+    # target (correct for fixed-weight books like 60/40 that must rebalance back as prices drift).
+    rebalance_on_change: bool = False
+
+    # Optional per-row post-processing
+    target_gross_leverage: Optional[float] = None
+    max_abs_weight_per_name: Optional[float] = None
+    turnover_limit: Optional[TurnoverLimit] = None
+
+    debugging: bool = False
+
+    def __post_init__(self) -> None:
+        has_matrix = self.weights is not None
+        has_signal = self.weights_signal is not None
+        if has_matrix == has_signal:
+            raise ValueError(
+                "TargetWeights requires exactly one of `weights` (a precomputed "
+                "DataFrame) or `weights_signal` (a signal name); "
+                f"got weights={'set' if has_matrix else 'None'}, "
+                f"weights_signal={self.weights_signal!r}."
+            )

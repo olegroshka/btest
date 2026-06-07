@@ -22,6 +22,10 @@ class OrderPolicy:
     default_order_type: Literal["MKT", "MOC", "LIMIT"] = "MOC"
     time_in_force: Literal["DAY", "GTC"] = "DAY"
     fill_on: Literal["close", "open"] = "close"
+    # --- Rebalance gates (vectorized, per instrument, checked every rebalance; all default off) ---
+    no_trade_band: float = 0.0            # relative: skip unless |target_w - current_w| >= this
+    min_trade_notional: float = 0.0       # absolute $: skip orders smaller than this (scalar)
+    min_trade_units: Optional[dict] = None  # absolute units: {symbol: min_units} or a scalar; kills crumbs
 
 
 @dataclass(slots=True)

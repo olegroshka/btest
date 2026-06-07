@@ -584,14 +584,19 @@ def _is_rebalance_date_vectorized(
     """
     Rebalance schedule for the vectorized engine.
 
-    For now mirrors the event-driven engine: '1d' = every day.
-    Extend here to support weekly / monthly rebalancing without
-    touching the rest of the engine.
+    '1d' - every bar
+    '1w' - first bar of each calendar week
+    '1m' - first bar of each calendar month
     """
     freq = strategy.portfolio.rebalance_frequency
     if freq == "1d":
         return True
-    # Placeholder: extend to '1w', '1m', etc. as needed
+    if idx == 0:
+        return True
+    if freq == "1w":
+        return dates[idx].isocalendar().week != dates[idx - 1].isocalendar().week
+    if freq == "1m":
+        return dates[idx].month != dates[idx - 1].month
     return True
 
 

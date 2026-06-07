@@ -73,7 +73,7 @@ def test_execution_engine_integration_exec_price_with_slippage():
         execution=execution,
         commission=commission,
         fees=fees,
-        equity=equity,
+        cash=equity,   # starts flat, so cash == equity; engine derives equity from cash + prev·prices
         prices=prices,
         volumes=volumes,
         prev_positions=prev_positions,

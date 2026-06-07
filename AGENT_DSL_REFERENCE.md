@@ -495,3 +495,60 @@ series = df[factor.column]
 series = data_df[factor.field]     # e.g. data_df["3m_50d_ivol"]
 ```
 
+---
+
+## 13. Parameter Sweeps — Best Practices
+
+### Data caching (built-in, automatic)
+`engine/data_loader.py` has a module-level `_DATA_CACHE` dict keyed on `(source, start, end)`.
+Identical strategies in the same process share one parquet load automatically.
+Call `from quantdsl_backtest.engine.data_loader import clear_data_cache` to free it.
+
+### Parallelization with ProcessPoolExecutor
+Each worker process gets its own `_DATA_CACHE`, so data is loaded once per worker.
+Worker functions **must be at module level** (not lambdas or nested defs) to be picklable.
+
+```python
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import os
+
+N_WORKERS = max(1, os.cpu_count() // 2)
+
+def _run_single(args: tuple) -> dict:          # module-level — picklable
+    yw, n = args
+    import sys; sys.path.insert(0, "src")      # Windows spawn needs this
+    # load strategy + run_backtest here ...
+
+grid    = [(yw, n) for yw in YIELD_WEIGHTS for n in LONG_NS]
+rows    = {}
+with ProcessPoolExecutor(max_workers=N_WORKERS) as pool:
+    futures = {pool.submit(_run_single, a): a for a in grid}
+    for fut in as_completed(futures):
+        rows[futures[fut]] = fut.result()
+```
+
+### ExternalFactor with on-the-fly composite (no temp files)
+Avoid temp parquets for parameter sweeps — use the `loader` parameter instead:
+
+```python
+def _make_loader(yw: float, growth_path: str):
+    def _loader(yield_df):                      # obj = loaded yield_rank.parquet
+        import pandas as pd
+        growth = pd.read_parquet(growth_path)
+        return yw * yield_df + (1 - yw) * growth
+    return _loader
+
+composite_raw = ExternalFactor(
+    name="composite_raw",
+    path="data/yield_rank.parquet",
+    per_instrument=True,
+    loader=_make_loader(yield_weight, str(DATA_DIR / "growth_rank.parquet")),
+)
+```
+
+### GPU / further acceleration
+- The Polars-accelerated path in `SignalEngine` already vectorizes cross-sectional ranking.
+- The event loop (`_run_backtest_event_driven`) is CPU-bound; GPU is not beneficial here.
+- For 10–100 run sweeps: `ProcessPoolExecutor` with `N_WORKERS = cpu_count // 2` is optimal.
+- For 1000+ run sweeps: consider Optuna with `n_jobs=-1` (uses joblib internally).
+
