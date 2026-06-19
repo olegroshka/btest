@@ -51,6 +51,25 @@ def mark_to_market(
     return equity_before, float(price_pnl)
 
 
+def apply_coupon_income(
+    prev_positions: pd.Series,
+    coupon_per_unit: pd.Series,
+) -> float:
+    """Credit coupon (bond income) cash for one bar: sum(positions * coupon_per_unit).
+
+    For fixed-income strategies marked at DIRTY price (clean + accrued), the dirty mark
+    already books the daily accrual; on a coupon date the dirty price drops by the coupon
+    (accrued resets) and THIS credits the offsetting cash, so total return stays correct and
+    smooth. `coupon_per_unit` is the coupon paid per unit held on this date (0 elsewhere);
+    it may come from the explicit schedule or the MOEX accrued-drop inference.
+    """
+    if coupon_per_unit is None:
+        return 0.0
+    pos = prev_positions.fillna(0.0).astype("float64")
+    cpn = coupon_per_unit.reindex(pos.index).fillna(0.0).astype("float64")
+    return float((pos * cpn).sum())
+
+
 def apply_carry_costs(
     positions: pd.Series,
     prices: pd.Series,

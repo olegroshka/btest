@@ -112,6 +112,23 @@ def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame
     return result
 
 
+def load_income_for_strategy(strategy: "Strategy", instruments, dates):
+    """Optional FIXED-INCOME coupon panel [dates x instruments] = coupon cash paid PER UNIT held per date.
+
+    Reads strategy.data.income_source (long-format parquet: columns date, ticker, income). Returns None when
+    not configured (ordinary equity backtests unaffected); 0 where no coupon on that date/instrument.
+    """
+    import re
+    src = getattr(getattr(strategy, "data", None), "income_source", None)
+    if not src:
+        return None
+    path = re.sub(r"^parquet://", "", str(src))
+    df = pd.read_parquet(path)
+    df["date"] = pd.to_datetime(df["date"])
+    panel = df.pivot_table(index="date", columns="ticker", values="income", aggfunc="sum")
+    return panel.reindex(index=pd.DatetimeIndex(dates), columns=instruments).fillna(0.0)
+
+
 def load_open_prices(md: "MarketData", instruments: "pd.Index") -> "pd.DataFrame":
     """Extract open prices from already-loaded MarketData.
 
