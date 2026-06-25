@@ -9,7 +9,7 @@ import pandas as pd
 
 from ..dsl.execution import Execution
 from ..models.slippage import build_slippage_model
-from ..dsl.costs import Commission, StaticFees
+from ..dsl.costs import Commission, StaticFees, TransactionTax
 from ..models.costs import build_cost_model
 from ..models.volume_limits import build_volume_limit_model
 from ..utils.logging import get_logger
@@ -28,6 +28,7 @@ def rebalance_to_target_weights(
     volumes: pd.Series,
     prev_positions: pd.Series,
     target_weights: pd.Series,
+    tax: "TransactionTax | None" = None,
 ) -> Tuple[pd.Series, float, pd.DataFrame]:
     """
     Size and execute a rebalance ENTIRELY at ``prices`` — the prices at the execution instant.
@@ -90,6 +91,8 @@ def rebalance_to_target_weights(
     vl_model   = build_volume_limit_model(getattr(execution, "volume_limits", None))
     sl_model   = build_slippage_model(execution.slippage)
     cost_model = build_cost_model(commission)
+    # tax may be a single TransactionTax or a list (a mixed-domicile book has different stamp rates per name).
+    _taxes = list(tax) if isinstance(tax, (list, tuple)) else ([] if tax is None else [tax])
 
     trades = []
     cash_delta = 0.0
@@ -117,7 +120,16 @@ def rebalance_to_target_weights(
         notional_exec = exec_price * q                     # signed
         comm = cost_model.commission_from_trade(qty=q, exec_price=exec_price)
 
-        cash_delta += -notional_exec - comm                # cash decreases on a buy (q>0)
+        # Transaction tax (e.g. UK stamp duty) — on trade notional, only the taxed side, only the named instruments.
+        # Sum over every configured tax so a mixed book charges each name its own domicile's rate.
+        tax_cost = 0.0
+        for _tx in _taxes:
+            if _tx.rate > 0.0 \
+                    and (_tx.on == "both" or (_tx.on == "buy" and side == "BUY") or (_tx.on == "sell" and side == "SELL")) \
+                    and (_tx.instruments is None or instr in _tx.instruments):
+                tax_cost += _tx.rate * abs(notional_exec)
+
+        cash_delta += -notional_exec - comm - tax_cost     # cash decreases on a buy (q>0); tax charged on the taxed side
         new_positions[instr] = new_positions[instr] + q
 
         trades.append(
@@ -132,6 +144,7 @@ def rebalance_to_target_weights(
                 "slippage_bps": slippage_bps,
                 "slippage_usd": abs(q) * abs(exec_price - price),    # $ slippage cost
                 "commission": comm,
+                "tax": tax_cost,                                     # transaction tax $ (UK stamp etc.)
                 "fees": 0.0,  # per-trade static fees not modeled in detail
                 "realized_pnl": 0.0,
             }
