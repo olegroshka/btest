@@ -2,9 +2,35 @@
 
 This directory contains the operational fetchers and factual manifests for the `btest`-owned EODHD data lanes.
 
+## Quick start — unified CLI
+
+`cli.py` is the single front door. It is driven by the lane registry in
+`eodhd_datasets.py`, so it never hardcodes lane or file names.
+
+```powershell
+Set-Location "C:\Users\olegr\PycharmProjects\btest"
+
+uv run python scripts/eodhd/cli.py --help          # all commands
+uv run python scripts/eodhd/cli.py status          # what data we have, as of when
+uv run python scripts/eodhd/cli.py status --write   # + regenerate data/raw/eodhd/STATUS.md
+uv run python scripts/eodhd/cli.py lanes           # registered lanes/datasets/fetchers
+uv run python scripts/eodhd/cli.py refresh         # show the refresh plan (no fetch)
+uv run python scripts/eodhd/cli.py refresh --run   # execute: prices + events, all lanes
+uv run python scripts/eodhd/cli.py refresh us_common --run
+uv run python scripts/eodhd/cli.py refresh --with-fundamentals --run
+uv run python scripts/eodhd/cli.py probe AAPL MSFT NVDA
+```
+
+`refresh` is **dry-run by default** and only fetches with `--run` (it hits a paid
+API). The individual `fetch_eodhd_*.py` scripts below remain the ground truth and
+are still the way to do windowed or otherwise unusual pulls.
+
 ## What lives where
 
 - `README.md` (this file): operator-facing entry point for how to run, resume, and audit the EODHD fetchers.
+- `cli.py`: unified CLI (`status` / `refresh` / `qc` / `probe` / `lanes`).
+- `eodhd_datasets.py`: the lane/dataset registry — single source of truth; add a lane or dataset here.
+- `status_eodhd.py`: as-of / staleness reporter; writes `data/raw/eodhd/STATUS.md` + `STATUS.json`.
 - `EODHD_*_MANIFEST.md`: per-lane factual inventories of scope, local artefacts, and current observed counts.
 - `fetch_eodhd_*.py`: the actual fetchers.
 - `tmp_poll_eodhd_progress.py` at repo root: ad hoc progress snapshot across the ETF and index-reference lanes.
