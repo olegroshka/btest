@@ -148,6 +148,11 @@ def build_refresh_plan(
     steps: list[Step] = []
     for name in lane_names:
         lane = LANES[name]
+        matching = [
+            ds for ds in lane.datasets if ds.kind in kinds and ds.fetcher is not None
+        ]
+        if not matching:
+            continue  # nothing selected here -> skip the lane (and its universe step)
         if with_universe and lane.universe_fetcher:
             steps.append(
                 Step(
@@ -157,9 +162,7 @@ def build_refresh_plan(
                     list(lane.universe_fetcher_args),
                 )
             )
-        for ds in lane.datasets:
-            if ds.kind not in kinds or ds.fetcher is None:
-                continue
+        for ds in matching:
             step_args = list(ds.fetcher_args)
             if ds.state is not None:  # incremental fetcher accepts passthrough flags
                 step_args += passthrough

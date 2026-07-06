@@ -68,6 +68,21 @@ def test_passthrough_appends_to_data_steps_not_universe() -> None:
     assert prices.args == ["--universe", "provider", "--full-refresh"]
 
 
+def test_fundamentals_only_selects_common_lanes_and_skips_universe() -> None:
+    # `--datasets fundamentals` across all lanes must hit only the two lanes that
+    # have a fundamentals dataset, and must not trigger ETF/index universe steps.
+    plan = cli.build_refresh_plan(
+        list(reg.LANES),
+        kinds={"fundamentals"},
+        with_universe=True,
+        passthrough=[],
+    )
+    assert [(s.lane, s.kind) for s in plan] == [
+        ("us_common", "fundamentals"),
+        ("uk_eu", "fundamentals"),
+    ]
+
+
 def test_passthrough_not_applied_to_fundamentals_snapshot() -> None:
     # The snapshot fundamentals fetcher doesn't accept --full-refresh/--to, so
     # passthrough must stop at the incremental (state-backed) fetchers.
