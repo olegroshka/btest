@@ -47,6 +47,21 @@ class StaticFees:
 
 
 @dataclass(slots=True)
+class TransactionTax:
+    """A transaction tax on trade notional — generic across markets (UK SDRT = 0.5% on buys; French / Italian FTT;
+    etc.). Charged ON TOP of commission/slippage, scoped to a trade side and (optionally) an instrument set.
+
+    Examples:
+        TransactionTax(rate=0.005, on="buy")                       # UK stamp duty, whole book
+        TransactionTax(rate=0.005, on="buy", instruments=uk_set)   # UK stamp, only the UK names in a mixed book
+    """
+
+    rate: float = 0.0                                  # fraction of trade notional, e.g. 0.005 = 0.5%
+    on: Literal["buy", "sell", "both"] = "buy"         # which side is taxed (UK stamp = buy only)
+    instruments: Optional[frozenset] = None            # None = every instrument; else only these tickers
+
+
+@dataclass(slots=True)
 class Costs:
     """
     All cost / fee / financing related parameters.
@@ -56,3 +71,4 @@ class Costs:
     borrow: BorrowCost
     financing: FinancingCost
     fees: StaticFees
+    tax: Optional[TransactionTax] = None               # transaction tax (e.g. UK stamp duty); None = no tax

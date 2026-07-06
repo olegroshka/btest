@@ -10,7 +10,7 @@ import pandas as pd
 from ..dsl.strategy import Strategy
 from ..engine.results import BacktestResult
 from ..utils.logging import get_logger
-from .data_loader import load_data_for_strategy, load_open_prices
+from .data_loader import load_data_for_strategy, load_open_prices, load_income_for_strategy
 from .factor_engine import FactorEngine
 from .signal_engine import SignalEngine
 from .portfolio_engine import compute_target_weights_for_date
@@ -18,6 +18,7 @@ from .execution_engine import rebalance_to_target_weights
 from .accounting import (
     mark_to_market,
     apply_carry_costs,
+    apply_coupon_income,
     compute_exposures,
     compute_basic_metrics,
 )
@@ -784,6 +785,9 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     dates = prices.index
     instruments = prices.columns
 
+    # Optional FIXED-INCOME / dividend coupon stream (per-unit cash income per date). None for equities.
+    income = load_income_for_strategy(strategy, instruments, dates)
+
     # Load open prices if T+1 open fills are requested
     _fill_on = getattr(getattr(strategy.execution, "order_policy", None), "fill_on", "close")
     open_prices: Optional[pd.DataFrame] = None
@@ -885,6 +889,12 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             borrow=strategy.costs.borrow,
             financing=strategy.costs.financing,
         )
+
+        # Credit coupon (bond) / dividend (equity) income for today on held positions. Paired with a DIRTY
+        # price source this gives correct, smooth fixed-income total return (dirty mark = daily accrual; the
+        # coupon-date dirty drop is offset by this cash credit). No-op when no income stream is configured.
+        if income is not None and dt in income.index:
+            st.cash += apply_coupon_income(st.prev_positions, income.loc[dt])
 
         # Optionally management fees (we'll apply continuously on equity_before)
         nav_fee = strategy.costs.fees.nav_fee_annual
@@ -1063,6 +1073,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                             execution=strategy.execution,
                             commission=strategy.costs.commission,
                             fees=strategy.costs.fees,
+                            tax=getattr(strategy.costs, "tax", None),
                             cash=st.cash,
                             prices=open_aligned,
                             volumes=volume_t,
@@ -1083,6 +1094,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                         execution=strategy.execution,
                         commission=strategy.costs.commission,
                         fees=strategy.costs.fees,
+                        tax=getattr(strategy.costs, "tax", None),
                         cash=st.cash,
                         prices=price_t_eff,
                         volumes=volume_t,

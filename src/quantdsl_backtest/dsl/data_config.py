@@ -45,6 +45,13 @@ class DataConfig:
     # Optional: data transforms to apply after loading
     transforms: Optional[List["DataTransform"]] = None
 
+    # Optional FIXED-INCOME coupon stream. Path to a long-format parquet with columns (date, ticker, income)
+    # giving the coupon cash paid PER UNIT held on each date (0 / absent elsewhere). When set, the engine
+    # credits sum(positions * income) to cash each bar. Pair with a DIRTY price source (close = clean+accrued)
+    # for correct, smooth bond total return: the dirty mark books daily accrual, the coupon date's dirty drop
+    # is offset by this cash credit. None = ordinary equity behaviour.
+    income_source: Optional[str] = None
+
     def __post_init__(self) -> None:
         # Validate/normalize frequency early so invalid configs fail fast.
         # Preserve original string, but ensure it parses and is in canonical form.
