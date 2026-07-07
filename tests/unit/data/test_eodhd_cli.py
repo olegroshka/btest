@@ -83,9 +83,9 @@ def test_fundamentals_only_selects_common_lanes_and_skips_universe() -> None:
     ]
 
 
-def test_passthrough_not_applied_to_fundamentals_snapshot() -> None:
-    # The snapshot fundamentals fetcher doesn't accept --full-refresh/--to, so
-    # passthrough must stop at the incremental (state-backed) fetchers.
+def test_passthrough_not_applied_to_fundamentals() -> None:
+    # fundamentals runs via its own --update mode and doesn't accept --to/etc, so
+    # price/event passthrough must stop at the incremental fetchers.
     plan = cli.build_refresh_plan(
         ["us_common"],
         kinds={"prices", "fundamentals"},
@@ -95,7 +95,7 @@ def test_passthrough_not_applied_to_fundamentals_snapshot() -> None:
     prices = next(s for s in plan if s.kind == "prices")
     fundamentals = next(s for s in plan if s.kind == "fundamentals")
     assert prices.args == ["--full-refresh"]
-    assert fundamentals.args == []
+    assert fundamentals.args == ["--update"]  # fixed arg only, no passthrough
 
 
 def test_step_display_and_argv() -> None:

@@ -164,15 +164,22 @@ def event_spec(
 
 
 def fundamentals_spec(fetcher: str | None = None) -> DatasetSpec:
-    """Quarterly-fundamentals snapshot spec (freshness = latest filing date)."""
+    """Quarterly-fundamentals spec.
+
+    Refreshed incrementally by the fetcher's ``--update`` mode, which writes a
+    per-firm ``fundamentals_fetch_state.csv`` sidecar. Freshness is the newest
+    filing we hold (``latest_filing_date``); there is no query "coverage".
+    """
     return DatasetSpec(
         kind="fundamentals",
         output="fundamentals_quarterly.parquet",
-        state=None,
-        freshness_col="filing_date",
+        state="fundamentals_fetch_state.csv",
+        as_of_state_col="latest_filing_date",
+        freshness_col="latest_filing_date",
         as_of_data_col="filing_date",
         label="fundamentals_q",
         fetcher=fetcher,
+        fetcher_args=("--update",),
     )
 
 

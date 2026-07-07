@@ -35,8 +35,10 @@ import logging
 import os
 import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
+import fundamentals_refresh_common as fr
 import pandas as pd
 import requests
 
@@ -155,16 +157,31 @@ IS_FIELDS = [
 
 # Smoke test tickers (verified to have data)
 SMOKE_TICKERS = [
-    ("SHEL", "LSE"), ("BP", "LSE"), ("AZN", "LSE"), ("HSBA", "LSE"),
-    ("GSK", "LSE"), ("ULVR", "LSE"), ("DGE", "LSE"), ("BARC", "LSE"),
-    ("SAP", "XETRA"), ("SIE", "XETRA"), ("BAS", "XETRA"), ("BAYN", "XETRA"),
-    ("BMW", "XETRA"), ("ALV", "XETRA"),
-    ("TTE", "PA"), ("BNP", "PA"), ("MC", "PA"), ("SAN", "PA"),
-    ("NESN", "SW"), ("NOVN", "SW"),
+    ("SHEL", "LSE"),
+    ("BP", "LSE"),
+    ("AZN", "LSE"),
+    ("HSBA", "LSE"),
+    ("GSK", "LSE"),
+    ("ULVR", "LSE"),
+    ("DGE", "LSE"),
+    ("BARC", "LSE"),
+    ("SAP", "XETRA"),
+    ("SIE", "XETRA"),
+    ("BAS", "XETRA"),
+    ("BAYN", "XETRA"),
+    ("BMW", "XETRA"),
+    ("ALV", "XETRA"),
+    ("TTE", "PA"),
+    ("BNP", "PA"),
+    ("MC", "PA"),
+    ("SAN", "PA"),
+    ("NESN", "SW"),
+    ("NOVN", "SW"),
 ]
 
 
 # ── API helpers ───────────────────────────────────────────────────────────────
+
 
 def _get_api_key_from_windows_user_env() -> str:
     if os.name != "nt":
@@ -177,6 +194,7 @@ def _get_api_key_from_windows_user_env() -> str:
             return str(value).strip()
     except Exception:
         return ""
+
 
 def _get_api_key() -> str:
     key = os.environ.get("EODHD_API_KEY", "").strip()
@@ -247,7 +265,9 @@ def raw_cache_path(ticker: str, exchange: str, *, raw_dir: Path = RAW_DIR) -> Pa
     return raw_dir / "cache" / "fundamentals" / safe_exchange / f"{safe_ticker}.json.gz"
 
 
-def load_cached_raw_payload(ticker: str, exchange: str, *, raw_dir: Path = RAW_DIR) -> dict | None:
+def load_cached_raw_payload(
+    ticker: str, exchange: str, *, raw_dir: Path = RAW_DIR
+) -> dict | None:
     cache_path = raw_cache_path(ticker, exchange, raw_dir=raw_dir)
     if not cache_path.exists():
         return None
@@ -260,7 +280,9 @@ def load_cached_raw_payload(ticker: str, exchange: str, *, raw_dir: Path = RAW_D
     return payload if isinstance(payload, dict) else None
 
 
-def save_raw_payload(raw: dict, ticker: str, exchange: str, *, raw_dir: Path = RAW_DIR) -> Path:
+def save_raw_payload(
+    raw: dict, ticker: str, exchange: str, *, raw_dir: Path = RAW_DIR
+) -> Path:
     cache_path = raw_cache_path(ticker, exchange, raw_dir=raw_dir)
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(cache_path, "wt", encoding="utf-8") as handle:
@@ -268,7 +290,9 @@ def save_raw_payload(raw: dict, ticker: str, exchange: str, *, raw_dir: Path = R
     return cache_path
 
 
-def summarize_payload_sections(raw: dict, *, max_keys: int = 12) -> dict[str, dict[str, object]]:
+def summarize_payload_sections(
+    raw: dict, *, max_keys: int = 12
+) -> dict[str, dict[str, object]]:
     summary: dict[str, dict[str, object]] = {}
     for section_name, value in raw.items():
         section_summary: dict[str, object] = {"type": type(value).__name__}
@@ -281,7 +305,6 @@ def summarize_payload_sections(raw: dict, *, max_keys: int = 12) -> dict[str, di
                 section_summary["sample_keys"] = sorted(value[0].keys())[:max_keys]
         summary[section_name] = section_summary
     return summary
-
 
 
 def _api_get(
@@ -316,8 +339,11 @@ def _api_get(
 
 # ── Step 1: Fetch exchange ticker lists ───────────────────────────────────────
 
+
 def fetch_exchange_tickers(session: requests.Session, exchange: str) -> pd.DataFrame:
-    log.info("Fetching ticker list for %s (%s)", exchange, TARGET_EXCHANGES.get(exchange, ""))
+    log.info(
+        "Fetching ticker list for %s (%s)", exchange, TARGET_EXCHANGES.get(exchange, "")
+    )
     data = _api_get(session, f"exchange-symbol-list/{exchange}")
     if not data or not isinstance(data, list):
         log.warning("No tickers for %s", exchange)
@@ -332,11 +358,13 @@ def fetch_exchange_tickers(session: requests.Session, exchange: str) -> pd.DataF
 
 # ── Step 2: Fetch fundamentals for one firm ───────────────────────────────────
 
-def fetch_fundamentals(session: requests.Session, ticker: str, exchange: str) -> dict | None:
+
+def fetch_fundamentals(
+    session: requests.Session, ticker: str, exchange: str
+) -> dict | None:
     endpoint = f"fundamentals/{ticker}.{exchange}"
     data = _api_get(session, endpoint)
     return data if isinstance(data, dict) else None
-
 
 
 def extract_general_info(raw: dict) -> dict:
@@ -351,7 +379,6 @@ def extract_general_info(raw: dict) -> dict:
         "isin": gen.get("ISIN", ""),
         "market_cap": gen.get("MarketCapitalization", None),
     }
-
 
 
 def extract_quarterly_statements(raw: dict, ticker: str, exchange: str) -> pd.DataFrame:
@@ -470,8 +497,12 @@ def _merge_output_frame(
     return merged
 
 
-def extract_same_call_section_frames(raw: dict, ticker: str, exchange: str) -> dict[str, pd.DataFrame]:
-    frames: dict[str, pd.DataFrame] = {name: pd.DataFrame() for name in SECTION_OUTPUT_SPECS}
+def extract_same_call_section_frames(
+    raw: dict, ticker: str, exchange: str
+) -> dict[str, pd.DataFrame]:
+    frames: dict[str, pd.DataFrame] = {
+        name: pd.DataFrame() for name in SECTION_OUTPUT_SPECS
+    }
 
     splits_dividends = raw.get("SplitsDividends", {}) or {}
     if isinstance(splits_dividends, dict):
@@ -485,12 +516,22 @@ def extract_same_call_section_frames(raw: dict, ticker: str, exchange: str) -> d
         if isinstance(counts, dict):
             rows = []
             for row in _records_from_mapping(counts, ticker=ticker, exchange=exchange):
-                rows.append({
-                    "ticker": ticker,
-                    "exchange": exchange,
-                    "year": int(row.get("year")) if row.get("year") is not None else None,
-                    "count": int(row.get("count")) if row.get("count") is not None else None,
-                })
+                rows.append(
+                    {
+                        "ticker": ticker,
+                        "exchange": exchange,
+                        "year": (
+                            int(row.get("year"))
+                            if row.get("year") is not None
+                            else None
+                        ),
+                        "count": (
+                            int(row.get("count"))
+                            if row.get("count") is not None
+                            else None
+                        ),
+                    }
+                )
             if rows:
                 frames["dividend_counts_by_year"] = pd.DataFrame(rows)
 
@@ -549,6 +590,7 @@ def extract_same_call_section_frames(raw: dict, ticker: str, exchange: str) -> d
 
 # ── Step 3: Coverage analysis ─────────────────────────────────────────────────
 
+
 def compute_coverage(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
@@ -567,7 +609,11 @@ def compute_coverage(df: pd.DataFrame) -> pd.DataFrame:
     for (ticker, exchange), group in df.groupby(["ticker", "exchange"]):
         bs_sub = group[group["statement"] == "BS"]
         cf_sub = group[group["statement"] == "CF"]
-        has_assets = bs_sub["totalAssets"].notna().sum() if "totalAssets" in bs_sub.columns else 0
+        has_assets = (
+            bs_sub["totalAssets"].notna().sum()
+            if "totalAssets" in bs_sub.columns
+            else 0
+        )
         has_capex = (
             cf_sub["capitalExpenditures"].notna().sum()
             if "capitalExpenditures" in cf_sub.columns
@@ -581,9 +627,17 @@ def compute_coverage(df: pd.DataFrame) -> pd.DataFrame:
             "n_assets": int(has_assets),
             "n_capex": int(has_capex),
         }
-        bs_in_window = bs_sub[(bs_sub["date"] >= "2011-01-01") & (bs_sub["date"] <= "2025-12-31")]
-        cf_in_window = cf_sub[(cf_sub["date"] >= "2011-01-01") & (cf_sub["date"] <= "2025-12-31")]
-        assets_in_window = bs_in_window["totalAssets"].notna().sum() if "totalAssets" in bs_in_window.columns else 0
+        bs_in_window = bs_sub[
+            (bs_sub["date"] >= "2011-01-01") & (bs_sub["date"] <= "2025-12-31")
+        ]
+        cf_in_window = cf_sub[
+            (cf_sub["date"] >= "2011-01-01") & (cf_sub["date"] <= "2025-12-31")
+        ]
+        assets_in_window = (
+            bs_in_window["totalAssets"].notna().sum()
+            if "totalAssets" in bs_in_window.columns
+            else 0
+        )
         capex_in_window = (
             cf_in_window["capitalExpenditures"].notna().sum()
             if "capitalExpenditures" in cf_in_window.columns
@@ -599,10 +653,17 @@ def compute_coverage(df: pd.DataFrame) -> pd.DataFrame:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Fetch EODHD UK/EU fundamentals into btest")
-    parser.add_argument("--smoke", action="store_true", help="Smoke test: 20 known tickers only")
-    parser.add_argument("--limit", type=int, default=0, help="Max firms per exchange (0=all)")
+    parser = argparse.ArgumentParser(
+        description="Fetch EODHD UK/EU fundamentals into btest"
+    )
+    parser.add_argument(
+        "--smoke", action="store_true", help="Smoke test: 20 known tickers only"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Max firms per exchange (0=all)"
+    )
     parser.add_argument(
         "--tickers",
         nargs="*",
@@ -613,6 +674,33 @@ def main() -> None:
         "--refresh-raw",
         action="store_true",
         help="Ignore the private raw payload cache and refetch payloads from EODHD",
+    )
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Refresh existing firms that reported since the last pull (calendar-targeted) "
+        "plus any new firms; not just backfill missing firms",
+    )
+    parser.add_argument(
+        "--full-refresh",
+        action="store_true",
+        help="Refresh every firm (restatement sweep / hard rebuild)",
+    )
+    parser.add_argument(
+        "--stale-days",
+        type=int,
+        default=30,
+        help="In --update without the calendar, re-fetch firms not pulled in this many days",
+    )
+    parser.add_argument(
+        "--no-calendar",
+        action="store_true",
+        help="In --update, skip the earnings calendar and use --stale-days targeting",
+    )
+    parser.add_argument(
+        "--reported-from",
+        default="",
+        help="Override the earnings-calendar window start (YYYY-MM-DD)",
     )
     parser.add_argument(
         "--exchanges",
@@ -638,8 +726,12 @@ def main() -> None:
     existing_meta: pd.DataFrame | None = None
     cached_tickers: set[tuple[str, str]] = set()
     meta_tickers: set[tuple[str, str]] = set()
-    existing_section_outputs: dict[str, pd.DataFrame | None] = {name: None for name in SECTION_OUTPUT_SPECS}
-    section_tickers: dict[str, set[tuple[str, str]]] = {name: set() for name in SECTION_OUTPUT_SPECS}
+    existing_section_outputs: dict[str, pd.DataFrame | None] = {
+        name: None for name in SECTION_OUTPUT_SPECS
+    }
+    section_tickers: dict[str, set[tuple[str, str]]] = {
+        name: set() for name in SECTION_OUTPUT_SPECS
+    }
 
     if fund_path.exists() and not args.smoke:
         existing_fund = pd.read_parquet(fund_path)
@@ -652,7 +744,9 @@ def main() -> None:
     if meta_path.exists() and not args.smoke:
         existing_meta = pd.read_parquet(meta_path)
         if {"ticker", "exchange_code"}.issubset(existing_meta.columns):
-            meta_tickers = set(zip(existing_meta["ticker"], existing_meta["exchange_code"]))
+            meta_tickers = set(
+                zip(existing_meta["ticker"], existing_meta["exchange_code"])
+            )
 
     for output_name, spec in SECTION_OUTPUT_SPECS.items():
         output_path = spec["path"]
@@ -660,11 +754,15 @@ def main() -> None:
             output_df = pd.read_parquet(output_path)
             existing_section_outputs[output_name] = output_df
             if {"ticker", "exchange"}.issubset(output_df.columns):
-                section_tickers[output_name] = set(zip(output_df["ticker"], output_df["exchange"]))
+                section_tickers[output_name] = set(
+                    zip(output_df["ticker"], output_df["exchange"])
+                )
 
     new_fundamentals: list[pd.DataFrame] = []
     new_metadata: list[dict] = []
-    new_section_outputs: dict[str, list[pd.DataFrame]] = {name: [] for name in SECTION_OUTPUT_SPECS}
+    new_section_outputs: dict[str, list[pd.DataFrame]] = {
+        name: [] for name in SECTION_OUTPUT_SPECS
+    }
     total_materialized = 0
     total_api_payloads = 0
     total_raw_cache_hits = 0
@@ -695,30 +793,42 @@ def main() -> None:
                 ticker_df = pd.read_parquet(ticker_path)
                 if "Type" in ticker_df.columns:
                     ticker_df = ticker_df[ticker_df["Type"] == "Common Stock"]
-                log.info("  %s: loaded %d common stocks from cache", exchange, len(ticker_df))
+                log.info(
+                    "  %s: loaded %d common stocks from cache", exchange, len(ticker_df)
+                )
             else:
                 ticker_df = fetch_exchange_tickers(session, exchange)
                 if ticker_df.empty:
                     continue
                 ticker_df.to_parquet(ticker_path, index=False)
-                log.info("  %s: fetched and saved %d common stocks", exchange, len(ticker_df))
+                log.info(
+                    "  %s: fetched and saved %d common stocks", exchange, len(ticker_df)
+                )
 
             code_col = "Code" if "Code" in ticker_df.columns else ticker_df.columns[0]
             codes = ticker_df[code_col].astype(str).tolist()
             if args.limit > 0:
-                codes = codes[:args.limit]
+                codes = codes[: args.limit]
             for code in codes:
                 tickers_to_fetch.append((str(code), exchange))
 
     log.info(
         "Total tickers to process: %d (cached: %d)",
         len(tickers_to_fetch),
-        sum(1 for ticker, exchange in tickers_to_fetch if (ticker, exchange) in cached_tickers),
+        sum(
+            1
+            for ticker, exchange in tickers_to_fetch
+            if (ticker, exchange) in cached_tickers
+        ),
     )
 
     def _flush_to_disk() -> None:
         nonlocal existing_fund, existing_meta, existing_section_outputs
-        if not new_fundamentals and not new_metadata and not any(new_section_outputs.values()):
+        if (
+            not new_fundamentals
+            and not new_metadata
+            and not any(new_section_outputs.values())
+        ):
             return
 
         if new_fundamentals:
@@ -742,7 +852,9 @@ def main() -> None:
             existing_meta = merged_meta
 
         for output_name, frames in new_section_outputs.items():
-            non_empty_frames = [frame for frame in frames if frame is not None and not frame.empty]
+            non_empty_frames = [
+                frame for frame in frames if frame is not None and not frame.empty
+            ]
             if not non_empty_frames:
                 continue
             new_output_df = pd.concat(non_empty_frames, ignore_index=True)
@@ -755,13 +867,17 @@ def main() -> None:
             merged_output.to_parquet(output_path, index=False)
             existing_section_outputs[output_name] = merged_output
 
-        fund_rows = 0 if existing_fund is None or existing_fund.empty else len(existing_fund)
+        fund_rows = (
+            0 if existing_fund is None or existing_fund.empty else len(existing_fund)
+        )
         fund_firms = (
             0
             if existing_fund is None or existing_fund.empty
             else existing_fund[["ticker", "exchange"]].drop_duplicates().shape[0]
         )
-        meta_firms = 0 if existing_meta is None or existing_meta.empty else len(existing_meta)
+        meta_firms = (
+            0 if existing_meta is None or existing_meta.empty else len(existing_meta)
+        )
         log.info(
             "  [FLUSH] fundamentals=%d rows (%d firms); metadata=%d firms",
             fund_rows,
@@ -773,20 +889,88 @@ def main() -> None:
         for frames in new_section_outputs.values():
             frames.clear()
 
-    for i, (ticker, exchange) in enumerate(tickers_to_fetch):
-        needs_fundamentals = (ticker, exchange) not in cached_tickers
-        needs_metadata = (ticker, exchange) not in meta_tickers
-        missing_section_outputs = [
-            output_name
-            for output_name, completed in section_tickers.items()
-            if (ticker, exchange) not in completed
-        ]
+    now_ts = pd.Timestamp(datetime.now(timezone.utc)).tz_localize(None)
+    if args.full_refresh:
+        mode = fr.MODE_FULL
+    elif args.update:
+        mode = fr.MODE_UPDATE
+    else:
+        mode = fr.MODE_BACKFILL
 
-        if not needs_fundamentals and not needs_metadata and not missing_section_outputs:
+    state_path = RAW_DIR / fr.STATE_FILENAME
+    prior_state = fr.load_state(state_path)
+
+    reported = None
+    if mode == fr.MODE_UPDATE and not args.no_calendar:
+        window_from = fr.resolve_reported_from(
+            args.reported_from or None, existing_fund, as_of=now_ts
+        )
+        reported = fr.fetch_reported_symbols(
+            session, window_from, now_ts.date().isoformat()
+        )
+        if reported is None:
+            log.warning(
+                "earnings calendar unavailable; falling back to --stale-days=%d",
+                args.stale_days,
+            )
+        else:
+            log.info(
+                "earnings calendar: %d symbols reported since %s",
+                len(reported),
+                window_from,
+            )
+
+    targets = set(
+        fr.select_targets(
+            tickers_to_fetch,
+            mode=mode,
+            present=cached_tickers,
+            state=prior_state,
+            reported=reported,
+            stale_days=args.stale_days,
+            as_of=now_ts,
+        )
+    )
+    force_refresh = mode in (fr.MODE_UPDATE, fr.MODE_FULL)
+    refreshed_pairs: set[tuple[str, str]] = set()
+    empty_pairs: set[tuple[str, str]] = set()
+    log.info(
+        "Refresh mode=%s -> %d firms targeted (of %d candidates)",
+        mode,
+        len(targets),
+        len(tickers_to_fetch),
+    )
+
+    for i, (ticker, exchange) in enumerate(tickers_to_fetch):
+        norm = fr.normalize_pair(ticker, exchange)
+        if norm not in targets:
             total_cached += 1
             continue
 
-        if (total_materialized + total_skipped) % 50 == 0 and (total_materialized + total_skipped) > 0:
+        if force_refresh:
+            needs_fundamentals = True
+            needs_metadata = True
+            missing_section_outputs = list(section_tickers)
+        else:
+            needs_fundamentals = (ticker, exchange) not in cached_tickers
+            needs_metadata = (ticker, exchange) not in meta_tickers
+            missing_section_outputs = [
+                output_name
+                for output_name, completed in section_tickers.items()
+                if (ticker, exchange) not in completed
+            ]
+
+        if (
+            not needs_fundamentals
+            and not needs_metadata
+            and not missing_section_outputs
+        ):
+            total_cached += 1
+            continue
+
+        if (total_materialized + total_skipped) % 50 == 0 and (
+            total_materialized + total_skipped
+        ) > 0:
             log.info(
                 "Progress: %d / %d (materialized=%d, skipped=%d, raw_cache=%d, parquet_cached=%d)",
                 i + 1,
@@ -797,7 +981,8 @@ def main() -> None:
                 total_cached,
             )
 
-        raw = None if args.refresh_raw else load_cached_raw_payload(ticker, exchange)
+        use_cache = not (args.refresh_raw or force_refresh)
+        raw = load_cached_raw_payload(ticker, exchange) if use_cache else None
         used_api = False
         if raw is not None:
             total_raw_cache_hits += 1
@@ -809,6 +994,7 @@ def main() -> None:
                 used_api = True
 
         if not raw:
+            empty_pairs.add(norm)
             total_skipped += 1
             time.sleep(DELAY_BETWEEN_CALLS)
             continue
@@ -828,8 +1014,10 @@ def main() -> None:
             if not stmt_df.empty:
                 new_fundamentals.append(stmt_df)
                 cached_tickers.add((ticker, exchange))
+                refreshed_pairs.add(norm)
                 materialized_this_ticker = True
             else:
+                empty_pairs.add(norm)
                 total_skipped += 1
 
         if missing_section_outputs:
@@ -866,6 +1054,20 @@ def main() -> None:
     else:
         fundamentals_df = pd.DataFrame()
         log.warning("No fundamentals data on disk")
+
+    fr.write_state(
+        state_path,
+        fundamentals_df,
+        refreshed=refreshed_pairs,
+        empty=empty_pairs,
+        now=now_ts,
+    )
+    log.info(
+        "Wrote %s (refreshed=%d, empty=%d)",
+        state_path.name,
+        len(refreshed_pairs),
+        len(empty_pairs),
+    )
 
     if meta_path.exists():
         meta_df = pd.read_parquet(meta_path)
@@ -911,7 +1113,9 @@ def main() -> None:
         for exchange in sorted(coverage["exchange"].unique()):
             sub = coverage[coverage["exchange"] == exchange]
             n60 = sub["both_60q"].sum()
-            print(f"  {exchange:<6}: {len(sub):>4} firms total, {n60:>3} with >=56Q both")
+            print(
+                f"  {exchange:<6}: {len(sub):>4} firms total, {n60:>3} with >=56Q both"
+            )
 
         print("=" * 70 + "\n")
         log.info("Saved %s (%d rows)", out_path.name, len(coverage))
@@ -919,4 +1123,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

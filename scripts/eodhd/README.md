@@ -31,6 +31,8 @@ are still the way to do windowed or otherwise unusual pulls.
 - `cli.py`: unified CLI (`status` / `refresh` / `qc` / `probe` / `lanes`).
 - `eodhd_datasets.py`: the lane/dataset registry — single source of truth; add a lane or dataset here.
 - `status_eodhd.py`: as-of / staleness reporter; writes `data/raw/eodhd/STATUS.md` + `STATUS.json`.
+- `fundamentals_refresh_common.py`: shared incremental-refresh helpers for the fundamentals fetchers (target selection, state sidecar, earnings-calendar lookup).
+- `FUNDAMENTALS_REFRESH_DESIGN.md`: design notes for the fundamentals refresh (why append-only was a problem, the fix).
 - `EODHD_*_MANIFEST.md`: per-lane factual inventories of scope, local artefacts, and current observed counts.
 - `fetch_eodhd_*.py`: the actual fetchers.
 - `tmp_poll_eodhd_progress.py` at repo root: ad hoc progress snapshot across the ETF and index-reference lanes.
@@ -69,6 +71,33 @@ On a normal rerun, the scripts will:
 - and merge new output with existing parquet files.
 
 Use `--full-refresh` only when you intentionally want to rebuild an output from scratch.
+
+## Fundamentals refresh
+
+Fundamentals are **not** append-only anymore. The fetchers support:
+
+- *(default)* backfill — fetch only firms not yet present (initial load / resume),
+- `--update` — refresh firms that reported since the last pull (via the EODHD
+  `/calendar/earnings` endpoint) plus any new firms; falls back to `--stale-days N`
+  if the calendar is unavailable or `--no-calendar` is passed,
+- `--full-refresh` — re-fetch every firm (restatement sweep / hard rebuild).
+
+Each run writes a per-firm `fundamentals_fetch_state.csv` sidecar (last `fetched_at`,
+`latest_filing_date`, `latest_statement_date`, `n_quarters`), which the status tool
+uses for freshness. Re-fetched firms are upserted into `fundamentals_quarterly.parquet`
+(merge on `ticker, exchange, statement, date`), so new quarters and restatements land
+correctly.
+
+```powershell
+# Routine incremental refresh (calendar-targeted) via the CLI:
+uv run python scripts/eodhd/cli.py refresh --datasets fundamentals --run
+
+# Or a fetcher directly (e.g. a full rebuild — not exposed through the CLI):
+uv run python scripts/eodhd/fetch_eodhd_us_fundamentals.py --update
+uv run python scripts/eodhd/fetch_eodhd_us_fundamentals.py --full-refresh
+```
+
+See `FUNDAMENTALS_REFRESH_DESIGN.md` for the rationale and details.
 
 ## Typical run order
 

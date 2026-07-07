@@ -52,6 +52,9 @@ COMMAND_HELP: list[tuple[str, str]] = [
 
 KNOWN_KINDS = ("prices", "dividends", "splits", "fundamentals")
 DEFAULT_KINDS = ("prices", "dividends", "splits")
+# Kinds whose fetchers accept the incremental passthrough flags (--to/--limit/...).
+# fundamentals is refreshed via its own --update mode and takes different flags.
+INCREMENTAL_KINDS = frozenset({"prices", "dividends", "splits"})
 
 
 # --------------------------------------------------------------------------- #
@@ -163,8 +166,9 @@ def build_refresh_plan(
                 )
             )
         for ds in matching:
+            assert ds.fetcher is not None  # guaranteed by `matching`
             step_args = list(ds.fetcher_args)
-            if ds.state is not None:  # incremental fetcher accepts passthrough flags
+            if ds.kind in INCREMENTAL_KINDS:  # these fetchers accept passthrough flags
                 step_args += passthrough
             steps.append(Step(name, ds.kind, ds.fetcher, step_args))
     return steps
