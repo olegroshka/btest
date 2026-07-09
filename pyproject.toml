@@ -75,12 +75,6 @@ e2e = [
   "playwright>=1.57.0",
 ]
 
-# Interactive data-operations shell (scripts/datacli.py)
-cli = [
-  "cmd2>=2.4",
-  "rich>=13",
-]
-
 [project.urls]
 Homepage = "https://github.com/olegroshka/btest"
 Repository = "https://github.com/olegroshka/btest"

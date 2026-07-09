@@ -186,6 +186,20 @@ Playwright tests require a running platform server and are marked `manual`. The 
 SMIM is now maintained in the standalone sibling repository `C:\Users\olegr\PycharmProjects\smim`.
 Only btest-owned bridge helpers remain in `dsl` when needed for integration.
 
+## datacli note (EODHD data acquisition)
+
+The EODHD data-acquisition tooling (the `scripts/eodhd/` fetchers + unified CLI +
+status/QC/bulk-refresh) and the interactive data-ops shell were extracted into the
+standalone sibling repo `C:\Users\olegr\PycharmProjects\datacli`.
+
+- The **raw snapshots stay in btest** at `data/raw/eodhd/` (not moved). datacli
+  reads/writes them via the `EODHD_DATA_ROOT` env var, defaulting to
+  `../btest/data/raw/eodhd`.
+- Do **not** re-add EODHD fetchers or the datacli shell under `btest`; work on
+  them in the `datacli` repo.
+- btest keeps its runtime data-source adapters (`src/quantdsl_backtest/data/sources/`)
+  for loading data into backtests.
+
 ## Reference Documents (read when needed, not upfront)
 
 - For SMIM research materials, read them from the standalone sibling repo `C:\Users\olegr\PycharmProjects\smim`
