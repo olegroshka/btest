@@ -70,6 +70,27 @@ def test_gap_dates_business_days() -> None:
     assert bulk.gap_dates(state2, pd.Timestamp("2026-07-08"), max_days=7) == []
 
 
+def test_gap_dates_uses_latest_data_date_when_coverage_runs_ahead() -> None:
+    # Regression: a fetch before the day's close records latest_data_date=07-07
+    # but sets coverage_through=07-08. Keying the gap off coverage_through would
+    # skip 07-08; keying off latest_data_date (prices' freshness_col) catches it.
+    state = pd.DataFrame(
+        {
+            "ticker": ["A"],
+            "exchange": ["US"],
+            "coverage_through": ["2026-07-08"],
+            "latest_data_date": ["2026-07-07"],
+        }
+    )
+    as_of = pd.Timestamp("2026-07-08")
+    assert (
+        bulk.gap_dates(state, as_of, 7, freshness_col="coverage_through") == []
+    )  # old bug
+    assert bulk.gap_dates(state, as_of, 7, freshness_col="latest_data_date") == [
+        "2026-07-08"
+    ]
+
+
 def test_select_new_rows_filters_and_skips_big_gaps() -> None:
     normalized = pd.DataFrame(
         [

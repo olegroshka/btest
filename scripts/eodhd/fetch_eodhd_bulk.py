@@ -110,10 +110,17 @@ def _num(value: Any) -> float | None:
         return None
 
 
-def _cov_series(state: pd.DataFrame) -> pd.Series:
-    """coverage_through as datetimes (all-NaT series if the column is absent)."""
-    if "coverage_through" in state.columns:
-        return pd.to_datetime(state["coverage_through"], errors="coerce")
+def _freshness_series(state: pd.DataFrame, col: str) -> pd.Series:
+    """The lane's 'how far do we have data' column as datetimes (NaT if absent).
+
+    Keyed off the dataset's ``freshness_col`` -- ``latest_data_date`` for prices
+    (the actual last bar) and ``coverage_through`` for events. Using the real
+    last-bar date matters: the per-ticker fetchers set ``coverage_through`` to
+    the query ceiling, which can run *ahead* of the last bar when a fetch happens
+    before that day's close -- keying the gap off it would then skip the day.
+    """
+    if col in state.columns:
+        return pd.to_datetime(state[col], errors="coerce")
     return pd.Series(pd.NaT, index=state.index)
 
 
@@ -188,10 +195,16 @@ DATE_COL = {"prices": "date", "dividends": "ex_date", "splits": "ex_date"}
 # --------------------------------------------------------------------------- #
 # pure gap / merge / state logic
 # --------------------------------------------------------------------------- #
-def gap_dates(state: pd.DataFrame, as_of: pd.Timestamp, max_days: int) -> list[str]:
-    """Business days to bulk-fetch: from the oldest coverage_through (+1), capped
+def gap_dates(
+    state: pd.DataFrame,
+    as_of: pd.Timestamp,
+    max_days: int,
+    *,
+    freshness_col: str = "coverage_through",
+) -> list[str]:
+    """Business days to bulk-fetch: from the oldest last-data date (+1), capped
     at ``max_days`` most-recent, through ``as_of`` inclusive."""
-    cov = _cov_series(state)
+    cov = _freshness_series(state, freshness_col)
     min_cov = cov.min()
     floor = as_of.normalize() - pd.Timedelta(days=max_days - 1)
     if pd.isna(min_cov):
@@ -203,9 +216,11 @@ def gap_dates(state: pd.DataFrame, as_of: pd.Timestamp, max_days: int) -> list[s
     return [d.date().isoformat() for d in pd.bdate_range(start, as_of.normalize())]
 
 
-def coverage_map(state: pd.DataFrame) -> dict[Pair, pd.Timestamp]:
-    """(ticker, exchange) -> coverage_through timestamp (NaT-safe)."""
-    cov = _cov_series(state)
+def coverage_map(
+    state: pd.DataFrame, *, freshness_col: str = "coverage_through"
+) -> dict[Pair, pd.Timestamp]:
+    """(ticker, exchange) -> last-data timestamp (NaT-safe), per ``freshness_col``."""
+    cov = _freshness_series(state, freshness_col)
     result: dict[Pair, pd.Timestamp] = {}
     for ticker, exchange, c in zip(state["ticker"], state["exchange"], cov):
         result[(str(ticker).upper(), str(exchange).upper())] = c
@@ -377,7 +392,7 @@ def process_dataset(
         return summary
 
     state = pd.read_csv(state_path)
-    dates = gap_dates(state, as_of, max_days)
+    dates = gap_dates(state, as_of, max_days, freshness_col=ds.freshness_col)
     if not dates:
         summary["note"] = "up to date"
         return summary
@@ -392,7 +407,7 @@ def process_dataset(
                 frames.append(NORMALIZERS[ds.kind](rows))
     normalized = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
 
-    cov = coverage_map(state)
+    cov = coverage_map(state, freshness_col=ds.freshness_col)
     new_rows, skipped = select_new_rows(
         normalized, cov, date_col=date_col, earliest_fetched=earliest
     )
