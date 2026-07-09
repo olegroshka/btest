@@ -128,6 +128,7 @@ Current known persistent UK/EU ETF price exceptions:
 
 - `PHPT.AS` -> `invalid_ohlc_relationship`, `non_positive_prices`
 - `EX14.VI` -> `non_positive_prices`
+- `EXHG.XETRA` -> `invalid_ohlc_relationship` (2,327 historical bars; survives `--full-refresh` as of 2026-07-09)
 
 Operator rule:
 
