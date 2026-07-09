@@ -15,7 +15,8 @@ uv run python scripts/eodhd/cli.py status          # what data we have, as of wh
 uv run python scripts/eodhd/cli.py status --write   # + regenerate data/raw/eodhd/STATUS.md
 uv run python scripts/eodhd/cli.py lanes           # registered lanes/datasets/fetchers
 uv run python scripts/eodhd/cli.py refresh         # show the refresh plan (no fetch)
-uv run python scripts/eodhd/cli.py refresh --run   # execute: prices + events, all lanes
+uv run python scripts/eodhd/cli.py refresh --run   # execute: prices + events, all lanes (per-ticker; slow)
+uv run python scripts/eodhd/cli.py refresh --fast --run   # FAST: bulk endpoints, minutes not hours
 uv run python scripts/eodhd/cli.py refresh us_common --run
 uv run python scripts/eodhd/cli.py refresh --with-fundamentals --run
 uv run python scripts/eodhd/cli.py probe AAPL MSFT NVDA
@@ -31,6 +32,7 @@ are still the way to do windowed or otherwise unusual pulls.
 - `cli.py`: unified CLI (`status` / `refresh` / `qc` / `probe` / `lanes`).
 - `eodhd_datasets.py`: the lane/dataset registry — single source of truth; add a lane or dataset here.
 - `status_eodhd.py`: as-of / staleness reporter; writes `data/raw/eodhd/STATUS.md` + `STATUS.json`.
+- `fetch_eodhd_bulk.py`: the fast path — bulk end-of-day refresh (one call per exchange) for prices/dividends/splits; used by `refresh --fast`.
 - `fundamentals_refresh_common.py`: shared incremental-refresh helpers for the fundamentals fetchers (target selection, state sidecar, earnings-calendar lookup).
 - `FUNDAMENTALS_REFRESH_DESIGN.md`: design notes for the fundamentals refresh (why append-only was a problem, the fix).
 - `EODHD_*_MANIFEST.md`: per-lane factual inventories of scope, local artefacts, and current observed counts.
@@ -71,6 +73,35 @@ On a normal rerun, the scripts will:
 - and merge new output with existing parquet files.
 
 Use `--full-refresh` only when you intentionally want to rebuild an output from scratch.
+
+## Fast refresh (bulk end-of-day)
+
+The per-ticker fetchers make one HTTP call per ticker — tens of thousands of
+calls, hours of wall-clock — because they're request-bound (incremental shrinks
+the *data* per call, not the *number* of calls). For a routine daily/weekly
+top-up, use the bulk path instead:
+
+```powershell
+uv run python scripts/eodhd/cli.py refresh --fast --run          # all lanes, prices/divs/splits
+uv run python scripts/eodhd/cli.py refresh --fast us_common      # dry-run, one lane
+uv run python scripts/eodhd/cli.py refresh --fast --days 3 --run # only fill the last 3 days
+```
+
+It pulls a whole exchange's latest day(s) in a single `/eod-bulk-last-day/{EXCHANGE}`
+call (shared across lanes on the same exchange), filters to each lane's universe,
+and **append-merges** only genuinely-new rows — existing rows are never rewritten,
+so multiple dividends on one ex-date are preserved. State advances only to each
+pair's actual newest bar (never past real data), so nothing is ever skipped.
+
+Caveats / when to still use the per-ticker path:
+- **Adjustments:** bulk appends bars with the provider's current adjustment; it
+  does not re-adjust historical `adjusted_close` after a split. Tickers that split
+  are reported — run a periodic per-ticker `--full-refresh` for those.
+- **Large gaps:** a pair more than `--days` behind is reported and skipped (never
+  hole-punched); use the normal `refresh --run` to backfill it.
+- **New listings / universe:** `--fast` updates the existing universe; run the
+  universe fetchers (or a normal refresh) to discover newly listed tickers.
+- **Fundamentals:** not part of `--fast`; use `refresh --datasets fundamentals --run`.
 
 ## Fundamentals refresh
 

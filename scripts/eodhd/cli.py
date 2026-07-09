@@ -205,6 +205,18 @@ def cmd_refresh(argv: list[str]) -> int:
         "--run", action="store_true", help="Actually execute (default: dry-run)."
     )
     parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Use bulk end-of-day endpoints for prices/dividends/splits "
+        "(one call per exchange -> minutes instead of hours).",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="With --fast, max days back to fill (default 7).",
+    )
+    parser.add_argument(
         "--keep-going", action="store_true", help="Continue after a fetcher fails."
     )
     parser.add_argument(
@@ -230,6 +242,26 @@ def cmd_refresh(argv: list[str]) -> int:
     bad = kinds - set(KNOWN_KINDS)
     if bad:
         parser.error(f"unknown dataset kind(s): {', '.join(sorted(bad))}")
+
+    if args.fast:
+        bulk_kinds = sorted(kinds & INCREMENTAL_KINDS)
+        if not bulk_kinds:
+            parser.error("--fast supports prices/dividends/splits only; none selected")
+        if "fundamentals" in kinds:
+            print(
+                "note: --fast covers prices/dividends/splits; refresh fundamentals via "
+                "'refresh --datasets fundamentals --run'\n"
+            )
+        forwarded = [
+            *lane_names,
+            "--kinds",
+            ",".join(bulk_kinds),
+            "--days",
+            str(args.days),
+        ]
+        if args.run:
+            forwarded.append("--run")
+        return delegate("fetch_eodhd_bulk.py", forwarded)
 
     passthrough: list[str] = []
     if args.full_refresh:
