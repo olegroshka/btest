@@ -7,6 +7,10 @@ This directory contains the operational fetchers and factual manifests for the `
 `cli.py` is the single front door. It is driven by the lane registry in
 `eodhd_datasets.py`, so it never hardcodes lane or file names.
 
+> **Interactive shell:** `scripts/datacli.py` is a cmd2/Rich REPL over all data
+> sources. `uv run --extra cli python scripts/datacli.py`, then `/source eodhd`
+> and run `/status`, `/fetch --fast --run`, `/qc`, `/config` — it reuses this CLI.
+
 ```powershell
 Set-Location "C:\Users\olegr\PycharmProjects\btest"
 
