@@ -13,6 +13,27 @@ if str(_SCRIPTS_EODHD) not in sys.path:
 import report_eodhd_raw_quality as qc  # type: ignore  # noqa: E402
 
 
+def test_load_universe_pairs_falls_back_to_state_when_no_universe_path(
+    tmp_path: Path,
+) -> None:
+    # us_common / uk_eu have no single universe parquet -> derive from prices state.
+    pd.DataFrame(
+        [
+            {"ticker": "vod", "exchange": "lse"},
+            {"ticker": "AAPL", "exchange": "US"},
+            {"ticker": "AAPL", "exchange": "US"},  # dup collapses
+        ]
+    ).to_csv(tmp_path / "prices_fetch_state.csv", index=False)
+
+    config = qc.LaneConfig(name="common_test", root=tmp_path, universe_path=None)
+    pairs = qc.load_universe_pairs(config)
+
+    assert pairs.to_dict("records") == [
+        {"ticker": "AAPL", "exchange": "US"},
+        {"ticker": "VOD", "exchange": "LSE"},
+    ]
+
+
 def test_load_universe_pairs_uses_source_exchange_for_uk_eu_etf(tmp_path: Path) -> None:
     universe_path = tmp_path / "tickers_UK_EU_ETF.parquet"
     pd.DataFrame(
@@ -38,7 +59,9 @@ def test_load_universe_pairs_uses_source_exchange_for_uk_eu_etf(tmp_path: Path) 
 
 
 def test_build_price_flags_marks_missing_state_and_invalid_prices() -> None:
-    universe = pd.DataFrame([{"ticker": "AAA", "exchange": "US"}, {"ticker": "BBB", "exchange": "US"}])
+    universe = pd.DataFrame(
+        [{"ticker": "AAA", "exchange": "US"}, {"ticker": "BBB", "exchange": "US"}]
+    )
     metrics = pd.DataFrame(
         [
             {
@@ -113,7 +136,9 @@ def test_build_price_flags_marks_missing_state_and_invalid_prices() -> None:
 
 
 def test_build_event_flags_detects_state_mismatches_and_invalid_split_values() -> None:
-    universe = pd.DataFrame([{"ticker": "SPLT", "exchange": "US"}, {"ticker": "MISS", "exchange": "US"}])
+    universe = pd.DataFrame(
+        [{"ticker": "SPLT", "exchange": "US"}, {"ticker": "MISS", "exchange": "US"}]
+    )
     event_metrics = pd.DataFrame(
         [
             {
@@ -128,11 +153,17 @@ def test_build_event_flags_detects_state_mismatches_and_invalid_split_values() -
         ]
     )
     state = pd.DataFrame(
-        [{"ticker": "SPLT", "exchange": "US", "status": "empty", "fetched_at": "2025-01-01T00:00:00+00:00", "detail": ""}]
+        [
+            {
+                "ticker": "SPLT",
+                "exchange": "US",
+                "status": "empty",
+                "fetched_at": "2025-01-01T00:00:00+00:00",
+                "detail": "",
+            }
+        ]
     )
-    audit = pd.DataFrame(
-        [{"ticker": "SPLT", "exchange": "US", "status": "ok"}]
-    )
+    audit = pd.DataFrame([{"ticker": "SPLT", "exchange": "US", "status": "ok"}])
     config = qc.LaneConfig(
         name="us_etf_test",
         root=Path("unused"),
@@ -165,8 +196,26 @@ def test_build_event_flags_detects_state_mismatches_and_invalid_split_values() -
 def test_sort_flags_orders_errors_before_warnings() -> None:
     flags = pd.DataFrame(
         [
-            {"lane": "x", "dataset": "prices", "ticker": "BBB", "exchange": "US", "severity": "warning", "issue": "warn", "recommendation": "manual_inspect", "detail": "b"},
-            {"lane": "x", "dataset": "prices", "ticker": "AAA", "exchange": "US", "severity": "error", "issue": "err", "recommendation": "targeted_rerun", "detail": "a"},
+            {
+                "lane": "x",
+                "dataset": "prices",
+                "ticker": "BBB",
+                "exchange": "US",
+                "severity": "warning",
+                "issue": "warn",
+                "recommendation": "manual_inspect",
+                "detail": "b",
+            },
+            {
+                "lane": "x",
+                "dataset": "prices",
+                "ticker": "AAA",
+                "exchange": "US",
+                "severity": "error",
+                "issue": "err",
+                "recommendation": "targeted_rerun",
+                "detail": "a",
+            },
         ]
     )
 
@@ -174,4 +223,3 @@ def test_sort_flags_orders_errors_before_warnings() -> None:
 
     assert ordered.iloc[0]["severity"] == "error"
     assert ordered.iloc[0]["ticker"] == "AAA"
-
