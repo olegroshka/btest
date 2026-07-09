@@ -20,8 +20,11 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
+import os
 import shlex
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import cmd2
@@ -31,14 +34,14 @@ from rich.table import Table
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE / "eodhd"))
 import cli as eodhd_cli  # type: ignore[import-not-found]  # noqa: E402
-from eodhd_datasets import LANES, RAW_EODHD  # type: ignore[import-not-found]  # noqa: E402
+from eodhd_datasets import (  # type: ignore[import-not-found]  # noqa: E402
+    LANES, RAW_EODHD)
 
 console = Console()
 
 # Data-source adapters that can currently only *load* (no ops tooling yet) --
 # shown in `sources` for context so the roadmap is visible.
 LOAD_ONLY: dict[str, str] = {
-    "fred": "FRED economic series",
     "yahoo": "Yahoo Finance",
     "csv": "Local CSV files",
     "parquet": "Local parquet files",
@@ -99,9 +102,8 @@ class EodhdPlugin(SourcePlugin):
 
     def _config(self) -> int:
         try:
-            from fetch_eodhd_eu_fundamentals import (  # type: ignore[import-not-found]  # noqa: E402
-                _get_api_key,
-            )
+            from fetch_eodhd_eu_fundamentals import \
+                _get_api_key  # type: ignore[import-not-found]  # noqa: E402
 
             key = _get_api_key()
             masked = ("****" + key[-4:]) if len(key) >= 4 else "set"
@@ -117,7 +119,139 @@ class EodhdPlugin(SourcePlugin):
         return 0
 
 
-SOURCES: dict[str, SourcePlugin] = {"eodhd": EodhdPlugin()}
+class FredPlugin(SourcePlugin):
+    """FRED source -- drives the runtime load adapter to warm the Arctic cache."""
+
+    name = "fred"
+    summary = "FRED economic time series"
+    PROVIDER = "FRED"
+    FREQ = "1d"
+
+    def command_names(self) -> list[str]:
+        return ["status", "fetch", "config"]
+
+    def detail(self) -> str:
+        return "arctic-cached"
+
+    def run(self, command: str, argv: list[str]) -> int:
+        if command == "config":
+            return self._config()
+        if command == "fetch":
+            return self._fetch(argv)
+        if command == "status":
+            return self._status()
+        return 0
+
+    # ----- helpers ---------------------------------------------------------- #
+    @staticmethod
+    def _parse_fetch(argv: list[str]) -> tuple[list[str], str, str]:
+        parser = argparse.ArgumentParser(prog="fetch", add_help=False)
+        parser.add_argument("series", nargs="*")
+        parser.add_argument("--start", default="2000-01-01")
+        parser.add_argument("--end", default=datetime.now().date().isoformat())
+        try:
+            ns, _ = parser.parse_known_args(argv)
+        except SystemExit:
+            return [], "", ""
+        return [s.strip().upper() for s in ns.series], ns.start, ns.end
+
+    def _config(self) -> int:
+        try:
+            from quantdsl_backtest.data.market import _load_fred_api_key
+
+            key = _load_fred_api_key(strict=False)
+            masked = (
+                ("****" + key[-4:]) if key and len(key) >= 4 else "[red]NOT SET[/red]"
+            )
+        except Exception:
+            masked = "[red]NOT SET[/red]"
+        try:
+            import arcticdb  # noqa: F401
+
+            arctic = "available"
+        except Exception:
+            arctic = "[yellow]not installed (fetch works, no caching)[/yellow]"
+        table = Table(title="fred config", show_header=False, title_style="bold")
+        table.add_column("setting", style="cyan")
+        table.add_column("value")
+        table.add_row("FRED_API_KEY", masked)
+        table.add_row(
+            "arctic_uri", os.environ.get("QUANTDSL_ARCTIC_URI", "lmdb://local_cache")
+        )
+        table.add_row("cache_library", f"market_data/{self.PROVIDER}/{self.FREQ}")
+        table.add_row("arcticdb", arctic)
+        console.print(table)
+        return 0
+
+    def _fetch(self, argv: list[str]) -> int:
+        series, start, end = self._parse_fetch(argv)
+        if not series:
+            console.print(
+                "[red]usage:[/red] fetch <SERIES_ID> [SERIES_ID ...] "
+                "[--start YYYY-MM-DD] [--end YYYY-MM-DD]"
+            )
+            return 2
+        try:
+            from quantdsl_backtest.data.requests import (KIND_TIME_SERIES,
+                                                         DataRequest)
+            from quantdsl_backtest.data.sources.cache import \
+                SafeArcticCacheStore
+            from quantdsl_backtest.data.sources.fred import \
+                FredTimeSeriesSource
+        except Exception as exc:
+            console.print(f"[red]fred dependencies unavailable: {exc}[/red]")
+            return 1
+
+        adapter = FredTimeSeriesSource()
+        cache = SafeArcticCacheStore(provider=self.PROVIDER, frequency=self.FREQ)
+        table = Table(title=f"fred fetch  {start} -> {end}", title_style="bold")
+        table.add_column("series", style="cyan")
+        table.add_column("rows", justify="right")
+        table.add_column("range")
+        table.add_column("status")
+        for sid in series:
+            try:
+                request = DataRequest(
+                    source=f"fred://{sid}",
+                    kind=KIND_TIME_SERIES,
+                    start=start,
+                    end=end,
+                    fields=["value"],
+                )
+                bundle = adapter.load(request, None, cache)
+                frame = bundle.frames.get(sid)
+                rows = 0 if frame is None else len(frame)
+                if rows:
+                    rng = f"{frame.index.min().date()} -> {frame.index.max().date()}"
+                else:
+                    rng = "-"
+                table.add_row(sid, str(rows), rng, "ok")
+            except Exception as exc:
+                table.add_row(sid, "-", "-", f"[red]{type(exc).__name__}: {exc}[/red]")
+        console.print(table)
+        return 0
+
+    def _status(self) -> int:
+        try:
+            from quantdsl_backtest.data.cache_arctic import get_cache_lib
+
+            symbols = sorted(get_cache_lib(self.PROVIDER, self.FREQ).list_symbols())
+        except Exception as exc:
+            console.print(
+                f"[yellow]cache unavailable: {type(exc).__name__}: {exc}[/yellow]"
+            )
+            return 1
+        console.print(
+            f"FRED cache [cyan]market_data/{self.PROVIDER}/{self.FREQ}[/cyan]: "
+            f"[bold]{len(symbols)}[/bold] series cached"
+        )
+        if symbols:
+            shown = ", ".join(symbols[:60])
+            console.print(shown + (" ..." if len(symbols) > 60 else ""))
+        return 0
+
+
+SOURCES: dict[str, SourcePlugin] = {"eodhd": EodhdPlugin(), "fred": FredPlugin()}
 
 
 # --------------------------------------------------------------------------- #

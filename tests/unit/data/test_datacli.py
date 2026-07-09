@@ -37,11 +37,27 @@ def test_eodhd_plugin_command_names() -> None:
     assert set(names) == {"status", "fetch", "qc", "lanes", "probe", "config"}
 
 
-def test_sources_registry_has_eodhd_and_not_load_only() -> None:
+def test_sources_registry() -> None:
     assert "eodhd" in datacli.SOURCES
-    # fred/yahoo are load-only adapters, not operational sources (yet).
-    assert "fred" not in datacli.SOURCES
-    assert "fred" in datacli.LOAD_ONLY
+    assert "fred" in datacli.SOURCES
+    # yahoo is still a load-only adapter (no ops tooling yet).
+    assert "yahoo" not in datacli.SOURCES
+    assert "yahoo" in datacli.LOAD_ONLY
+
+
+def test_fred_plugin_command_names() -> None:
+    assert set(datacli.FredPlugin().command_names()) == {"status", "fetch", "config"}
+
+
+def test_fred_parse_fetch() -> None:
+    series, start, end = datacli.FredPlugin._parse_fetch(
+        ["gdp", "unrate", "--start", "2020-01-01"]
+    )
+    assert series == ["GDP", "UNRATE"]  # upper-cased
+    assert start == "2020-01-01"
+    assert end  # defaults to today
+    # no series -> empty (caller shows usage)
+    assert datacli.FredPlugin._parse_fetch([])[0] == []
 
 
 def test_argv_parses_string_and_arg_list() -> None:
