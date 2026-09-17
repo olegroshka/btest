@@ -10,6 +10,14 @@ import pandas as pd
 from ..dsl.costs import BorrowCost, FinancingCost
 from ..utils.logging import get_logger
 
+try:  # shared platform stats (quant_models/perf) — optional so the engine still runs without it
+    from perf.advanced import probabilistic_sharpe_ratio as _qp_psr
+    from perf.metrics import cagr as _qp_cagr
+    from perf.robustness import fitness as _qp_fitness, persistence as _qp_persistence
+    _HAS_QP = True
+except Exception:  # pragma: no cover
+    _HAS_QP = False
+
 
 log = get_logger(__name__)
 
@@ -139,6 +147,13 @@ def compute_basic_metrics(
       - sortino (annualized)
       - max_drawdown
       - turnover_annual (if weights provided)
+    Plus, when `perf` (quant_models/perf) is installed, the robustness layer every consumer (critic, sfera
+    Review/monitor) reads off the same JSON:
+      - turnover_daily, cagr
+      - psr            P(true Sharpe > 0), skew/kurtosis-corrected
+      - fitness        WorldQuant BRAIN: sharpe * sqrt(|cagr| / max(turnover_daily, 0.125))
+      - sharpe_recent, persistence_ratio, persistence  (ALIVE / SOFTENING / DECAYING —
+                       does the edge still earn in the last 2y at the full-window rate?)
     """
     metrics: Dict[str, float] = {}
 
@@ -232,4 +247,20 @@ def compute_basic_metrics(
     metrics["sortino"] = float(sortino)
     metrics["max_drawdown"] = float(max_dd)
     metrics["turnover_annual"] = float(turnover_annual)
+    metrics["turnover_daily"] = float(turnover_daily)
+
+    # Robustness layer (perf). Defensive like everything above: a stats failure must never
+    # take down a backtest — it just leaves the field NaN, which downstream gates treat as FAIL.
+    if _HAS_QP:
+        try:
+            ann_ret = _qp_cagr(rets_for_metrics, periods=252)        # perf.cagr takes RETURNS, periods pinned
+            metrics["cagr"] = float(ann_ret)
+            metrics["psr"] = float(_qp_psr(rets_for_metrics))
+            metrics["fitness"] = float(_qp_fitness(sharpe, ann_ret, turnover_daily))
+            pers = _qp_persistence(rets_for_metrics, periods=252)
+            metrics["sharpe_recent"] = float(pers["sharpe_recent"]) if pers["sharpe_recent"] == pers["sharpe_recent"] else float("nan")
+            metrics["persistence_ratio"] = float(pers["ratio"]) if pers["ratio"] is not None else float("nan")
+            metrics["persistence"] = str(pers["label"])
+        except Exception as exc:  # pragma: no cover
+            log.warning("[METRICS] perf robustness layer failed: %s", exc)
     return metrics
