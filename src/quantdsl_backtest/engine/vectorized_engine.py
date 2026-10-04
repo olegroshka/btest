@@ -71,7 +71,7 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
     factor_engine = FactorEngine(md, prices)
     factor_panels = factor_engine.compute_all(strategy.factors)
 
-    signal_engine = SignalEngine(factor_panels, strategy.signals)
+    signal_engine = SignalEngine(factor_panels, strategy.signals, index=prices.index, columns=prices.columns)
     signal_panels = signal_engine.compute_all()
 
     # ------------------------------------------------------------------ #
@@ -429,8 +429,11 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
         fin_cfg = strategy.costs.financing if strategy.costs is not None else None
         fees_cfg = strategy.costs.fees if strategy.costs is not None else None
 
+        from .accounting import has_per_instrument_borrow_rates, resolve_borrow_rates
+
         has_carry_or_fees = (
             (borrow_cfg is not None and float(getattr(borrow_cfg, "default_annual_rate", 0.0)) != 0.0)
+            or (borrow_cfg is not None and has_per_instrument_borrow_rates(borrow_cfg))
             or (fin_cfg is not None and float(getattr(fin_cfg, "spread_bps", 0.0)) != 0.0)
             or (fees_cfg is not None and float(getattr(fees_cfg, "nav_fee_annual", 0.0)) != 0.0)
         )
@@ -450,10 +453,15 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             nav_fee_daily = nav_fee_annual * dt
 
             # Compute daily deltas
-            short_notional = (-prev_positions_df.clip(upper=0.0) * price_df).sum(axis=1)
+            short_by_name = -prev_positions_df.clip(upper=0.0) * price_df
+            short_notional = short_by_name.sum(axis=1)
             equity_before = prev_cash_series + (prev_positions_df * price_df).sum(axis=1)
 
-            borrow_cost = short_notional * borrow_rate * dt
+            if borrow_cfg is not None and has_per_instrument_borrow_rates(borrow_cfg):
+                rates = resolve_borrow_rates(borrow_cfg, short_by_name.columns)
+                borrow_cost = short_by_name.fillna(0.0).mul(rates, axis=1).sum(axis=1) * dt
+            else:
+                borrow_cost = short_notional * borrow_rate * dt
             financing_pnl = prev_cash_series * fin_rate * dt
             nav_fee_amt = equity_before * nav_fee_daily
 

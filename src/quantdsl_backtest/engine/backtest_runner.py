@@ -800,7 +800,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     factor_engine = FactorEngine(md, prices)
     factor_panels = factor_engine.compute_all(strategy.factors)
 
-    signal_engine = SignalEngine(factor_panels, strategy.signals)
+    signal_engine = SignalEngine(factor_panels, strategy.signals, index=prices.index, columns=prices.columns)
     signal_panels = signal_engine.compute_all()
 
     # ------------------------------------------------------------------ #

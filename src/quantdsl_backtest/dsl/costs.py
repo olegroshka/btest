@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal, Mapping, Optional
 
 
 @dataclass(slots=True)
@@ -20,10 +20,26 @@ class Commission:
 class BorrowCost:
     """
     Short borrow cost specification.
+
+    ``default_annual_rate`` is charged on every short notional unless the
+    instrument has its own rate: ``rates`` maps instrument to an annual rate
+    (a fraction, 0.03 = 3% p.a.), or ``rates_path`` names a parquet/CSV file
+    with one row per instrument (``instrument_column``, ``rate_column``),
+    read once per run. Instruments absent from both pay the default. The
+    file is a snapshot (one level of cost), not a history.
+
+    Examples:
+        BorrowCost(default_annual_rate=0.01)
+        BorrowCost(default_annual_rate=0.01, rates={"GME": 0.48})
+        BorrowCost(default_annual_rate=0.01, rates_path="exports/borrow_rates.parquet")
     """
 
     default_annual_rate: float = 0.0    # e.g. 0.02 = 2% p.a.
     curve_name: Optional[str] = None    # name of curve in your data store
+    rates: Optional[Mapping[str, float]] = None   # per-instrument annual rates, a fraction
+    rates_path: Optional[str] = None              # parquet or CSV with one row per instrument
+    instrument_column: str = "ticker"
+    rate_column: str = "fee_rate"
 
 
 @dataclass(slots=True)

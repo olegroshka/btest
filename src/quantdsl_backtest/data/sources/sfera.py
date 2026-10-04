@@ -64,7 +64,12 @@ def _ensure_sfera_db_on_path() -> None:
 _ensure_sfera_db_on_path()
 
 # sfera DB client lives in the sfera repo as `connector` (pip-installed; exposes columns()/query()/index_prices()).
-import connector as _sfera_db
+# Optional: a workspace without sfera-db can still run parquet/csv/yf/fred sources
+# (`_require_sfera_db` raises when a Sfera-backed request is actually made).
+try:
+    import connector as _sfera_db
+except ImportError:  # pragma: no cover - env-dependent
+    _sfera_db = None
 
 
 def _require_sfera_db() -> Any:

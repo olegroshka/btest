@@ -246,12 +246,15 @@ class CrossSectionRank(SignalNode):
 
     method:
       - "percentile": 0..1 rank
+      - "demeaned": the percentile rank minus one half, -0.5..0.5 (a signal
+        whose sign is the side of the book and whose size is the distance
+        from the middle; its negation is the rank of the other side)
       - "zscore": z-scored version
     """
 
     factor_name: str
     mask_name: Optional[str] = None
-    method: Literal["percentile", "zscore"] = "percentile"
+    method: Literal["percentile", "demeaned", "zscore"] = "percentile"
     name: Optional[str] = None
 
     def evaluate(self, engine: Any) -> Any:
@@ -322,6 +325,26 @@ class RollingMean(SignalNode):
 
     def evaluate(self, engine: Any) -> Any:
         return engine._eval_rolling_mean(self)
+
+
+@dataclass(slots=True)
+class Identity(SignalNode):
+    """
+    A factor (or another signal) used as a signal, unchanged.
+
+    The panel itself, copied: for an ``ExternalFactor`` that already is the
+    score a book weights by, or to give an expression a name. Replaces the
+    ``RollingMean(window=1)`` idiom.
+
+    Example:
+        Identity(base="s_bear", name="bear")
+    """
+
+    base: Expr
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_identity(self)
 
 
 @dataclass(slots=True)

@@ -28,6 +28,7 @@ from ..dsl.signals import (
     MaskFromBoolean,
     TimeSeries,
     EWMMean,
+    Identity,
     RollingMean,
     RollingStd,
     Diff,
@@ -53,16 +54,25 @@ class SignalEngine:
         factors: Dict[str, pd.DataFrame],
         signal_nodes: Dict[str, SignalNode],
         use_polars: Optional[bool] = None,
+        index: Optional[pd.Index] = None,
+        columns: Optional[pd.Index] = None,
     ):
         self.factors = factors
         self.nodes = signal_nodes
         # This will hold both "named" signals and intermediate results
         self.cache: Dict[str, pd.DataFrame] = {}
 
-        # Assume all factors share the same shape
-        any_factor = next(iter(factors.values()))
-        self.index = any_factor.index
-        self.columns = any_factor.columns
+        # Assume all factors share the same shape; a strategy with no factors
+        # (given target weights) passes the panel shape explicitly.
+        if factors:
+            any_factor = next(iter(factors.values()))
+            self.index = any_factor.index
+            self.columns = any_factor.columns
+        elif index is not None and columns is not None:
+            self.index = pd.Index(index)
+            self.columns = pd.Index(columns)
+        else:
+            raise ValueError("SignalEngine: no factors given and no index/columns to take the panel shape from")
 
         # Decide whether to use polars-backed path
         if use_polars is None:
@@ -130,6 +140,8 @@ class SignalEngine:
             return self._eval_time_series(node)
         if isinstance(node, EWMMean):
             return self._eval_ewm_mean(node)
+        if isinstance(node, Identity):
+            return self._eval_identity(node)
         if isinstance(node, RollingMean):
             return self._eval_rolling_mean(node)
         if isinstance(node, RollingStd):
@@ -299,7 +311,7 @@ class SignalEngine:
                     pl.col("mask").fill_null(False) & pl.col("value").is_not_null()
                 )
 
-                if node.method == "percentile":
+                if node.method in ("percentile", "demeaned"):
                     # Create denominator column correctly named as "denom"
                     df = df.with_columns(
                         (pl.len().over("date") - 1).alias("denom")
@@ -311,6 +323,8 @@ class SignalEngine:
                         r=(pl.col("value").rank(method="average").over("date") - 1)
                         / pl.col("denom_safe")
                     )
+                    if node.method == "demeaned":
+                        df = df.with_columns(r=pl.col("r") - 0.5)
                 elif node.method == "zscore":
                     df = df.with_columns(
                         mu=pl.mean("value").over("date"),
@@ -360,10 +374,12 @@ class SignalEngine:
                 # artificially selecting names when the factor row is empty.
                 out.loc[ts] = np.nan
                 continue
-            if node.method == "percentile":
+            if node.method in ("percentile", "demeaned"):
                 ranks = valid.rank(method="average", ascending=True) - 1
                 denom = max(len(valid) - 1, 1)
                 ranks = ranks / denom
+                if node.method == "demeaned":
+                    ranks = ranks - 0.5
             elif node.method == "zscore":
                 mu = valid.mean()
                 sigma = valid.std()
@@ -428,6 +444,9 @@ class SignalEngine:
     def _eval_ewm_mean(self, node: EWMMean) -> pd.DataFrame:
         base = self._resolve_expr(node.base)
         return base.ewm(span=node.span, min_periods=node.min_periods, adjust=node.adjust).mean()
+
+    def _eval_identity(self, node: Identity) -> pd.DataFrame:
+        return self._resolve_expr(node.base).copy()
 
     def _eval_rolling_mean(self, node: RollingMean) -> pd.DataFrame:
         base = self._resolve_expr(node.base)
