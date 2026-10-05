@@ -34,7 +34,7 @@ from quantdsl_backtest.dsl.execution import (
     Execution, OrderPolicy, LatencyModel,
     PowerLawSlippageModel, VolumeParticipation, LimitOrderBookModel,
 )
-from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees
+from quantdsl_backtest.dsl.costs import Costs, Commission, BorrowCost, FinancingCost, StaticFees, FundingCost
 from quantdsl_backtest.dsl.backtest_config import (
     BacktestConfig, MarginConfig, RiskChecks, DrawdownPolicy, Reporting,
 )
@@ -264,8 +264,19 @@ Costs(
     borrow=BorrowCost(default_annual_rate=0.005),             # 50bps short borrow
     financing=FinancingCost(base_rate_curve="SOFR", spread_bps=0.0),
     fees=StaticFees(nav_fee_annual=0.0, perf_fee_fraction=0.0),
+    funding=None,                                             # perp funding — see below
 )
 ```
+
+**Perp funding (crypto)** — `FundingCost(source="sfera://bncrpt/funding_rates", venue="binance_um")`
+(or `source="parquet://f.parquet"` with columns `ts, ticker, funding_rate`). Each bar the engine charges
+`q · price · Σrate` for the funding events settling in the bar's holding window `(open, open + 1 bar]`:
+rate > 0 → longs pay, shorts receive. Net cash paid is reported as `metrics["funding_paid"]`.
+Event-driven engine only (the vectorized engine raises). Funding is material: BTC long 2021-26 lost
+~12%/yr to it — never backtest a perp strategy without it.
+
+Note: `FinancingCost` currently applies only `spread_bps` on the cash balance; `base_rate_curve` is a label,
+not a loaded curve.
 
 ---
 
@@ -275,6 +286,7 @@ Costs(
 BacktestConfig(
     engine="event_driven",                 # always use this
     cash_initial=1_000_000.0,
+    periods_per_year=252.0,                # bars/yr for ALL annualisation — 365 for 24/7 crypto daily
     risk_checks=RiskChecks(
         max_gross_leverage=3.0,
         drawdown=DrawdownPolicy(
@@ -316,6 +328,7 @@ DataConfig(
 | `parquet://path` | Local parquet file or folder | `parquet://equities/sp500_daily` |
 | `csv://path.csv` | Local CSV file (single or multi-instrument long format) | `csv://data/c40_ohlcv.csv` |
 | `sfera://schema/table` | Sfera PostgreSQL — price data or time-series | `sfera://bbgidx/index_prices` |
+| `sfera://bncrpt/perp_bars_<iv>` | Crypto perps (Binance), iv = 5m/1h/4h/1d | `sfera://bncrpt/perp_bars_1d?date_col=bar_ts&ticker_col=symbol` |
 | `yf://TICKER` | Yahoo Finance live pull | `yf://SPY` |
 | `fred://SERIES` | FRED macro series | `fred://BAMLH0A0HYM2` |
 
@@ -324,7 +337,13 @@ DataConfig(
 - Use `kind="market_bars"` (default) for OHLCV tables → returns MarketBarsBundle
 - Use `kind="timeseries"` for macro/event/yield tables → returns TimeSeriesBundle
 - `sfera-bars://` still works as a backward-compat alias for `kind="market_bars"`
-- Available schemas: `bbgidx` (index prices/vol), `mxbdprc` (bond data), `ecocal`, `mxent`
+- Available schemas: `bbgidx` (index prices/vol), `mxbdprc` (bond data), `ecocal`, `mxent`, `bncrpt` (Binance crypto futures)
+- `timestamptz` date columns are converted to **naive UTC** and start/end bounds are read as UTC
+  (the sfera server zone is Asia/Dubai). `date` columns are untouched.
+- **Intraday bars** (`perp_bars_4h` / `_1h` / `_5m`): `DataConfig(frequency="4h")`, `TargetWeights(rebalance_frequency="every_bar")` (NB `"1m"` = monthly, `"1d"` = every bar on any bar size), lookbacks are in BARS (20 days = 120 4h bars). A date-only `end=` on a timestamp series covers the whole day. Verified 2026-10-01: BTC buy-hold on 1d/4h/1h gives the same Sharpe/DD/funding.
+- **Crypto recipe:** `calendar="24/7"`, `BacktestConfig(periods_per_year=365)` (×6 for 4h, ×24 for 1h),
+  `Costs(funding=FundingCost())`. Drop delisted zombie bars (flat, `quote_volume = 0`) from the universe.
+  Pipeline + table docs: `sfera/data_pipelines/BNCRPT/README.md`.
 
 **CSV notes:**
 - Long-format (multiple tickers per file): needs a `ticker` column (auto-detected)

@@ -129,6 +129,46 @@ def load_income_for_strategy(strategy: "Strategy", instruments, dates):
     return panel.reindex(index=pd.DatetimeIndex(dates), columns=instruments).fillna(0.0)
 
 
+def load_funding_for_strategy(strategy: "Strategy", instruments, dates):
+    """Perp funding panel [dates x instruments] = SUM of funding rates settling inside each bar's
+    holding window, or None when `strategy.costs.funding` is not set.
+
+    Timing: engine dates are bar OPEN times (naive UTC) and a bar's close is the next bar's open, so the
+    position carried into bar t (held from close[t-1] = open[t] to close[t] = open[t] + step) pays the
+    events with funding_ts in (open[t], open[t] + step]. An event exactly at a bar boundary belongs to the
+    bar that ENDS there — the position held up to that instant is the one that pays.
+    """
+    import re
+    fc = getattr(getattr(strategy, "costs", None), "funding", None)
+    if fc is None:
+        return None
+    src = str(fc.source)
+    if src.startswith("sfera://"):
+        from ..data.sources.sfera import _require_sfera_db
+        schema, table = src[len("sfera://"):].split("?")[0].strip("/").split("/")[:2]
+        df = _require_sfera_db().query(
+            f"SELECT symbol AS ticker, funding_ts AS ts, funding_rate FROM {schema}.{table} "
+            f"WHERE venue = %s AND symbol = ANY(%s) AND deprecated_at IS NULL",
+            [fc.venue, [str(i) for i in instruments]],
+        )
+    else:
+        df = pd.read_parquet(re.sub(r"^parquet://", "", src))
+    idx = pd.DatetimeIndex(dates)
+    if df is None or df.empty or len(idx) < 2:
+        return pd.DataFrame(0.0, index=idx, columns=instruments)
+    ts = pd.to_datetime(df["ts"])
+    if ts.dt.tz is not None:
+        ts = ts.dt.tz_convert("UTC").dt.tz_localize(None)
+    step = pd.Series(idx).diff().median()
+    # bar t owns (open[t], open[t] + step]  →  locate open[t] via the event time minus 1ns
+    pos = idx.searchsorted(ts - pd.Timedelta(1, "ns"), side="right") - 1
+    ok = (pos >= 0) & (ts.values <= (idx[pos.clip(0)] + step).values)
+    out = pd.DataFrame({"date": idx[pos[ok]], "ticker": df["ticker"].values[ok],
+                        "rate": pd.to_numeric(df["funding_rate"]).values[ok]})
+    panel = out.pivot_table(index="date", columns="ticker", values="rate", aggfunc="sum")
+    return panel.reindex(index=idx, columns=instruments).fillna(0.0).astype("float64")
+
+
 def load_open_prices(md: "MarketData", instruments: "pd.Index") -> "pd.DataFrame":
     """Extract open prices from already-loaded MarketData.
 

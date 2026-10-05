@@ -80,6 +80,55 @@ class SignalWeight(Weighting):
     signal_name: str  # Name of the signal (typically the rank or composite)
 
 
+@dataclass(slots=True)
+class OptimizedWeight(Weighting):
+    """
+    Risk-based / optimised weights across the instruments a selector picked.
+
+    Replaces the naive 1/N or signal-proportional split inside a :class:`Book`
+    with a covariance-aware allocation computed from a trailing window of
+    returns. Backed by :func:`quantdsl_backtest.engine.portfolio_optimizer.optimize_weights`
+    (skfolio under the hood for the convex / hierarchical methods).
+
+    Parameters
+    ----------
+    method:
+        ``"inverse_vol"`` (default), ``"min_variance"``, ``"risk_parity"``,
+        ``"hrp"``, ``"max_sharpe"``, ``"min_cvar"`` or ``"equal"``.
+    lookback_bars:
+        Trailing window length (bars) of returns used for the estimate. The
+        window ends at the *signal* date (already lagged by ``signal_delay_bars``),
+        so there is no look-ahead.
+    returns_signal:
+        Optional name of a ``[date x instrument]`` returns panel in
+        ``Strategy.signals`` to estimate from. When ``None`` the engine uses the
+        close-price panel it loaded (``pct_change``), which is the normal case.
+    min_weight, max_weight:
+        Per-name bounds *within the book* (fractions of the book's gross).
+    min_periods:
+        Minimum valid rows before the method runs; below this it falls back to
+        ``inverse_vol`` (then ``equal``) so early bars still produce a book.
+
+    Example::
+
+        long_book = Book(
+            name="long",
+            selector=TopN(factor_name="mom_12_1", n=20),
+            weighting=OptimizedWeight(method="hrp", lookback_bars=126, max_weight=0.15),
+        )
+    """
+
+    method: Literal[
+        "equal", "inverse_vol", "min_variance", "risk_parity", "hrp", "max_sharpe", "min_cvar"
+    ] = "inverse_vol"
+    lookback_bars: int = 252
+    returns_signal: Optional[str] = None
+    min_weight: float = 0.0
+    max_weight: float = 1.0
+    min_periods: int = 20
+    cvar_beta: float = 0.95
+
+
 # --- Constraints / risk-style knobs ----------------------------------------
 
 

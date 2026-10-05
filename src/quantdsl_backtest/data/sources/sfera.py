@@ -189,13 +189,26 @@ def _fetch_raw(uri: _ParsedUri, start: str, end: str) -> pd.DataFrame:
             f"Pass date_col=<name> in the URI, e.g. sfera://{uri.schema}/{uri.table}?date_col=my_date"
         )
 
+    # timestamptz bounds must be read as UTC: a bare '2026-09-28' literal is otherwise parsed in the
+    # server zone (Asia/Dubai) → 09-27 20:00 UTC, silently dropping the end bar of a UTC-stamped series.
+    dtype = ""
+    if "data_type" in cols_df.columns:
+        m = cols_df.loc[cols_df["column_name"] == date_col, "data_type"]
+        dtype = str(m.iloc[0]).lower() if len(m) else ""
+    ph = "(%s::timestamp AT TIME ZONE 'UTC')" if "with time zone" in dtype else "%s"
+
     clauses: list[str] = []
     params:  list     = []
     if start:
-        clauses.append(f"{date_col} >= %s")
+        clauses.append(f"{date_col} >= {ph}")
         params.append(start)
     if end:
-        clauses.append(f"{date_col} <= %s")
+        # A DATE-only end on a timestamp series means "through the end of that day": `<= '2026-09-28'` would
+        # stop at 00:00 and silently drop the day's intraday bars (4h/1h/5m). Daily bars are unaffected.
+        if "with time zone" in dtype and len(str(end).strip()) == 10:
+            clauses.append(f"{date_col} < ((%s::date + 1)::timestamp AT TIME ZONE 'UTC')")
+        else:
+            clauses.append(f"{date_col} <= {ph}")
         params.append(end)
     if uri.deprecated_filter and "deprecated_at" in all_cols:
         clauses.append("deprecated_at IS NULL")
@@ -208,6 +221,11 @@ def _fetch_raw(uri: _ParsedUri, start: str, end: str) -> pd.DataFrame:
         return df
 
     df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+    # timestamptz columns come back in the SERVER session zone (sfera = Asia/Dubai): a UTC-midnight
+    # crypto bar would read 04:00+04:00. Canonicalise to naive UTC — the engine's convention (the csv
+    # source is naive too). `date` columns (bbgidx/eodhd/fredmac) are naive already → unaffected.
+    if getattr(df[date_col].dt, "tz", None) is not None:
+        df[date_col] = df[date_col].dt.tz_convert("UTC").dt.tz_localize(None)
     df = df.dropna(subset=[date_col]).sort_values(date_col)
     df = df.set_index(date_col)
     df.index.name = "date"

@@ -10,15 +10,16 @@ import pandas as pd
 from ..dsl.strategy import Strategy
 from ..engine.results import BacktestResult
 from ..utils.logging import get_logger
-from .data_loader import load_data_for_strategy, load_open_prices, load_income_for_strategy
+from .data_loader import load_data_for_strategy, load_open_prices, load_income_for_strategy, load_funding_for_strategy
 from .factor_engine import FactorEngine
 from .signal_engine import SignalEngine
-from .portfolio_engine import compute_target_weights_for_date
+from .portfolio_engine import PRICES_PANEL_KEY, compute_target_weights_for_date
 from .execution_engine import rebalance_to_target_weights
 from .accounting import (
     mark_to_market,
     apply_carry_costs,
     apply_coupon_income,
+    apply_funding,
     compute_exposures,
     compute_basic_metrics,
 )
@@ -788,6 +789,13 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # Optional FIXED-INCOME / dividend coupon stream (per-unit cash income per date). None for equities.
     income = load_income_for_strategy(strategy, instruments, dates)
 
+    # Optional perp FUNDING panel (Σ rate per bar holding window). None unless costs.funding is set.
+    funding = load_funding_for_strategy(strategy, instruments, dates)
+    funding_paid_total = 0.0
+
+    # Bars per year for every annualisation (252 exchange-daily default; 365 for 24/7 crypto daily).
+    ppy = float(getattr(strategy.backtest, "periods_per_year", 252.0) or 252.0)
+
     # Load open prices if T+1 open fills are requested
     _fill_on = getattr(getattr(strategy.execution, "order_policy", None), "fill_on", "close")
     open_prices: Optional[pd.DataFrame] = None
@@ -797,11 +805,14 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # ------------------------------------------------------------------ #
     # 2. Compute factors & signals
     # ------------------------------------------------------------------ #
-    factor_engine = FactorEngine(md, prices)
+    factor_engine = FactorEngine(md, prices, periods_per_year=ppy)
     factor_panels = factor_engine.compute_all(strategy.factors)
 
     signal_engine = SignalEngine(factor_panels, strategy.signals)
     signal_panels = signal_engine.compute_all()
+    # Expose the close panel to the portfolio engine (OptimizedWeight needs a
+    # returns history). Reserved key; a user signal of the same name wins.
+    signal_panels.setdefault(PRICES_PANEL_KEY, prices)
 
     # ------------------------------------------------------------------ #
     # 3. Initialize state containers
@@ -888,7 +899,14 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             cash=st.cash,
             borrow=strategy.costs.borrow,
             financing=strategy.costs.financing,
+            dt_years=1.0 / ppy,
         )
+
+        # Perp funding on positions carried over this bar (longs pay when rate > 0).
+        if funding is not None and dt in funding.index:
+            _fund = apply_funding(st.prev_positions, price_t_eff, funding.loc[dt])
+            st.cash -= _fund
+            funding_paid_total += _fund
 
         # Credit coupon (bond) / dividend (equity) income for today on held positions. Paired with a DIRTY
         # price source this gives correct, smooth fixed-income total return (dirty mark = daily accrual; the
@@ -899,7 +917,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
         # Optionally management fees (we'll apply continuously on equity_before)
         nav_fee = strategy.costs.fees.nav_fee_annual
         if nav_fee > 0:
-            nav_fee_daily = nav_fee / 252.0
+            nav_fee_daily = nav_fee / ppy
             fee_amt = equity_before * nav_fee_daily
             st.cash -= fee_amt
 
@@ -1271,7 +1289,9 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # ------------------------------------------------------------------ #
     # 6. Metrics & BacktestResult
     # ------------------------------------------------------------------ #
-    metrics = compute_basic_metrics(return_series, equity_series, weights_df)
+    metrics = compute_basic_metrics(return_series, equity_series, weights_df, periods_per_year=ppy)
+    if funding is not None:
+        metrics["funding_paid"] = float(funding_paid_total)   # cash, + = net paid, − = net received
 
     result = BacktestResult(
         equity=equity_series,
@@ -1413,11 +1433,12 @@ def _is_rebalance_date(
 
     '1d' - every bar (default)
     '1w' - first bar of each calendar week  (Mon changes)
-    '1m' - first bar of each calendar month
-    Any other value defaults to daily.
+    '1m' - first bar of each calendar MONTH (not one minute)
+    'every_bar' - every bar, explicit form for intraday data ('1d' also means every bar, on any bar size)
+    Any other value defaults to every bar.
     """
     freq = portfolio.rebalance_frequency
-    if freq == "1d":
+    if freq in ("1d", "every_bar"):
         return True
     if idx == 0:
         return True  # always rebalance on the very first bar

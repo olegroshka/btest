@@ -111,6 +111,24 @@ def apply_carry_costs(
     return new_cash, borrow_cost, financing_pnl
 
 
+def apply_funding(
+    prev_positions: pd.Series,
+    prices: pd.Series,
+    funding_rate: pd.Series | None,
+) -> float:
+    """Perp funding PAID over one bar (positive = cash out): sum(q * price * Σrate).
+
+    `funding_rate` is the summed per-event rate of the funding events settling inside this bar's
+    holding window, per instrument. rate > 0 → longs pay (cost > 0 for q > 0), shorts receive.
+    """
+    if funding_rate is None:
+        return 0.0
+    pos = prev_positions.fillna(0.0).astype("float64")
+    px = prices.reindex(pos.index).fillna(0.0).astype("float64")
+    fr = funding_rate.reindex(pos.index).fillna(0.0).astype("float64")
+    return float((pos * px * fr).sum())
+
+
 def compute_exposures(
     positions: pd.Series,
     prices: pd.Series,
@@ -139,11 +157,12 @@ def compute_basic_metrics(
     returns: pd.Series,
     equity: pd.Series,
     weights: pd.DataFrame | None,
+    periods_per_year: float = 252.0,
 ) -> Dict[str, float]:
     """
     Compute basic performance metrics using robust, comparable logic:
       - total_return
-      - sharpe (annualized, 252 trading days)
+      - sharpe (annualized by `periods_per_year`: 252 exchange days, 365 for 24/7 crypto daily)
       - sortino (annualized)
       - max_drawdown
       - turnover_annual (if weights provided)
@@ -217,7 +236,7 @@ def compute_basic_metrics(
     std_ret = float(rets_for_metrics.std())
     neg_ret = rets_for_metrics[rets_for_metrics < 0]
 
-    ann_factor = float(np.sqrt(252.0))
+    ann_factor = float(np.sqrt(periods_per_year))
     sharpe = (mean_ret / std_ret * ann_factor) if std_ret > 0 else 0.0
 
     if len(neg_ret) > 0:
@@ -240,7 +259,7 @@ def compute_basic_metrics(
             turnover_daily = float(diff.mean())
     except Exception:
         turnover_daily = 0.0
-    turnover_annual = float(turnover_daily * 252.0)
+    turnover_annual = float(turnover_daily * periods_per_year)
 
     metrics["total_return"] = float(total_ret)
     metrics["sharpe"] = float(sharpe)
@@ -253,11 +272,11 @@ def compute_basic_metrics(
     # take down a backtest — it just leaves the field NaN, which downstream gates treat as FAIL.
     if _HAS_QP:
         try:
-            ann_ret = _qp_cagr(rets_for_metrics, periods=252)        # perf.cagr takes RETURNS, periods pinned
+            ann_ret = _qp_cagr(rets_for_metrics, periods=periods_per_year)        # perf.cagr takes RETURNS, periods pinned
             metrics["cagr"] = float(ann_ret)
             metrics["psr"] = float(_qp_psr(rets_for_metrics))
             metrics["fitness"] = float(_qp_fitness(sharpe, ann_ret, turnover_daily))
-            pers = _qp_persistence(rets_for_metrics, periods=252)
+            pers = _qp_persistence(rets_for_metrics, periods=periods_per_year)
             metrics["sharpe_recent"] = float(pers["sharpe_recent"]) if pers["sharpe_recent"] == pers["sharpe_recent"] else float("nan")
             metrics["persistence_ratio"] = float(pers["ratio"]) if pers["ratio"] is not None else float("nan")
             metrics["persistence"] = str(pers["label"])

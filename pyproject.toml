@@ -28,7 +28,8 @@ dependencies = [
   "nbformat>=5.10.4",
   "ipywidgets>=8.1.8",
   "requests>=2.31",
-  "statsmodels>=0.14.6",
+  # NOTE: `statsmodels` was a direct dep with zero imports in src/tests (2026-09 audit); it now
+  # arrives transitively via `arch` (the [garch] extra). Add it back here only if src imports it.
   "scikit-learn>=1.7.2",
   "scipy-stubs~=1.15.3",
   "openpyxl>=3.1.5",
@@ -52,6 +53,18 @@ dev = [
   "isort>=5.13",
   # Type stubs should be dev-only to avoid unnecessary runtime installs
   "pandas-stubs==2.3.3.251201",
+]
+
+# Risk-based book weighting (dsl.portfolio.OptimizedWeight: min-var / risk-parity / HRP / CVaR).
+# `equal` and `inverse_vol` work without it; the convex methods need skfolio (cvxpy + CLARABEL).
+portfolio = [
+  "skfolio>=1.0",
+]
+
+# GARCH-family vol forecasts (dsl.factors.VolatilityFactor(method="garch")) via the local
+# quant_models/volforecast package, which pulls `arch` (and, transitively, statsmodels).
+garch = [
+  "volforecast[garch]",
 ]
 
 platform = [
@@ -99,3 +112,6 @@ addopts = ""
 testpaths = [
   "tests/unit",
 ]
+
+[tool.uv.sources]
+volforecast = { path = "../quant_models/volforecast", editable = true }

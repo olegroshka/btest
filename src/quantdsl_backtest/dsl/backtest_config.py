@@ -96,6 +96,11 @@ class BacktestConfig:
     risk_checks: RiskChecks = field(default_factory=RiskChecks)
     reporting: Reporting = field(default_factory=Reporting)
 
+    # Bars per year for EVERY annualisation in the engine: Sharpe/Sortino/CAGR/persistence, turnover,
+    # borrow + financing accrual, NAV fee, and annualised VolatilityFactor. 252 = exchange-traded daily
+    # (default, unchanged behaviour); 365 = 24/7 daily (crypto); 365*6 for 4h crypto bars, 365*24 for 1h.
+    periods_per_year: float = 252.0
+
     # Optional metadata / knobs
     #
     # Use this dictionary for advanced/experimental switches that affect engine behavior

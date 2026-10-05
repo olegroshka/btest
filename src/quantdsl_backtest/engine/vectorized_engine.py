@@ -19,7 +19,7 @@ from ..models.latency import build_latency_model, apply_latency_to_weights
 from .data_loader import load_data_for_strategy
 from .factor_engine import FactorEngine
 from .signal_engine import SignalEngine
-from .portfolio_engine import compute_target_weights_for_date
+from .portfolio_engine import PRICES_PANEL_KEY, compute_target_weights_for_date
 from .results import BacktestResult
 from .accounting import compute_basic_metrics
 from ..utils.logging import get_logger
@@ -68,11 +68,17 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
     # ------------------------------------------------------------------ #
     # 2. Compute factors & signals using existing engines
     # ------------------------------------------------------------------ #
-    factor_engine = FactorEngine(md, prices)
+    ppy = float(getattr(strategy.backtest, "periods_per_year", 252.0) or 252.0)
+    if getattr(strategy.costs, "funding", None) is not None:
+        raise NotImplementedError("costs.funding (perp funding) is only modelled by the event_driven engine")
+    factor_engine = FactorEngine(md, prices, periods_per_year=ppy)
     factor_panels = factor_engine.compute_all(strategy.factors)
 
     signal_engine = SignalEngine(factor_panels, strategy.signals)
     signal_panels = signal_engine.compute_all()
+    # Expose the close panel to the portfolio engine (OptimizedWeight needs a
+    # returns history). Reserved key; a user signal of the same name wins.
+    signal_panels.setdefault(PRICES_PANEL_KEY, prices)
 
     # ------------------------------------------------------------------ #
     # 3. Build target weights panel [time x instrument]
@@ -443,7 +449,7 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             price_df = prices
 
             # Parameters
-            dt = 1.0 / 252.0
+            dt = 1.0 / ppy
             borrow_rate = float(getattr(borrow_cfg, "default_annual_rate", 0.0)) if borrow_cfg is not None else 0.0
             fin_rate = (float(getattr(fin_cfg, "spread_bps", 0.0)) / 1e4) if fin_cfg is not None else 0.0
             nav_fee_annual = float(getattr(fees_cfg, "nav_fee_annual", 0.0)) if fees_cfg is not None else 0.0
@@ -481,6 +487,7 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
         returns=returns,
         equity=equity,
         weights=weights_full,
+        periods_per_year=ppy,
     )
 
     result = BacktestResult(

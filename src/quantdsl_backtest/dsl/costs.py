@@ -62,6 +62,23 @@ class TransactionTax:
 
 
 @dataclass(slots=True)
+class FundingCost:
+    """Perpetual-futures funding. Per event: a position of q units pays q * price * funding_rate
+    (rate > 0 → longs pay shorts; rate < 0 → shorts pay longs). Each bar is charged the SUM of the
+    rates of the events that settle inside the bar's holding window (bar open, bar open + 1 bar],
+    on the positions held over that bar, at that bar's mark price.
+
+    source:
+        "sfera://bncrpt/funding_rates"  (default; columns symbol, funding_ts, funding_rate, venue)
+        "parquet://path.parquet"        long format with columns (ts, ticker, funding_rate)
+    venue: filters the sfera table (ignored for parquet).
+    """
+
+    source: str = "sfera://bncrpt/funding_rates"
+    venue: str = "binance_um"
+
+
+@dataclass(slots=True)
 class Costs:
     """
     All cost / fee / financing related parameters.
@@ -72,3 +89,4 @@ class Costs:
     financing: FinancingCost
     fees: StaticFees
     tax: Optional[TransactionTax] = None               # transaction tax (e.g. UK stamp duty); None = no tax
+    funding: Optional[FundingCost] = None              # perp funding (crypto); None = no funding

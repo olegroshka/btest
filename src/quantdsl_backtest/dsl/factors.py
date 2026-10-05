@@ -8,7 +8,7 @@ from typing import Any, Callable, Literal, Optional
 
 # Factor method literals
 ReturnMethod = Literal["log", "simple"]
-VolMethod = Literal["realized", "stdev"]
+VolMethod = Literal["realized", "stdev", "ewma", "garch"]
 
 
 @dataclass(slots=True)
@@ -40,12 +40,21 @@ class VolatilityFactor(FactorNode):
 
     field: str = "close"
     lookback: int = 20
+    # "realized"/"stdev": rolling std over `lookback` bars.
+    # "ewma":  exponentially-weighted vol, halflife = `lookback` bars (RiskMetrics λ≈0.94 ↔ 11).
+    # "garch": point-in-time GJR-GARCH(1,1,1)-t forecast via `volforecast` (needs `arch`);
+    #          `horizon` bars ahead, re-fit every `refit_every` bars on a trailing `lookback`
+    #          window (use lookback≈500–1000 here). Reacts in one bar and mean-reverts, so a
+    #          vol-target sizer built on it de-levers on the spike, not a month later.
     method: VolMethod = "realized"
     # Optional: you might later add annualization, etc.
     annualize: bool = True
     # Allow loosening of rolling window requirement in sparse calendars.
     # If None, defaults to `lookback`.
     min_periods: int | None = None
+    # --- garch-only knobs ---
+    horizon: int = 1
+    refit_every: int = 21
 
 
 @dataclass(slots=True)

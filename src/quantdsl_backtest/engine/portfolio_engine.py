@@ -13,11 +13,18 @@ from ..dsl.portfolio import (
     EqualWeight,
     LongShortPortfolio,
     MaskSelector,
+    OptimizedWeight,
     SignalWeight,
     TargetWeights,
     TopN,
 )
 from ..utils.logging import get_logger
+from .portfolio_optimizer import optimize_weights
+
+# Key under which the runners expose the loaded close-price panel to the
+# portfolio engine, so risk-based weightings can estimate covariance without
+# the strategy author having to declare a returns signal.
+PRICES_PANEL_KEY = "__prices__"
 
 log = get_logger(__name__)
 
@@ -258,7 +265,16 @@ def compute_target_weights_for_date(
     # Apply weighting scheme for long book
     if n_long > 0 and long_gross > 0.0:
         long_weighting = portfolio.long_book.weighting
-        if isinstance(long_weighting, SignalWeight):
+        if isinstance(long_weighting, OptimizedWeight):
+            w_opt = _optimized_book_weights(
+                weighting=long_weighting,
+                names=list(long_names),
+                sig_date=sig_date,
+                signals=signals,
+            )
+            for name in long_names:
+                target[name] = long_gross * float(w_opt.get(name, 0.0))
+        elif isinstance(long_weighting, SignalWeight):
             # Signal-proportional weighting
             signal_name = long_weighting.signal_name
             signal_values = long_rank_row.loc[list(long_names)].fillna(0.0)
@@ -280,7 +296,16 @@ def compute_target_weights_for_date(
     # Apply weighting scheme for short book
     if n_short > 0 and short_gross > 0.0:
         short_weighting = portfolio.short_book.weighting
-        if isinstance(short_weighting, SignalWeight):
+        if isinstance(short_weighting, OptimizedWeight):
+            w_opt = _optimized_book_weights(
+                weighting=short_weighting,
+                names=list(short_names),
+                sig_date=sig_date,
+                signals=signals,
+            )
+            for name in short_names:
+                target[name] = -short_gross * float(w_opt.get(name, 0.0))
+        elif isinstance(short_weighting, SignalWeight):
             # Signal-proportional weighting
             signal_name = short_weighting.signal_name
             signal_values = short_rank_row.loc[list(short_names)].fillna(0.0)
@@ -434,6 +459,77 @@ def _compute_target_weights_generic(
         )
 
     return target
+
+
+def _optimized_book_weights(
+    weighting: OptimizedWeight,
+    names: list[str],
+    sig_date: pd.Timestamp,
+    signals: Dict[str, pd.DataFrame],
+) -> pd.Series:
+    """
+    Risk-based weights (sum = 1) for ``names`` using the trailing return window
+    ending at ``sig_date`` (inclusive — ``sig_date`` is already the lagged
+    signal date, so no look-ahead is introduced here).
+
+    Returns source, in order of preference:
+      1. ``signals[weighting.returns_signal]`` — an explicit returns panel;
+      2. ``signals["__prices__"]`` — the close panel the runner injected, → pct_change;
+    If neither is present the book degrades to equal weight with a warning.
+    """
+    n = len(names)
+    if n == 0:
+        return pd.Series(dtype="float64")
+    if n == 1:
+        return pd.Series(1.0, index=names)
+
+    rets: Optional[pd.DataFrame] = None
+    if weighting.returns_signal is not None:
+        panel = signals.get(weighting.returns_signal)
+        if isinstance(panel, pd.DataFrame):
+            rets = panel
+    if rets is None:
+        prices = signals.get(PRICES_PANEL_KEY)
+        if isinstance(prices, pd.DataFrame):
+            rets = prices.pct_change()
+
+    if rets is None:
+        log.warning(
+            "OptimizedWeight(%s): no returns/price panel available; using equal weight.",
+            weighting.method,
+        )
+        return pd.Series(1.0 / n, index=names)
+
+    cols = [c for c in names if c in rets.columns]
+    if not cols:
+        return pd.Series(1.0 / n, index=names)
+
+    # Window ends at sig_date (inclusive). If sig_date isn't in the panel, use
+    # everything at/before it via searchsorted.
+    idx = rets.index
+    if sig_date in idx:
+        end = idx.get_loc(sig_date)
+        if isinstance(end, slice):
+            end = end.start
+        end = int(end) + 1
+    else:
+        end = int(idx.searchsorted(sig_date, side="right"))
+    start = max(0, end - int(weighting.lookback_bars))
+    window = rets.iloc[start:end][cols]
+
+    w = optimize_weights(
+        window,
+        weighting.method,
+        min_weight=weighting.min_weight,
+        max_weight=weighting.max_weight,
+        min_periods=weighting.min_periods,
+        cvar_beta=weighting.cvar_beta,
+    )
+    w = w.reindex(names).fillna(0.0)
+    tot = float(w.sum())
+    if tot <= 0:
+        return pd.Series(1.0 / n, index=names)
+    return w / tot
 
 
 def _select_book_names(

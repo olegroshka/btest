@@ -38,7 +38,9 @@ class FactorEngine:
         market_data: MarketData,
         close: pd.DataFrame,
         btest_root: Optional[pathlib.Path] = None,
+        periods_per_year: float = 252.0,
     ):
+        self.periods_per_year = float(periods_per_year)
         self.market_data = market_data
         self.close = close
         self.index = close.index
@@ -125,11 +127,31 @@ class FactorEngine:
 
         if method in ("realized", "stdev"):
             vol = r.rolling(lookback, min_periods=min_periods).std()
+        elif method == "ewma":
+            var = (r ** 2).ewm(halflife=float(lookback), min_periods=min_periods, adjust=False).mean()
+            vol = np.sqrt(var)
+        elif method == "garch":
+            try:
+                import volforecast as vf
+            except ImportError as exc:
+                raise ImportError(
+                    "VolatilityFactor(method='garch') needs the `volforecast` package and `arch` "
+                    "(pip install -e quant_models/volforecast[garch])."
+                ) from exc
+            horizon = int(getattr(node, "horizon", 1) or 1)
+            refit_every = int(getattr(node, "refit_every", 21) or 21)
+            cols = {}
+            for c in prices.columns:
+                cols[c] = vf.garch_vol(
+                    prices[c], horizon=horizon, window=int(lookback), refit_every=refit_every,
+                    min_obs=int(min_periods), annualize=False, returns=r[c],
+                )
+            vol = pd.DataFrame(cols, index=prices.index)
         else:
             raise ValueError(f"Unknown volatility method: {method}")
 
         if annualize:
-            vol *= np.sqrt(252.0)
+            vol *= np.sqrt(self.periods_per_year)
 
         return vol
 
