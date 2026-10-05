@@ -2,12 +2,60 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, Tuple
 
 import numpy as np
 import pandas as pd
 
 from ..dsl.costs import BorrowCost, FinancingCost
+
+#: Per-run cache of borrow-rate files: (path, instrument column, rate column) -> Series by instrument.
+_BORROW_RATE_FILES: Dict[Tuple[str, str, str], pd.Series] = {}
+
+
+def _load_borrow_rate_file(path: str, instrument_column: str, rate_column: str) -> pd.Series:
+    key = (str(path), instrument_column, rate_column)
+    if key in _BORROW_RATE_FILES:
+        return _BORROW_RATE_FILES[key]
+    file = Path(path)
+    frame = pd.read_csv(file) if file.suffix.lower() == ".csv" else pd.read_parquet(file)
+    for column in (instrument_column, rate_column):
+        if column not in frame.columns:
+            raise ValueError(
+                f"borrow rates file {file} has no column {column!r}; columns are {list(frame.columns)}"
+            )
+    series = (
+        frame[[instrument_column, rate_column]]
+        .dropna()
+        .drop_duplicates(instrument_column, keep="last")
+        .set_index(instrument_column)[rate_column]
+        .astype("float64")
+    )
+    _BORROW_RATE_FILES[key] = series
+    return series
+
+
+def resolve_borrow_rates(borrow: BorrowCost, instruments: pd.Index) -> pd.Series:
+    """Annual borrow rate per instrument: its own (``rates`` first, then the file), else the default."""
+    out = pd.Series(float(borrow.default_annual_rate), index=pd.Index(instruments), dtype="float64")
+    path = getattr(borrow, "rates_path", None)
+    if path:
+        file_rates = _load_borrow_rate_file(
+            path, getattr(borrow, "instrument_column", "ticker"), getattr(borrow, "rate_column", "fee_rate")
+        )
+        hit = out.index.intersection(file_rates.index)
+        out.loc[hit] = file_rates.reindex(hit).to_numpy()
+    mapping = getattr(borrow, "rates", None)
+    if mapping:
+        for name, rate in mapping.items():
+            if name in out.index:
+                out.loc[name] = float(rate)
+    return out
+
+
+def has_per_instrument_borrow_rates(borrow: BorrowCost) -> bool:
+    return bool(getattr(borrow, "rates", None)) or bool(getattr(borrow, "rates_path", None))
 from ..utils.logging import get_logger
 
 try:  # shared platform stats (quant_models/perf) — optional so the engine still runs without it
@@ -96,11 +144,15 @@ def apply_carry_costs(
     prices = prices.reindex(positions.index)
 
     long_notional = float((positions.clip(lower=0.0) * prices).sum())
-    short_notional = float((-positions.clip(upper=0.0) * prices).sum())
+    short_by_name = -positions.clip(upper=0.0) * prices
+    short_notional = float(short_by_name.sum())
 
-    # Borrow cost on shorts
-    borrow_rate = borrow.default_annual_rate
-    borrow_cost = short_notional * borrow_rate * dt_years
+    # Borrow cost on shorts: each name at its own annual rate, the rest at the default
+    if has_per_instrument_borrow_rates(borrow):
+        rates = resolve_borrow_rates(borrow, positions.index)
+        borrow_cost = float((short_by_name.fillna(0.0) * rates).sum()) * dt_years
+    else:
+        borrow_cost = short_notional * borrow.default_annual_rate * dt_years
 
     # Financing on cash: project baseline tests expect spread applied on cash
     # balance (positive earns, negative pays).

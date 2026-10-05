@@ -164,9 +164,10 @@ class LongShortPortfolio:
     Declarative spec for a daily cross-sectional long/short strategy.
     """
 
-    # Books (required, must appear before any fields with defaults)
+    # Books. A portfolio without a short book is long only: set
+    # target_net_exposure equal to target_gross_leverage.
     long_book: Book
-    short_book: Book
+    short_book: Optional[Book] = None
 
     # Rebalance policy (defaults)
     rebalance_frequency: Literal["1d", "1w", "1m"]
@@ -182,6 +183,16 @@ class LongShortPortfolio:
     sector_neutral: Optional[SectorNeutral] = None
     turnover_limit: Optional[TurnoverLimit] = None
     debugging: bool = False
+
+    # How many names must carry a valid rank in each present book before a
+    # rebalance forms targets. None keeps the historical rule: as many valid
+    # names in total as the books' TopN/BottomN sizes add up to, which leaves
+    # a thin cross-section (fewer names than the books could hold) in cash.
+    min_names_per_book: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        if self.min_names_per_book is not None and int(self.min_names_per_book) < 1:
+            raise ValueError("min_names_per_book must be at least 1 when set")
 
 
 @dataclass(slots=True, kw_only=True)

@@ -86,6 +86,15 @@ All signal nodes accept an optional `name: str`.
 | `Quantile` | `factor_name, q: float, within_mask=None, name=None` | Scalar threshold at quantile q |
 | `CrossSectionAggregate` | `source, op="mean"\|"median"\|"sum"\|"min"\|"max", mask_name=None, name=None` | Regime indicators |
 
+### Identity (a factor as a signal)
+```python
+Identity(base="s_bear", name="bear")   # the ExternalFactor panel itself, as the score a book weights by
+Identity(base="valid", name="again")   # also works on a signal; replaces RollingMean(window=1)
+```
+`CrossSectionRank(method="demeaned")` gives the percentile rank minus one half (-0.5..0.5): the
+sign is the side of the book, the size the distance from the middle, and its negation the other
+side's score.
+
 ### Boolean / masks
 | Class | Key Fields | Notes |
 |-------|-----------|-------|
@@ -262,6 +271,10 @@ Execution(
 Costs(
     commission=Commission(type="bps_notional", amount=1.0),  # 1bp per trade
     borrow=BorrowCost(default_annual_rate=0.005),             # 50bps short borrow
+    # per-name rates (a fraction a year), the default for the rest; a parquet/CSV with
+    # one row per instrument (columns ticker, fee_rate by default) or a mapping:
+    # borrow=BorrowCost(default_annual_rate=0.01, rates_path="exports/borrow_rates.parquet")
+    # borrow=BorrowCost(default_annual_rate=0.01, rates={"GME": 0.48})
     financing=FinancingCost(base_rate_curve="SOFR", spread_bps=0.0),
     fees=StaticFees(nav_fee_annual=0.0, perf_fee_fraction=0.0),
     funding=None,                                             # perp funding — see below
@@ -404,12 +417,18 @@ Output goes to `btest/outputs/<strategy_name>/`.
 ```python
 portfolio = LongShortPortfolio(
     long_book=Book(name="long", selector=TopN(factor_name="rank", n=20), weighting=EqualWeight()),
-    short_book=Book(name="short", selector=BottomN(factor_name="rank", n=0), weighting=EqualWeight()),
+    short_book=None,                 # no short book (a BottomN(n=0) book does the same)
     rebalance_frequency="1w",
     target_gross_leverage=1.0,
     target_net_exposure=1.0,
 )
 ```
+
+### Thin cross-sections: `min_names_per_book`
+By default a rebalance forms no target until as many names carry a valid rank as the books'
+`n` add up to (`TopN(n=80)` + `BottomN(n=80)` waits for 160 ranked names, and a universe that
+ranks 50 a day stays in cash). Set `min_names_per_book=10` to trade as soon as each present book
+has ten ranked names; the selectors then take what is there, up to `n`.
 
 ### Momentum + volatility filter (quality momentum)
 ```python
@@ -456,7 +475,7 @@ data = DataConfig(
     calendar="XPAR",
     frequency="1d",
     start="2015-01-01",
-    end="2025-12-31",
+    end="2025-q12-31",
     fields=["open", "high", "low", "close", "volume", "3m_50d_ivol"],
 )
 

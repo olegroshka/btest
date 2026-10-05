@@ -63,7 +63,7 @@ def compute_target_weights_for_date(
     delay = portfolio.signal_delay_bars
 
     long_sel = portfolio.long_book.selector
-    short_sel = portfolio.short_book.selector
+    short_sel = portfolio.short_book.selector if portfolio.short_book is not None else None
 
     def _get_df_opt(name: Optional[str]) -> Optional[pd.DataFrame]:
         if name is None:
@@ -88,7 +88,10 @@ def compute_target_weights_for_date(
             else signals.get("long_candidates")
         )
 
-    if isinstance(short_sel, MaskSelector):
+    if short_sel is None:
+        short_rank_df = None
+        short_mask_df = None
+    elif isinstance(short_sel, MaskSelector):
         _short_signal_df = _get_df_opt(short_sel.signal_name)
         short_rank_df = _short_signal_df
         short_mask_df = _short_signal_df
@@ -186,14 +189,17 @@ def compute_target_weights_for_date(
 
     # Optional gating: if there aren't enough valid ranks to populate both books,
     # keep target at zeros (baseline reference behavior in integration tests).
+    # With min_names_per_book set, each present book needs that many valid
+    # ranks instead of the books' sizes adding up.
     try:
         long_n_req = getattr(portfolio.long_book.selector, "n", 0)
-        short_n_req = getattr(portfolio.short_book.selector, "n", 0)
+        short_n_req = getattr(portfolio.short_book.selector, "n", 0) if portfolio.short_book is not None else 0
         n_required = int(long_n_req) + int(short_n_req)
     except Exception:
         n_required = 0
 
-    if n_required > 0:
+    min_per_book = getattr(portfolio, "min_names_per_book", None)
+    if min_per_book is not None or n_required > 0:
         valid_long = (
             long_rank_row[long_rank_row.notna()].index
             if long_rank_row is not None
@@ -206,7 +212,13 @@ def compute_target_weights_for_date(
         )
         # union of symbols with a valid rank in either book
         valid_union = valid_long.union(valid_short)
-        if int(valid_union.size) < n_required:
+        if min_per_book is not None:
+            thin = int(valid_long.size) < int(min_per_book) or (
+                portfolio.short_book is not None and int(valid_short.size) < int(min_per_book)
+            )
+        else:
+            thin = int(valid_union.size) < n_required
+        if thin:
             # Not enough valid names to form both books: return zeros after turnover cap
             if portfolio.turnover_limit is not None:
                 target = _apply_turnover_limit(
@@ -224,12 +236,16 @@ def compute_target_weights_for_date(
         mask=long_mask,
         debugging=portfolio.debugging,
     )
-    short_names = _select_book_names(
-        date=sig_date,
-        book=portfolio.short_book,
-        rank_row=short_rank_row,
-        mask=short_mask,
-        debugging=portfolio.debugging,
+    short_names = (
+        _select_book_names(
+            date=sig_date,
+            book=portfolio.short_book,
+            rank_row=short_rank_row,
+            mask=short_mask,
+            debugging=portfolio.debugging,
+        )
+        if portfolio.short_book is not None
+        else []
     )
 
     # Diagnostics: mask sparsity and selection sizes (debug level)
@@ -294,7 +310,7 @@ def compute_target_weights_for_date(
                 target[name] = w_long
 
     # Apply weighting scheme for short book
-    if n_short > 0 and short_gross > 0.0:
+    if n_short > 0 and short_gross > 0.0 and portfolio.short_book is not None:
         short_weighting = portfolio.short_book.weighting
         if isinstance(short_weighting, OptimizedWeight):
             w_opt = _optimized_book_weights(
