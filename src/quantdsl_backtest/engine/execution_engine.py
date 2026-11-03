@@ -48,6 +48,7 @@ def rebalance_to_target_weights(
       * ``OrderPolicy.min_trade_notional`` — skip orders below this many dollars (absolute, scalar).
       * ``OrderPolicy.min_trade_units``    — skip orders below this many units; a per-instrument dict
                                              ``{symbol: min_units}`` or a scalar applied to all.
+      * ``OrderPolicy.cash_only``          — sells first, then buys shrunk pro rata so cash stays >= 0.
 
     Returns
     -------
@@ -94,12 +95,29 @@ def rebalance_to_target_weights(
     # tax may be a single TransactionTax or a list (a mixed-domicile book has different stamp rates per name).
     _taxes = list(tax) if isinstance(tax, (list, tuple)) else ([] if tax is None else [tax])
 
+    def _tax_on(instr: str, side: str, notional: float) -> float:
+        # Sum over every configured tax so a mixed book charges each name its own domicile's rate.
+        total = 0.0
+        for _tx in _taxes:
+            if (_tx.rate > 0.0 or _tx.min_per_trade > 0.0) \
+                    and (_tx.on == "both" or (_tx.on == "buy" and side == "BUY") or (_tx.on == "sell" and side == "SELL")) \
+                    and (_tx.instruments is None or instr in _tx.instruments):
+                total += max(_tx.rate * abs(notional), _tx.min_per_trade)
+        return total
+
+    cash_only = bool(getattr(_op, "cash_only", False))
+
     trades = []
     cash_delta = 0.0
     new_positions = prev_positions.reindex(instruments).fillna(0.0).copy()
 
     # Only instruments that pass the gate trade — the loop is over survivors, not the whole universe.
-    for k in np.nonzero(trade)[0]:
+    survivors = np.nonzero(trade)[0]
+    if cash_only:
+        survivors = np.concatenate([survivors[dn[survivors] <= 0.0], survivors[dn[survivors] > 0.0]])  # sells fund buys
+    buys_left = float(np.sum(dn[survivors][dn[survivors] > 0.0])) if cash_only else 0.0
+
+    for k in survivors:
         instr = instruments[k]
         price = float(px[k])
 
@@ -121,13 +139,21 @@ def rebalance_to_target_weights(
         comm = cost_model.commission_from_trade(qty=q, exec_price=exec_price)
 
         # Transaction tax (e.g. UK stamp duty) — on trade notional, only the taxed side, only the named instruments.
-        # Sum over every configured tax so a mixed book charges each name its own domicile's rate.
-        tax_cost = 0.0
-        for _tx in _taxes:
-            if _tx.rate > 0.0 \
-                    and (_tx.on == "both" or (_tx.on == "buy" and side == "BUY") or (_tx.on == "sell" and side == "SELL")) \
-                    and (_tx.instruments is None or instr in _tx.instruments):
-                tax_cost += _tx.rate * abs(notional_exec)
+        tax_cost = _tax_on(instr, side, notional_exec)
+
+        if cash_only and side == "BUY":
+            # This buy's pro-rata share of the cash left. Commission and tax are held at their full-size
+            # amounts while scaling, which can only overstate them, so the outlay stays inside the budget.
+            budget = max(float(cash) + cash_delta, 0.0) * (float(dn[k]) / buys_left if buys_left > 0.0 else 1.0)
+            buys_left -= float(dn[k])
+            if notional_exec + comm + tax_cost > budget:
+                scale = (budget - comm - tax_cost) / notional_exec
+                if scale <= 0.0:
+                    continue
+                q *= scale
+                notional_exec = exec_price * q
+                comm = cost_model.commission_from_trade(qty=q, exec_price=exec_price)
+                tax_cost = _tax_on(instr, side, notional_exec)
 
         cash_delta += -notional_exec - comm - tax_cost     # cash decreases on a buy (q>0); tax charged on the taxed side
         new_positions[instr] = new_positions[instr] + q

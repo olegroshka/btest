@@ -278,6 +278,11 @@ Costs(
     financing=FinancingCost(base_rate_curve="SOFR", spread_bps=0.0),
     fees=StaticFees(nav_fee_annual=0.0, perf_fee_fraction=0.0),
     funding=None,                                             # perp funding — see below
+    # Small retail accounts (event-driven engine only; the vectorized engine refuses these):
+    #   Commission(type="bps_notional", amount=5.0, min_per_order=3.0)   # the larger of 5 bps and 3 per order
+    #   TransactionTax(rate=0.0003, on="both", min_per_trade=1.5, instruments=frozenset({"MU"}))  # FX on a foreign name
+    #   StaticFees(min_monthly_fee=3.0)                                  # monthly fee, less that month's commission
+    #   OrderPolicy(cash_only=True)                                      # sells first; buys shrink so cash stays >= 0
 )
 ```
 

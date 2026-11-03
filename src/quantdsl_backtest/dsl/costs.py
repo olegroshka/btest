@@ -14,6 +14,9 @@ class Commission:
 
     type: Literal["per_share", "bps_notional"] = "per_share"
     amount: float = 0.0                 # per-share, or bps depending on type
+    # Smallest charge per order, in account currency (bps_notional only). A broker's "3 or 0.05%,
+    # whichever is more" is Commission(type="bps_notional", amount=5.0, min_per_order=3.0).
+    min_per_order: float = 0.0
 
 
 @dataclass(slots=True)
@@ -60,6 +63,9 @@ class StaticFees:
 
     nav_fee_annual: float = 0.0         # mgmt fee in fraction of NAV p.a.
     perf_fee_fraction: float = 0.0      # e.g. 0.2 for 20% performance fee
+    # A broker's minimum monthly activity fee, in account currency: at each month end the account pays
+    # this less the commission it paid that month, never below zero. Event-driven engine only.
+    min_monthly_fee: float = 0.0
 
 
 @dataclass(slots=True)
@@ -70,11 +76,13 @@ class TransactionTax:
     Examples:
         TransactionTax(rate=0.005, on="buy")                       # UK stamp duty, whole book
         TransactionTax(rate=0.005, on="buy", instruments=uk_set)   # UK stamp, only the UK names in a mixed book
+        TransactionTax(rate=0.0003, on="both", min_per_trade=1.5, instruments=usd_set)   # FX conversion on foreign names
     """
 
     rate: float = 0.0                                  # fraction of trade notional, e.g. 0.005 = 0.5%
     on: Literal["buy", "sell", "both"] = "buy"         # which side is taxed (UK stamp = buy only)
     instruments: Optional[frozenset] = None            # None = every instrument; else only these tickers
+    min_per_trade: float = 0.0                         # smallest charge per taxed trade, in account currency
 
 
 @dataclass(slots=True)

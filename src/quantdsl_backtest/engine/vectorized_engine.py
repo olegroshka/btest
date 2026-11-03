@@ -40,6 +40,23 @@ from .metrics_advanced import compute_advanced_metrics_from_result
 log = get_logger(__name__)
 
 
+def _refuse_path_dependent_costs(strategy: Strategy) -> None:
+    """Per-order minimums, a monthly account fee and a cash-only gate depend on the path of each order and of
+    cash; a fees fraction cannot express them. Refuse rather than silently undercharge."""
+    costs = strategy.costs
+    taxes = getattr(costs, "tax", None) if costs is not None else None
+    taxes = list(taxes) if isinstance(taxes, (list, tuple)) else ([] if taxes is None else [taxes])
+    if (
+        float(getattr(getattr(costs, "commission", None), "min_per_order", 0.0) or 0.0) > 0.0
+        or any(float(getattr(t, "min_per_trade", 0.0) or 0.0) > 0.0 for t in taxes)
+        or float(getattr(getattr(costs, "fees", None), "min_monthly_fee", 0.0) or 0.0) > 0.0
+        or bool(getattr(getattr(strategy.execution, "order_policy", None), "cash_only", False))
+    ):
+        raise NotImplementedError(
+            "min_per_order, min_per_trade, min_monthly_fee and cash_only need engine='event_driven'."
+        )
+
+
 def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
     """
     Vectorized backtest implementation backed by vectorbt.
@@ -51,6 +68,8 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
       4) Call vectorbt.Portfolio.from_orders with size_type='targetpercent'
       5) Convert vectorbt.Portfolio into BacktestResult
     """
+    _refuse_path_dependent_costs(strategy)
+
     # ------------------------------------------------------------------ #
     # 1. Load data
     # ------------------------------------------------------------------ #

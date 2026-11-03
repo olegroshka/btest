@@ -87,10 +87,13 @@ class PerShareCommission(CostModel):
 @dataclass(slots=True)
 class BpsNotionalCommission(CostModel):
     bps: float = 0.0
+    min_per_order: float = 0.0
 
     def commission_from_trade(self, *, qty: float, exec_price: float) -> float:
         notional = abs(float(qty)) * float(exec_price)
-        return (float(self.bps) / 1e4) * notional
+        if notional <= 0.0:
+            return 0.0
+        return max((float(self.bps) / 1e4) * notional, float(self.min_per_order))
 
     def build_fees_fraction_matrix_from_orders_numpy(self, *, prices_arr: np.ndarray, abs_size_arr: np.ndarray) -> np.ndarray:
         # Constant fraction per order bar. We only apply on bars with orders.
@@ -127,7 +130,8 @@ def build_cost_model(commission_cfg: Optional[object]) -> CostModel:
         return PerShareCommission(amount_per_share=amt)
     if ctype == "bps_notional":
         bps = float(getattr(commission_cfg, "amount", 0.0) or 0.0)
-        if bps == 0.0:
+        min_per_order = float(getattr(commission_cfg, "min_per_order", 0.0) or 0.0)
+        if bps == 0.0 and min_per_order == 0.0:
             return NoCommission()
-        return BpsNotionalCommission(bps=bps)
+        return BpsNotionalCommission(bps=bps, min_per_order=min_per_order)
     return NoCommission()

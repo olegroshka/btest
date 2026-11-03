@@ -26,6 +26,9 @@ class OrderPolicy:
     no_trade_band: float = 0.0            # relative: skip unless |target_w - current_w| >= this
     min_trade_notional: float = 0.0       # absolute $: skip orders smaller than this (scalar)
     min_trade_units: Optional[dict] = None  # absolute units: {symbol: min_units} or a scalar; kills crumbs
+    # A cash account that cannot borrow (an ISA): sells execute first and buys are shrunk pro rata so cash,
+    # after every cost, never goes below zero. Event-driven engine only. Long-only books.
+    cash_only: bool = False
 
 
 @dataclass(slots=True)

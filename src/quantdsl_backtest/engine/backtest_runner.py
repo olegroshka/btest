@@ -844,6 +844,9 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # Opt-in per portfolio via TargetWeights.rebalance_on_change (default off = legacy daily rebalance).
     _roc = bool(getattr(strategy.portfolio, "rebalance_on_change", False))
     _held_target = None
+    # Minimum monthly activity fee: at each month end, the fee less the commission paid that month.
+    _min_monthly_fee = float(getattr(strategy.costs.fees, "min_monthly_fee", 0.0) or 0.0)
+    _month_commission = 0.0
     for i, dt in enumerate(dates):
         price_t = prices.loc[dt]
         volume_t = volumes.loc[dt]
@@ -920,6 +923,10 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             nav_fee_daily = nav_fee / ppy
             fee_amt = equity_before * nav_fee_daily
             st.cash -= fee_amt
+
+        if _min_monthly_fee > 0.0 and i > 0 and dt.month != dates[i - 1].month:
+            st.cash -= max(0.0, _min_monthly_fee - _month_commission)
+            _month_commission = 0.0
 
         # Equity before trades at today's prices
         equity_before = st.cash + (st.prev_positions * price_t_eff).sum()
@@ -1122,6 +1129,8 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                     _held_target = target_weights.copy()
 
             st.cash += cash_delta
+            if _min_monthly_fee > 0.0 and not trades_today.empty:
+                _month_commission += float(trades_today["commission"].sum())
             cur_positions = new_positions
         else:
             cur_positions = st.prev_positions
