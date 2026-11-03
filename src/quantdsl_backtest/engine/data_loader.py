@@ -46,6 +46,7 @@ def load_data_for_strategy(strategy: Strategy) -> Tuple[MarketData, pd.DataFrame
         str(strategy.data.source),
         str(getattr(strategy.data, "start", None)),
         str(getattr(strategy.data, "end", None)),
+        repr(strategy.universe),  # two universes over one file are two different panels
     )
     if _cache_key in _DATA_CACHE:
         log.debug("Data cache hit for %s", strategy.data.source)
