@@ -9,9 +9,14 @@ def asset_returns(close: pd.DataFrame) -> pd.DataFrame:
     rets = close.pct_change(fill_method=None)
     return rets.replace([np.inf, -np.inf], np.nan)
 
-def contrib_return_panel(weights: pd.DataFrame, close: pd.DataFrame) -> pd.DataFrame:
-    # return-space contribution: w_{t-1} * r_t
-    r = asset_returns(close).fillna(0.0)
+def contrib_return_panel(weights: pd.DataFrame, close: pd.DataFrame, open_: Optional[pd.DataFrame] = None) -> pd.DataFrame:
+    # return-space contribution: w_{t-1} * r_t, with r_t close to close, or (when an open panel is given,
+    # for a book sold at the next open) the night only: open_t / close_{t-1} - 1
+    if open_ is None:
+        r = asset_returns(close).fillna(0.0)
+    else:
+        night = open_.reindex_like(close) / close.shift(1) - 1.0
+        r = night.replace([np.inf, -np.inf], np.nan).fillna(0.0)
     w_prev = weights.shift(1).fillna(0.0)
     return w_prev * r
 

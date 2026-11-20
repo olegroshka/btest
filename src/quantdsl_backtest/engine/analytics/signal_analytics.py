@@ -4,12 +4,15 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 import pandas as pd
 
-def compute_forward_returns(close: pd.DataFrame, horizons: list[int]) -> Dict[int, pd.DataFrame]:
-    # fwd_ret_h[t] = close[t+h]/close[t] - 1
+def compute_forward_returns(
+    close: pd.DataFrame, horizons: list[int], open_: Optional[pd.DataFrame] = None
+) -> Dict[int, pd.DataFrame]:
+    # fwd_ret_h[t] = close[t+h]/close[t] - 1, or open[t+h]/close[t] - 1 when an open panel is given
     out: Dict[int, pd.DataFrame] = {}
     base = close.to_numpy(dtype=float)
+    exit_px = close if open_ is None else open_.reindex_like(close)
     for h in horizons:
-        fwd = close.shift(-h).to_numpy(dtype=float)
+        fwd = exit_px.shift(-h).to_numpy(dtype=float)
         # Safe divide: where base==0 -> NaN (avoid inf), also preserves NaNs
         res = np.divide(fwd, base, out=np.full_like(fwd, np.nan, dtype=float), where=base != 0) - 1.0
         out[h] = pd.DataFrame(res, index=close.index, columns=close.columns)

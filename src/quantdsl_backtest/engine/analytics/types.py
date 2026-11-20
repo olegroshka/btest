@@ -26,6 +26,11 @@ class SignalAnalyticsConfig:
     # enforce timing used by portfolio engine
     signal_delay_bars: int = 1          # MUST match portfolio.signal_delay_bars
 
+    # What a horizon of h bars measures:
+    #   "close_to_close": close[t+h] / close[t] - 1 (a position held from one close to a later one)
+    #   "close_to_open":  open[t+h]  / close[t] - 1 (h=1 is the night; for books sold at the next open)
+    forward_return: str = "close_to_close"
+
     # limit storage
     max_instruments: Optional[int] = None   # e.g. 2000
     store_only_traded_names: bool = False   # if you have selection trace

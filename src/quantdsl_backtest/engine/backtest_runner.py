@@ -784,6 +784,15 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # 1. Load data
     # ------------------------------------------------------------------ #
     md, prices, volumes = load_data_for_strategy(strategy)
+    # Warm-up history (BacktestConfig.trade_start): factors and signals see every bar loaded; the simulation,
+    # and so every reported series, starts at the trading start date.
+    history = prices
+    _trade_start = getattr(strategy.backtest, "trade_start", None)
+    if _trade_start is not None:
+        _live = prices.index >= pd.Timestamp(_trade_start)
+        if not bool(_live.any()):
+            raise ValueError(f"trade_start={_trade_start!r} is after the last bar of the data.")
+        prices, volumes = prices.loc[_live], volumes.loc[_live]
     dates = prices.index
     instruments = prices.columns
 
@@ -835,14 +844,14 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     # ------------------------------------------------------------------ #
     # 2. Compute factors & signals
     # ------------------------------------------------------------------ #
-    factor_engine = FactorEngine(md, prices, periods_per_year=ppy)
+    factor_engine = FactorEngine(md, history, periods_per_year=ppy)
     factor_panels = factor_engine.compute_all(strategy.factors)
 
-    signal_engine = SignalEngine(factor_panels, strategy.signals, index=prices.index, columns=prices.columns)
+    signal_engine = SignalEngine(factor_panels, strategy.signals, index=history.index, columns=history.columns)
     signal_panels = signal_engine.compute_all()
     # Expose the close panel to the portfolio engine (OptimizedWeight needs a
     # returns history). Reserved key; a user signal of the same name wins.
-    signal_panels.setdefault(PRICES_PANEL_KEY, prices)
+    signal_panels.setdefault(PRICES_PANEL_KEY, history)
 
     # ------------------------------------------------------------------ #
     # 3. Initialize state containers
@@ -1428,6 +1437,11 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             except Exception:
                 pass
 
+            _open_for_analytics = None
+            if getattr(cfg, "forward_return", "close_to_close") == "close_to_open":
+                _open_for_analytics = (
+                    open_prices if open_prices is not None else load_open_prices(md, instruments).reindex(prices.index)
+                )
             reports, attribs = compute_signal_analytics_and_attribution(
                 prices=prices,
                 signal_panels=signal_panels,
@@ -1435,6 +1449,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 trades=trades_df,
                 cfg=cfg,
                 equity=equity_series,
+                open_prices=_open_for_analytics,
             )
 
             # Attach to result
@@ -1595,6 +1610,7 @@ def compute_signal_analytics_and_attribution(
     trades: pd.DataFrame,
     cfg: SignalAnalyticsConfig,
     equity: Optional[pd.Series] = None,
+    open_prices: Optional[pd.DataFrame] = None,
 ) -> tuple[Dict[str, SignalTearsheetData], Dict[str, PortfolioSignalAttribution]]:
     """Compute per-signal diagnostics + portfolio attribution (pure function).
 
@@ -1631,21 +1647,29 @@ def compute_signal_analytics_and_attribution(
             mask_df = signal_panels[cfg.within_mask].astype(bool)
         except Exception:
             mask_df = signal_panels[cfg.within_mask].notna()
+        mask_df = mask_df.reindex(index=prices.index, fill_value=False)
 
-    # Forward returns from prices
-    fwd = compute_forward_returns(prices, cfg.horizons)
+    # Forward returns from prices: close to close, or close to a later open (cfg.forward_return)
+    _mode = getattr(cfg, "forward_return", "close_to_close")
+    if _mode not in ("close_to_close", "close_to_open"):
+        raise ValueError(f"forward_return must be 'close_to_close' or 'close_to_open', got {_mode!r}")
+    overnight = _mode == "close_to_open"
+    if overnight and open_prices is None:
+        raise ValueError("forward_return='close_to_open' needs an open price panel")
+    fwd = compute_forward_returns(prices, cfg.horizons, open_=open_prices if overnight else None)
 
     reports: Dict[str, SignalTearsheetData] = {}
     attribs: Dict[str, PortfolioSignalAttribution] = {}
 
     # Contributions (return-space) based on realized weights and asset returns
-    contrib_panel = contrib_return_panel(realized_weights, prices)
+    contrib_panel = contrib_return_panel(realized_weights, prices, open_=open_prices if overnight else None)
 
     for sname in cfg.signals:
         if sname not in signal_panels:
             continue
         panel = signal_panels[sname]
-        used_panel = panel.shift(int(getattr(cfg, "signal_delay_bars", 1)))
+        # Shift on the full panel (warm-up history included), then keep the simulated bars only.
+        used_panel = panel.shift(int(getattr(cfg, "signal_delay_bars", 1))).reindex(index=prices.index)
 
         # Optionally cap universe size (Tiering)
         _mask_df = mask_df
@@ -1685,7 +1709,9 @@ def compute_signal_analytics_and_attribution(
         reports[sname] = rep
 
         # Attribution by quantile (return-space)
-        contrib_by_q, ls_contrib = contrib_by_quantile(contrib_panel, qdf, cfg.quantiles)
+        # An overnight book earns on bar t what it bought on bar t-1, so its contribution is booked to the
+        # bucket the name was in when it was bought.
+        contrib_by_q, ls_contrib = contrib_by_quantile(contrib_panel, qdf.shift(1) if overnight else qdf, cfg.quantiles)
 
         # Costs by quantile (optional)
         cost_panel = costs_by_instrument_day(trades)

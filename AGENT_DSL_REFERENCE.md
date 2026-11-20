@@ -381,6 +381,31 @@ BacktestConfig(
 )
 ```
 
+**Warm-up history: `trade_start`.** Signals with long windows need data from before the first trade.
+Load it with `DataConfig.start` and set `BacktestConfig(trade_start="2016-02-01")`: factors and signals
+are computed on every bar loaded, but the simulation, the equity curve and every metric start at
+`trade_start`. Without it the warm-up bars are simulated as flat days and drag every metric down.
+Event-driven engine only.
+
+**Signal pages for books that do not hold close to close.**
+```python
+from quantdsl_backtest.engine.analytics.types import SignalAnalyticsConfig
+
+Reporting(
+    output_dir="outputs/my_strategy",
+    signal_analytics=SignalAnalyticsConfig(
+        signals=["score", "r_mom"],          # names from Strategy.signals
+        horizons=[1],
+        quantiles=5,
+        within_mask="eligible",
+        forward_return="close_to_open",      # "close_to_close" (default) | "close_to_open"
+    ),
+)
+```
+- `"close_to_close"`: `close[t+h] / close[t] - 1`.
+- `"close_to_open"`: `open[t+h] / close[t] - 1`; `h=1` is the night. Use it with `exit_on="next_open"`.
+  The attribution page then books each night's result to the bucket the name was bought in.
+
 ---
 
 ## 9. DataConfig

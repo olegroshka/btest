@@ -78,6 +78,8 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
       5) Convert vectorbt.Portfolio into BacktestResult
     """
     _refuse_path_dependent_costs(strategy)
+    if getattr(strategy.backtest, "trade_start", None) is not None:
+        raise NotImplementedError("trade_start needs engine='event_driven'.")
 
     # ------------------------------------------------------------------ #
     # 1. Load data

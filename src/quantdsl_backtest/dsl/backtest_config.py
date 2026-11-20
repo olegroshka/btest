@@ -101,6 +101,12 @@ class BacktestConfig:
     # (default, unchanged behaviour); 365 = 24/7 daily (crypto); 365*6 for 4h crypto bars, 365*24 for 1h.
     periods_per_year: float = 252.0
 
+    # First date the strategy may trade ("YYYY-MM-DD"). Data from DataConfig.start up to this date is
+    # warm-up history: factors and signals are computed on it, but it is not simulated, so the equity
+    # curve, the returns and every metric start here. None = trade from the first bar of the data.
+    # Event-driven engine only.
+    trade_start: Optional[str] = None
+
     # Optional metadata / knobs
     #
     # Use this dictionary for advanced/experimental switches that affect engine behavior
