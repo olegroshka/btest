@@ -25,12 +25,15 @@ from ..dsl.signals import (
     Quantile,
     CrossSectionAggregate,
     CrossSectionRank,
+    Composite,
     MaskFromBoolean,
     TimeSeries,
     EWMMean,
     Identity,
+    Lag,
     RollingMean,
     RollingStd,
+    RollingSum,
     Diff,
     PctChange,
     ZScoreRolling,
@@ -146,6 +149,12 @@ class SignalEngine:
             return self._eval_rolling_mean(node)
         if isinstance(node, RollingStd):
             return self._eval_rolling_std(node)
+        if isinstance(node, RollingSum):
+            return self._eval_rolling_sum(node)
+        if isinstance(node, Lag):
+            return self._eval_lag(node)
+        if isinstance(node, Composite):
+            return self._eval_composite(node)
         if isinstance(node, Diff):
             return self._eval_diff(node)
         if isinstance(node, PctChange):
@@ -278,7 +287,13 @@ class SignalEngine:
         return out
 
     def _eval_rank(self, node: CrossSectionRank) -> pd.DataFrame:
-        factor = self._get_factor(node.factor_name)
+        # The ranked panel is a factor or, failing that, another signal (a lagged panel, a composite).
+        if node.factor_name in self.factors:
+            factor = self._get_factor(node.factor_name)
+        else:
+            factor = self._get_signal(node.factor_name)
+        if not getattr(node, "ascending", True):
+            factor = -factor.astype("float64")
         if node.mask_name is not None:
             mask = self._get_signal(node.mask_name).astype(bool)
         else:
@@ -325,6 +340,12 @@ class SignalEngine:
                     )
                     if node.method == "demeaned":
                         df = df.with_columns(r=pl.col("r") - 0.5)
+                elif node.method == "midpoint":
+                    df = df.with_columns(
+                        r=(pl.col("value").rank(method="average").over("date") - 0.5)
+                        / pl.len().over("date")
+                        - 0.5
+                    )
                 elif node.method == "zscore":
                     df = df.with_columns(
                         mu=pl.mean("value").over("date"),
@@ -380,6 +401,8 @@ class SignalEngine:
                 ranks = ranks / denom
                 if node.method == "demeaned":
                     ranks = ranks - 0.5
+            elif node.method == "midpoint":
+                ranks = (valid.rank(method="average", ascending=True) - 0.5) / len(valid) - 0.5
             elif node.method == "zscore":
                 mu = valid.mean()
                 sigma = valid.std()
@@ -455,6 +478,28 @@ class SignalEngine:
     def _eval_rolling_std(self, node: RollingStd) -> pd.DataFrame:
         base = self._resolve_expr(node.base)
         return base.rolling(window=node.window, min_periods=node.min_periods).std()
+
+    def _eval_rolling_sum(self, node: RollingSum) -> pd.DataFrame:
+        base = self._resolve_expr(node.base)
+        return base.rolling(window=node.window, min_periods=node.min_periods).sum()
+
+    def _eval_lag(self, node: Lag) -> pd.DataFrame:
+        periods = int(node.periods)
+        if periods < 0:
+            raise ValueError("Lag.periods cannot be negative: that would read the future")
+        return self._resolve_expr(node.base).shift(periods)
+
+    def _eval_composite(self, node: Composite) -> pd.DataFrame:
+        stack = np.stack(
+            [self._resolve_expr(m).reindex(index=self.index, columns=self.columns).to_numpy(dtype="float64")
+             for m in node.members]
+        )
+        present = ~np.isnan(stack)
+        count = present.sum(axis=0)
+        total = np.where(present, stack, 0.0).sum(axis=0)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            mean = np.where(count >= int(node.min_count), total / count, np.nan)
+        return pd.DataFrame(mean, index=self.index, columns=self.columns)
 
     def _eval_diff(self, node: Diff) -> pd.DataFrame:
         base = self._resolve_expr(node.base)

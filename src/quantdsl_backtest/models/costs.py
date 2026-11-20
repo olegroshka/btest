@@ -21,9 +21,12 @@ class CostModel:
     helpers to build per-bar fees fraction matrices for vectorized paths.
     """
 
-    def commission_from_trade(self, *, qty: float, exec_price: float) -> float:
+    def commission_from_trade(self, *, qty: float, exec_price: float, shares: Optional[float] = None) -> float:
         """
         Return absolute commission dollars for a single executed trade.
+
+        ``shares`` is the number of shares actually traded when ``qty`` is in units of an adjusted price
+        (see ``Commission.share_price_field_close``); None means ``abs(qty)`` is the share count.
         """
         raise NotImplementedError
 
@@ -58,16 +61,33 @@ class CostModel:
 
 @dataclass(slots=True)
 class NoCommission(CostModel):
-    def commission_from_trade(self, *, qty: float, exec_price: float) -> float:  # noqa: ARG002
+    def commission_from_trade(self, *, qty: float, exec_price: float, shares: Optional[float] = None) -> float:  # noqa: ARG002
         return 0.0
+
+
+def _bounded(charge: float, notional: float, min_per_order: float, max_fraction: Optional[float]) -> float:
+    """The charge raised to the order minimum, then capped at a fraction of the order's notional."""
+    out = max(float(charge), float(min_per_order))
+    if max_fraction is not None:
+        out = min(out, float(max_fraction) * float(notional))
+    return out
 
 
 @dataclass(slots=True)
 class PerShareCommission(CostModel):
     amount_per_share: float = 0.0
+    min_per_order: float = 0.0
+    max_fraction_of_notional: Optional[float] = None
 
-    def commission_from_trade(self, *, qty: float, exec_price: float) -> float:  # noqa: ARG002
-        return float(self.amount_per_share) * abs(float(qty))
+    def commission_from_trade(self, *, qty: float, exec_price: float, shares: Optional[float] = None) -> float:
+        n_shares = abs(float(qty)) if shares is None else abs(float(shares))
+        charge = float(self.amount_per_share) * n_shares
+        if self.min_per_order == 0.0 and self.max_fraction_of_notional is None:
+            return charge
+        notional = abs(float(qty)) * float(exec_price)
+        if notional <= 0.0:
+            return 0.0
+        return _bounded(charge, notional, self.min_per_order, self.max_fraction_of_notional)
 
     def build_fees_fraction_matrix_from_orders_numpy(self, *, prices_arr: np.ndarray, abs_size_arr: np.ndarray) -> np.ndarray:
         # fraction = per_share / price, but only on bars with orders (abs_size>0)
@@ -88,12 +108,13 @@ class PerShareCommission(CostModel):
 class BpsNotionalCommission(CostModel):
     bps: float = 0.0
     min_per_order: float = 0.0
+    max_fraction_of_notional: Optional[float] = None
 
-    def commission_from_trade(self, *, qty: float, exec_price: float) -> float:
+    def commission_from_trade(self, *, qty: float, exec_price: float, shares: Optional[float] = None) -> float:  # noqa: ARG002
         notional = abs(float(qty)) * float(exec_price)
         if notional <= 0.0:
             return 0.0
-        return max((float(self.bps) / 1e4) * notional, float(self.min_per_order))
+        return _bounded((float(self.bps) / 1e4) * notional, notional, self.min_per_order, self.max_fraction_of_notional)
 
     def build_fees_fraction_matrix_from_orders_numpy(self, *, prices_arr: np.ndarray, abs_size_arr: np.ndarray) -> np.ndarray:
         # Constant fraction per order bar. We only apply on bars with orders.
@@ -123,15 +144,14 @@ def build_cost_model(commission_cfg: Optional[object]) -> CostModel:
         return NoCommission()
 
     ctype = getattr(commission_cfg, "type", None)
+    amount = float(getattr(commission_cfg, "amount", 0.0) or 0.0)
+    min_per_order = float(getattr(commission_cfg, "min_per_order", 0.0) or 0.0)
+    cap = getattr(commission_cfg, "max_fraction_of_notional", None)
+    cap = None if cap is None else float(cap)
+    if amount == 0.0 and min_per_order == 0.0:
+        return NoCommission()
     if ctype == "per_share":
-        amt = float(getattr(commission_cfg, "amount", 0.0) or 0.0)
-        if amt == 0.0:
-            return NoCommission()
-        return PerShareCommission(amount_per_share=amt)
+        return PerShareCommission(amount_per_share=amount, min_per_order=min_per_order, max_fraction_of_notional=cap)
     if ctype == "bps_notional":
-        bps = float(getattr(commission_cfg, "amount", 0.0) or 0.0)
-        min_per_order = float(getattr(commission_cfg, "min_per_order", 0.0) or 0.0)
-        if bps == 0.0 and min_per_order == 0.0:
-            return NoCommission()
-        return BpsNotionalCommission(bps=bps, min_per_order=min_per_order)
+        return BpsNotionalCommission(bps=amount, min_per_order=min_per_order, max_fraction_of_notional=cap)
     return NoCommission()

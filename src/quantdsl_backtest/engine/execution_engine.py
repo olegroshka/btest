@@ -29,6 +29,7 @@ def rebalance_to_target_weights(
     prev_positions: pd.Series,
     target_weights: pd.Series,
     tax: "TransactionTax | None" = None,
+    share_prices: "pd.Series | None" = None,
 ) -> Tuple[pd.Series, float, pd.DataFrame]:
     """
     Size and execute a rebalance ENTIRELY at ``prices`` — the prices at the execution instant.
@@ -50,6 +51,10 @@ def rebalance_to_target_weights(
                                              ``{symbol: min_units}`` or a scalar applied to all.
       * ``OrderPolicy.cash_only``          — sells first, then buys shrunk pro rata so cash stays >= 0.
 
+    ``share_prices`` are the prices actually printed at this same instant, given when ``prices`` are
+    adjusted and the commission is per share: an order's share count is then its notional over the
+    printed price. They never size or fill an order. Where one is missing the fill price stands in.
+
     Returns
     -------
     (new_positions, cash_delta, trades_df)
@@ -59,6 +64,13 @@ def rebalance_to_target_weights(
     prev = prev_positions.reindex(instruments).fillna(0.0).to_numpy(dtype=float)
     vol  = volumes.reindex(instruments).fillna(0.0).to_numpy(dtype=float)
     tw   = target_weights.to_numpy(dtype=float)
+    # Shares per unit of quantity: adjusted price over printed price (1 where no printed price is known).
+    if share_prices is None:
+        per_unit = None
+    else:
+        spx = share_prices.reindex(instruments).to_numpy(dtype=float)
+        ok = np.isfinite(spx) & (spx > 0.0) & np.isfinite(px)
+        per_unit = np.where(ok, np.divide(px, spx, out=np.ones_like(px), where=ok), 1.0)
 
     valid = np.isfinite(px) & (px > 0.0)
 
@@ -136,7 +148,13 @@ def rebalance_to_target_weights(
         exec_price = price * (1.0 + slippage_frac) if side == "BUY" else price * (1.0 - slippage_frac)
 
         notional_exec = exec_price * q                     # signed
-        comm = cost_model.commission_from_trade(qty=q, exec_price=exec_price)
+        unit_shares = None if per_unit is None else float(per_unit[k])
+
+        def _commission(quantity: float) -> float:
+            n_shares = None if unit_shares is None else abs(quantity) * unit_shares
+            return cost_model.commission_from_trade(qty=quantity, exec_price=exec_price, shares=n_shares)
+
+        comm = _commission(q)
 
         # Transaction tax (e.g. UK stamp duty) — on trade notional, only the taxed side, only the named instruments.
         tax_cost = _tax_on(instr, side, notional_exec)
@@ -152,7 +170,7 @@ def rebalance_to_target_weights(
                     continue
                 q *= scale
                 notional_exec = exec_price * q
-                comm = cost_model.commission_from_trade(qty=q, exec_price=exec_price)
+                comm = _commission(q)
                 tax_cost = _tax_on(instr, side, notional_exec)
 
         cash_delta += -notional_exec - comm - tax_cost     # cash decreases on a buy (q>0); tax charged on the taxed side
@@ -164,6 +182,7 @@ def rebalance_to_target_weights(
                 "instrument": instr,
                 "side": side,
                 "quantity": q,
+                "shares": abs(q) if unit_shares is None else abs(q) * unit_shares,   # at the printed price
                 "raw_price": price,                                  # market price BEFORE slippage (fill level)
                 "price": exec_price,                                 # filled price, slippage included
                 "notional": notional_exec,

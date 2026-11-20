@@ -170,6 +170,15 @@ def load_funding_for_strategy(strategy: "Strategy", instruments, dates):
     return panel.reindex(index=idx, columns=instruments).fillna(0.0).astype("float64")
 
 
+def load_field_panel(md: "MarketData", instruments: "pd.Index", field: str) -> "pd.DataFrame":
+    """A wide panel [datetime x instrument] of one data field. Instruments without the column get NaN."""
+    panel = pd.DataFrame({
+        instr: md.bars[instr].get(field, pd.Series(dtype="float64"))
+        for instr in instruments
+    })
+    return panel.sort_index().astype("float64")
+
+
 def load_open_prices(md: "MarketData", instruments: "pd.Index") -> "pd.DataFrame":
     """Extract open prices from already-loaded MarketData.
 

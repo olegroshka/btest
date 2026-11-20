@@ -22,8 +22,9 @@ from quantdsl_backtest.dsl.signals import (
     And, Or, Not,
     LessEqual, GreaterEqual, Less, Greater,
     NotNull,
-    EWMMean, RollingMean, RollingStd, Diff, PctChange, ZScoreRolling,
+    EWMMean, RollingMean, RollingStd, RollingSum, Lag, Diff, PctChange, ZScoreRolling,
     RiskMultiplierFromZ, TimeSeries,
+    Composite, Identity,
 )
 from quantdsl_backtest.dsl.portfolio import (
     LongShortPortfolio, Book, TopN, BottomN, MaskSelector, EqualWeight,
@@ -82,7 +83,8 @@ All signal nodes accept an optional `name: str`.
 ### Cross-sectional
 | Class | Key Fields | Notes |
 |-------|-----------|-------|
-| `CrossSectionRank` | `factor_name, mask_name=None, method="percentile"\|"zscore", name=None` | Returns 0–1 rank per date |
+| `CrossSectionRank` | `factor_name, mask_name=None, method="percentile"\|"demeaned"\|"midpoint"\|"zscore", name=None, ascending=True` | Rank per date. `factor_name` may be a factor or a signal |
+| `Composite` | `members: list[Expr], min_count=1, name=None` | Mean of the member panels present in each cell; NaN below `min_count` |
 | `Quantile` | `factor_name, q: float, within_mask=None, name=None` | Scalar threshold at quantile q |
 | `CrossSectionAggregate` | `source, op="mean"\|"median"\|"sum"\|"min"\|"max", mask_name=None, name=None` | Regime indicators |
 
@@ -94,6 +96,18 @@ Identity(base="valid", name="again")   # also works on a signal; replaces Rollin
 `CrossSectionRank(method="demeaned")` gives the percentile rank minus one half (-0.5..0.5): the
 sign is the side of the book, the size the distance from the middle, and its negation the other
 side's score.
+
+`CrossSectionRank(method="midpoint")` gives `(rank - 0.5) / n - 0.5`, strictly inside -0.5..0.5:
+the day's scores sum to zero whatever the number of names, so ranks of signals with different
+coverage can be averaged. `ascending=False` ranks the negated values (a low value ranks high).
+
+```python
+# A composite of rank scores: each ranked among eligible names, at least two of three present.
+r_mom  = CrossSectionRank(factor_name="mom",  mask_name="eligible", method="midpoint", name="r_mom")
+r_vol  = CrossSectionRank(factor_name="vol",  mask_name="eligible", method="midpoint", name="r_vol")
+r_size = CrossSectionRank(factor_name="size", mask_name="eligible", method="midpoint", ascending=False, name="r_size")
+score  = Composite(members=["r_mom", "r_vol", "r_size"], min_count=2, name="score")
+```
 
 ### Boolean / masks
 | Class | Key Fields | Notes |
@@ -118,11 +132,21 @@ side's score.
 | `EWMMean` | `base: Expr, span: int, min_periods=1, adjust=False` |
 | `RollingMean` | `base: Expr, window: int, min_periods=1` |
 | `RollingStd` | `base: Expr, window: int, min_periods=1` |
+| `RollingSum` | `base: Expr, window: int, min_periods=1` |
+| `Lag` | `base: Expr, periods=1` → the panel `periods` bars earlier; negative lags are refused |
 | `Diff` | `base: Expr, periods=1` |
 | `PctChange` | `base: Expr, periods=1` |
 | `ZScoreRolling` | `base: Expr, window: int, min_periods=1` |
 | `RiskMultiplierFromZ` | `z: Expr, max_z=2.5` → maps z-score to [0,1] scalar |
 | `TimeSeries` | `source: str (e.g. "fred://BAMLH0A0HYM2"), field="close"` |
+
+**Point-in-time rule.** A value that is complete only at a bar's close (a close-to-close return, a
+volatility of closes) must go through `Lag` before it drives a decision taken before that close:
+```python
+ret_1d = ReturnFactor(name="ret_1d", field="close", lookback=1, method="simple")          # a factor
+vol20  = Lag(base=RollingStd(base="ret_1d", window=20, min_periods=15), periods=1, name="vol20")
+mom    = Lag(base=RollingSum(base="logret_1d", window=126, min_periods=100), periods=5, name="mom")   # six months, skipping the last week
+```
 
 **Example — composite long signal with regime filter:**
 ```python
@@ -263,6 +287,22 @@ Execution(
 )
 ```
 
+**Overnight-only book (buy at the close, sell at the next open):**
+```python
+OrderPolicy(
+    default_order_type="MOC",
+    fill_on="close",          # required with exit_on="next_open"
+    exit_on="next_open",      # "hold" (default) | "next_open"
+)
+```
+- Each bar: first everything carried from the previous close is sold at this bar's **open**, then the
+  target is bought at this bar's **close**. The book is flat during the day.
+- Every position pays two orders a night (commission, minimums, taxes and slippage on both).
+- The exit is forced: `no_trade_band`, `min_trade_notional` and `min_trade_units` do not block it.
+- With `rebalance_frequency="1w"` the book is bought on the weekly bar and held for one night only.
+- The data must carry an `open` field. Event-driven engine only; the vectorized engine refuses it.
+- Trades carry a `fill_at` column (`"open"` or `"close"`).
+
 ---
 
 ## 7. Costs
@@ -280,6 +320,8 @@ Costs(
     funding=None,                                             # perp funding — see below
     # Small retail accounts (event-driven engine only; the vectorized engine refuses these):
     #   Commission(type="bps_notional", amount=5.0, min_per_order=3.0)   # the larger of 5 bps and 3 per order
+    #   Commission(type="per_share", amount=0.005, min_per_order=1.0,    # 0.005 a share, at least 1.00,
+    #              max_fraction_of_notional=0.01)                        #   at most 1% of the order's value
     #   TransactionTax(rate=0.0003, on="both", min_per_trade=1.5, instruments=frozenset({"MU"}))  # FX on a foreign name
     #   StaticFees(min_monthly_fee=3.0)                                  # monthly fee, less that month's commission
     #   OrderPolicy(cash_only=True)                                      # sells first; buys shrink so cash stays >= 0
@@ -295,6 +337,21 @@ Event-driven engine only (the vectorized engine raises). Funding is material: BT
 
 Note: `FinancingCost` currently applies only `spread_bps` on the cash balance; `base_rate_curve` is a label,
 not a loaded curve.
+
+**Per-share commission on adjusted prices.** A split- or dividend-adjusted price is not the price
+a share traded at, so quantity is not a share count. Name the data fields that hold the printed
+prices and the engine counts shares as order value / printed price:
+```python
+Commission(
+    type="per_share", amount=0.005, min_per_order=1.0, max_fraction_of_notional=0.01,
+    share_price_field_close="raw_close",   # orders filled at the close
+    share_price_field_open="raw_open",     # orders filled at the open (fill_on="open", exit_on="next_open")
+)
+```
+- The fields must be in the data (`DataConfig.fields`). Where a printed price is missing the fill price is used.
+- The printed prices never size or fill an order. Trades carry a `shares` column.
+- The cap is applied after the minimum, so on a very small order the cap wins.
+- Event-driven engine only; the vectorized engine refuses the minimum, the cap and the fields.
 
 ---
 

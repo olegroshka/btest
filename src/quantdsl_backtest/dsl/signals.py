@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Optional, Any, Protocol, runtime_checkable
+from typing import Literal, Optional, Any, Protocol, Sequence, runtime_checkable
 
 
 # For now, we keep the expression types loose (Any / object) so the engine
@@ -249,16 +249,51 @@ class CrossSectionRank(SignalNode):
       - "demeaned": the percentile rank minus one half, -0.5..0.5 (a signal
         whose sign is the side of the book and whose size is the distance
         from the middle; its negation is the rank of the other side)
+      - "midpoint": (rank - 0.5) / n - 0.5, strictly inside -0.5..0.5 (each name
+        sits at the middle of its rank cell, so the mean over the day is zero
+        and the spread does not depend on how many names are ranked)
       - "zscore": z-scored version
+
+    ``factor_name`` may name a factor or another signal (a lagged or rolled
+    panel, a composite). ``ascending=False`` ranks the negated values, so the
+    lowest value gets the highest rank.
     """
 
     factor_name: str
     mask_name: Optional[str] = None
-    method: Literal["percentile", "demeaned", "zscore"] = "percentile"
+    method: Literal["percentile", "demeaned", "midpoint", "zscore"] = "percentile"
     name: Optional[str] = None
+    ascending: bool = True
 
     def evaluate(self, engine: Any) -> Any:
         return engine._eval_rank(self)
+
+
+@dataclass(slots=True)
+class Composite(SignalNode):
+    """
+    Equal-weighted mean of several panels, cell by cell, over the members
+    that have a value there.
+
+    A cell is NaN unless at least ``min_count`` members are present, so a
+    name scored by too few signals is not ranked on the strength of one.
+
+    Example (three rank scores, at least two present):
+        Composite(members=["r_mom", "r_vol", "r_gap"], min_count=2, name="score")
+    """
+
+    members: Sequence[Expr]
+    min_count: int = 1
+    name: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if len(self.members) == 0:
+            raise ValueError("Composite needs at least one member")
+        if not 1 <= int(self.min_count) <= len(self.members):
+            raise ValueError("min_count must be between 1 and the number of members")
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_composite(self)
 
 
 @dataclass(slots=True)
@@ -345,6 +380,45 @@ class Identity(SignalNode):
 
     def evaluate(self, engine: Any) -> Any:
         return engine._eval_identity(self)
+
+
+@dataclass(slots=True)
+class RollingSum(SignalNode):
+    """Sum over the trailing ``window`` bars, per instrument; NaN with fewer than ``min_periods`` values."""
+
+    base: Expr
+    window: int
+    min_periods: int = 1
+    name: Optional[str] = None
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_rolling_sum(self)
+
+
+@dataclass(slots=True)
+class Lag(SignalNode):
+    """
+    The panel as it stood ``periods`` bars earlier, per instrument.
+
+    The point-in-time operator: a value that is only complete at a bar's
+    close (a close-to-close return, a volatility over closes) must be lagged
+    one bar before it may drive a decision taken before that close.
+    ``periods`` cannot be negative: that would read the future.
+
+    Example (volatility over the 20 closes ending yesterday):
+        Lag(base=RollingStd(base="ret_1d", window=20, min_periods=15), periods=1, name="vol20")
+    """
+
+    base: Expr
+    periods: int = 1
+    name: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if int(self.periods) < 0:
+            raise ValueError("Lag.periods cannot be negative: that would read the future")
+
+    def evaluate(self, engine: Any) -> Any:
+        return engine._eval_lag(self)
 
 
 @dataclass(slots=True)

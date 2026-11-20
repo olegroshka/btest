@@ -46,15 +46,24 @@ def _refuse_path_dependent_costs(strategy: Strategy) -> None:
     costs = strategy.costs
     taxes = getattr(costs, "tax", None) if costs is not None else None
     taxes = list(taxes) if isinstance(taxes, (list, tuple)) else ([] if taxes is None else [taxes])
+    _commission = getattr(costs, "commission", None)
     if (
-        float(getattr(getattr(costs, "commission", None), "min_per_order", 0.0) or 0.0) > 0.0
+        float(getattr(_commission, "min_per_order", 0.0) or 0.0) > 0.0
+        or getattr(_commission, "max_fraction_of_notional", None) is not None
+        or getattr(_commission, "share_price_field_close", None)
+        or getattr(_commission, "share_price_field_open", None)
         or any(float(getattr(t, "min_per_trade", 0.0) or 0.0) > 0.0 for t in taxes)
         or float(getattr(getattr(costs, "fees", None), "min_monthly_fee", 0.0) or 0.0) > 0.0
         or bool(getattr(getattr(strategy.execution, "order_policy", None), "cash_only", False))
     ):
         raise NotImplementedError(
-            "min_per_order, min_per_trade, min_monthly_fee and cash_only need engine='event_driven'."
+            "min_per_order, max_fraction_of_notional, share_price_field_*, min_per_trade, min_monthly_fee "
+            "and cash_only need engine='event_driven'."
         )
+    if getattr(getattr(strategy.execution, "order_policy", None), "exit_on", "hold") == "next_open":
+        # Two fills a bar at two prices (sell at the open, buy at the close): one weights-times-returns
+        # product cannot express it.
+        raise NotImplementedError("exit_on='next_open' needs engine='event_driven'.")
 
 
 def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:

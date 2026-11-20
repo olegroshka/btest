@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import ClassVar, Dict, List, Optional, Protocol, Sequence, runtime_checkable
 
 import numpy as np
@@ -10,7 +11,7 @@ import pandas as pd
 from ..dsl.strategy import Strategy
 from ..engine.results import BacktestResult
 from ..utils.logging import get_logger
-from .data_loader import load_data_for_strategy, load_open_prices, load_income_for_strategy, load_funding_for_strategy
+from .data_loader import load_data_for_strategy, load_field_panel, load_open_prices, load_income_for_strategy, load_funding_for_strategy
 from .factor_engine import FactorEngine
 from .signal_engine import SignalEngine
 from .portfolio_engine import PRICES_PANEL_KEY, compute_target_weights_for_date
@@ -802,6 +803,35 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     if _fill_on == "open":
         open_prices = load_open_prices(md, instruments).reindex(prices.index)
 
+    # Overnight-only books (OrderPolicy.exit_on="next_open"): what a bar buys at its close is sold at the
+    # next bar's open. The exit is forced, so the rebalance gates (band, minimum sizes) do not apply to it.
+    _exit_next_open = getattr(getattr(strategy.execution, "order_policy", None), "exit_on", "hold") == "next_open"
+    _exit_execution = None
+    if _exit_next_open:
+        open_prices = load_open_prices(md, instruments).reindex(prices.index)
+        if not bool(open_prices.notna().to_numpy().any()):
+            raise ValueError("exit_on='next_open' needs an 'open' price field in the data.")
+        _exit_execution = dataclasses.replace(
+            strategy.execution,
+            order_policy=dataclasses.replace(
+                strategy.execution.order_policy, no_trade_band=0.0, min_trade_notional=0.0, min_trade_units=None
+            ),
+        )
+
+    # Per-share commission on an adjusted panel: the printed prices that turn an order into a share count.
+    _share_px: dict = {}
+    for _when in ("close", "open"):
+        _field = getattr(strategy.costs.commission, f"share_price_field_{_when}", None)
+        if _field:
+            _panel = load_field_panel(md, instruments, _field).reindex(prices.index)
+            if not bool(_panel.notna().to_numpy().any()):
+                raise ValueError(f"Commission.share_price_field_{_when}={_field!r}: no such field in the data.")
+            _share_px[_when] = _panel
+
+    def _share_prices_at(when: str, dt: pd.Timestamp) -> Optional[pd.Series]:
+        panel = _share_px.get(when)
+        return None if panel is None else panel.loc[dt]
+
     # ------------------------------------------------------------------ #
     # 2. Compute factors & signals
     # ------------------------------------------------------------------ #
@@ -928,6 +958,34 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
             st.cash -= max(0.0, _min_monthly_fee - _month_commission)
             _month_commission = 0.0
 
+        # Overnight-only books: sell at today's OPEN whatever was carried from yesterday's close. The sale is
+        # sized and filled at the open alone (single price vector), after carry and income for the night
+        # have been booked, and before today's close is used for anything.
+        if _exit_next_open and i > 0 and float(np.abs(st.prev_positions.to_numpy(dtype=float)).sum()) > 0.0:
+            open_aligned = open_prices.loc[dt].reindex(st.prev_positions.index)
+            open_aligned = open_aligned.where(~open_aligned.isna(), st.prev_prices)  # no open print: last price
+            flat_positions, cash_delta_open, trades_open = rebalance_to_target_weights(
+                date=dt,
+                execution=_exit_execution,
+                commission=strategy.costs.commission,
+                fees=strategy.costs.fees,
+                tax=getattr(strategy.costs, "tax", None),
+                cash=st.cash,
+                prices=open_aligned,
+                volumes=volume_t,
+                prev_positions=st.prev_positions,
+                target_weights=pd.Series(0.0, index=instruments),
+                share_prices=_share_prices_at("open", dt),
+            )
+            st.cash += cash_delta_open
+            st.prev_positions = flat_positions
+            _held_target = None  # the book is flat again: the next target is always a fresh entry
+            if not trades_open.empty:
+                trades_open["fill_at"] = "open"
+                st.all_trades.append(trades_open)
+                if _min_monthly_fee > 0.0:
+                    _month_commission += float(trades_open["commission"].sum())
+
         # Equity before trades at today's prices
         equity_before = st.cash + (st.prev_positions * price_t_eff).sum()
 
@@ -1010,7 +1068,10 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 date=dt,
                 portfolio=strategy.portfolio,
                 signals=signal_panels,
-                prev_weights=weights_df.iloc[i - 1] if i > 0 else pd.Series(0.0, index=instruments),
+                # An overnight-only book was sold at this bar's open: it holds nothing when the target is formed.
+                prev_weights=(
+                    weights_df.iloc[i - 1] if (i > 0 and not _exit_next_open) else pd.Series(0.0, index=instruments)
+                ),
                 collector=st.sel_collector,
             )
 
@@ -1104,6 +1165,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                             volumes=volume_t,
                             prev_positions=st.prev_positions,
                             target_weights=exec_weights,
+                            share_prices=_share_prices_at("open", dt),
                         )
                         _held_target = exec_weights.copy()
                 elif _roc and _held_target is not None and _same_alloc(target_weights, _held_target):
@@ -1125,6 +1187,7 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                         volumes=volume_t,
                         prev_positions=st.prev_positions,
                         target_weights=target_weights,
+                        share_prices=_share_prices_at("close", dt),
                     )
                     _held_target = target_weights.copy()
 
@@ -1228,6 +1291,8 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                 st.soft_scale_latched = True
 
         if not trades_today.empty:
+            if _exit_next_open:
+                trades_today["fill_at"] = "close"
             st.all_trades.append(trades_today)
 
         st.prev_prices = price_t_eff

@@ -14,9 +14,19 @@ class Commission:
 
     type: Literal["per_share", "bps_notional"] = "per_share"
     amount: float = 0.0                 # per-share, or bps depending on type
-    # Smallest charge per order, in account currency (bps_notional only). A broker's "3 or 0.05%,
-    # whichever is more" is Commission(type="bps_notional", amount=5.0, min_per_order=3.0).
+    # Smallest charge per order, in account currency. A broker's "3 or 0.05%, whichever is more" is
+    # Commission(type="bps_notional", amount=5.0, min_per_order=3.0); "0.005 a share, at least 1.00" is
+    # Commission(type="per_share", amount=0.005, min_per_order=1.0).
     min_per_order: float = 0.0
+    # Largest charge per order as a fraction of its notional (0.01 = 1% of trade value); None = no cap.
+    # The cap is applied after the minimum, so on a very small order the cap wins.
+    max_fraction_of_notional: Optional[float] = None
+    # per_share on an ADJUSTED price panel. A split- or dividend-adjusted price is not the price a share
+    # traded at, so quantity is not a share count. Name the data fields that hold the price actually
+    # printed at the close and at the open; the order's shares are then notional / printed price.
+    # Where the printed price is missing the fill price is used. Event-driven engine only.
+    share_price_field_close: Optional[str] = None
+    share_price_field_open: Optional[str] = None
 
 
 @dataclass(slots=True)
