@@ -51,6 +51,10 @@ class PowerLawSlippageModel:
     k: float = 20.0
     exponent: float = 0.5
     use_intraday_vol: bool = False
+    # Per-instrument override of base_bps, e.g. {"TECL": 20.0, "TQQQ": 1.0, "BIL": 0.5}: one flat cost for every
+    # instrument mis-prices a book that mixes a 1bp-spread ETF with a 40bp-at-the-open one. Instruments not
+    # listed keep base_bps. Event-driven engine; the vectorized engine falls back to it when this is set.
+    base_bps_by_symbol: Optional[dict] = None
 
 
 @dataclass(slots=True)

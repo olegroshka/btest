@@ -112,6 +112,16 @@ class PowerLawSlippage(SlippageModel):
     base_bps: float = 0.0
     k: float = 0.0
     exponent: float = 1.0
+    base_bps_by_symbol: Optional[dict] = None   # per-instrument base_bps override (symbol -> bps)
+
+    def base_for(self, symbol: Optional[str]) -> float:
+        if symbol is not None and self.base_bps_by_symbol and symbol in self.base_bps_by_symbol:
+            return float(self.base_bps_by_symbol[symbol])
+        return self.base_bps
+
+    def slippage_bps_from_order(self, *, qty: float, volume: float, symbol: Optional[str] = None) -> float:
+        part = min(1.0, abs(qty) / float(volume)) if volume > 0 else 0.0
+        return float(self.base_for(symbol) + self.k * (float(np.clip(part, 0.0, 1.0)) ** self.exponent))
 
     def is_active(self) -> bool:
         return (self.base_bps != 0.0) or (self.k != 0.0)
@@ -138,4 +148,6 @@ def build_slippage_model(cfg: Optional[object]) -> SlippageModel:
     base_bps = float(getattr(cfg, "base_bps", 0.0) or 0.0)
     k = float(getattr(cfg, "k", 0.0) or 0.0)
     exponent = float(getattr(cfg, "exponent", 1.0) or 1.0)
-    return PowerLawSlippage(base_bps=base_bps, k=k, exponent=exponent)
+    by_sym = getattr(cfg, "base_bps_by_symbol", None) or None
+    return PowerLawSlippage(base_bps=base_bps, k=k, exponent=exponent,
+                            base_bps_by_symbol=(dict(by_sym) if by_sym else None))

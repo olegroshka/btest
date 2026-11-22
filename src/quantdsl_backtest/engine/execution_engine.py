@@ -113,7 +113,10 @@ def rebalance_to_target_weights(
         q = dnk / price
         side = "BUY" if dnk > 0 else "SELL"
 
-        slippage_bps  = sl_model.slippage_bps_from_order(qty=q, volume=float(vol[k]))
+        try:                                               # per-instrument base bps when the model has one
+            slippage_bps = sl_model.slippage_bps_from_order(qty=q, volume=float(vol[k]), symbol=instr)
+        except TypeError:                                  # models without the symbol argument
+            slippage_bps = sl_model.slippage_bps_from_order(qty=q, volume=float(vol[k]))
         slippage_frac = slippage_bps / 1e4
         exec_price = price * (1.0 + slippage_frac) if side == "BUY" else price * (1.0 - slippage_frac)
 

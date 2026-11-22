@@ -150,6 +150,13 @@ def run_backtest_vectorized(strategy: Strategy) -> BacktestResult:
             return _run_backtest_event_driven(strategy)
     except Exception as exc:
         log.warning("Vectorized engine: failed to inspect volume limits, continuing with vectorized path: %s", exc)
+    if sl_cfg is not None and getattr(sl_cfg, "base_bps_by_symbol", None):
+        # per-instrument slippage is applied per fill in the event-driven engine; the vectorized cost matrices
+        # use one model for every column — fall back rather than silently ignore the override.
+        log.info("Vectorized engine: per-symbol slippage set — falling back to event-driven engine.")
+        from .backtest_runner import _run_backtest_event_driven
+
+        return _run_backtest_event_driven(strategy)
 
     need_per_share = bool(
         commission is not None and getattr(commission, "type", None) == "per_share" and float(getattr(commission, "amount", 0.0)) != 0.0
