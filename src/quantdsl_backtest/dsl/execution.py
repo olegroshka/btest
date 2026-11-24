@@ -26,6 +26,12 @@ class OrderPolicy:
     no_trade_band: float = 0.0            # relative: skip unless |target_w - current_w| >= this
     min_trade_notional: float = 0.0       # absolute $: skip orders smaller than this (scalar)
     min_trade_units: Optional[dict] = None  # absolute units: {symbol: min_units} or a scalar; kills crumbs
+    # --- Limit-on-open buys (fill_on="open" only; default off) ---
+    # A buy (target weight above the weight held at the open) is a limit order at prev_close × (1 + pct):
+    # it fills at the open only if open ≤ that limit, else it is cancelled for the day — the symbol keeps its
+    # held weight, sells still execute, the unspent cash stays cash. The target is re-queued every bar, so an
+    # unfilled buy is retried next morning at the new limit. Scalar = every symbol; dict = {symbol: pct}.
+    limit_buy_pct: Optional[object] = None
 
 
 @dataclass(slots=True)

@@ -1086,6 +1086,12 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
                         # close is never passed in, so it cannot leak into the sizing.
                         open_aligned = open_t.reindex(st.prev_positions.index)
                         open_aligned = open_aligned.where(~open_aligned.isna(), st.prev_prices)
+                        _lb = getattr(strategy.execution.order_policy, "limit_buy_pct", None)
+                        if _lb is not None:
+                            # limit = the close the order was decided on (st.prev_prices), fill test at this open
+                            exec_weights = _apply_limit_buys(exec_weights, _lb, open_aligned, st.prev_prices,
+                                                             st.prev_positions, st.cash)
+                            st.limit_cancels += int(exec_weights.attrs.get("cancelled", 0))
                         new_positions, cash_delta, trades_today = rebalance_to_target_weights(
                             date=dt,
                             execution=strategy.execution,
@@ -1292,6 +1298,8 @@ def _run_backtest_event_driven(strategy: Strategy) -> BacktestResult:
     metrics = compute_basic_metrics(return_series, equity_series, weights_df, periods_per_year=ppy)
     if funding is not None:
         metrics["funding_paid"] = float(funding_paid_total)   # cash, + = net paid, − = net received
+    if getattr(getattr(strategy.execution, "order_policy", None), "limit_buy_pct", None) is not None:
+        metrics["limit_buy_cancels"] = int(st.limit_cancels)
 
     result = BacktestResult(
         equity=equity_series,
@@ -1409,6 +1417,28 @@ def _resolve_reporting_output_dir(strategy: Strategy) -> Path | None:
         return Path("outputs") / (strategy.name or "run")
 
 
+def _apply_limit_buys(exec_weights, limit_pct, open_px, prev_close, prev_positions, cash):
+    """Limit-on-open buys: a symbol whose target weight exceeds the weight held at the open is a buy at
+    limit = prev_close × (1 + pct). If open > limit the buy is cancelled: the symbol's target becomes its held
+    weight (no trade in it), every other order is untouched, unspent cash stays cash.
+    Uses only the prior close (decision time) and the open it would fill at — the order-book mechanics of a
+    resting limit order, no later data. Returns a copy; ``attrs['cancelled']`` = number of cancelled buys."""
+    w = exec_weights.copy()
+    idx = w.index
+    px = open_px.reindex(idx)
+    q = prev_positions.reindex(idx).fillna(0.0)
+    eq_open = float(cash) + float(np.nansum(q.values * px.fillna(0.0).values))
+    held = (q * px).fillna(0.0) / eq_open if eq_open > 0 else pd.Series(0.0, index=idx)
+    pct = (pd.Series(limit_pct).reindex(idx) if isinstance(limit_pct, dict)
+           else pd.Series(float(limit_pct), index=idx))
+    lim = prev_close.reindex(idx) * (1.0 + pct)
+    buy = w.fillna(0.0) > held + 1e-9
+    miss = buy & pct.notna() & lim.notna() & px.notna() & (px > lim)
+    w[miss] = held[miss]
+    w.attrs["cancelled"] = int(miss.sum())
+    return w
+
+
 def _same_alloc(a, b, atol: float = 1e-9) -> bool:
     """True if two target-weight Series describe the same allocation (event-driven hold check)."""
     if a is None or b is None:
@@ -1482,6 +1512,8 @@ class BacktestState:
 
     # pending orders for T+1 open fill (None when fill_on="close")
     pending_target_weights: Optional[pd.Series] = None
+    # limit-on-open buys cancelled because the open gapped past the limit (OrderPolicy.limit_buy_pct)
+    limit_cancels: int = 0
 
     # collectors
     sel_collector: SelectionTraceCollector = None  # type: ignore[assignment]
